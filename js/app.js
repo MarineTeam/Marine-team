@@ -14,6 +14,7 @@
   const esc = s => String(s ?? '').replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
   const fmtDate = iso => new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const dayParts = iso => { const d = new Date(iso + 'T12:00:00'); return { day: d.getDate(), mon: d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase() }; };
+  const fmtDateTime = ts => { const d = new Date(ts); return isNaN(d) ? String(ts) : d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }); };
 
   function toast(msg) {
     const t = document.getElementById('toast');
@@ -510,6 +511,93 @@
   }
 
   /* ============================================================
+     ADMIN (staff, Supabase Auth)
+     ============================================================ */
+  function admin() {
+    return `
+    <section class="phead"><div class="container"><span class="eyebrow">Staff</span>
+      <h1 class="h-xl">Admin dashboard</h1>
+      <p class="lead">Sign in to view giving, registrations, and prayer requests.</p></div></section>
+    <section class="section" style="padding-top:40px"><div class="container" id="adminRoot">${spinner('Checking session…')}</div></section>`;
+  }
+  async function initAdmin() {
+    if (!$('#adminRoot')) return;
+    let user = null;
+    try { user = await API.adminUser(); } catch (e) { console.warn(e); }
+    if (user) renderAdminDash(user); else renderAdminLogin();
+  }
+  function renderAdminLogin() {
+    const root = $('#adminRoot'); if (!root) return;
+    root.innerHTML = `
+      <div class="admin-login">
+        <h2>Staff sign in</h2>
+        <p class="muted">${API.live ? 'Use your Supabase staff account.' : 'Demo mode — any email &amp; password works.'}</p>
+        <form id="adminLoginForm" class="form">
+          <label class="label">Email<input name="email" type="email" required placeholder="you@church.org" autocomplete="username" /></label>
+          <label class="label">Password<input name="password" type="password" required placeholder="••••••••" autocomplete="current-password" /></label>
+          <button class="btn btn--primary btn--lg btn--block" type="submit">Sign in</button>
+        </form>
+      </div>`;
+    $('#adminLoginForm').addEventListener('submit', async ev => {
+      ev.preventDefault(); const f = ev.target, btn = f.querySelector('button');
+      btn.disabled = true; btn.textContent = 'Signing in…';
+      try { const u = await API.adminSignIn(f.email.value, f.password.value); renderAdminDash(u); toast('Welcome back!'); }
+      catch (e) { console.error(e); btn.disabled = false; btn.textContent = 'Sign in'; toast(e.message || 'Sign in failed.'); }
+    });
+  }
+  async function renderAdminDash(user) {
+    const root = $('#adminRoot'); if (!root) return;
+    root.innerHTML = `
+      <div class="admin-head">
+        <div><h2>Welcome, ${esc(user.email)}</h2><p class="muted">${API.live ? 'Live data from your database.' : 'Demo data from this browser.'}</p></div>
+        <button class="btn btn--ghost" id="adminLogout">Log out</button></div>
+      <div class="admin-cards" id="adminCards">${spinner('Loading submissions…')}</div>
+      <div class="admin-tabs" id="adminTabs"></div>
+      <div id="adminPanel"></div>`;
+    $('#adminLogout').onclick = async () => { await API.adminSignOut(); renderAdminLogin(); toast('Signed out.'); };
+    try {
+      const [gifts, rsvps, prayers] = await Promise.all([API.listGifts(), API.listRsvps(), API.listPrayers()]);
+      const total = gifts.reduce((s, g) => s + Number(g.amount || 0), 0);
+      $('#adminCards').innerHTML =
+        adminStat(money(total), 'Total given', gifts.length + ' gifts') +
+        adminStat(rsvps.length, 'Registrations', 'event RSVPs') +
+        adminStat(prayers.length, 'Prayer requests', 'received');
+      const tabs = [['Gifts', () => giftsTable(gifts)], ['RSVPs', () => rsvpsTable(rsvps)], ['Prayer', () => prayersList(prayers)]];
+      const tabsEl = $('#adminTabs'), panel = $('#adminPanel');
+      tabsEl.innerHTML = tabs.map((t, i) => `<button class="atab ${i === 0 ? 'is-active' : ''}" data-i="${i}">${t[0]}</button>`).join('');
+      const show = i => { panel.innerHTML = tabs[i][1](); $$('.atab', tabsEl).forEach((b, j) => b.classList.toggle('is-active', j === i)); };
+      tabsEl.onclick = e => { const b = e.target.closest('[data-i]'); if (b) show(+b.dataset.i); };
+      show(0);
+    } catch (e) { console.error(e); $('#adminCards').innerHTML = `<div class="empty"><p>Couldn't load data.</p><p class="muted">${esc(e.message || '')}</p></div>`; }
+  }
+  const adminStat = (b, l, s) => `<div class="astat"><b>${b}</b><span>${l}</span><i>${s}</i></div>`;
+  function giftsTable(rows) {
+    if (!rows.length) return emptyTable('No gifts yet.');
+    return table(['Date', 'Amount', 'Frequency', 'Fund', 'Reference'],
+      rows.map(g => [fmtDateTime(g.created_at), money(g.amount), g.frequency, g.fund, g.reference || '—']));
+  }
+  function rsvpsTable(rows) {
+    if (!rows.length) return emptyTable('No registrations yet.');
+    return table(['Date', 'Event', 'Name', 'Email', 'Guests'],
+      rows.map(r => [fmtDateTime(r.created_at), r.event, r.name, r.email || '—', r.guests || '—']));
+  }
+  function prayersList(rows) {
+    if (!rows.length) return emptyTable('No prayer requests yet.');
+    return `<div class="prayer-feed">${rows.map(p => `
+      <div class="pr">
+        <div class="pr__head"><b>${esc(p.name)}</b><span>${p.is_private ? '🔒 Private' : '🌐 Shareable'} · ${fmtDateTime(p.created_at)}</span></div>
+        <p>${esc(p.request)}</p>
+        ${p.email ? `<a href="mailto:${esc(p.email)}" class="pr__mail">${esc(p.email)}</a>` : ''}
+      </div>`).join('')}</div>`;
+  }
+  function table(head, rows) {
+    return `<div class="atable-wrap"><table class="atable">
+      <thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  }
+  const emptyTable = msg => `<div class="empty"><p>${esc(msg)}</p></div>`;
+
+  /* ============================================================
      MODAL + ROUTER
      ============================================================ */
   const modal = document.getElementById('modal');
@@ -525,7 +613,8 @@
     '/groups': { render: groups, after: fillGroups },
     '/give': { render: give, after: () => wireGive() },
     '/visit': { render: visit, after: wireVisit },
-    '/prayer': { render: prayer, after: wirePrayer }
+    '/prayer': { render: prayer, after: wirePrayer },
+    '/admin': { render: admin, after: initAdmin }
   };
 
   function router() {

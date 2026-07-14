@@ -79,9 +79,36 @@
     return record;
   }
 
+  /* ---------- admin: Supabase Auth + staff reads ---------- */
+  async function adminUser() {
+    if (!LIVE) return LS.get('adminUser', null);
+    const { data } = await (await sb()).auth.getUser();
+    return data.user || null;
+  }
+  async function adminSignIn(email, password) {
+    if (!LIVE) { const u = { email }; localStorage.setItem('gcc_adminUser', JSON.stringify(u)); return wait(u); }
+    const { data, error } = await (await sb()).auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return data.user;
+  }
+  async function adminSignOut() {
+    if (!LIVE) { localStorage.removeItem('gcc_adminUser'); return; }
+    await (await sb()).auth.signOut();
+  }
+  async function listTable(name, lsKey) {
+    if (!LIVE) return wait(LS.get(lsKey, []));
+    const { data, error } = await (await sb()).from(name).select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  }
+  const listGifts = () => listTable('gifts', 'gifts');
+  const listRsvps = () => listTable('rsvps', 'rsvps');
+  const listPrayers = () => listTable('prayer_requests', 'prayers');
+
   window.API = {
     live: LIVE,
     getSermons, getEvents, getMinistries, getStats,
-    createGift, createRsvp, createPrayer
+    createGift, createRsvp, createPrayer,
+    adminUser, adminSignIn, adminSignOut, listGifts, listRsvps, listPrayers
   };
 })();

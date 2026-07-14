@@ -50,10 +50,12 @@ window.CONFIG = {
 /* --- derive runtime flags: a service is "live" only when configured --- */
 (function (c) {
   const set = v => v && !String(v).startsWith('YOUR_');
+  // `?mock=1` forces local mode even when keys are present (handy for demos).
+  const forceMock = new URLSearchParams(location.search).has('mock');
   c.flags = {
-    supabase: set(c.supabase.url) && set(c.supabase.anonKey),
-    auth0: set(c.auth0.domain) && set(c.auth0.clientId),
-    bunny: set(c.bunny.pullZone)
+    supabase: !forceMock && set(c.supabase.url) && set(c.supabase.anonKey),
+    auth0: !forceMock && set(c.auth0.domain) && set(c.auth0.clientId),
+    bunny: !forceMock && set(c.bunny.pullZone)
   };
   c.mock = !c.flags.supabase; // no DB configured → run on local seed data
 })(window.CONFIG);

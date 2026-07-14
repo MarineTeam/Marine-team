@@ -441,3 +441,37 @@ img{max-width:100%}
   .steps{grid-template-columns:1fr}
   .sec-head{align-items:flex-start}
 }
+
+/* ============================================================
+   Admin dashboard
+   ============================================================ */
+.admin-login{max-width:420px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:22px;
+  padding:32px;box-shadow:var(--shadow-lg)}
+.admin-login h2{font-size:1.5rem;margin-bottom:4px}
+.admin-login .muted{margin-bottom:20px;font-size:.92rem}
+.admin-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+.admin-head h2{font-size:1.5rem;letter-spacing:-.01em}
+.admin-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:28px}
+.astat{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:var(--shadow)}
+.astat b{display:block;font-size:2rem;font-weight:820;letter-spacing:-.02em;color:var(--ink)}
+.astat span{display:block;font-weight:650;color:var(--ink-2);margin-top:2px}
+.astat i{font-style:normal;font-size:.82rem;color:var(--muted)}
+.admin-tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+.atab{border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 18px;font-weight:650;font-size:.9rem;
+  color:var(--ink-2);cursor:pointer;transition:.15s}
+.atab:hover{border-color:var(--blue);color:var(--blue)}
+.atab.is-active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.atable-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);background:#fff}
+.atable{width:100%;border-collapse:collapse;min-width:560px}
+.atable th,.atable td{text-align:left;padding:13px 18px;font-size:.92rem;border-bottom:1px solid var(--line);white-space:nowrap}
+.atable th{background:var(--bg-soft);font-size:.76rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+.atable tbody tr:last-child td{border-bottom:0}
+.atable tbody tr:hover{background:var(--bg-soft)}
+.prayer-feed{display:grid;gap:14px}
+.pr{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:var(--shadow)}
+.pr__head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:8px;flex-wrap:wrap}
+.pr__head b{font-size:1.02rem}
+.pr__head span{font-size:.8rem;color:var(--muted)}
+.pr p{color:var(--ink-2)}
+.pr__mail{display:inline-block;margin-top:10px;color:var(--blue);font-weight:600;font-size:.88rem}
+@media(max-width:640px){.admin-cards{grid-template-columns:1fr}}
