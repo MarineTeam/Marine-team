@@ -53,26 +53,30 @@
   }
 
   /* ---------- writes ---------- */
+  // NOTE: the submission tables (gifts / rsvps / prayer_requests) grant anon
+  // INSERT but not SELECT (privacy). So we insert with return=minimal — i.e.
+  // NO `.select()` — and build the returned record client-side. The reference
+  // is generated here and stored, so staff and the giver see the same code.
   async function createGift(g) {
     const record = { reference: ref(), created_at: new Date().toISOString(), ...g };
     if (!LIVE) { LS.push('gifts', record); return wait(record); }
-    const { data, error } = await (await sb()).from('gifts').insert(g).select().single();
+    const { error } = await (await sb()).from('gifts').insert({ ...g, reference: record.reference });
     if (error) throw error;
-    return data;
+    return record;
   }
   async function createRsvp(r) {
     const record = { created_at: new Date().toISOString(), ...r };
     if (!LIVE) { LS.push('rsvps', record); return wait(record); }
-    const { data, error } = await (await sb()).from('rsvps').insert(r).select().single();
+    const { error } = await (await sb()).from('rsvps').insert(r);
     if (error) throw error;
-    return data;
+    return record;
   }
   async function createPrayer(p) {
     const record = { created_at: new Date().toISOString(), ...p };
     if (!LIVE) { LS.push('prayers', record); return wait(record); }
-    const { data, error } = await (await sb()).from('prayer_requests').insert(p).select().single();
+    const { error } = await (await sb()).from('prayer_requests').insert(p);
     if (error) throw error;
-    return data;
+    return record;
   }
 
   window.API = {

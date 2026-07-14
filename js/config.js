@@ -27,8 +27,8 @@ window.CONFIG = {
   // ---- Supabase (database + REST API) ----
   // Project Settings → API. URL + anon public key.
   supabase: {
-    url: 'YOUR_SUPABASE_URL',            // e.g. https://abcd.supabase.co
-    anonKey: 'YOUR_SUPABASE_ANON_KEY'
+    url: 'https://aoyhlyxzhypahtacjlgg.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFveWhseXh6aHlwYWh0YWNqbGdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1NzA1NzAsImV4cCI6MjA5NzE0NjU3MH0.cDKeR3q9H7BXJ-0Uy8pUEDUrDbPYqGy0d5wa0fLwtog'
   },
 
   // ---- Auth0 (member / staff login) ----
