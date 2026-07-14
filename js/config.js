@@ -31,19 +31,22 @@ window.CONFIG = {
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFveWhseXh6aHlwYWh0YWNqbGdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1NzA1NzAsImV4cCI6MjA5NzE0NjU3MH0.cDKeR3q9H7BXJ-0Uy8pUEDUrDbPYqGy0d5wa0fLwtog'
   },
 
-  // ---- Auth0 (member / staff login) ----
-  // Application (SPA) → Settings. Add your deploy URL to Allowed
-  // Callback URLs, Logout URLs, and Web Origins.
+  // ---- Auth0 (MEMBER login — gates sermon video playback) ----
+  // Create a Single Page Application in Auth0. Add your deploy URL to Allowed
+  // Callback URLs, Logout URLs, and Web Origins. Members sign in here to watch
+  // members-only videos. (Staff admin login is separate — it uses Supabase Auth.)
   auth0: {
     domain: 'YOUR_AUTH0_DOMAIN',         // e.g. your-tenant.us.auth0.com
     clientId: 'YOUR_AUTH0_CLIENT_ID'
   },
 
-  // ---- bunny.net (media CDN: sermon video + images) ----
-  // Pull Zone hostname; assets referenced as `${pullZone}/path`.
+  // ---- bunny.net (Stream video CDN) ----
+  // The signing key is a SECRET and lives ONLY in Vercel env vars, never here
+  // (see api/embed.js). The browser only sends a video GUID to /api/embed and
+  // gets back a short-lived signed URL. pullZone is optional (thumbnails).
   bunny: {
     pullZone: 'YOUR_PULLZONE.b-cdn.net',
-    streamLibraryId: '' // optional: bunny Stream library id for HLS
+    streamLibraryId: '' // optional client-side reference; server uses BUNNY_LIBRARY_ID
   }
 };
 

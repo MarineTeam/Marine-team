@@ -502,3 +502,19 @@ img{max-width:100%}
   .sform-grid{grid-template-columns:1fr}
   .trow{grid-template-columns:1fr 1fr auto}
 }
+
+/* ============================================================
+   Real video player (bunny.net) + members-only gate
+   ============================================================ */
+.vplayer{position:relative;aspect-ratio:16/9;border-radius:20px 20px 0 0;overflow:hidden;display:grid;place-items:center}
+.vplayer iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.vloading{display:flex;align-items:center;gap:12px;color:#fff;font-weight:600}
+.spin--light{border-color:rgba(255,255,255,.4);border-top-color:#fff}
+.vgate{text-align:center;color:#fff;padding:28px;max-width:420px}
+.vgate__lock{font-size:2.4rem;margin-bottom:8px}
+.vgate h3{font-size:1.5rem;margin-bottom:8px}
+.vgate p{opacity:.92;margin-bottom:18px}
+.vgate__note{font-size:.85rem;opacity:.8}
+.vgate code{background:rgba(255,255,255,.18);padding:2px 6px;border-radius:6px;font-size:.85em}
+.scard__lock{position:absolute;top:12px;right:12px;background:rgba(11,21,36,.72);color:#fff;font-size:.72rem;
+  font-weight:600;padding:4px 10px;border-radius:999px;backdrop-filter:blur(4px)}

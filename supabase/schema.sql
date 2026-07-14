@@ -17,6 +17,7 @@ create table if not exists public.sermons (
   hue        int  default 212,
   blurb      text,
   video_url  text,               -- bunny.net Stream/CDN URL (optional)
+  video_id   text,               -- bunny.net Stream video GUID (members-only playback)
   created_at timestamptz default now()
 );
 

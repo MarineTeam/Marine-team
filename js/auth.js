@@ -37,6 +37,12 @@
     if (!enabled) return;
     await client.loginWithRedirect();
   }
+  // Access token for calling our own /api/embed (which verifies it via Auth0 /userinfo).
+  async function getToken() {
+    if (!enabled || !client) return null;
+    try { return await client.getTokenSilently(); }
+    catch (e) { console.warn('getTokenSilently failed', e); return null; }
+  }
   async function logout() {
     if (!enabled) return;
     await client.logout({ logoutParams: { returnTo: window.location.origin } });
@@ -45,6 +51,6 @@
   window.Auth = {
     get enabled() { return enabled; },
     get user() { return user; },
-    init, login, logout
+    init, login, logout, getToken
   };
 })();

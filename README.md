@@ -61,18 +61,29 @@ RLS is set so the public can **read** content and **submit** gifts/RSVPs/prayer 
 **cannot read** others' submissions; only **authenticated staff** can read submissions and
 add/edit/delete content + settings.
 
-### 2. Auth0 — login (optional)
+### 2. Auth0 — member login (gates sermon video)
 1. Create an **Application → Single Page Application** at [auth0.com](https://auth0.com).
-2. In its settings add your deploy URL (e.g. `https://your-site.vercel.app`) to
-   **Allowed Callback URLs**, **Logout URLs**, and **Web Origins**.
+2. Add your deploy URL (e.g. `https://your-site.vercel.app`) to **Allowed Callback URLs**,
+   **Logout URLs**, and **Web Origins**.
 3. Copy **Domain** and **Client ID** into `js/config.js` under `auth0`.
-   A **Log in / Log out** button then appears in the nav automatically.
+   A **Log in / Log out** button appears in the nav, and members must sign in to watch
+   members-only videos. *(This is separate from staff admin, which uses Supabase Auth.)*
 
-### 3. bunny.net — media (optional)
-1. Create a **Pull Zone** (and optionally a **Stream** library) at [bunny.net](https://bunny.net).
-2. Put your Pull Zone hostname in `js/config.js` under `bunny.pullZone`.
-3. Store a sermon's video URL in the `sermons.video_url` column; swap the simulated player in
-   `openPlayer()` for a real `<video>`/HLS source pointing at the bunny CDN.
+### 3. bunny.net + members-only video
+Videos are gated exactly like the Marine video portals: a short-lived, signed bunny.net
+embed token is generated **server-side** per view, behind an Auth0 login — the token key
+never reaches the browser.
+1. bunny.net → **Stream** → create a **Video Library**; upload sermons.
+2. Library → **Security** → enable **Token Authentication**; copy the **Authentication Key**.
+3. Run [`supabase/add_video.sql`](supabase/add_video.sql) (adds `sermons.video_id`).
+4. In the admin editor, paste each sermon's **bunny video GUID** into the *Bunny video ID* field.
+5. Set the serverless env vars in Vercel (see [`.env.example`](.env.example)):
+   `AUTH0_DOMAIN`, `BUNNY_LIBRARY_ID`, `BUNNY_TOKEN_AUTH_KEY`.
+
+Flow: member clicks a 🔒 sermon → Auth0 login → browser calls
+[`/api/embed`](api/embed.js) with the Auth0 access token → the function verifies it and
+returns a signed `iframe.mediadelivery.net/embed/...` URL. Sermons without a `video_id`
+fall back to the built-in demo player.
 
 ### 4. Deploy to Vercel
 ```
@@ -80,8 +91,8 @@ npm i -g vercel      # once
 vercel               # from the repo root → follow prompts
 vercel --prod        # promote to production
 ```
-Vercel serves the static files as-is ([`vercel.json`](vercel.json) adds sensible headers).
-Prefer **bunny.net**? Point a Pull Zone at this repo/origin — it's just static files.
+Vercel serves the static files and runs [`api/embed.js`](api/embed.js) as a serverless
+function automatically ([`vercel.json`](vercel.json) adds sensible headers).
 
 > **Keys in the browser:** the Supabase **anon** key and Auth0 **client ID** are *designed* to be
 > public — safety comes from RLS + Auth0 config, not secrecy. **Never** put a Supabase
@@ -91,16 +102,22 @@ Prefer **bunny.net**? Point a Pull Zone at this repo/origin — it's just static
 
 ## Project structure
 ```
-index.html            # app shell (nav, footer, modal + toast hosts)
-css/styles.css        # design system + all components
+index.html               # app shell (nav, footer, modal + toast hosts)
+css/styles.css           # design system + all components
 js/
-  config.js           # service keys + mock/live auto-detect
-  data.js             # seed content (mock mode + DB seed reference)
-  api.js              # data layer — Supabase live, or localStorage mock
-  auth.js             # Auth0 wrapper (optional)
-  app.js              # router, views, player, giving & form flows
-supabase/schema.sql   # tables + RLS + seed
-vercel.json           # static-hosting config
+  config.js              # service keys + mock/live auto-detect
+  data.js                # seed content (mock mode + DB seed reference)
+  api.js                 # data layer — Supabase live, or localStorage mock
+  auth.js                # Auth0 member-login wrapper
+  app.js                 # router, views, players, giving, admin/CMS
+api/embed.js             # Vercel function: Auth0-gated signed bunny embed
+supabase/
+  schema.sql             # tables + RLS + seed
+  admin_policies.sql     # staff read access to submissions
+  admin_content.sql      # settings table + staff write (CMS)
+  add_video.sql          # sermons.video_id column
+.env.example             # server env vars for the embed function
+vercel.json              # hosting + headers
 ```
 
 ---

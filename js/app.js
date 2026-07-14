@@ -191,6 +191,7 @@
       <article class="scard" data-play="${s.id}">
         <div class="scard__art" style="background:${grad(s.hue)}">
           <span class="scard__badge">${esc(s.category)}</span>${icon.play}
+          ${s.video_id ? '<span class="scard__lock">🔒 Members</span>' : ''}
           <span class="scard__dur">${esc(s.duration)}</span></div>
         <div class="scard__body">
           <div class="scard__series">${esc(s.series)}</div>
@@ -202,9 +203,62 @@
 
   /* ---------- player modal ---------- */
   let playerTimer = null;
+  function findSermon(id) { return mediaState.sermons.find(x => x.id === id) || window.SEED.sermons.find(x => x.id === id); }
   function openPlayer(id) {
-    const s = mediaState.sermons.find(x => x.id === id) || (window.SEED.sermons.find(x => x.id === id));
+    const s = findSermon(id);
     if (!s) return;
+    // Real bunny.net video → members-only, signed embed. No video → demo player.
+    if (s.video_id) return openVideoPlayer(s);
+    return openSimulatedPlayer(s);
+  }
+
+  // Members-only real video: gate on Auth0, then fetch a signed bunny embed URL.
+  function videoShell(s, inner) {
+    return `
+      <button class="modal__close" data-close aria-label="Close">×</button>
+      <div class="vplayer" id="vplayer" style="background:${grad(s.hue)}">${inner}</div>
+      <div class="modal__body">
+        <div class="scard__series">${esc(s.series)}</div>
+        <h2>${esc(s.title)}</h2>
+        <div class="meta">${esc(s.speaker)} · ${fmtDate(s.date)} · ${esc(s.category)}</div>
+        <p>${esc(s.blurb)}</p></div>`;
+  }
+  async function openVideoPlayer(s) {
+    const gate = msg => `<div class="vgate">
+        <div class="vgate__lock">🔒</div>
+        <h3>Members only</h3>
+        <p>${msg}</p>
+        ${Auth.enabled ? `<button class="btn btn--white btn--lg" id="vLogin">Log in to watch</button>`
+                       : `<p class="vgate__note">Member login isn't configured yet (add your Auth0 keys in <code>js/config.js</code>).</p>`}
+      </div>`;
+
+    // 1) Not signed in → show the gate.
+    if (!Auth.enabled || !Auth.user) {
+      $('#modalCard').innerHTML = videoShell(s, gate(Auth.enabled
+        ? 'Sign in with your church account to watch this message.'
+        : 'This message is reserved for members.'));
+      openModal();
+      const b = $('#vLogin'); if (b) b.onclick = () => Auth.login();
+      return;
+    }
+    // 2) Signed in → ask our serverless function for a signed, short-lived embed.
+    $('#modalCard').innerHTML = videoShell(s, `<div class="vloading"><span class="spin spin--light"></span>Loading video…</div>`);
+    openModal();
+    try {
+      const token = await Auth.getToken();
+      const r = await fetch(`/api/embed?video=${encodeURIComponent(s.video_id)}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || `Error ${r.status}`); }
+      const { url } = await r.json();
+      const v = $('#vplayer');
+      if (v) v.innerHTML = `<iframe src="${esc(url)}" loading="lazy" allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture;fullscreen" allowfullscreen></iframe>`;
+    } catch (e) {
+      console.error(e);
+      const v = $('#vplayer');
+      if (v) v.innerHTML = `<div class="vgate"><div class="vgate__lock">⚠️</div><h3>Couldn't load video</h3><p>${esc(e.message)}</p></div>`;
+    }
+  }
+
+  function openSimulatedPlayer(s) {
     const [mm, ss] = s.duration.split(':').map(Number); const total = mm * 60 + ss;
     $('#modalCard').innerHTML = `
       <button class="modal__close" data-close aria-label="Close">×</button>
@@ -617,6 +671,7 @@
         { name: 'date', label: 'Date', type: 'date', required: true },
         { name: 'duration', label: 'Duration (mm:ss)', placeholder: '34:20' },
         { name: 'category', label: 'Category', placeholder: 'Faith' },
+        { name: 'video_id', label: 'Bunny video ID (GUID) — members-only', placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' },
         { name: 'hue', label: 'Color hue (0–360)', type: 'number', default: 212 },
         { name: 'featured', label: 'Feature on the home page', type: 'checkbox' },
         { name: 'blurb', label: 'Description', type: 'textarea' }
