@@ -36,8 +36,8 @@ window.CONFIG = {
   // Callback URLs, Logout URLs, and Web Origins. Members sign in here to watch
   // members-only videos. (Staff admin login is separate — it uses Supabase Auth.)
   auth0: {
-    domain: 'YOUR_AUTH0_DOMAIN',         // e.g. your-tenant.us.auth0.com
-    clientId: 'YOUR_AUTH0_CLIENT_ID'
+    domain: 'vvanmarinevan.ca.auth0.com',
+    clientId: 'cs6UdeRe6yrtUVRhsTmD2QEPjkxtwR0i'
   },
 
   // ---- bunny.net (Stream video CDN) ----
