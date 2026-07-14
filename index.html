@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grace Community Church</title>
+  <meta name="description" content="A place to belong, believe, and become. Join us Sundays at 9 & 11 AM — watch messages, give, and find your community." />
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563eb'/%3E%3Cpath d='M16 6v20M9 13h14' stroke='white' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <!-- ============ HEADER ============ -->
+  <header class="nav" id="nav">
+    <div class="container nav__inner">
+      <a href="#/" class="brand" aria-label="Home">
+        <span class="brand__mark" aria-hidden="true">
+          <svg viewBox="0 0 34 34" width="30" height="30"><rect width="34" height="34" rx="9" fill="url(#bg)"/><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b82f6"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs><path d="M17 8v18M10 15h14" stroke="white" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg>
+        </span>
+        <span class="brand__name" id="brandName">Grace</span>
+      </a>
+      <nav class="nav__links" aria-label="Primary">
+        <a href="#/watch" data-nav>Watch</a>
+        <a href="#/events" data-nav>Events</a>
+        <a href="#/groups" data-nav>Groups</a>
+        <a href="#/give" data-nav>Give</a>
+        <a href="#/visit" data-nav>Plan a Visit</a>
+      </nav>
+      <div class="nav__cta">
+        <span id="authSlot"></span>
+        <a href="#/give" class="btn btn--primary">Give</a>
+      </div>
+      <button class="nav__burger" id="burger" aria-label="Toggle menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main id="view"><!-- routed content --></main>
+
+  <!-- ============ FOOTER ============ -->
+  <footer class="footer">
+    <div class="container footer__grid">
+      <div>
+        <a href="#/" class="brand brand--footer"><span class="brand__name" id="footBrand">Grace Community Church</span></a>
+        <p class="footer__tag" id="footTag">A place to belong, believe, and become.</p>
+        <p class="footer__fine" id="footAddr"></p>
+      </div>
+      <div>
+        <h4>Connect</h4>
+        <a href="#/watch">Watch Messages</a>
+        <a href="#/events">Events</a>
+        <a href="#/groups">Groups &amp; Ministries</a>
+        <a href="#/visit">Plan a Visit</a>
+      </div>
+      <div>
+        <h4>Engage</h4>
+        <a href="#/give">Give</a>
+        <a href="#/prayer">Prayer &amp; Contact</a>
+        <a href="#/visit">I'm New</a>
+      </div>
+      <div>
+        <h4>Gatherings</h4>
+        <div id="footTimes" class="footer__times"></div>
+        <a href="#/visit" class="btn btn--primary btn--sm" style="margin-top:12px">Plan your visit</a>
+      </div>
+    </div>
+    <div class="container footer__bottom">
+      <span>© 2026 Grace Community Church</span>
+      <span id="modeTag">Demo build</span>
+    </div>
+  </footer>
+
+  <div class="modal" id="modal" aria-hidden="true">
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__card" role="dialog" aria-modal="true" id="modalCard"></div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
