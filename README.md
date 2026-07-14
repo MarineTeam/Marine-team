@@ -25,9 +25,10 @@ so it deploys to any static host and the browser talks directly to Supabase via 
 - **Groups** — ministries & small groups with "I'm interested" capture
 - **Plan a Visit** — FAQ + a "let us know you're coming" form
 - **Prayer & Contact** — prayer request form (public/private) + contact info
-- **Staff admin** (`#/admin`) — Supabase-Auth login; view giving/RSVPs/prayer, **and a full CMS**:
-  add/edit/delete sermons, events, and ministries, plus edit site settings (name, tagline,
-  contact, service times). Every change updates the public site live.
+- **Staff admin** (`#/admin`) — Supabase-Auth login; view giving/RSVPs/prayer, **a full CMS**
+  (add/edit/delete sermons, events, ministries + edit site settings), and a **Videos** tab that
+  **syncs your bunny.net library** and toggles each video published/hidden. Every change updates
+  the public site live.
 - Responsive, mobile nav, scroll animations, optional Auth0 login button
 
 ## Runs offline out of the box (mock mode)
@@ -73,17 +74,23 @@ add/edit/delete content + settings.
 Videos are gated exactly like the Marine video portals: a short-lived, signed bunny.net
 embed token is generated **server-side** per view, behind an Auth0 login — the token key
 never reaches the browser.
-1. bunny.net → **Stream** → create a **Video Library**; upload sermons.
+1. bunny.net → **Stream** → create a **Video Library**; upload your videos.
 2. Library → **Security** → enable **Token Authentication**; copy the **Authentication Key**.
-3. Run [`supabase/add_video.sql`](supabase/add_video.sql) (adds `sermons.video_id`).
-4. In the admin editor, paste each sermon's **bunny video GUID** into the *Bunny video ID* field.
-5. Set the serverless env vars in Vercel (see [`.env.example`](.env.example)):
-   `AUTH0_DOMAIN`, `BUNNY_LIBRARY_ID`, `BUNNY_TOKEN_AUTH_KEY`.
+   Also copy the **Library ID** and the library **API Key**.
+3. Run [`supabase/add_video.sql`](supabase/add_video.sql) and [`supabase/videos.sql`](supabase/videos.sql).
+4. Set the serverless env vars in Vercel (see [`.env.example`](.env.example)):
+   `AUTH0_DOMAIN`, `BUNNY_LIBRARY_ID`, `BUNNY_TOKEN_AUTH_KEY`, `BUNNY_API_KEY`,
+   `SUPABASE_URL`, `SUPABASE_ANON_KEY`.
 
-Flow: member clicks a 🔒 sermon → Auth0 login → browser calls
+**Sync & publish (no GUID typing):** in `/#/admin` → **Videos** tab, click
+**↻ Sync from bunny.net** — [`/api/videos`](api/videos.js) pulls your whole library. Flip a
+video's toggle to **publish** it; published videos appear on the home page and Watch. You can
+still attach a GUID to a specific sermon via the *Bunny video ID* field on the Sermons tab.
+
+Playback flow: member clicks a 🔒 video → Auth0 login → browser calls
 [`/api/embed`](api/embed.js) with the Auth0 access token → the function verifies it and
-returns a signed `iframe.mediadelivery.net/embed/...` URL. Sermons without a `video_id`
-fall back to the built-in demo player.
+returns a signed `iframe.mediadelivery.net/embed/...` URL. Items without a video fall back to
+the built-in demo player.
 
 ### 4. Deploy to Vercel
 ```
@@ -110,12 +117,15 @@ js/
   api.js                 # data layer — Supabase live, or localStorage mock
   auth.js                # Auth0 member-login wrapper
   app.js                 # router, views, players, giving, admin/CMS
-api/embed.js             # Vercel function: Auth0-gated signed bunny embed
+api/
+  embed.js               # Vercel function: Auth0-gated signed bunny embed
+  videos.js              # Vercel function: list bunny library (staff-gated)
 supabase/
   schema.sql             # tables + RLS + seed
   admin_policies.sql     # staff read access to submissions
   admin_content.sql      # settings table + staff write (CMS)
   add_video.sql          # sermons.video_id column
+  videos.sql             # videos table (bunny sync + publish)
 .env.example             # server env vars for the embed function
 vercel.json              # hosting + headers
 ```

@@ -25,13 +25,14 @@
     push: (k, v) => { const a = LS.get(k, []); a.unshift(v); LS.set(k, a); return v; }
   };
   // Editable mock collection: seed from SEED on first use, then persist edits.
+  const rowKey = x => String(x.id ?? x.guid); // sermons/events use id; videos use guid
   function coll(key, seed) { const cur = LS.get(key, null); if (cur) return cur; LS.set(key, seed); return [...seed]; }
   function mockUpsert(key, seed, row) {
-    const arr = coll(key, seed); const i = arr.findIndex(x => String(x.id) === String(row.id));
+    const arr = coll(key, seed); const i = arr.findIndex(x => rowKey(x) === rowKey(row));
     if (i >= 0) arr[i] = { ...arr[i], ...row }; else arr.unshift(row);
     LS.set(key, arr); return row;
   }
-  function mockDelete(key, seed, id) { LS.set(key, coll(key, seed).filter(x => String(x.id) !== String(id))); }
+  function mockDelete(key, seed, id) { LS.set(key, coll(key, seed).filter(x => rowKey(x) !== String(id))); }
 
   const ref = () => 'GCC-' + Math.random().toString(36).slice(2, 8).toUpperCase();
   const wait = (v, ms = 260) => new Promise(r => setTimeout(() => r(v), ms)); // tiny latency so UI feels real
@@ -150,12 +151,62 @@
     return o;
   }
 
+  /* ---------- bunny.net video sync + publishing ---------- */
+  // Public site: only PUBLISHED videos (anon-readable).
+  async function getPublishedVideos() {
+    if (!LIVE) return wait(coll('c_videos', []).filter(v => v.published)
+      .sort((a, b) => (a.sort_order - b.sort_order) || String(b.synced_at || '').localeCompare(String(a.synced_at || ''))));
+    const { data, error } = await (await sb()).from('videos').select('*').eq('published', true).order('sort_order').order('synced_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  }
+  // Admin: every synced video (published or not).
+  async function adminListVideos() {
+    if (!LIVE) return wait(coll('c_videos', []));
+    const { data, error } = await (await sb()).from('videos').select('*').order('synced_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  }
+  // Pull the raw library from bunny.net (mock: SEED; live: /api/videos with staff token).
+  async function fetchBunnyLibrary() {
+    if (!LIVE) return wait(SEED.bunnyLibrary.map(v => ({ ...v })));
+    const { data: { session } } = await (await sb()).auth.getSession();
+    const token = session?.access_token;
+    const r = await fetch('/api/videos', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || `Error ${r.status}`); }
+    return (await r.json()).items || [];
+  }
+  // Sync: merge the bunny library into our table, KEEPING existing publish flags.
+  async function syncVideos() {
+    const [lib, existing] = await Promise.all([fetchBunnyLibrary(), adminListVideos()]);
+    const byGuid = Object.fromEntries(existing.map(v => [v.guid, v]));
+    let added = 0;
+    for (const v of lib) {
+      const prev = byGuid[v.guid];
+      const row = {
+        guid: v.guid, title: v.title, length: v.length || 0, thumbnail: v.thumbnail || '',
+        published: prev ? prev.published : false, featured: prev ? prev.featured : false,
+        sort_order: prev ? prev.sort_order : 0, synced_at: new Date().toISOString()
+      };
+      if (!prev) added++;
+      if (!LIVE) mockUpsert('c_videos', [], row);
+      else { const { error } = await (await sb()).from('videos').upsert(row, { onConflict: 'guid' }); if (error) throw error; }
+    }
+    return { total: lib.length, added };
+  }
+  async function setVideoPublished(guid, published) {
+    if (!LIVE) { const arr = coll('c_videos', []); const v = arr.find(x => x.guid === guid); if (v) { v.published = published; LS.set('c_videos', arr); } return wait(v); }
+    const { error } = await (await sb()).from('videos').update({ published }).eq('guid', guid);
+    if (error) throw error;
+  }
+
   window.API = {
     live: LIVE,
-    getSermons, getEvents, getMinistries, getStats,
+    getSermons, getEvents, getMinistries, getStats, getPublishedVideos,
     createGift, createRsvp, createPrayer,
     adminUser, adminSignIn, adminSignOut, listGifts, listRsvps, listPrayers,
     saveSermon, deleteSermon, saveEvent, deleteEvent, saveMinistry, deleteMinistry,
-    getSettings, saveSettings
+    getSettings, saveSettings,
+    adminListVideos, syncVideos, setVideoPublished
   };
 })();

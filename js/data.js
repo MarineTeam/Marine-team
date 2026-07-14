@@ -31,5 +31,12 @@ window.SEED = {
     { id: 'm6', name: 'Outreach', audience: 'Servants at heart', hue: 28, blurb: 'Loving our city through service and generosity.', when: 'Monthly projects' }
   ],
   funds: ['General Fund', 'Missions', 'Building Fund', 'Youth Ministry', 'Benevolence'],
-  stats: { given: 2480000, families: 1240, projects: 68, countries: 14, members: 3200 }
+  stats: { given: 2480000, families: 1240, projects: 68, countries: 14, members: 3200 },
+  // Stand-in for the bunny.net library in mock mode (live mode calls /api/videos).
+  bunnyLibrary: [
+    { guid: 'a1b2c3d4-0001-4a1a-9b2b-000000000001', title: 'Sunday Service — July 6', length: 3820, status: 4, thumbnail: '' },
+    { guid: 'a1b2c3d4-0002-4a1a-9b2b-000000000002', title: 'Sunday Service — June 29', length: 3105, status: 4, thumbnail: '' },
+    { guid: 'a1b2c3d4-0003-4a1a-9b2b-000000000003', title: 'Baptism Celebration 2026', length: 1240, status: 4, thumbnail: '' },
+    { guid: 'a1b2c3d4-0004-4a1a-9b2b-000000000004', title: 'Youth Camp Recap', length: 540, status: 4, thumbnail: '' }
+  ]
 };

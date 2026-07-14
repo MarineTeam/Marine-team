@@ -12,7 +12,10 @@
   const money = n => '$' + Number(n).toLocaleString('en-US');
   const grad = (h, s = 60) => `linear-gradient(135deg,hsl(${h} ${s}% 52%),hsl(${(h + 40) % 360} ${s}% 42%))`;
   const esc = s => String(s ?? '').replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
-  const fmtDate = iso => new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const fmtDate = iso => iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  const fmtLen = sec => { sec = Number(sec) || 0; return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
+  const hueFromId = id => { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+  const videoToCard = v => ({ id: v.guid, title: v.title || 'Untitled', series: 'On Demand', speaker: '', date: v.synced_at ? String(v.synced_at).slice(0, 10) : '', category: 'Message', duration: fmtLen(v.length), hue: hueFromId(v.guid), video_id: v.guid, blurb: '' });
   const dayParts = iso => { const d = new Date(iso + 'T12:00:00'); return { day: d.getDate(), mon: d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase() }; };
   const fmtDateTime = ts => { const d = new Date(ts); return isNaN(d) ? String(ts) : d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }); };
 
@@ -113,8 +116,10 @@
 
   async function fillHome() {
     try {
-      const [sermons, events] = await Promise.all([API.getSermons(), API.getEvents()]);
-      const feat = sermons.find(s => s.featured) || sermons[0];
+      const [sermons, events, videos] = await Promise.all([API.getSermons(), API.getEvents(), API.getPublishedVideos().catch(() => [])]);
+      mediaState.sermons = sermons;
+      mediaState.videos = (videos || []).map(videoToCard);
+      const feat = mediaState.videos[0] || sermons.find(s => s.featured) || sermons[0];
       const l = $('#homeLatest');
       if (l && feat) l.innerHTML = featureSermon(feat);
       const e = $('#homeEvents');
@@ -125,7 +130,7 @@
   /* ============================================================
      WATCH (sermon library)
      ============================================================ */
-  let mediaState = { q: '', cat: 'All', sermons: [] };
+  let mediaState = { q: '', cat: 'All', sermons: [], videos: [] };
 
   function watch() {
     return `
@@ -139,11 +144,21 @@
 
   async function fillWatch() {
     try {
-      mediaState.sermons = await API.getSermons();
-      const cats = ['All', ...new Set(mediaState.sermons.map(s => s.category))];
-      const feat = mediaState.sermons.find(s => s.featured) || mediaState.sermons[0];
+      const [sermons, videos] = await Promise.all([API.getSermons(), API.getPublishedVideos().catch(() => [])]);
+      mediaState.sermons = sermons;
+      mediaState.videos = (videos || []).map(videoToCard);
+      const cats = ['All', ...new Set(sermons.map(s => s.category))];
+      // Prefer the newest published bunny video as the feature; else a featured sermon.
+      const feat = mediaState.videos[0] || sermons.find(s => s.featured) || sermons[0];
+      const onDemand = mediaState.videos.length ? `
+        <div class="sec-head" style="margin-top:8px"><div><span class="eyebrow">On demand</span>
+          <h2 class="h-xl" style="font-size:1.6rem">Members' library</h2></div></div>
+        <div class="grid" style="margin-bottom:40px">${mediaState.videos.map(scardHTML).join('')}</div>` : '';
       $('#watchBody').innerHTML = `
         ${feat ? featureSermon(feat, true) : ''}
+        ${onDemand}
+        <div class="sec-head"><div><span class="eyebrow">Archive</span>
+          <h2 class="h-xl" style="font-size:1.6rem">Message library</h2></div></div>
         <div class="mediabar">
           <div class="search">${icon.search}
             <input id="mediaSearch" type="search" placeholder="Search messages, speakers, series…" /></div>
@@ -187,8 +202,11 @@
       return okCat && okQ;
     });
     if (!list.length) { grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><h3>No messages found</h3><p>Try another search or category.</p></div>`; return; }
-    grid.innerHTML = list.map(s => `
-      <article class="scard" data-play="${s.id}">
+    grid.innerHTML = list.map(scardHTML).join('');
+  }
+  function scardHTML(s) {
+    return `
+      <article class="scard" data-play="${esc(s.id)}">
         <div class="scard__art" style="background:${grad(s.hue)}">
           <span class="scard__badge">${esc(s.category)}</span>${icon.play}
           ${s.video_id ? '<span class="scard__lock">🔒 Members</span>' : ''}
@@ -196,14 +214,18 @@
         <div class="scard__body">
           <div class="scard__series">${esc(s.series)}</div>
           <h3>${esc(s.title)}</h3>
-          <div class="scard__foot"><span>${esc(s.speaker)}</span><span>${fmtDate(s.date)}</span></div>
+          <div class="scard__foot"><span>${esc(s.speaker || '')}</span><span>${fmtDate(s.date)}</span></div>
         </div>
-      </article>`).join('');
+      </article>`;
   }
 
   /* ---------- player modal ---------- */
   let playerTimer = null;
-  function findSermon(id) { return mediaState.sermons.find(x => x.id === id) || window.SEED.sermons.find(x => x.id === id); }
+  function findSermon(id) {
+    return (mediaState.sermons || []).find(x => x.id === id)
+      || (mediaState.videos || []).find(x => x.id === id)
+      || window.SEED.sermons.find(x => x.id === id);
+  }
   function openPlayer(id) {
     const s = findSermon(id);
     if (!s) return;
@@ -620,6 +642,7 @@
         ['Gifts', () => giftsTable(gifts)],
         ['RSVPs', () => rsvpsTable(rsvps)],
         ['Prayer', () => prayersList(prayers)],
+        ['Videos', () => videosPanel()],
         ['Sermons', () => contentPanel('sermons')],
         ['Events', () => contentPanel('events')],
         ['Ministries', () => contentPanel('ministries')],
@@ -658,6 +681,40 @@
       <tbody>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   }
   const emptyTable = msg => `<div class="empty"><p>${esc(msg)}</p></div>`;
+
+  /* ---------- bunny.net video sync + publish ---------- */
+  let adminVideos = [];
+  function videosPanel() { setTimeout(fillVideosPanel, 0); return `<div id="cpanel">${spinner('Loading videos…')}</div>`; }
+  async function fillVideosPanel() {
+    const panel = $('#cpanel'); if (!panel) return;
+    try {
+      adminVideos = await API.adminListVideos();
+      const pub = adminVideos.filter(v => v.published).length;
+      panel.innerHTML = `
+        <div class="cbar">
+          <span class="muted">${adminVideos.length} video${adminVideos.length === 1 ? '' : 's'} · ${pub} published</span>
+          <button class="btn btn--primary btn--sm" id="syncVideos">↻ Sync from bunny.net</button></div>
+        <p class="muted" style="margin:-6px 0 14px;font-size:.85rem">Pulls your bunny.net library. Toggle a video on to publish it to the site (playback stays members-only).</p>
+        <div class="clist">${adminVideos.length ? adminVideos.map(videoRow).join('') : emptyTable('No videos yet — click “Sync from bunny.net”.')}</div>`;
+      $('#syncVideos').onclick = doSyncVideos;
+    } catch (e) { console.error(e); panel.innerHTML = `<div class="empty"><p>Couldn't load videos.</p><p class="muted">${esc(e.message || '')}</p></div>`; }
+  }
+  function videoRow(v) {
+    return `<div class="crow">
+      <span class="crow__sw crow__sw--play" style="background:${grad(hueFromId(v.guid))}">▶</span>
+      <div class="crow__main"><b>${esc(v.title || 'Untitled')}</b>
+        <span>${fmtLen(v.length)} · ${v.published ? '<i class="pub pub--on">Published</i>' : '<i class="pub">Hidden</i>'}</span></div>
+      <div class="crow__act">
+        <button class="btn btn--ghost btn--sm" data-vpreview="${esc(v.guid)}">Preview</button>
+        <label class="switch" title="Publish to site"><input type="checkbox" data-vpub="${esc(v.guid)}" ${v.published ? 'checked' : ''}/><span></span></label>
+      </div>
+    </div>`;
+  }
+  async function doSyncVideos() {
+    const btn = $('#syncVideos'); if (btn) { btn.disabled = true; btn.textContent = 'Syncing…'; }
+    try { const r = await API.syncVideos(); toast(`Synced ${r.total} video${r.total === 1 ? '' : 's'}${r.added ? ` · ${r.added} new` : ''}.`); fillVideosPanel(); }
+    catch (e) { console.error(e); toast(e.message || 'Sync failed.'); if (btn) { btn.disabled = false; btn.textContent = '↻ Sync from bunny.net'; } }
+  }
 
   /* ---------- content management (CMS) ---------- */
   const contentDefs = {
@@ -852,7 +909,19 @@
     const rsvp = e.target.closest('[data-rsvp]'); if (rsvp) { openRsvp(rsvp.dataset.rsvp); return; }
     const add = e.target.closest('[data-add]'); if (add) { openEditor(add.dataset.add, null); return; }
     const edit = e.target.closest('[data-edit]'); if (edit) { openEditorById(edit.dataset.edit, edit.dataset.id); return; }
-    const del = e.target.closest('[data-del]'); if (del) { handleDelete(del.dataset.del, del.dataset.id); }
+    const del = e.target.closest('[data-del]'); if (del) { handleDelete(del.dataset.del, del.dataset.id); return; }
+    const vprev = e.target.closest('[data-vpreview]');
+    if (vprev) { const v = adminVideos.find(x => x.guid === vprev.dataset.vpreview); if (v) openVideoPlayer(videoToCard(v)); }
+  });
+  document.addEventListener('change', async e => {
+    const t = e.target.closest('[data-vpub]'); if (!t) return;
+    try {
+      await API.setVideoPublished(t.dataset.vpub, t.checked);
+      const a = adminVideos.find(v => v.guid === t.dataset.vpub); if (a) a.published = t.checked;
+      const badge = t.closest('.crow')?.querySelector('.pub');
+      if (badge) { badge.textContent = t.checked ? 'Published' : 'Hidden'; badge.classList.toggle('pub--on', t.checked); }
+      toast(t.checked ? '✅ Published to the site.' : 'Hidden from the site.');
+    } catch (err) { console.error(err); t.checked = !t.checked; toast(err.message || 'Update failed.'); }
   });
 
   /* ---------- mobile menu ---------- */

@@ -518,3 +518,17 @@ img{max-width:100%}
 .vgate code{background:rgba(255,255,255,.18);padding:2px 6px;border-radius:6px;font-size:.85em}
 .scard__lock{position:absolute;top:12px;right:12px;background:rgba(11,21,36,.72);color:#fff;font-size:.72rem;
   font-weight:600;padding:4px 10px;border-radius:999px;backdrop-filter:blur(4px)}
+
+/* ============================================================
+   Admin video sync + publish toggle
+   ============================================================ */
+.crow__sw--play{display:grid;place-items:center;color:#fff;font-size:.9rem}
+.pub{font-style:normal;font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.pub--on{color:#059669}
+.switch{position:relative;display:inline-block;width:44px;height:26px;cursor:pointer;flex:0 0 auto}
+.switch input{opacity:0;width:0;height:0;position:absolute}
+.switch span{position:absolute;inset:0;background:#cbd5e1;border-radius:999px;transition:.2s}
+.switch span::before{content:"";position:absolute;left:3px;top:3px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.switch input:checked + span{background:var(--blue)}
+.switch input:checked + span::before{transform:translateX(18px)}
+.switch input:focus-visible + span{outline:2px solid var(--blue);outline-offset:2px}
