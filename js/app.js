@@ -562,7 +562,15 @@
         adminStat(money(total), 'Total given', gifts.length + ' gifts') +
         adminStat(rsvps.length, 'Registrations', 'event RSVPs') +
         adminStat(prayers.length, 'Prayer requests', 'received');
-      const tabs = [['Gifts', () => giftsTable(gifts)], ['RSVPs', () => rsvpsTable(rsvps)], ['Prayer', () => prayersList(prayers)]];
+      const tabs = [
+        ['Gifts', () => giftsTable(gifts)],
+        ['RSVPs', () => rsvpsTable(rsvps)],
+        ['Prayer', () => prayersList(prayers)],
+        ['Sermons', () => contentPanel('sermons')],
+        ['Events', () => contentPanel('events')],
+        ['Ministries', () => contentPanel('ministries')],
+        ['Site settings', () => settingsPanel()]
+      ];
       const tabsEl = $('#adminTabs'), panel = $('#adminPanel');
       tabsEl.innerHTML = tabs.map((t, i) => `<button class="atab ${i === 0 ? 'is-active' : ''}" data-i="${i}">${t[0]}</button>`).join('');
       const show = i => { panel.innerHTML = tabs[i][1](); $$('.atab', tabsEl).forEach((b, j) => b.classList.toggle('is-active', j === i)); };
@@ -596,6 +604,160 @@
       <tbody>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   }
   const emptyTable = msg => `<div class="empty"><p>${esc(msg)}</p></div>`;
+
+  /* ---------- content management (CMS) ---------- */
+  const contentDefs = {
+    sermons: {
+      singular: 'sermon', list: () => API.getSermons(), save: r => API.saveSermon(r), del: id => API.deleteSermon(id),
+      label: r => r.title, sub: r => `${r.speaker || ''} · ${r.series || ''} · ${r.date ? fmtDate(r.date) : ''}`,
+      fields: [
+        { name: 'title', label: 'Title', required: true },
+        { name: 'speaker', label: 'Speaker', required: true },
+        { name: 'series', label: 'Series' },
+        { name: 'date', label: 'Date', type: 'date', required: true },
+        { name: 'duration', label: 'Duration (mm:ss)', placeholder: '34:20' },
+        { name: 'category', label: 'Category', placeholder: 'Faith' },
+        { name: 'hue', label: 'Color hue (0–360)', type: 'number', default: 212 },
+        { name: 'featured', label: 'Feature on the home page', type: 'checkbox' },
+        { name: 'blurb', label: 'Description', type: 'textarea' }
+      ]
+    },
+    events: {
+      singular: 'event', list: () => API.getEvents(), save: r => API.saveEvent(r), del: id => API.deleteEvent(id),
+      label: r => r.title, sub: r => `${r.date ? fmtDate(r.date) : ''} · ${r.time || ''} · ${r.location || ''}`,
+      fields: [
+        { name: 'title', label: 'Title', required: true },
+        { name: 'date', label: 'Date', type: 'date', required: true },
+        { name: 'time', label: 'Time', placeholder: '7:00 PM' },
+        { name: 'location', label: 'Location', placeholder: 'Main Auditorium' },
+        { name: 'tag', label: 'Tag', placeholder: 'Special' },
+        { name: 'hue', label: 'Color hue (0–360)', type: 'number', default: 212 },
+        { name: 'blurb', label: 'Description', type: 'textarea' }
+      ]
+    },
+    ministries: {
+      singular: 'ministry', list: () => API.getMinistries(), save: r => API.saveMinistry(r), del: id => API.deleteMinistry(id),
+      label: r => r.name, sub: r => `${r.audience || ''} · ${r.when || ''}`,
+      fields: [
+        { name: 'name', label: 'Name', required: true },
+        { name: 'audience', label: 'Audience', placeholder: 'Ages 18–30' },
+        { name: 'when', label: 'When', placeholder: 'Sundays 9 AM' },
+        { name: 'hue', label: 'Color hue (0–360)', type: 'number', default: 212 },
+        { name: 'blurb', label: 'Description', type: 'textarea' }
+      ]
+    }
+  };
+
+  function contentPanel(type) { setTimeout(() => fillContentPanel(type), 0); return `<div id="cpanel">${spinner('Loading ' + type + '…')}</div>`; }
+  async function fillContentPanel(type) {
+    const def = contentDefs[type], panel = $('#cpanel'); if (!panel) return;
+    try {
+      const rows = await def.list();
+      panel.innerHTML = `
+        <div class="cbar"><span class="muted">${rows.length} ${type}</span>
+          <button class="btn btn--primary btn--sm" data-add="${type}">+ Add ${def.singular}</button></div>
+        <div class="clist">${rows.map(r => `
+          <div class="crow">
+            <span class="crow__sw" style="background:${grad(r.hue || 212)}"></span>
+            <div class="crow__main"><b>${esc(def.label(r))}</b><span>${esc(def.sub(r))}</span></div>
+            <div class="crow__act">
+              <button class="btn btn--ghost btn--sm" data-edit="${type}" data-id="${esc(r.id)}">Edit</button>
+              <button class="btn btn--ghost btn--sm" data-del="${type}" data-id="${esc(r.id)}">Delete</button>
+            </div>
+          </div>`).join('') || emptyTable('Nothing here yet — add one.')}</div>`;
+    } catch (e) { console.error(e); panel.innerHTML = `<div class="empty"><p>Couldn't load.</p><p class="muted">${esc(e.message || '')}</p></div>`; }
+  }
+
+  function fieldHTML(f, val) {
+    const v = (val ?? f.default ?? '');
+    if (f.type === 'textarea') return `<label class="label">${f.label}<textarea name="${f.name}" rows="3" ${f.required ? 'required' : ''}>${esc(v)}</textarea></label>`;
+    if (f.type === 'checkbox') return `<label class="check"><input type="checkbox" name="${f.name}" ${v ? 'checked' : ''}/> ${f.label}</label>`;
+    return `<label class="label">${f.label}<input name="${f.name}" type="${f.type || 'text'}" ${f.required ? 'required' : ''} value="${esc(v)}" ${f.placeholder ? `placeholder="${esc(f.placeholder)}"` : ''}/></label>`;
+  }
+  function openEditor(type, item) {
+    const def = contentDefs[type], isNew = !item, data = item || {};
+    $('#modalCard').innerHTML = `
+      <button class="modal__close" data-close aria-label="Close">×</button>
+      <div class="modal__body form-modal">
+        <span class="eyebrow">${isNew ? 'Add' : 'Edit'} ${def.singular}</span>
+        <h2>${isNew ? 'New ' + def.singular : esc(def.label(data))}</h2>
+        <form id="editForm" class="form">
+          ${def.fields.map(f => fieldHTML(f, data[f.name])).join('')}
+          <div style="display:flex;gap:10px;margin-top:6px">
+            <button type="button" class="btn btn--ghost btn--block" data-close>Cancel</button>
+            <button type="submit" class="btn btn--primary btn--block">${isNew ? 'Create' : 'Save changes'}</button>
+          </div>
+        </form>
+      </div>`;
+    openModal();
+    $('#editForm').addEventListener('submit', async ev => {
+      ev.preventDefault(); const f = ev.target, btn = f.querySelector('button[type=submit]');
+      btn.disabled = true; btn.textContent = 'Saving…';
+      const row = { id: data.id || (type[0] + Date.now().toString(36)) };
+      def.fields.forEach(fl => {
+        const el = f.querySelector(`[name="${fl.name}"]`);
+        if (fl.type === 'checkbox') row[fl.name] = el.checked;
+        else if (fl.type === 'number') row[fl.name] = el.value === '' ? null : Number(el.value);
+        else row[fl.name] = el.value;
+      });
+      try { await def.save(row); closeModal(); toast('Saved.'); fillContentPanel(type); }
+      catch (e) { console.error(e); btn.disabled = false; btn.textContent = isNew ? 'Create' : 'Save changes'; toast(e.message || 'Save failed.'); }
+    });
+  }
+  async function openEditorById(type, id) {
+    const rows = await contentDefs[type].list();
+    openEditor(type, rows.find(r => String(r.id) === String(id)));
+  }
+  async function handleDelete(type, id) {
+    if (!window.confirm('Delete this ' + contentDefs[type].singular + '? This cannot be undone.')) return;
+    try { await contentDefs[type].del(id); toast('Deleted.'); fillContentPanel(type); }
+    catch (e) { console.error(e); toast(e.message || 'Delete failed.'); }
+  }
+
+  /* ---------- editable site settings ---------- */
+  const sField = (n, l, v) => `<label class="label">${l}<input name="${n}" value="${esc(v || '')}"/></label>`;
+  const timeRow = t => `<div class="trow">
+    <input data-k="day" placeholder="Day" value="${esc(t.day || '')}"/>
+    <input data-k="service" placeholder="Service" value="${esc(t.service || '')}"/>
+    <input data-k="time" placeholder="Time" value="${esc(t.time || '')}"/>
+    <button type="button" class="trow-del" aria-label="Remove">×</button></div>`;
+  function settingsPanel() { setTimeout(fillSettingsPanel, 0); return `<div id="cpanel">${spinner('Loading settings…')}</div>`; }
+  async function fillSettingsPanel() {
+    const panel = $('#cpanel'); if (!panel) return;
+    const s = await API.getSettings();
+    panel.innerHTML = `
+      <form id="settingsForm" class="form settings-form">
+        <p class="muted">These control the public site — header, footer, home page, and Plan a Visit.</p>
+        <div class="sform-grid">${sField('name', 'Church name', s.name)}${sField('shortName', 'Short name', s.shortName)}</div>
+        ${sField('tagline', 'Tagline', s.tagline)}
+        <div class="sform-grid">${sField('phone', 'Phone', s.phone)}${sField('email', 'Email', s.email)}</div>
+        ${sField('address', 'Address', s.address)}
+        <div class="stimes">
+          <span class="label--plain">Service times</span>
+          <div id="timesRows">${(s.times || []).map(timeRow).join('')}</div>
+          <button type="button" class="btn btn--ghost btn--sm" id="addTime">+ Add a time</button>
+        </div>
+        <button type="submit" class="btn btn--primary btn--lg" style="margin-top:6px">Save site settings</button>
+      </form>`;
+    const rows = $('#timesRows');
+    $('#addTime').onclick = () => rows.insertAdjacentHTML('beforeend', timeRow({}));
+    rows.addEventListener('click', e => { const b = e.target.closest('.trow-del'); if (b) b.closest('.trow').remove(); });
+    $('#settingsForm').addEventListener('submit', async ev => {
+      ev.preventDefault(); const f = ev.target, btn = f.querySelector('button[type=submit]');
+      btn.disabled = true; btn.textContent = 'Saving…';
+      const times = $$('.trow', rows).map(r => ({
+        day: r.querySelector('[data-k=day]').value, service: r.querySelector('[data-k=service]').value, time: r.querySelector('[data-k=time]').value
+      })).filter(t => t.day || t.time);
+      const o = {
+        name: f.querySelector('[name=name]').value, shortName: f.querySelector('[name=shortName]').value,
+        tagline: f.querySelector('[name=tagline]').value, phone: f.querySelector('[name=phone]').value,
+        email: f.querySelector('[name=email]').value, address: f.querySelector('[name=address]').value, times
+      };
+      try { await API.saveSettings(o); C.church = { ...C.church, ...o }; paintChrome(); toast('Site settings saved — the public site is updated.'); }
+      catch (e) { console.error(e); toast(e.message || 'Save failed.'); }
+      finally { btn.disabled = false; btn.textContent = 'Save site settings'; }
+    });
+  }
 
   /* ============================================================
      MODAL + ROUTER
@@ -632,7 +794,10 @@
   /* ---------- global delegated clicks ---------- */
   document.addEventListener('click', e => {
     const play = e.target.closest('[data-play]'); if (play) { openPlayer(play.dataset.play); return; }
-    const rsvp = e.target.closest('[data-rsvp]'); if (rsvp) { openRsvp(rsvp.dataset.rsvp); }
+    const rsvp = e.target.closest('[data-rsvp]'); if (rsvp) { openRsvp(rsvp.dataset.rsvp); return; }
+    const add = e.target.closest('[data-add]'); if (add) { openEditor(add.dataset.add, null); return; }
+    const edit = e.target.closest('[data-edit]'); if (edit) { openEditorById(edit.dataset.edit, edit.dataset.id); return; }
+    const del = e.target.closest('[data-del]'); if (del) { handleDelete(del.dataset.del, del.dataset.id); }
   });
 
   /* ---------- mobile menu ---------- */
@@ -651,10 +816,12 @@
   /* ---------- chrome: footer + auth ---------- */
   function paintChrome() {
     const ch = C.church;
+    document.title = ch.name;
+    $('#brandName').textContent = ch.shortName || ch.name;
     $('#footBrand').textContent = ch.name;
     $('#footTag').textContent = ch.tagline;
     $('#footAddr').textContent = `${ch.address} · ${ch.phone}`;
-    $('#footTimes').innerHTML = ch.times.map(t => `<div><b>${esc(t.day)}</b> ${esc(t.time)}</div>`).join('');
+    $('#footTimes').innerHTML = (ch.times || []).map(t => `<div><b>${esc(t.day)}</b> ${esc(t.time)}</div>`).join('');
     $('#modeTag').textContent = API.live ? 'Connected · Supabase' : 'Demo build · mock data';
   }
   async function paintAuth() {
@@ -675,4 +842,11 @@
   paintChrome();
   paintAuth();
   router();
+  // Load editable site settings, then re-render with any staff customizations.
+  API.getSettings().then(s => {
+    if (!s) return;
+    C.church = { ...C.church, ...s, times: (s.times && s.times.length) ? s.times : C.church.times };
+    paintChrome();
+    router();
+  }).catch(e => console.warn('settings load failed', e));
 })();

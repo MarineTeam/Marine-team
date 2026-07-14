@@ -475,3 +475,30 @@ img{max-width:100%}
 .pr p{color:var(--ink-2)}
 .pr__mail{display:inline-block;margin-top:10px;color:var(--blue);font-weight:600;font-size:.88rem}
 @media(max-width:640px){.admin-cards{grid-template-columns:1fr}}
+
+/* ============================================================
+   Admin content management (CMS)
+   ============================================================ */
+.cbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px}
+.clist{display:grid;gap:10px}
+.crow{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;background:#fff;
+  border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
+.crow__sw{width:38px;height:38px;border-radius:10px;display:block}
+.crow__main b{display:block;font-size:1rem;letter-spacing:-.01em}
+.crow__main span{font-size:.83rem;color:var(--muted)}
+.crow__act{display:flex;gap:8px}
+.sform-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.settings-form .muted{margin-bottom:4px}
+.stimes{display:grid;gap:10px}
+.trow{display:grid;grid-template-columns:1fr 1.4fr 1fr auto;gap:8px;align-items:center}
+.trow input{padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:.92rem;outline:0;color:var(--ink);font-family:inherit}
+.trow input:focus{border-color:var(--blue)}
+.trow-del{width:34px;height:34px;border-radius:9px;border:1.5px solid var(--line);background:#fff;color:var(--muted);
+  font-size:1.1rem;cursor:pointer;line-height:1}
+.trow-del:hover{border-color:#ef4444;color:#ef4444}
+@media(max-width:640px){
+  .crow{grid-template-columns:auto 1fr;grid-template-areas:'sw main' 'act act'}
+  .crow__sw{grid-area:sw}.crow__main{grid-area:main}.crow__act{grid-area:act;justify-content:flex-end}
+  .sform-grid{grid-template-columns:1fr}
+  .trow{grid-template-columns:1fr 1fr auto}
+}

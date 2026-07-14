@@ -25,6 +25,9 @@ so it deploys to any static host and the browser talks directly to Supabase via 
 - **Groups** — ministries & small groups with "I'm interested" capture
 - **Plan a Visit** — FAQ + a "let us know you're coming" form
 - **Prayer & Contact** — prayer request form (public/private) + contact info
+- **Staff admin** (`#/admin`) — Supabase-Auth login; view giving/RSVPs/prayer, **and a full CMS**:
+  add/edit/delete sermons, events, and ministries, plus edit site settings (name, tagline,
+  contact, service times). Every change updates the public site live.
 - Responsive, mobile nav, scroll animations, optional Auth0 login button
 
 ## Runs offline out of the box (mock mode)
@@ -45,13 +48,18 @@ npx serve .                 # if you have Node
 
 ### 1. Supabase — database + API
 1. Create a free project at [supabase.com](https://supabase.com).
-2. **SQL Editor → New query**, paste [`supabase/schema.sql`](supabase/schema.sql), run it.
-   (Creates tables, Row-Level-Security policies, and seeds the sample content.)
+2. **SQL Editor → New query**, and run these three in order:
+   - [`supabase/schema.sql`](supabase/schema.sql) — tables, RLS, seed content.
+   - [`supabase/admin_policies.sql`](supabase/admin_policies.sql) — let staff **read** submissions.
+   - [`supabase/admin_content.sql`](supabase/admin_content.sql) — `settings` table + let staff **edit** content.
 3. **Project Settings → API**: copy the **Project URL** and **anon public** key.
 4. Paste them into [`js/config.js`](js/config.js) under `supabase`.
+5. **Authentication → Users → Add user**: create a staff account (tick *Auto Confirm*) to log
+   into `#/admin`.
 
-RLS is set so the public can **read** content and **submit** gifts/RSVPs/prayer requests, but
-**cannot read** others' submissions — staff read those via the service role or an admin policy.
+RLS is set so the public can **read** content and **submit** gifts/RSVPs/prayer requests but
+**cannot read** others' submissions; only **authenticated staff** can read submissions and
+add/edit/delete content + settings.
 
 ### 2. Auth0 — login (optional)
 1. Create an **Application → Single Page Application** at [auth0.com](https://auth0.com).

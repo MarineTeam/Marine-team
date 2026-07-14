@@ -20,28 +20,38 @@
 
   /* ---------- localStorage helpers (mock writes) ---------- */
   const LS = {
-    get: (k, d) => { try { return JSON.parse(localStorage.getItem('gcc_' + k)) ?? d; } catch { return d; } },
-    push: (k, v) => { const a = LS.get(k, []); a.unshift(v); localStorage.setItem('gcc_' + k, JSON.stringify(a)); return v; }
+    get: (k, d) => { try { const v = JSON.parse(localStorage.getItem('gcc_' + k)); return v ?? d; } catch { return d; } },
+    set: (k, v) => localStorage.setItem('gcc_' + k, JSON.stringify(v)),
+    push: (k, v) => { const a = LS.get(k, []); a.unshift(v); LS.set(k, a); return v; }
   };
+  // Editable mock collection: seed from SEED on first use, then persist edits.
+  function coll(key, seed) { const cur = LS.get(key, null); if (cur) return cur; LS.set(key, seed); return [...seed]; }
+  function mockUpsert(key, seed, row) {
+    const arr = coll(key, seed); const i = arr.findIndex(x => String(x.id) === String(row.id));
+    if (i >= 0) arr[i] = { ...arr[i], ...row }; else arr.unshift(row);
+    LS.set(key, arr); return row;
+  }
+  function mockDelete(key, seed, id) { LS.set(key, coll(key, seed).filter(x => String(x.id) !== String(id))); }
 
   const ref = () => 'GCC-' + Math.random().toString(36).slice(2, 8).toUpperCase();
   const wait = (v, ms = 260) => new Promise(r => setTimeout(() => r(v), ms)); // tiny latency so UI feels real
 
   /* ---------- reads ---------- */
+  const byDate = (a, b, dir) => dir * (String(a.date).localeCompare(String(b.date)));
   async function getSermons() {
-    if (!LIVE) return wait([...SEED.sermons]);
+    if (!LIVE) return wait(coll('c_sermons', SEED.sermons).slice().sort((a, b) => byDate(a, b, -1)));
     const { data, error } = await (await sb()).from('sermons').select('*').order('date', { ascending: false });
     if (error) throw error;
     return data;
   }
   async function getEvents() {
-    if (!LIVE) return wait([...SEED.events]);
+    if (!LIVE) return wait(coll('c_events', SEED.events).slice().sort((a, b) => byDate(a, b, 1)));
     const { data, error } = await (await sb()).from('events').select('*').order('date', { ascending: true });
     if (error) throw error;
     return data;
   }
   async function getMinistries() {
-    if (!LIVE) return wait([...SEED.ministries]);
+    if (!LIVE) return wait(coll('c_ministries', SEED.ministries).slice());
     const { data, error } = await (await sb()).from('ministries').select('*');
     if (error) throw error;
     return data;
@@ -105,10 +115,47 @@
   const listRsvps = () => listTable('rsvps', 'rsvps');
   const listPrayers = () => listTable('prayer_requests', 'prayers');
 
+  /* ---------- admin: content CRUD (staff-authenticated) ---------- */
+  async function upsertRow(table, key, seed, row) {
+    if (!LIVE) return wait(mockUpsert(key, seed, row));
+    const { error } = await (await sb()).from(table).upsert(row, { onConflict: 'id' });
+    if (error) throw error;
+    return row;
+  }
+  async function deleteRow(table, key, seed, id) {
+    if (!LIVE) { mockDelete(key, seed, id); return; }
+    const { error } = await (await sb()).from(table).delete().eq('id', id);
+    if (error) throw error;
+  }
+  const saveSermon = r => upsertRow('sermons', 'c_sermons', SEED.sermons, r);
+  const deleteSermon = id => deleteRow('sermons', 'c_sermons', SEED.sermons, id);
+  const saveEvent = r => upsertRow('events', 'c_events', SEED.events, r);
+  const deleteEvent = id => deleteRow('events', 'c_events', SEED.events, id);
+  const saveMinistry = r => upsertRow('ministries', 'c_ministries', SEED.ministries, r);
+  const deleteMinistry = id => deleteRow('ministries', 'c_ministries', SEED.ministries, id);
+
+  /* ---------- admin: editable site settings ---------- */
+  const fromRow = d => ({ name: d.name, shortName: d.short_name, tagline: d.tagline, address: d.address, phone: d.phone, email: d.email, times: d.times || [] });
+  async function getSettings() {
+    if (!LIVE) return wait(LS.get('c_settings', null) || { ...window.CONFIG.church });
+    const { data, error } = await (await sb()).from('settings').select('*').eq('id', 1).maybeSingle();
+    if (error) throw error;
+    return data ? fromRow(data) : { ...window.CONFIG.church };
+  }
+  async function saveSettings(o) {
+    if (!LIVE) { LS.set('c_settings', o); return wait(o); }
+    const row = { id: 1, name: o.name, short_name: o.shortName, tagline: o.tagline, address: o.address, phone: o.phone, email: o.email, times: o.times, updated_at: new Date().toISOString() };
+    const { error } = await (await sb()).from('settings').upsert(row, { onConflict: 'id' });
+    if (error) throw error;
+    return o;
+  }
+
   window.API = {
     live: LIVE,
     getSermons, getEvents, getMinistries, getStats,
     createGift, createRsvp, createPrayer,
-    adminUser, adminSignIn, adminSignOut, listGifts, listRsvps, listPrayers
+    adminUser, adminSignIn, adminSignOut, listGifts, listRsvps, listPrayers,
+    saveSermon, deleteSermon, saveEvent, deleteEvent, saveMinistry, deleteMinistry,
+    getSettings, saveSettings
   };
 })();
