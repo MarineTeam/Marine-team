@@ -1,0 +1,10 @@
+{
+  "name": "grace-church-site",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Church website (static frontend) + Vercel serverless functions for gated bunny.net video.",
+  "engines": {
+    "node": ">=18"
+  }
+}

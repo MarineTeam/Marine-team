@@ -17,7 +17,11 @@
       client = await createAuth0Client({
         domain: C.auth0.domain,
         clientId: C.auth0.clientId,
-        authorizationParams: { redirect_uri: window.location.origin }
+        authorizationParams: { redirect_uri: window.location.origin },
+        // Persist the session across reloads, and use refresh tokens so
+        // getTokenSilently() works without third-party cookies (Safari/Brave/etc).
+        cacheLocation: 'localstorage',
+        useRefreshTokens: true
       });
       // Handle the redirect back from Auth0
       const q = window.location.search;

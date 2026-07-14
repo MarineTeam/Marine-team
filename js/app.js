@@ -953,10 +953,12 @@
     if (!Auth.enabled) { slot.innerHTML = ''; return; }
     const user = await Auth.init();
     if (user) {
-      slot.innerHTML = `<button class="btn btn--ghost" id="logoutBtn" title="${esc(user.email || '')}">Hi, ${esc((user.given_name || user.name || 'Friend').split(' ')[0])} · Log out</button>`;
+      const name = esc((user.given_name || user.name || user.email || 'Member').split('@')[0].split(' ')[0]);
+      slot.innerHTML = `<span class="who" title="${esc(user.email || '')}"><span class="who__dot"></span>${name}</span>
+        <button class="btn btn--ghost btn--sm" id="logoutBtn">Log out</button>`;
       $('#logoutBtn').onclick = () => Auth.logout();
     } else {
-      slot.innerHTML = `<button class="btn btn--ghost" id="loginBtn">Log in</button>`;
+      slot.innerHTML = `<button class="btn btn--ghost" id="loginBtn">Member log in</button>`;
       $('#loginBtn').onclick = () => Auth.login();
     }
   }

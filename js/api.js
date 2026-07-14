@@ -172,7 +172,9 @@
     if (!LIVE) return wait(SEED.bunnyLibrary.map(v => ({ ...v })));
     const { data: { session } } = await (await sb()).auth.getSession();
     const token = session?.access_token;
-    const r = await fetch('/api/videos', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!token) throw new Error('Your staff session expired — please sign in again.');
+    const r = await fetch('/api/videos', { headers: { Authorization: `Bearer ${token}` } });
+    if (r.status === 404) throw new Error('The /api/videos function isn’t available — this feature runs on Vercel, not the local static server.');
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || `Error ${r.status}`); }
     return (await r.json()).items || [];
   }

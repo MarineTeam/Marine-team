@@ -13,15 +13,17 @@
 // ============================================================
 
 async function verifyStaff(req) {
-  const auth = req.headers.authorization || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
   const url = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
   const anon = (process.env.SUPABASE_ANON_KEY || '').trim();
-  if (!token || !url || !anon) return false;
+  if (!url || !anon) return { ok: false, code: 500, error: 'Server is missing SUPABASE_URL / SUPABASE_ANON_KEY env vars.' };
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  if (!token) return { ok: false, code: 401, error: 'No staff token — sign in to the admin, then Sync.' };
   try {
     const r = await fetch(`${url}/auth/v1/user`, { headers: { apikey: anon, Authorization: `Bearer ${token}` } });
-    return r.ok; // 200 ⇒ a valid, logged-in Supabase (staff) user
-  } catch { return false; }
+    if (r.ok) return { ok: true };
+    return { ok: false, code: 401, error: 'Staff session invalid or expired — sign in again.' };
+  } catch { return { ok: false, code: 502, error: 'Could not reach Supabase to verify staff.' }; }
 }
 
 export default async function handler(req, res) {
@@ -29,9 +31,10 @@ export default async function handler(req, res) {
 
   const libraryId = (process.env.BUNNY_LIBRARY_ID || '').trim();
   const apiKey = (process.env.BUNNY_API_KEY || '').trim();
-  if (!libraryId || !apiKey) { res.status(500).json({ error: 'bunny.net is not configured on the server.' }); return; }
+  if (!libraryId || !apiKey) { res.status(500).json({ error: 'Server is missing BUNNY_LIBRARY_ID / BUNNY_API_KEY env vars.' }); return; }
 
-  if (!(await verifyStaff(req))) { res.status(401).json({ error: 'Staff login required.' }); return; }
+  const staff = await verifyStaff(req);
+  if (!staff.ok) { res.status(staff.code).json({ error: staff.error }); return; }
 
   try {
     const r = await fetch(
