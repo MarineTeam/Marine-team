@@ -4,7 +4,7 @@
    ============================================================ */
 window.SEED = {
   sermons: [
-    { id: 's1', title: 'The Anchor for Your Soul', speaker: 'Pastor David Reyes', series: 'Hope That Holds', duration: '38:12', date: '2026-07-06', category: 'Faith', featured: true, hue: 212, blurb: 'When the storms of life hit, where do you turn? Discover the unshakable hope found in Hebrews 6.' },
+    { id: 's1', title: 'The Anchor for Your Soul', speaker: 'Pastor David Reyes', series: 'Hope That Holds', duration: '38:12', date: '2026-07-06', category: 'Faith', featured: true, hue: 212, published: true, members_only: false, blurb: 'When the storms of life hit, where do you turn? Discover the unshakable hope found in Hebrews 6.' },
     { id: 's2', title: 'Grace Upon Grace', speaker: 'Pastor Anna Cole', series: 'Rediscovering Grace', duration: '32:45', date: '2026-06-29', category: 'Grace', hue: 268, blurb: 'A fresh look at the endless grace of God and how it reshapes everyday life.' },
     { id: 's3', title: 'Built to Belong', speaker: 'Pastor David Reyes', series: 'Better Together', duration: '41:03', date: '2026-06-22', category: 'Community', hue: 168, blurb: 'We were never meant to walk alone. Exploring the beauty of biblical community.' },
     { id: 's4', title: 'The Generous Life', speaker: 'Elder Marcus Bell', series: 'Kingdom Economy', duration: '29:57', date: '2026-06-15', category: 'Stewardship', hue: 28, blurb: 'What if generosity was less about giving and more about becoming?' },

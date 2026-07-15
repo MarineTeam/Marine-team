@@ -26,9 +26,9 @@ so it deploys to any static host and the browser talks directly to Supabase via 
 - **Plan a Visit** — FAQ + a "let us know you're coming" form
 - **Prayer & Contact** — prayer request form (public/private) + contact info
 - **Staff admin** (`#/admin`) — Supabase-Auth login; view giving/RSVPs/prayer, **a full CMS**
-  (add/edit/delete sermons, events, ministries + edit site settings), and a **Videos** tab that
-  **syncs your bunny.net library** and toggles each video published/hidden. Every change updates
-  the public site live.
+  (add/edit/delete messages, events, ministries + edit site settings). The **Messages** tab
+  **syncs your bunny.net library** into one unified library — each message is Published/Draft
+  and Guest/Members-only. Every change updates the public site live.
 - Responsive, mobile nav, scroll animations, optional Auth0 login button
 
 ## Runs offline out of the box (mock mode)
@@ -70,27 +70,30 @@ add/edit/delete content + settings.
    A **Log in / Log out** button appears in the nav, and members must sign in to watch
    members-only videos. *(This is separate from staff admin, which uses Supabase Auth.)*
 
-### 3. bunny.net + members-only video
-Videos are gated exactly like the Marine video portals: a short-lived, signed bunny.net
-embed token is generated **server-side** per view, behind an Auth0 login — the token key
-never reaches the browser.
+### 3. bunny.net video — one unified library
+**Sermons and videos are the same thing.** A bunny.net video is just a message with a video
+attached, and every message has two switches: **Published/Draft** and **Members-only/Guest**.
+Signing is done **server-side** per view (the token key never reaches the browser), exactly
+like the Marine video portals.
 1. bunny.net → **Stream** → create a **Video Library**; upload your videos.
-2. Library → **Security** → enable **Token Authentication**; copy the **Authentication Key**.
-   Also copy the **Library ID** and the library **API Key**.
-3. Run [`supabase/add_video.sql`](supabase/add_video.sql) and [`supabase/videos.sql`](supabase/videos.sql).
+2. Library → **Security** → enable **Token Authentication**; copy the **Authentication Key**,
+   the **Library ID**, and the library **API Key**.
+3. Run [`supabase/unify.sql`](supabase/unify.sql) (adds `video_id`, `published`, `members_only`
+   to `sermons` + publish-aware RLS).
 4. Set the serverless env vars in Vercel (see [`.env.example`](.env.example)):
    `AUTH0_DOMAIN`, `BUNNY_LIBRARY_ID`, `BUNNY_TOKEN_AUTH_KEY`, `BUNNY_API_KEY`,
    `SUPABASE_URL`, `SUPABASE_ANON_KEY`.
 
-**Sync & publish (no GUID typing):** in `/#/admin` → **Videos** tab, click
-**↻ Sync from bunny.net** — [`/api/videos`](api/videos.js) pulls your whole library. Flip a
-video's toggle to **publish** it; published videos appear on the home page and Watch. You can
-still attach a GUID to a specific sermon via the *Bunny video ID* field on the Sermons tab.
+**Sync & publish (no GUID typing):** in `/#/admin` → **Messages**, click
+**↻ Sync from bunny.net** — [`/api/videos`](api/videos.js) imports your whole library as
+message **drafts**. Edit each one (add speaker, series, description…), then set **Published**
+and choose **Guest** (anyone can watch) or **Members-only** (login required). Published messages
+appear in the single library on the home page and Watch.
 
-Playback flow: member clicks a 🔒 video → Auth0 login → browser calls
-[`/api/embed`](api/embed.js) with the Auth0 access token → the function verifies it and
-returns a signed `iframe.mediadelivery.net/embed/...` URL. Items without a video fall back to
-the built-in demo player.
+Playback: click a message →
+[`/api/embed`](api/embed.js) looks it up. **Guest** → returns a signed
+`iframe.mediadelivery.net/embed/...` URL immediately. **Members-only** → requires a valid Auth0
+login first. Messages without a video use the built-in demo player.
 
 ### 4. Deploy to Vercel
 ```
@@ -125,7 +128,8 @@ supabase/
   admin_policies.sql     # staff read access to submissions
   admin_content.sql      # settings table + staff write (CMS)
   add_video.sql          # sermons.video_id column
-  videos.sql             # videos table (bunny sync + publish)
+  unify.sql              # published + members_only + publish-aware RLS (current model)
+  videos.sql             # (legacy) separate videos table — superseded by unify.sql
 .env.example             # server env vars for the embed function
 vercel.json              # hosting + headers
 ```

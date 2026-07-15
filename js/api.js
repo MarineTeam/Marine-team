@@ -151,22 +151,10 @@
     return o;
   }
 
-  /* ---------- bunny.net video sync + publishing ---------- */
-  // Public site: only PUBLISHED videos (anon-readable).
-  async function getPublishedVideos() {
-    if (!LIVE) return wait(coll('c_videos', []).filter(v => v.published)
-      .sort((a, b) => (a.sort_order - b.sort_order) || String(b.synced_at || '').localeCompare(String(a.synced_at || ''))));
-    const { data, error } = await (await sb()).from('videos').select('*').eq('published', true).order('sort_order').order('synced_at', { ascending: false });
-    if (error) throw error;
-    return data;
-  }
-  // Admin: every synced video (published or not).
-  async function adminListVideos() {
-    if (!LIVE) return wait(coll('c_videos', []));
-    const { data, error } = await (await sb()).from('videos').select('*').order('synced_at', { ascending: false });
-    if (error) throw error;
-    return data;
-  }
+  /* ---------- bunny.net sync → sermons (one unified library) ---------- */
+  const fmtLen = sec => { sec = Number(sec) || 0; return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
+  const hueFromId = id => { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+
   // Pull the raw library from bunny.net (mock: SEED; live: /api/videos with staff token).
   async function fetchBunnyLibrary() {
     if (!LIVE) return wait(SEED.bunnyLibrary.map(v => ({ ...v })));
@@ -178,37 +166,33 @@
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || `Error ${r.status}`); }
     return (await r.json()).items || [];
   }
-  // Sync: merge the bunny library into our table, KEEPING existing publish flags.
+  // Import bunny videos as sermons (drafts). Existing sermons keep their edits.
   async function syncVideos() {
-    const [lib, existing] = await Promise.all([fetchBunnyLibrary(), adminListVideos()]);
-    const byGuid = Object.fromEntries(existing.map(v => [v.guid, v]));
+    const [lib, existing] = await Promise.all([fetchBunnyLibrary(), getSermons()]);
+    const haveVid = new Set(existing.filter(s => s.video_id).map(s => s.video_id));
     let added = 0;
     for (const v of lib) {
-      const prev = byGuid[v.guid];
+      if (haveVid.has(v.guid)) continue; // already imported
       const row = {
-        guid: v.guid, title: v.title, length: v.length || 0, thumbnail: v.thumbnail || '',
-        published: prev ? prev.published : false, featured: prev ? prev.featured : false,
-        sort_order: prev ? prev.sort_order : 0, synced_at: new Date().toISOString()
+        id: v.guid, title: v.title || 'Untitled message', speaker: '', series: 'Messages',
+        date: v.dateUploaded ? String(v.dateUploaded).slice(0, 10) : new Date().toISOString().slice(0, 10),
+        duration: fmtLen(v.length), category: 'Message', hue: hueFromId(v.guid),
+        video_id: v.guid, published: false, members_only: true, featured: false, blurb: ''
       };
-      if (!prev) added++;
-      if (!LIVE) mockUpsert('c_videos', [], row);
-      else { const { error } = await (await sb()).from('videos').upsert(row, { onConflict: 'guid' }); if (error) throw error; }
+      added++;
+      if (!LIVE) mockUpsert('c_sermons', SEED.sermons, row);
+      else { const { error } = await (await sb()).from('sermons').upsert(row, { onConflict: 'id' }); if (error) throw error; }
     }
     return { total: lib.length, added };
-  }
-  async function setVideoPublished(guid, published) {
-    if (!LIVE) { const arr = coll('c_videos', []); const v = arr.find(x => x.guid === guid); if (v) { v.published = published; LS.set('c_videos', arr); } return wait(v); }
-    const { error } = await (await sb()).from('videos').update({ published }).eq('guid', guid);
-    if (error) throw error;
   }
 
   window.API = {
     live: LIVE,
-    getSermons, getEvents, getMinistries, getStats, getPublishedVideos,
+    getSermons, getEvents, getMinistries, getStats,
     createGift, createRsvp, createPrayer,
     adminUser, adminSignIn, adminSignOut, listGifts, listRsvps, listPrayers,
     saveSermon, deleteSermon, saveEvent, deleteEvent, saveMinistry, deleteMinistry,
     getSettings, saveSettings,
-    adminListVideos, syncVideos, setVideoPublished
+    syncVideos
   };
 })();

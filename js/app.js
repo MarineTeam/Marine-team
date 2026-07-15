@@ -13,9 +13,6 @@
   const grad = (h, s = 60) => `linear-gradient(135deg,hsl(${h} ${s}% 52%),hsl(${(h + 40) % 360} ${s}% 42%))`;
   const esc = s => String(s ?? '').replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
   const fmtDate = iso => iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-  const fmtLen = sec => { sec = Number(sec) || 0; return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
-  const hueFromId = id => { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
-  const videoToCard = v => ({ id: v.guid, title: v.title || 'Untitled', series: 'On Demand', speaker: '', date: v.synced_at ? String(v.synced_at).slice(0, 10) : '', category: 'Message', duration: fmtLen(v.length), hue: hueFromId(v.guid), video_id: v.guid, blurb: '' });
   const dayParts = iso => { const d = new Date(iso + 'T12:00:00'); return { day: d.getDate(), mon: d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase() }; };
   const fmtDateTime = ts => { const d = new Date(ts); return isNaN(d) ? String(ts) : d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }); };
 
@@ -114,12 +111,12 @@
       <h3>${title}</h3><p>${body}</p><span class="step__go">Learn more →</span>
     </a>`;
 
+  const isPublic = s => s.published !== false; // drafts hidden from the public site
   async function fillHome() {
     try {
-      const [sermons, events, videos] = await Promise.all([API.getSermons(), API.getEvents(), API.getPublishedVideos().catch(() => [])]);
-      mediaState.sermons = sermons;
-      mediaState.videos = (videos || []).map(videoToCard);
-      const feat = mediaState.videos[0] || sermons.find(s => s.featured) || sermons[0];
+      const [allSermons, events] = await Promise.all([API.getSermons(), API.getEvents()]);
+      mediaState.sermons = allSermons.filter(isPublic);
+      const feat = mediaState.sermons.find(s => s.featured) || mediaState.sermons.find(s => s.video_id) || mediaState.sermons[0];
       const l = $('#homeLatest');
       if (l && feat) l.innerHTML = featureSermon(feat);
       const e = $('#homeEvents');
@@ -130,7 +127,7 @@
   /* ============================================================
      WATCH (sermon library)
      ============================================================ */
-  let mediaState = { q: '', cat: 'All', sermons: [], videos: [] };
+  let mediaState = { q: '', cat: 'All', sermons: [] };
 
   function watch() {
     return `
@@ -144,21 +141,12 @@
 
   async function fillWatch() {
     try {
-      const [sermons, videos] = await Promise.all([API.getSermons(), API.getPublishedVideos().catch(() => [])]);
-      mediaState.sermons = sermons;
-      mediaState.videos = (videos || []).map(videoToCard);
-      const cats = ['All', ...new Set(sermons.map(s => s.category))];
-      // Prefer the newest published bunny video as the feature; else a featured sermon.
-      const feat = mediaState.videos[0] || sermons.find(s => s.featured) || sermons[0];
-      const onDemand = mediaState.videos.length ? `
-        <div class="sec-head" style="margin-top:8px"><div><span class="eyebrow">On demand</span>
-          <h2 class="h-xl" style="font-size:1.6rem">Members' library</h2></div></div>
-        <div class="grid" style="margin-bottom:40px">${mediaState.videos.map(scardHTML).join('')}</div>` : '';
+      const allSermons = await API.getSermons();
+      mediaState.sermons = allSermons.filter(isPublic);
+      const cats = ['All', ...new Set(mediaState.sermons.map(s => s.category))];
+      const feat = mediaState.sermons.find(s => s.featured) || mediaState.sermons.find(s => s.video_id) || mediaState.sermons[0];
       $('#watchBody').innerHTML = `
         ${feat ? featureSermon(feat, true) : ''}
-        ${onDemand}
-        <div class="sec-head"><div><span class="eyebrow">Archive</span>
-          <h2 class="h-xl" style="font-size:1.6rem">Message library</h2></div></div>
         <div class="mediabar">
           <div class="search">${icon.search}
             <input id="mediaSearch" type="search" placeholder="Search messages, speakers, series…" /></div>
@@ -209,7 +197,7 @@
       <article class="scard" data-play="${esc(s.id)}">
         <div class="scard__art" style="background:${grad(s.hue)}">
           <span class="scard__badge">${esc(s.category)}</span>${icon.play}
-          ${s.video_id ? '<span class="scard__lock">🔒 Members</span>' : ''}
+          ${s.video_id ? (s.members_only === false ? '<span class="scard__lock scard__lock--free">🌐 Free</span>' : '<span class="scard__lock">🔒 Members</span>') : ''}
           <span class="scard__dur">${esc(s.duration)}</span></div>
         <div class="scard__body">
           <div class="scard__series">${esc(s.series)}</div>
@@ -223,7 +211,6 @@
   let playerTimer = null;
   function findSermon(id) {
     return (mediaState.sermons || []).find(x => x.id === id)
-      || (mediaState.videos || []).find(x => x.id === id)
       || window.SEED.sermons.find(x => x.id === id);
   }
   function openPlayer(id) {
@@ -246,6 +233,7 @@
         <p>${esc(s.blurb)}</p></div>`;
   }
   async function openVideoPlayer(s) {
+    const membersOnly = s.members_only !== false; // guest videos are open to everyone
     const gate = msg => `<div class="vgate">
         <div class="vgate__lock">🔒</div>
         <h3>Members only</h3>
@@ -254,8 +242,8 @@
                        : `<p class="vgate__note">Member login isn't configured yet (add your Auth0 keys in <code>js/config.js</code>).</p>`}
       </div>`;
 
-    // 1) Not signed in → show the gate.
-    if (!Auth.enabled || !Auth.user) {
+    // 1) Members-only + not signed in → show the login gate. (Guest videos skip this.)
+    if (membersOnly && (!Auth.enabled || !Auth.user)) {
       $('#modalCard').innerHTML = videoShell(s, gate(Auth.enabled
         ? 'Sign in with your church account to watch this message.'
         : 'This message is reserved for members.'));
@@ -263,11 +251,12 @@
       const b = $('#vLogin'); if (b) b.onclick = () => Auth.login();
       return;
     }
-    // 2) Signed in → ask our serverless function for a signed, short-lived embed.
+    // 2) Allowed → ask our serverless function for a signed, short-lived embed.
+    //    Guests get a signed URL without login; members send their Auth0 token.
     $('#modalCard').innerHTML = videoShell(s, `<div class="vloading"><span class="spin spin--light"></span>Loading video…</div>`);
     openModal();
     try {
-      const token = await Auth.getToken();
+      const token = (Auth.enabled && Auth.user) ? await Auth.getToken() : null;
       const r = await fetch(`/api/embed?video=${encodeURIComponent(s.video_id)}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || `Error ${r.status}`); }
       const { url } = await r.json();
@@ -642,8 +631,7 @@
         ['Gifts', () => giftsTable(gifts)],
         ['RSVPs', () => rsvpsTable(rsvps)],
         ['Prayer', () => prayersList(prayers)],
-        ['Videos', () => videosPanel()],
-        ['Sermons', () => contentPanel('sermons')],
+        ['Messages', () => contentPanel('sermons')],
         ['Events', () => contentPanel('events')],
         ['Ministries', () => contentPanel('ministries')],
         ['Site settings', () => settingsPanel()]
@@ -682,45 +670,24 @@
   }
   const emptyTable = msg => `<div class="empty"><p>${esc(msg)}</p></div>`;
 
-  /* ---------- bunny.net video sync + publish ---------- */
-  let adminVideos = [];
-  function videosPanel() { setTimeout(fillVideosPanel, 0); return `<div id="cpanel">${spinner('Loading videos…')}</div>`; }
-  async function fillVideosPanel() {
-    const panel = $('#cpanel'); if (!panel) return;
+  /* ---------- bunny.net sync (imports videos as sermons) ---------- */
+  async function doSyncSermons(btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Syncing…'; }
     try {
-      adminVideos = await API.adminListVideos();
-      const pub = adminVideos.filter(v => v.published).length;
-      panel.innerHTML = `
-        <div class="cbar">
-          <span class="muted">${adminVideos.length} video${adminVideos.length === 1 ? '' : 's'} · ${pub} published</span>
-          <button class="btn btn--primary btn--sm" id="syncVideos">↻ Sync from bunny.net</button></div>
-        <p class="muted" style="margin:-6px 0 14px;font-size:.85rem">Pulls your bunny.net library. Toggle a video on to publish it to the site (playback stays members-only).</p>
-        <div class="clist">${adminVideos.length ? adminVideos.map(videoRow).join('') : emptyTable('No videos yet — click “Sync from bunny.net”.')}</div>`;
-      $('#syncVideos').onclick = doSyncVideos;
-    } catch (e) { console.error(e); panel.innerHTML = `<div class="empty"><p>Couldn't load videos.</p><p class="muted">${esc(e.message || '')}</p></div>`; }
-  }
-  function videoRow(v) {
-    return `<div class="crow">
-      <span class="crow__sw crow__sw--play" style="background:${grad(hueFromId(v.guid))}">▶</span>
-      <div class="crow__main"><b>${esc(v.title || 'Untitled')}</b>
-        <span>${fmtLen(v.length)} · ${v.published ? '<i class="pub pub--on">Published</i>' : '<i class="pub">Hidden</i>'}</span></div>
-      <div class="crow__act">
-        <button class="btn btn--ghost btn--sm" data-vpreview="${esc(v.guid)}">Preview</button>
-        <label class="switch" title="Publish to site"><input type="checkbox" data-vpub="${esc(v.guid)}" ${v.published ? 'checked' : ''}/><span></span></label>
-      </div>
-    </div>`;
-  }
-  async function doSyncVideos() {
-    const btn = $('#syncVideos'); if (btn) { btn.disabled = true; btn.textContent = 'Syncing…'; }
-    try { const r = await API.syncVideos(); toast(`Synced ${r.total} video${r.total === 1 ? '' : 's'}${r.added ? ` · ${r.added} new` : ''}.`); fillVideosPanel(); }
-    catch (e) { console.error(e); toast(e.message || 'Sync failed.'); if (btn) { btn.disabled = false; btn.textContent = '↻ Sync from bunny.net'; } }
+      const r = await API.syncVideos();
+      toast(r.added ? `Imported ${r.added} new video${r.added === 1 ? '' : 's'} from bunny.net (as drafts).` : `Up to date — ${r.total} video${r.total === 1 ? '' : 's'} in your library.`);
+      fillContentPanel('sermons');
+    } catch (e) { console.error(e); toast(e.message || 'Sync failed.'); if (btn) { btn.disabled = false; btn.textContent = '↻ Sync from bunny.net'; } }
   }
 
   /* ---------- content management (CMS) ---------- */
   const contentDefs = {
     sermons: {
-      singular: 'sermon', list: () => API.getSermons(), save: r => API.saveSermon(r), del: id => API.deleteSermon(id),
+      singular: 'message', list: () => API.getSermons(), save: r => API.saveSermon(r), del: id => API.deleteSermon(id),
+      sync: true,
       label: r => r.title, sub: r => `${r.speaker || ''} · ${r.series || ''} · ${r.date ? fmtDate(r.date) : ''}`,
+      badges: r => `${isPublic(r) ? '<i class="pub pub--on">Published</i>' : '<i class="pub">Draft</i>'}`
+        + (r.video_id ? (r.members_only === false ? ' · <i class="pub pub--guest">🌐 Guest</i>' : ' · <i class="pub">🔒 Members</i>') : ''),
       fields: [
         { name: 'title', label: 'Title', required: true },
         { name: 'speaker', label: 'Speaker', required: true },
@@ -728,7 +695,9 @@
         { name: 'date', label: 'Date', type: 'date', required: true },
         { name: 'duration', label: 'Duration (mm:ss)', placeholder: '34:20' },
         { name: 'category', label: 'Category', placeholder: 'Faith' },
-        { name: 'video_id', label: 'Bunny video ID (GUID) — members-only', placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' },
+        { name: 'video_id', label: 'Bunny video ID (GUID) — leave blank for no video', placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' },
+        { name: 'published', label: 'Published (visible on the site)', type: 'checkbox', default: true },
+        { name: 'members_only', label: 'Members-only (require login to watch)', type: 'checkbox', default: true },
         { name: 'hue', label: 'Color hue (0–360)', type: 'number', default: 212 },
         { name: 'featured', label: 'Feature on the home page', type: 'checkbox' },
         { name: 'blurb', label: 'Description', type: 'textarea' }
@@ -767,11 +736,15 @@
       const rows = await def.list();
       panel.innerHTML = `
         <div class="cbar"><span class="muted">${rows.length} ${type}</span>
-          <button class="btn btn--primary btn--sm" data-add="${type}">+ Add ${def.singular}</button></div>
+          <span style="display:flex;gap:8px">
+            ${def.sync ? `<button class="btn btn--ghost btn--sm" data-sync="${type}">↻ Sync from bunny.net</button>` : ''}
+            <button class="btn btn--primary btn--sm" data-add="${type}">+ Add ${def.singular}</button></span></div>
         <div class="clist">${rows.map(r => `
           <div class="crow">
-            <span class="crow__sw" style="background:${grad(r.hue || 212)}"></span>
-            <div class="crow__main"><b>${esc(def.label(r))}</b><span>${esc(def.sub(r))}</span></div>
+            <span class="crow__sw${r.video_id ? ' crow__sw--play' : ''}" style="background:${grad(r.hue || 212)}">${r.video_id ? '▶' : ''}</span>
+            <div class="crow__main"><b>${esc(def.label(r))}</b>
+              <span>${esc(def.sub(r))}</span>
+              ${def.badges ? `<span class="crow__badges">${def.badges(r)}</span>` : ''}</div>
             <div class="crow__act">
               <button class="btn btn--ghost btn--sm" data-edit="${type}" data-id="${esc(r.id)}">Edit</button>
               <button class="btn btn--ghost btn--sm" data-del="${type}" data-id="${esc(r.id)}">Delete</button>
@@ -910,18 +883,7 @@
     const add = e.target.closest('[data-add]'); if (add) { openEditor(add.dataset.add, null); return; }
     const edit = e.target.closest('[data-edit]'); if (edit) { openEditorById(edit.dataset.edit, edit.dataset.id); return; }
     const del = e.target.closest('[data-del]'); if (del) { handleDelete(del.dataset.del, del.dataset.id); return; }
-    const vprev = e.target.closest('[data-vpreview]');
-    if (vprev) { const v = adminVideos.find(x => x.guid === vprev.dataset.vpreview); if (v) openVideoPlayer(videoToCard(v)); }
-  });
-  document.addEventListener('change', async e => {
-    const t = e.target.closest('[data-vpub]'); if (!t) return;
-    try {
-      await API.setVideoPublished(t.dataset.vpub, t.checked);
-      const a = adminVideos.find(v => v.guid === t.dataset.vpub); if (a) a.published = t.checked;
-      const badge = t.closest('.crow')?.querySelector('.pub');
-      if (badge) { badge.textContent = t.checked ? 'Published' : 'Hidden'; badge.classList.toggle('pub--on', t.checked); }
-      toast(t.checked ? '✅ Published to the site.' : 'Hidden from the site.');
-    } catch (err) { console.error(err); t.checked = !t.checked; toast(err.message || 'Update failed.'); }
+    const sync = e.target.closest('[data-sync]'); if (sync) { doSyncSermons(sync); }
   });
 
   /* ---------- mobile menu ---------- */
