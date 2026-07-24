@@ -38,7 +38,21 @@ files hosted on Bunny Storage.
    ```bash
    npm run db:migrate
    ```
-4. Start the dev server:
+4. (Optional) Seed demo content — categories, hymnal series with playable
+   audio, sermon series with demo videos, and a members-only series — so
+   there's something to browse without wiring up Bunny or Auth0 first:
+   ```bash
+   npm run db:seed
+   ```
+   This uses only local files under `public/demo/` (self-generated WAV audio
+   tracks and SVG cover images, no external network calls), so it works
+   fully offline. Demo videos (`bunnyLibraryId: "demo"`) render a static
+   placeholder instead of a real Bunny Stream player, since there's no real
+   video behind them — everything else (browsing, categories, hymnal audio
+   playback, member-only gating) works exactly as it would with real
+   content. Re-run `prisma migrate reset` (or drop and recreate the
+   database) before seeding again to avoid unique-slug conflicts.
+5. Start the dev server:
    ```bash
    npm run dev
    ```
@@ -74,5 +88,6 @@ files hosted on Bunny Storage.
 
 ## Useful scripts
 
+- `npm run db:seed` — populate demo content (see Setup step 4)
 - `npm run db:studio` — browse the database with Prisma Studio
 - `npm run build` — production build
