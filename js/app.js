@@ -926,15 +926,20 @@
   }
 
   /* ---------- boot ---------- */
+  // Load site settings BEFORE the first paint so the page never flashes the
+  // local placeholder church data and then swaps to the real one. Cap the
+  // wait so a slow/unreachable API falls back to local defaults instead of
+  // leaving the page stuck on the loading spinner.
   window.addEventListener('hashchange', router);
-  paintChrome();
-  paintAuth();
-  router();
-  // Load editable site settings, then re-render with any staff customizations.
-  API.getSettings().then(s => {
-    if (!s) return;
-    C.church = { ...C.church, ...s, times: (s.times && s.times.length) ? s.times : C.church.times };
+  view.innerHTML = spinner('Loading…');
+  const timeout = (ms) => new Promise(r => setTimeout(r, ms, null));
+  (async function boot() {
+    try {
+      const s = await Promise.race([API.getSettings(), timeout(4000)]);
+      if (s) C.church = { ...C.church, ...s, times: (s.times && s.times.length) ? s.times : C.church.times };
+    } catch (e) { console.warn('settings load failed', e); }
     paintChrome();
+    paintAuth();
     router();
-  }).catch(e => console.warn('settings load failed', e));
+  })();
 })();
