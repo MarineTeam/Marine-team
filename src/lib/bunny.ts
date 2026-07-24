@@ -121,14 +121,36 @@ export function mapBunnyStreamStatus(bunnyStatus: number): "PROCESSING" | "READY
   return bunnyStatus === 4 ? "READY" : "FAILED";
 }
 
+/**
+ * When the Stream library has "Token Authentication" enabled (Library ->
+ * Security), the embed player and thumbnail/direct-play URLs 404 without a
+ * signed `token`/`expires` pair. Bunny's formula:
+ * sha256_hex(tokenAuthKey + videoId + expires).
+ * https://docs.bunny.net/docs/stream-embed-view-token-authentication
+ */
+function bunnyStreamAuthParams(videoId: string): string {
+  const tokenAuthKey = process.env.BUNNY_STREAM_TOKEN_AUTH_KEY;
+  if (!tokenAuthKey) return "";
+
+  const expires = Math.floor(Date.now() / 1000) + 6 * 60 * 60; // 6 hours
+  const token = crypto
+    .createHash("sha256")
+    .update(`${tokenAuthKey}${videoId}${expires}`)
+    .digest("hex");
+  return `token=${token}&expires=${expires}`;
+}
+
 export function bunnyStreamThumbnailUrl(videoId: string): string {
   const cdnHostname = process.env.BUNNY_STREAM_CDN_HOSTNAME;
   if (!cdnHostname) return "";
-  return `https://${cdnHostname}/${videoId}/thumbnail.jpg`;
+  const authParams = bunnyStreamAuthParams(videoId);
+  return `https://${cdnHostname}/${videoId}/thumbnail.jpg${authParams ? `?${authParams}` : ""}`;
 }
 
 export function bunnyStreamEmbedUrl(videoId: string): string {
-  return `https://iframe.mediadelivery.net/embed/${streamLibraryId()}/${videoId}?autoplay=false`;
+  const authParams = bunnyStreamAuthParams(videoId);
+  const query = ["autoplay=false", authParams].filter(Boolean).join("&");
+  return `https://iframe.mediadelivery.net/embed/${streamLibraryId()}/${videoId}?${query}`;
 }
 
 /** Uploads a file buffer to Bunny Storage at the given path and returns its public CDN url. */
