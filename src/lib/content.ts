@@ -16,6 +16,20 @@ export async function getPublishedCategoriesWithSeries() {
   });
 }
 
+/** The series shown in the homepage hero banner: most recently published with a cover image. */
+export async function getFeaturedSeries() {
+  const withCover = await prisma.series.findFirst({
+    where: { published: true, coverImageUrl: { not: null } },
+    orderBy: { updatedAt: "desc" },
+  });
+  if (withCover) return withCover;
+
+  return prisma.series.findFirst({
+    where: { published: true },
+    orderBy: { updatedAt: "desc" },
+  });
+}
+
 export async function getUncategorizedSeries() {
   return prisma.series.findMany({
     where: { published: true, categoryId: null },
