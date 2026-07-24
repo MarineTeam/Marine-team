@@ -18,6 +18,24 @@ const updateSchema = z.object({
   position: z.number().int().optional(),
 });
 
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    await ensureAdmin();
+    const { id } = await params;
+    const series = await prisma.series.findUniqueOrThrow({
+      where: { id },
+      include: {
+        category: true,
+        videos: { orderBy: { position: "asc" } },
+        files: { orderBy: { position: "asc" } },
+      },
+    });
+    return NextResponse.json(series);
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },

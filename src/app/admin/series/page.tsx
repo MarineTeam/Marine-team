@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type Category = { id: string; name: string };
@@ -138,13 +139,21 @@ export default function SeriesAdminPage() {
         {series.map((s) => (
           <li key={s.id} className="p-4 flex items-center justify-between gap-4">
             <div>
-              <p className="font-medium">{s.title}</p>
+              <Link href={`/admin/series/${s.id}`} className="font-medium hover:underline">
+                {s.title}
+              </Link>
               <p className="text-sm text-zinc-500">
                 {s.category?.name ?? "Uncategorized"} · {s._count.videos} videos ·{" "}
                 {s._count.files} files
               </p>
             </div>
             <div className="flex items-center gap-2 text-sm">
+              <Link
+                href={`/admin/series/${s.id}`}
+                className="rounded-md bg-zinc-900 text-white px-2 py-1 dark:bg-white dark:text-zinc-900"
+              >
+                Manage episodes
+              </Link>
               <button
                 onClick={() => toggle(s, "published")}
                 className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
