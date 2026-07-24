@@ -4,7 +4,8 @@ import { prisma } from "@/lib/db";
 import { ensureAdmin, errorResponse } from "@/lib/api-guard";
 
 const updateSchema = z.object({
-  role: z.enum(["MEMBER", "ADMIN"]),
+  role: z.enum(["MEMBER", "ADMIN"]).optional(),
+  authorized: z.boolean().optional(),
 });
 
 export async function PATCH(
@@ -12,10 +13,19 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await ensureAdmin();
+    const admin = await ensureAdmin();
     const { id } = await params;
     const body = updateSchema.parse(await request.json());
-    const user = await prisma.user.update({ where: { id }, data: { role: body.role } });
+    if (id === admin.id && body.authorized === false) {
+      return NextResponse.json(
+        { error: "You can't revoke your own access" },
+        { status: 400 },
+      );
+    }
+    const user = await prisma.user.update({
+      where: { id },
+      data: { role: body.role, authorized: body.authorized },
+    });
     return NextResponse.json(user);
   } catch (error) {
     return errorResponse(error);
@@ -31,7 +41,7 @@ export async function DELETE(
     const { id } = await params;
     if (id === admin.id) {
       return NextResponse.json(
-        { error: "You can't revoke your own access" },
+        { error: "You can't remove your own access" },
         { status: 400 },
       );
     }
