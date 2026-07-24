@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
 import { ensureAdmin, errorResponse } from "@/lib/api-guard";
+import { getTargetDb } from "@/lib/admin-target";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -19,6 +19,7 @@ export async function PATCH(
 ) {
   try {
     await ensureAdmin();
+    const prisma = getTargetDb(request);
     const { id } = await params;
     const body = updateSchema.parse(await request.json());
     const category = await prisma.category.update({ where: { id }, data: body });
@@ -29,11 +30,12 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await ensureAdmin();
+    const prisma = getTargetDb(request);
     const { id } = await params;
     await prisma.category.delete({ where: { id } });
     return NextResponse.json({ ok: true });

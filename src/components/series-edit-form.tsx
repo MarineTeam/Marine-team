@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useAdminTarget } from "@/lib/use-admin-target";
 
 type Category = { id: string; name: string };
 type Series = {
@@ -23,6 +24,7 @@ export function SeriesEditForm({
   categories: Category[];
 }) {
   const router = useRouter();
+  const { apiPath, isDemo } = useAdminTarget();
   const [title, setTitle] = useState(series.title);
   const [slug, setSlug] = useState(series.slug);
   const [description, setDescription] = useState(series.description ?? "");
@@ -40,7 +42,7 @@ export function SeriesEditForm({
     setError(null);
     setSaved(false);
     try {
-      const res = await fetch(`/api/admin/series/${series.id}`, {
+      const res = await fetch(apiPath(`/api/admin/series/${series.id}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -67,8 +69,8 @@ export function SeriesEditForm({
     if (!confirm("Delete this series? Its videos and files will be detached, not deleted.")) {
       return;
     }
-    await fetch(`/api/admin/series/${series.id}`, { method: "DELETE" });
-    router.push("/admin/series");
+    await fetch(apiPath(`/api/admin/series/${series.id}`), { method: "DELETE" });
+    router.push(isDemo ? "/admin/demo/series" : "/admin/series");
   }
 
   return (

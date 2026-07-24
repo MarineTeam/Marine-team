@@ -116,6 +116,14 @@ Setup:
    - Is safe to click more than once — it skips anything already there
 4. Visit `/demo`.
 
+**Managing demo content**: `/admin/demo` also links to Categories, Series,
+Videos, and Files pages under `/admin/demo/*` — the exact same admin CMS
+components as the real `/admin/*` pages, just pointed at the demo database.
+Every admin API route (except `/api/admin/users`, which is never
+per-database) accepts a `?target=demo` query param
+(`src/lib/admin-target.ts`); the admin pages add it automatically based on
+whether the current URL is under `/admin/demo` (`src/lib/use-admin-target.ts`).
+
 If you ever change `prisma/schema.prisma`, regenerate the DDL embedded in
 `src/lib/demo-schema.ts` with:
 ```bash
