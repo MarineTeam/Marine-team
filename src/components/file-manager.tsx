@@ -79,6 +79,15 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
     await load();
   }
 
+  async function reassignSeries(id: string, newSeriesId: string) {
+    await fetch(`/api/admin/files/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seriesId: newSeriesId || null }),
+    });
+    await load();
+  }
+
   const visibleFiles = seriesId ? files.filter((f) => f.series?.id === seriesId) : files;
 
   return (
@@ -137,11 +146,22 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
           <li key={f.id} className="p-4 flex items-center justify-between gap-4">
             <div>
               <p className="font-medium">{f.title}</p>
-              {!seriesId && (
-                <p className="text-sm text-zinc-500">{f.series?.title ?? "No series"}</p>
-              )}
             </div>
             <div className="flex items-center gap-2 text-sm">
+              {!seriesId && (
+                <select
+                  value={f.series?.id ?? ""}
+                  onChange={(e) => reassignSeries(f.id, e.target.value)}
+                  className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+                >
+                  <option value="">No series</option>
+                  {seriesList.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.title}
+                    </option>
+                  ))}
+                </select>
+              )}
               <button
                 onClick={() => toggle(f, "published")}
                 className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
