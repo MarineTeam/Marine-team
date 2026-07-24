@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAdminTarget } from "@/lib/use-admin-target";
 
 type Series = { id: string; title: string };
 type FileAsset = {
@@ -18,6 +19,7 @@ type FileAsset = {
  * page); omit it for the global "All files" view with a series picker.
  */
 export function FileManager({ seriesId }: { seriesId?: string }) {
+  const { apiPath } = useAdminTarget();
   const [files, setFiles] = useState<FileAsset[]>([]);
   const [seriesList, setSeriesList] = useState<Series[]>([]);
   const [title, setTitle] = useState("");
@@ -28,8 +30,8 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
 
   async function load() {
     const [filesRes, seriesRes] = await Promise.all([
-      fetch("/api/admin/files"),
-      fetch("/api/admin/series"),
+      fetch(apiPath("/api/admin/files")),
+      fetch(apiPath("/api/admin/series")),
     ]);
     if (filesRes.ok) setFiles(await filesRes.json());
     if (seriesRes.ok) setSeriesList(await seriesRes.json());
@@ -38,6 +40,7 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function uploadFile(e: React.FormEvent) {
@@ -51,7 +54,7 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
       form.append("title", title);
       const targetSeriesId = seriesId ?? pickedSeriesId;
       if (targetSeriesId) form.append("seriesId", targetSeriesId);
-      const res = await fetch("/api/admin/files", { method: "POST", body: form });
+      const res = await fetch(apiPath("/api/admin/files"), { method: "POST", body: form });
       if (!res.ok) throw new Error((await res.json()).error ?? "Upload failed");
       setTitle("");
       setPickedSeriesId("");
@@ -65,7 +68,7 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
   }
 
   async function toggle(f: FileAsset, field: "published" | "memberOnly") {
-    await fetch(`/api/admin/files/${f.id}`, {
+    await fetch(apiPath(`/api/admin/files/${f.id}`), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [field]: !f[field] }),
@@ -75,12 +78,12 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
 
   async function remove(id: string) {
     if (!confirm("Delete this file? This also removes it from Bunny Storage.")) return;
-    await fetch(`/api/admin/files/${id}`, { method: "DELETE" });
+    await fetch(apiPath(`/api/admin/files/${id}`), { method: "DELETE" });
     await load();
   }
 
   async function reassignSeries(id: string, newSeriesId: string) {
-    await fetch(`/api/admin/files/${id}`, {
+    await fetch(apiPath(`/api/admin/files/${id}`), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ seriesId: newSeriesId || null }),

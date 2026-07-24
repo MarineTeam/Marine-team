@@ -1,12 +1,13 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
 import { ensureAdmin, errorResponse } from "@/lib/api-guard";
+import { getTargetDb } from "@/lib/admin-target";
 import { bunnyListStreamVideos } from "@/lib/bunny";
 
 /** Lists videos already in the Bunny Stream library that haven't been imported into the app yet. */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     await ensureAdmin();
+    const prisma = getTargetDb(request);
     const [bunnyVideos, importedVideos] = await Promise.all([
       bunnyListStreamVideos(),
       prisma.video.findMany({ select: { bunnyVideoId: true } }),

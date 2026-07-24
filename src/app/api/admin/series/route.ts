@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
 import { ensureAdmin, errorResponse } from "@/lib/api-guard";
+import { getTargetDb } from "@/lib/admin-target";
 
 const seriesSchema = z.object({
   title: z.string().min(1),
@@ -17,9 +17,10 @@ const seriesSchema = z.object({
   position: z.number().int().optional(),
 });
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     await ensureAdmin();
+    const prisma = getTargetDb(request);
     const series = await prisma.series.findMany({
       orderBy: { position: "asc" },
       include: { category: true, _count: { select: { videos: true, files: true } } },
@@ -33,6 +34,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     await ensureAdmin();
+    const prisma = getTargetDb(request);
     const body = seriesSchema.parse(await request.json());
     const series = await prisma.series.create({ data: body });
     return NextResponse.json(series, { status: 201 });

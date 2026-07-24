@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useAdminTarget } from "@/lib/use-admin-target";
 
 type Category = { id: string; name: string };
 type Series = {
@@ -25,6 +26,8 @@ function slugify(value: string) {
 }
 
 export default function SeriesAdminPage() {
+  const { apiPath, isDemo } = useAdminTarget();
+  const seriesBasePath = isDemo ? "/admin/demo/series" : "/admin/series";
   const [series, setSeries] = useState<Series[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [title, setTitle] = useState("");
@@ -35,8 +38,8 @@ export default function SeriesAdminPage() {
 
   async function load() {
     const [seriesRes, categoriesRes] = await Promise.all([
-      fetch("/api/admin/series"),
-      fetch("/api/admin/categories"),
+      fetch(apiPath("/api/admin/series")),
+      fetch(apiPath("/api/admin/categories")),
     ]);
     if (seriesRes.ok) setSeries(await seriesRes.json());
     if (categoriesRes.ok) setCategories(await categoriesRes.json());
@@ -45,6 +48,7 @@ export default function SeriesAdminPage() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function createSeries(e: React.FormEvent) {
@@ -52,7 +56,7 @@ export default function SeriesAdminPage() {
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/series", {
+      const res = await fetch(apiPath("/api/admin/series"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -76,7 +80,7 @@ export default function SeriesAdminPage() {
   }
 
   async function toggle(s: Series, field: "published" | "memberOnly") {
-    await fetch(`/api/admin/series/${s.id}`, {
+    await fetch(apiPath(`/api/admin/series/${s.id}`), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [field]: !s[field] }),
@@ -87,7 +91,7 @@ export default function SeriesAdminPage() {
   async function remove(id: string) {
     if (!confirm("Delete this series? Its videos and files will be detached, not deleted."))
       return;
-    await fetch(`/api/admin/series/${id}`, { method: "DELETE" });
+    await fetch(apiPath(`/api/admin/series/${id}`), { method: "DELETE" });
     await load();
   }
 
@@ -139,7 +143,7 @@ export default function SeriesAdminPage() {
         {series.map((s) => (
           <li key={s.id} className="p-4 flex items-center justify-between gap-4">
             <div>
-              <Link href={`/admin/series/${s.id}`} className="font-medium hover:underline">
+              <Link href={`${seriesBasePath}/${s.id}`} className="font-medium hover:underline">
                 {s.title}
               </Link>
               <p className="text-sm text-zinc-500">
@@ -149,7 +153,7 @@ export default function SeriesAdminPage() {
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Link
-                href={`/admin/series/${s.id}`}
+                href={`${seriesBasePath}/${s.id}`}
                 className="rounded-md bg-zinc-900 text-white px-2 py-1 dark:bg-white dark:text-zinc-900"
               >
                 Manage episodes

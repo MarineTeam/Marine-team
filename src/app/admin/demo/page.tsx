@@ -1,6 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+
+const manageLinks = [
+  { href: "/admin/demo/categories", label: "Categories" },
+  { href: "/admin/demo/series", label: "Series" },
+  { href: "/admin/demo/videos", label: "Videos" },
+  { href: "/admin/demo/files", label: "Files" },
+];
 
 type SetupResult = {
   applied: string[];
@@ -67,6 +75,24 @@ export default function DemoSetupPage() {
           </p>
         </div>
       )}
+
+      <div>
+        <h2 className="font-medium mb-2">Manage demo content</h2>
+        <p className="text-sm text-zinc-500 mb-3">
+          Same CMS as the real one, pointed at the demo database instead.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {manageLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
