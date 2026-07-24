@@ -21,12 +21,11 @@ export async function getSessionIdentity(): Promise<SessionIdentity | null> {
 }
 
 /**
- * Returns the local User row for the current Auth0 session, or null if
- * nobody is logged in to Auth0 OR they aren't authorized: authorization
- * means either a row already exists for their email (added ahead of time
- * via /admin/users) or their email is in ADMIN_EMAILS. Auth0 login proves
- * identity, not that we let someone in — an authenticated-but-unlisted
- * email never gets a User row and is treated as logged out everywhere.
+ * Records every Auth0 login attempt as a User row (so admins can see it at
+ * /admin/users and decide whether to grant access), but only returns a
+ * user — meaning "treat as logged in" — once `authorized` is true. A brand
+ * new row starts unauthorized unless the email is in ADMIN_EMAILS, which
+ * self-authorizes as ADMIN so there's always a way in.
  */
 export async function getCurrentUser(): Promise<User | null> {
   const session = await auth0.getSession();
@@ -37,20 +36,27 @@ export async function getCurrentUser(): Promise<User | null> {
   const isBootstrapAdmin = ADMIN_EMAILS.includes(email);
 
   const existing = await prisma.user.findUnique({ where: { email } });
-  if (!existing && !isBootstrapAdmin) {
-    return null;
-  }
 
-  return prisma.user.upsert({
+  const user = await prisma.user.upsert({
     where: { email },
-    create: { auth0Id: sub, email, name, picture, role: isBootstrapAdmin ? "ADMIN" : "MEMBER" },
+    create: {
+      auth0Id: sub,
+      email,
+      name,
+      picture,
+      role: isBootstrapAdmin ? "ADMIN" : "MEMBER",
+      authorized: isBootstrapAdmin,
+    },
     update: {
       auth0Id: sub,
       name,
       picture,
       role: isBootstrapAdmin ? "ADMIN" : existing?.role,
+      authorized: isBootstrapAdmin ? true : existing?.authorized,
     },
   });
+
+  return user.authorized ? user : null;
 }
 
 export async function requireAdmin(): Promise<User> {

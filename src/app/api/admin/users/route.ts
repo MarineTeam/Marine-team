@@ -11,7 +11,9 @@ const createSchema = z.object({
 export async function GET() {
   try {
     await ensureAdmin();
-    const users = await prisma.user.findMany({ orderBy: { createdAt: "asc" } });
+    const users = await prisma.user.findMany({
+      orderBy: [{ authorized: "asc" }, { createdAt: "asc" }],
+    });
     return NextResponse.json(users);
   } catch (error) {
     return errorResponse(error);
@@ -27,11 +29,11 @@ export async function POST(request: NextRequest) {
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
-      return NextResponse.json({ error: "That email is already authorized" }, { status: 409 });
+      return NextResponse.json({ error: "That email already has a row" }, { status: 409 });
     }
 
     const user = await prisma.user.create({
-      data: { email, role: body.role ?? "MEMBER" },
+      data: { email, role: body.role ?? "MEMBER", authorized: true },
     });
     return NextResponse.json(user, { status: 201 });
   } catch (error) {

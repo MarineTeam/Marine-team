@@ -45,13 +45,15 @@ files hosted on Bunny Storage.
 - **Auth**: `/auth/login`, `/auth/logout`, `/auth/callback` are handled
   automatically by the Auth0 SDK's `proxy.ts` (Next.js 16 renamed Middleware
   to Proxy). Logging in with Auth0 only proves identity — it does **not**
-  grant access by itself. `getCurrentUser()` only returns (and syncs) a
-  `User` row for emails that are either already in the `User` table (added
-  ahead of time via `/admin/users`) or listed in `ADMIN_EMAILS` (which
-  self-bootstraps as `ADMIN` on first login, so you always have a way in).
-  Anyone else who logs in through Auth0 is treated as logged out everywhere
-  in the app — the Navbar shows "Access not authorized" instead of their
-  name. Manage who's allowed in at `/admin/users`.
+  grant access by itself. Every login attempt gets a `User` row (so it's
+  visible at `/admin/users`), but `getCurrentUser()` only treats someone as
+  logged in once their row's `authorized` flag is true. Emails in
+  `ADMIN_EMAILS` self-authorize as `ADMIN` on first login (so you always
+  have a way in); everyone else shows up under "Pending login attempts" at
+  `/admin/users` until an admin clicks **Grant access** — or you can
+  pre-authorize an email there before they ever log in. Someone who isn't
+  authorized yet sees "Access not authorized" in the Navbar instead of
+  being treated as a member.
 - **Admin CMS** (`/admin`, gated to `ADMIN` role): manage categories, series,
   videos, and files. Video upload creates a placeholder in Bunny Stream,
   signs a TUS upload session, and streams the file straight from the

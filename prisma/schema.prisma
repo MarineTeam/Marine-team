@@ -20,19 +20,21 @@ enum VideoStatus {
   FAILED
 }
 
-// A row here is what makes an email authorized to log in at all: the
-// Auth0 login itself only proves identity, not that we allow the person
-// in. Admins add rows via /admin/users before someone ever logs in
-// (auth0Id is filled in on their first successful login), or an email in
-// ADMIN_EMAILS bootstraps itself as ADMIN on first login without needing
-// a pre-created row.
+// Auth0 login only proves identity, not that we let someone in: anyone
+// who attempts to log in gets a row here (so admins can see the attempt
+// at /admin/users), but `authorized` starts false and getCurrentUser()
+// only grants access once it's true. Admins can pre-authorize an email
+// via /admin/users before the person ever logs in, or grant access to a
+// pending row after seeing the attempt. ADMIN_EMAILS self-authorizes as
+// ADMIN on first login so there's always a way in.
 model User {
-  id        String   @id @default(cuid())
-  auth0Id   String?  @unique
-  email     String   @unique
-  name      String?
-  picture   String?
-  role      Role     @default(MEMBER)
+  id         String   @id @default(cuid())
+  auth0Id    String?  @unique
+  email      String   @unique
+  name       String?
+  picture    String?
+  role       Role     @default(MEMBER)
+  authorized Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
