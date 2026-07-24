@@ -38,9 +38,10 @@ files hosted on Bunny Storage.
    ```bash
    npm run db:migrate
    ```
-4. (Optional) Seed demo content — categories, hymnal series with playable
-   audio, sermon series with demo videos, and a members-only series — so
-   there's something to browse without wiring up Bunny or Auth0 first:
+4. (Optional) Seed demo content into your local `DATABASE_URL` — categories,
+   hymnal series with playable audio, sermon series with demo videos, and a
+   members-only series — so there's something to browse without wiring up
+   Bunny or Auth0 first:
    ```bash
    npm run db:seed
    ```
@@ -52,6 +53,10 @@ files hosted on Bunny Storage.
    playback, member-only gating) works exactly as it would with real
    content. Re-run `prisma migrate reset` (or drop and recreate the
    database) before seeding again to avoid unique-slug conflicts.
+
+   For a **live demo running alongside your real production site**, see
+   "Demo section (`/demo`)" below instead — it uses a completely separate
+   database so simulated content never touches your real data.
 5. Start the dev server:
    ```bash
    npm run dev
@@ -85,6 +90,39 @@ files hosted on Bunny Storage.
   sign a short-lived `token`/`expires` pair per Bunny's token authentication
   formula (`sha256_hex(tokenAuthKey + videoId + expires)`); if it's unset,
   plain unsigned URLs are used instead.
+
+## Demo section (`/demo`)
+
+`/demo`, `/demo/series/[slug]`, and `/demo/videos/[slug]` mirror the public
+site but read from a **separate database** (`DEMO_DATABASE_URL`), so you can
+run a live simulated demo on the same deployment as your real production
+site without any risk of demo content ending up mixed into real church data.
+It's intentionally not linked from the Navbar — reachable only by visiting
+`/demo` directly.
+
+Setup:
+
+1. Provision a second Postgres database (any provider — this doesn't need
+   to be the same one as your main `DATABASE_URL`).
+2. Add `DEMO_DATABASE_URL` with that connection string to your environment
+   (Vercel: Settings -> Environment Variables, Production).
+3. Log in as an admin and open **Admin -> Demo Setup** (`/admin/demo`), then
+   click **Run demo setup**. This calls `POST /api/admin/demo/setup`, which:
+   - Creates the schema in the demo database (raw SQL — the demo database
+     may not support running `prisma db push`/`migrate` directly depending
+     on the provider, so this runs from the deployed app instead, which
+     always has a real network path to it)
+   - Seeds the same demo content as `npm run db:seed`
+   - Is safe to click more than once — it skips anything already there
+4. Visit `/demo`.
+
+If you ever change `prisma/schema.prisma`, regenerate the DDL embedded in
+`src/lib/demo-schema.ts` with:
+```bash
+npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script
+```
+(drop the `CREATE SCHEMA` statement — some managed Postgres providers reject
+it since `public` already exists by default).
 
 ## Useful scripts
 

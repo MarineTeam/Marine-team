@@ -1,10 +1,16 @@
 import Link from "next/link";
 import type { Series } from "@prisma/client";
 
-export function HeroBanner({ series }: { series: Series }) {
+export function HeroBanner({
+  series,
+  basePath = "",
+}: {
+  series: Series;
+  basePath?: string;
+}) {
   return (
     <Link
-      href={`/series/${series.slug}`}
+      href={`${basePath}/series/${series.slug}`}
       className="group relative block h-64 sm:h-80 w-full overflow-hidden bg-zinc-900"
     >
       {series.coverImageUrl && (
