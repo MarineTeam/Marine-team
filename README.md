@@ -24,6 +24,12 @@ files hosted on Bunny Storage.
    - `ADMIN_EMAILS`: comma-separated emails granted the `ADMIN` role on login
    - A Bunny Stream video library (`BUNNY_STREAM_*`) and a Bunny Storage zone
      with a public pull zone (`BUNNY_STORAGE_*`)
+     - If the Stream library has **Token Authentication** enabled (Library ->
+       Security in the Bunny dashboard), also set
+       `BUNNY_STREAM_TOKEN_AUTH_KEY` to the "Token Authentication Key" shown
+       there (a different secret from `BUNNY_STREAM_API_KEY`) — otherwise
+       the video player and thumbnails will 404. Leave it unset if token
+       auth is off.
 2. Install dependencies and generate the Prisma client:
    ```bash
    npm install
@@ -59,6 +65,12 @@ files hosted on Bunny Storage.
   signs a TUS upload session, and streams the file straight from the
   browser to Bunny; small files (≤4.5MB) are uploaded to Bunny Storage via
   the server.
+- **Bunny Stream playback**: `bunnyStreamEmbedUrl()` and
+  `bunnyStreamThumbnailUrl()` (`src/lib/bunny.ts`) build the iframe/thumbnail
+  URLs fresh on every request. If `BUNNY_STREAM_TOKEN_AUTH_KEY` is set, they
+  sign a short-lived `token`/`expires` pair per Bunny's token authentication
+  formula (`sha256_hex(tokenAuthKey + videoId + expires)`); if it's unset,
+  plain unsigned URLs are used instead.
 
 ## Useful scripts
 
