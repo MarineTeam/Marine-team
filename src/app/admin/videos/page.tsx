@@ -13,6 +13,13 @@ type Video = {
   published: boolean;
   series: { id: string; title: string } | null;
 };
+type BunnyLibraryVideo = {
+  guid: string;
+  title: string;
+  status: number;
+  length: number;
+  dateUploaded: string;
+};
 
 function slugify(value: string) {
   return value
@@ -31,6 +38,14 @@ export default function VideosAdminPage() {
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [showImport, setShowImport] = useState(false);
+  const [bunnyLibrary, setBunnyLibrary] = useState<BunnyLibraryVideo[] | null>(null);
+  const [bunnyLoading, setBunnyLoading] = useState(false);
+  const [importDrafts, setImportDrafts] = useState<
+    Record<string, { title: string; slug: string; seriesId: string }>
+  >({});
+  const [importingGuid, setImportingGuid] = useState<string | null>(null);
+
   async function load() {
     const [videosRes, seriesRes] = await Promise.all([
       fetch("/api/admin/videos"),
@@ -44,6 +59,62 @@ export default function VideosAdminPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, []);
+
+  async function loadBunnyLibrary() {
+    setBunnyLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/videos/bunny-library");
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed to list Bunny videos");
+      const items: BunnyLibraryVideo[] = await res.json();
+      setBunnyLibrary(items);
+      setImportDrafts(
+        Object.fromEntries(
+          items.map((v) => [
+            v.guid,
+            { title: v.title, slug: slugify(v.title), seriesId: "" },
+          ]),
+        ),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to list Bunny videos");
+    } finally {
+      setBunnyLoading(false);
+    }
+  }
+
+  function updateDraft(guid: string, field: "title" | "slug" | "seriesId", value: string) {
+    setImportDrafts((prev) => ({ ...prev, [guid]: { ...prev[guid], [field]: value } }));
+  }
+
+  async function importVideo(guid: string) {
+    const draft = importDrafts[guid];
+    if (!draft?.title.trim() || !draft?.slug.trim()) {
+      setError("Title and slug are required to import a video");
+      return;
+    }
+    setImportingGuid(guid);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/videos/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bunnyVideoId: guid,
+          title: draft.title,
+          slug: draft.slug,
+          seriesId: draft.seriesId || null,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Import failed");
+      setBunnyLibrary((prev) => prev?.filter((v) => v.guid !== guid) ?? null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      setImportingGuid(null);
+    }
+  }
 
   async function uploadVideo(e: React.FormEvent) {
     e.preventDefault();
@@ -164,6 +235,86 @@ export default function VideosAdminPage() {
         )}
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-medium">Import existing Bunny videos</h2>
+          <button
+            onClick={() => {
+              const next = !showImport;
+              setShowImport(next);
+              if (next && bunnyLibrary === null) loadBunnyLibrary();
+            }}
+            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700"
+          >
+            {showImport ? "Hide" : "Show"}
+          </button>
+        </div>
+
+        {showImport && (
+          <div className="space-y-3">
+            <button
+              onClick={loadBunnyLibrary}
+              disabled={bunnyLoading}
+              className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm disabled:opacity-50 dark:border-zinc-700"
+            >
+              {bunnyLoading ? "Checking…" : "Check for new videos"}
+            </button>
+
+            {bunnyLibrary?.length === 0 && (
+              <p className="text-sm text-zinc-500">
+                Everything already in your Bunny Stream library has been imported.
+              </p>
+            )}
+
+            <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-md border border-zinc-200 dark:border-zinc-800">
+              {bunnyLibrary?.map((v) => {
+                const draft = importDrafts[v.guid];
+                return (
+                  <li key={v.guid} className="p-3 space-y-2">
+                    <p className="text-sm text-zinc-500">
+                      Bunny: {v.title} · uploaded {new Date(v.dateUploaded).toLocaleDateString()}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        value={draft?.title ?? ""}
+                        onChange={(e) => updateDraft(v.guid, "title", e.target.value)}
+                        placeholder="Title"
+                        className="rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                      />
+                      <input
+                        value={draft?.slug ?? ""}
+                        onChange={(e) => updateDraft(v.guid, "slug", e.target.value)}
+                        placeholder="slug"
+                        className="rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                      />
+                      <select
+                        value={draft?.seriesId ?? ""}
+                        onChange={(e) => updateDraft(v.guid, "seriesId", e.target.value)}
+                        className="rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                      >
+                        <option value="">No series</option>
+                        {seriesList.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.title}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => importVideo(v.guid)}
+                        disabled={importingGuid === v.guid}
+                        className="ml-auto rounded-md bg-zinc-900 text-white px-3 py-1.5 text-sm hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+                      >
+                        {importingGuid === v.guid ? "Importing…" : "Import"}
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+      </div>
 
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
         {videos.map((v) => (
