@@ -186,6 +186,15 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
     await load();
   }
 
+  async function reassignSeries(id: string, newSeriesId: string) {
+    await fetch(`/api/admin/videos/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seriesId: newSeriesId || null }),
+    });
+    await load();
+  }
+
   async function remove(id: string) {
     if (!confirm("Delete this video? This also removes it from Bunny Stream.")) return;
     await fetch(`/api/admin/videos/${id}`, { method: "DELETE" });
@@ -337,11 +346,23 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
           <li key={v.id} className="p-4 flex items-center justify-between gap-4">
             <div>
               <p className="font-medium">{v.title}</p>
-              <p className="text-sm text-zinc-500">
-                {seriesId ? v.status : `${v.series?.title ?? "No series"} · ${v.status}`}
-              </p>
+              <p className="text-sm text-zinc-500">{v.status}</p>
             </div>
             <div className="flex items-center gap-2 text-sm">
+              {!seriesId && (
+                <select
+                  value={v.series?.id ?? ""}
+                  onChange={(e) => reassignSeries(v.id, e.target.value)}
+                  className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+                >
+                  <option value="">No series</option>
+                  {seriesList.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.title}
+                    </option>
+                  ))}
+                </select>
+              )}
               {v.status !== "READY" && (
                 <button
                   onClick={() => refreshStatus(v.id)}
