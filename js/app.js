@@ -248,7 +248,7 @@
         ? 'Sign in with your church account to watch this message.'
         : 'This message is reserved for members.'));
       openModal();
-      const b = $('#vLogin'); if (b) b.onclick = () => Auth.login();
+      const b = $('#vLogin'); if (b) b.onclick = () => Auth.login().catch(e => { console.error(e); toast(e.message || 'Login failed — please try again.'); });
       return;
     }
     // 2) Allowed → ask our serverless function for a signed, short-lived embed.
@@ -921,7 +921,7 @@
       $('#logoutBtn').onclick = () => Auth.logout();
     } else {
       slot.innerHTML = `<button class="btn btn--ghost" id="loginBtn">Member log in</button>`;
-      $('#loginBtn').onclick = () => Auth.login();
+      $('#loginBtn').onclick = () => Auth.login().catch(e => { console.error(e); toast(e.message || 'Login failed — please try again.'); });
     }
   }
 
