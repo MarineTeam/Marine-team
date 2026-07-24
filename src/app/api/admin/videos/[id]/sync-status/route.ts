@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { ensureAdmin, errorResponse } from "@/lib/api-guard";
-import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
+import { bunnyStreamThumbnailUrl, mapBunnyStreamStatus } from "@/lib/bunny";
 
 /**
  * Polls Bunny Stream for encoding progress. Bunny status codes: 0 created,
@@ -26,7 +26,7 @@ export async function POST(
     }
     const data = (await res.json()) as { status: number; length?: number };
 
-    const status = data.status >= 4 ? (data.status === 4 ? "READY" : "FAILED") : "PROCESSING";
+    const status = mapBunnyStreamStatus(data.status);
     const updated = await prisma.video.update({
       where: { id },
       data: {

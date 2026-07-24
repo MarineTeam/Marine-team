@@ -31,6 +31,41 @@ function storageHost(): string {
   return region ? `${region}.storage.bunnycdn.com` : "storage.bunnycdn.com";
 }
 
+export type BunnyStreamVideoSummary = {
+  guid: string;
+  title: string;
+  status: number;
+  length: number;
+  dateUploaded: string;
+};
+
+/** Lists every video in the Bunny Stream library, paging through the API's 100-per-page limit. */
+export async function bunnyListStreamVideos(): Promise<BunnyStreamVideoSummary[]> {
+  const libraryId = streamLibraryId();
+  const results: BunnyStreamVideoSummary[] = [];
+  let page = 1;
+  const itemsPerPage = 100;
+
+  while (true) {
+    const res = await fetch(
+      `${STREAM_API_BASE}/library/${libraryId}/videos?page=${page}&itemsPerPage=${itemsPerPage}&orderBy=date`,
+      { headers: { AccessKey: streamApiKey() } },
+    );
+    if (!res.ok) {
+      throw new Error(`Bunny Stream list videos failed: ${res.status} ${await res.text()}`);
+    }
+    const data = (await res.json()) as {
+      items: BunnyStreamVideoSummary[];
+      totalItems: number;
+    };
+    results.push(...data.items);
+    if (results.length >= data.totalItems || data.items.length === 0) break;
+    page += 1;
+  }
+
+  return results;
+}
+
 /** Creates a placeholder video entry in Bunny Stream; returns its guid. */
 export async function bunnyCreateStreamVideo(title: string): Promise<string> {
   const res = await fetch(`${STREAM_API_BASE}/library/${streamLibraryId()}/videos`, {
@@ -78,6 +113,12 @@ export function bunnyStreamTusSignature(videoId: string) {
     expirationTime,
     signature,
   };
+}
+
+/** Maps Bunny Stream's numeric status to our VideoStatus enum. 4 = finished, 5 = error. */
+export function mapBunnyStreamStatus(bunnyStatus: number): "PROCESSING" | "READY" | "FAILED" {
+  if (bunnyStatus < 4) return "PROCESSING";
+  return bunnyStatus === 4 ? "READY" : "FAILED";
 }
 
 export function bunnyStreamThumbnailUrl(videoId: string): string {
