@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUser, getSessionIdentity } from "@/lib/current-user";
 
 export async function Navbar() {
-  const user = await getCurrentUser();
+  const [user, identity] = await Promise.all([getCurrentUser(), getSessionIdentity()]);
+  const unauthorized = !user && identity !== null;
 
   return (
     <header className="border-b border-zinc-200 bg-white/80 backdrop-blur sticky top-0 z-10 dark:bg-zinc-950/80 dark:border-zinc-800">
@@ -22,6 +23,16 @@ export async function Navbar() {
           {user ? (
             <>
               <span className="text-zinc-500">{user.name ?? user.email}</span>
+              <a
+                href="/auth/logout"
+                className="rounded-md border border-zinc-300 px-3 py-1 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              >
+                Log out
+              </a>
+            </>
+          ) : unauthorized ? (
+            <>
+              <span className="text-amber-600 dark:text-amber-500">Access not authorized</span>
               <a
                 href="/auth/logout"
                 className="rounded-md border border-zinc-300 px-3 py-1 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUser, getSessionIdentity } from "@/lib/current-user";
 
 const links = [
   { href: "/admin", label: "Overview" },
@@ -8,15 +8,25 @@ const links = [
   { href: "/admin/series", label: "Series" },
   { href: "/admin/videos", label: "Videos" },
   { href: "/admin/files", label: "Files" },
+  { href: "/admin/users", label: "Access" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/auth/login?returnTo=/admin");
-  if (user.role !== "ADMIN") {
+  const [user, identity] = await Promise.all([getCurrentUser(), getSessionIdentity()]);
+
+  if (!user && !identity) redirect("/auth/login?returnTo=/admin");
+  if (!user || user.role !== "ADMIN") {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-16 text-center">
+      <div className="max-w-3xl mx-auto px-4 py-16 text-center space-y-4">
         <p className="font-medium">You don&apos;t have access to the admin dashboard.</p>
+        {!user && (
+          <a
+            href="/auth/logout"
+            className="inline-block rounded-md border border-zinc-300 px-4 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          >
+            Log out
+          </a>
+        )}
       </div>
     );
   }
