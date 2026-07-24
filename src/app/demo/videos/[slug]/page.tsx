@@ -3,14 +3,15 @@ import { notFound } from "next/navigation";
 import { getVideoBySlug, canAccess } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { bunnyStreamEmbedUrl } from "@/lib/bunny";
+import { demoPrisma } from "@/lib/demo-db";
 
-export default async function VideoPage({
+export default async function DemoVideoPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [video, user] = await Promise.all([getVideoBySlug(slug), getCurrentUser()]);
+  const [video, user] = await Promise.all([getVideoBySlug(slug, demoPrisma), getCurrentUser()]);
 
   if (!video) notFound();
 
@@ -33,7 +34,7 @@ export default async function VideoPage({
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-4">
       {video.series && (
         <Link
-          href={`/series/${video.series.slug}`}
+          href={`/demo/series/${video.series.slug}`}
           className="text-sm text-zinc-500 hover:underline"
         >
           ← {video.series.title}

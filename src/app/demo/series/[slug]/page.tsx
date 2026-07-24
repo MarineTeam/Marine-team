@@ -2,14 +2,18 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSeriesBySlug, canAccess } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
+import { demoPrisma } from "@/lib/demo-db";
 
-export default async function SeriesPage({
+export default async function DemoSeriesPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [series, user] = await Promise.all([getSeriesBySlug(slug), getCurrentUser()]);
+  const [series, user] = await Promise.all([
+    getSeriesBySlug(slug, demoPrisma),
+    getCurrentUser(),
+  ]);
 
   if (!series) notFound();
 
@@ -50,7 +54,7 @@ export default async function SeriesPage({
                         <span className="text-sm text-zinc-400">Members only</span>
                       ) : (
                         <Link
-                          href={`/videos/${video.slug}`}
+                          href={`/demo/videos/${video.slug}`}
                           className="rounded-md bg-zinc-900 text-white px-3 py-1.5 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
                         >
                           Watch
