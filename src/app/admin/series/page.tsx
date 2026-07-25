@@ -13,6 +13,7 @@ type Series = {
   description: string | null;
   categoryId: string | null;
   memberOnly: boolean;
+  hidden: boolean;
   published: boolean;
   featured: boolean;
   pinned: boolean;
@@ -93,7 +94,7 @@ export default function SeriesAdminPage() {
     }
   }
 
-  async function toggle(s: Series, field: "published" | "memberOnly" | "featured" | "pinned") {
+  async function toggle(s: Series, field: "published" | "memberOnly" | "hidden" | "featured" | "pinned") {
     await fetch(`/api/admin/series/${s.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -377,6 +378,12 @@ export default function SeriesAdminPage() {
                     className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
                   >
                     {s.memberOnly ? "Members only" : "Public"}
+                  </button>
+                  <button
+                    onClick={() => toggle(s, "hidden")}
+                    className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${s.hidden ? "border-red-400 text-red-600 dark:text-red-400" : "border-zinc-300"}`}
+                  >
+                    {s.hidden ? "Hidden" : "Visible"}
                   </button>
                   <button
                     onClick={() => toggle(s, "featured")}

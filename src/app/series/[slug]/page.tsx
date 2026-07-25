@@ -80,7 +80,7 @@ export default async function SeriesPage({
     ratingsOn && user ? getUserSeriesRating(user.id, series.id) : Promise.resolve(null),
     likesOn ? getSeriesReactionSummary(series.id) : Promise.resolve({ likes: 0, dislikes: 0 }),
     likesOn && user ? getUserSeriesReaction(user.id, series.id) : Promise.resolve(null),
-    relatedOn && !seriesLocked ? getRelatedSeries(series) : Promise.resolve([]),
+    relatedOn && !seriesLocked ? getRelatedSeries(series, isLoggedIn) : Promise.resolve([]),
     commentsOn && !seriesLocked ? getComments("series", series.id) : Promise.resolve([]),
   ]);
   const initialComments = comments.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }));

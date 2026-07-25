@@ -13,15 +13,15 @@ export default async function CategoryPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const category = await getCategoryBySlug(slug);
+  const user = await getCurrentUser();
+  const category = await getCategoryBySlug(slug, Boolean(user));
 
   if (!category) notFound();
 
-  const [user, subscriptionsOn] = await Promise.all([
-    getCurrentUser(),
+  const [subscriptionsOn, subscribed] = await Promise.all([
     isPluginEnabled("subscriptions", category.id),
+    user ? isCategorySubscribed(user.id, category.id) : Promise.resolve(false),
   ]);
-  const subscribed = user ? await isCategorySubscribed(user.id, category.id) : false;
 
   const backHref = category.parent ? `/categories/${category.parent.slug}` : "/";
   const backLabel = category.parent ? category.parent.name : "Browse";

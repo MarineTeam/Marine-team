@@ -10,6 +10,7 @@ const updateSchema = z.object({
   title: z.string().min(1).optional(),
   seriesId: z.string().optional().nullable(),
   memberOnly: z.boolean().optional(),
+  hidden: z.boolean().optional(),
   published: z.boolean().optional(),
   publishAt: z.string().nullable().optional(),
   unpublishAt: z.string().nullable().optional(),

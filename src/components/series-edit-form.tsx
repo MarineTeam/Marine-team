@@ -12,6 +12,7 @@ type Series = {
   coverImageUrl: string | null;
   categoryId: string | null;
   memberOnly: boolean;
+  hidden: boolean;
   published: boolean;
   publishAt: Date | string | null;
   featured: boolean;
@@ -43,6 +44,7 @@ export function SeriesEditForm({
   const [coverImageUrl, setCoverImageUrl] = useState(series.coverImageUrl ?? "");
   const [categoryId, setCategoryId] = useState(series.categoryId ?? "");
   const [memberOnly, setMemberOnly] = useState(series.memberOnly);
+  const [hidden, setHidden] = useState(series.hidden);
   const [published, setPublished] = useState(series.published);
   const [featured, setFeatured] = useState(series.featured);
   const [pinned, setPinned] = useState(series.pinned);
@@ -70,6 +72,7 @@ export function SeriesEditForm({
           coverImageUrl,
           categoryId: categoryId || null,
           memberOnly,
+          hidden,
           published,
           featured,
           pinned,
@@ -202,6 +205,10 @@ export function SeriesEditForm({
             onChange={(e) => setMemberOnly(e.target.checked)}
           />
           Members only
+        </label>
+        <label className="flex items-center gap-1.5 text-sm">
+          <input type="checkbox" checked={hidden} onChange={(e) => setHidden(e.target.checked)} />
+          Hidden (invisible to everyone but admins/editors)
         </label>
         <label className="flex items-center gap-1.5 text-sm">
           <input

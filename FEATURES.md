@@ -114,6 +114,18 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   soon as any such grant exists for an item, "Members only" no longer gates
   it — only the granted roles/people (and admins) can view it. Files aren't
   covered — they stay governed by their own "Members only" flag.
+- **Hide content**: a series, video, or file can be marked `hidden` from its
+  admin edit page, independent of `published`/`memberOnly`. Hidden content is
+  excluded from every guest- and member-facing listing, search, RSS/podcast
+  feed, and direct URL — it behaves like it doesn't exist for anyone except
+  admins/editors managing it in `/admin`.
+- **Member content hidden from guests by default**: `memberOnly` series and
+  videos are excluded outright from all public listings (homepage, category
+  pages, search, trending, related/up-next, RSS) for anyone not logged in —
+  a guest browsing the site never sees that the content exists. Logged-in
+  members see it normally. Visiting a member-only item's URL directly still
+  shows a "log in to view" gate rather than a 404, so a shared link still
+  invites sign-up.
 
 ## Admin analytics (`/admin/analytics`)
 
