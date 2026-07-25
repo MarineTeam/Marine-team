@@ -35,7 +35,12 @@ export default async function Home() {
         {categories
           .filter((category) => category.series.length > 0)
           .map((category) => (
-            <SeriesRow key={category.id} title={category.name} series={category.series} />
+            <SeriesRow
+              key={category.id}
+              title={category.name}
+              href={`/categories/${category.slug}`}
+              series={category.series}
+            />
           ))}
 
         <SeriesRow title="More" series={uncategorized} />

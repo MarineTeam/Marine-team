@@ -30,6 +30,15 @@ export async function getFeaturedSeries() {
   });
 }
 
+export async function getCategoryBySlug(slug: string) {
+  return prisma.category.findFirst({
+    where: { slug },
+    include: {
+      series: { where: { published: true }, orderBy: { position: "asc" } },
+    },
+  });
+}
+
 export async function getUncategorizedSeries() {
   return prisma.series.findMany({
     where: { published: true, categoryId: null },
