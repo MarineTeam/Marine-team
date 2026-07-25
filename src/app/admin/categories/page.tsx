@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DragHandle, PositionInput } from "@/components/reorder-controls";
+import { reorderArray } from "@/lib/reorder";
 
 type Category = {
   id: string;
@@ -55,6 +57,7 @@ export default function CategoriesPage() {
   const [parentId, setParentId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
 
   async function load() {
     const res = await fetch("/api/admin/categories");
@@ -103,11 +106,8 @@ export default function CategoriesPage() {
     await load();
   }
 
-  async function move(siblings: CategoryNode[], index: number, direction: "up" | "down") {
-    const swapIndex = direction === "up" ? index - 1 : index + 1;
-    if (swapIndex < 0 || swapIndex >= siblings.length) return;
-    const reordered = [...siblings];
-    [reordered[index], reordered[swapIndex]] = [reordered[swapIndex], reordered[index]];
+  async function reorderTo(siblings: CategoryNode[], fromIndex: number, toIndex: number) {
+    const reordered = reorderArray(siblings, fromIndex, toIndex);
     await Promise.all(
       reordered.map((node, i) =>
         fetch(`/api/admin/categories/${node.id}`, {
@@ -118,6 +118,12 @@ export default function CategoriesPage() {
       ),
     );
     await load();
+  }
+
+  async function move(siblings: CategoryNode[], index: number, direction: "up" | "down") {
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= siblings.length) return;
+    await reorderTo(siblings, index, targetIndex);
   }
 
   async function remove(id: string) {
@@ -135,17 +141,36 @@ export default function CategoriesPage() {
     return nodes.flatMap((node, index) => [
       <li
         key={node.id}
-        className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4"
+        className={`p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 ${draggingId === node.id ? "opacity-40" : ""}`}
         style={{ paddingLeft: `${1 + depth * 1.5}rem` }}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          const fromIndex = nodes.findIndex((n) => n.id === draggingId);
+          if (fromIndex !== -1 && fromIndex !== index) reorderTo(nodes, fromIndex, index);
+          setDraggingId(null);
+        }}
       >
-        <div className="min-w-0">
-          <p className="font-medium">{node.name}</p>
-          <p className="text-sm text-zinc-500">
-            {node.slug}
-            {node.parent && ` · under ${node.parent.name}`}
-          </p>
+        <div className="min-w-0 flex items-center gap-2">
+          <DragHandle
+            draggable
+            onDragStart={() => setDraggingId(node.id)}
+            onDragEnd={() => setDraggingId(null)}
+          />
+          <div className="min-w-0">
+            <p className="font-medium">{node.name}</p>
+            <p className="text-sm text-zinc-500">
+              {node.slug}
+              {node.parent && ` · under ${node.parent.name}`}
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
+          <PositionInput
+            index={index}
+            total={nodes.length}
+            onReorder={(toIndex) => reorderTo(nodes, index, toIndex)}
+          />
           <button
             onClick={() => move(nodes, index, "up")}
             disabled={index === 0}

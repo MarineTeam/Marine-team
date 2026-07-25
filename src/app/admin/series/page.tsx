@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { DragHandle, PositionInput } from "@/components/reorder-controls";
+import { reorderArray } from "@/lib/reorder";
 
 type Category = { id: string; name: string };
 type Series = {
@@ -43,6 +45,7 @@ export default function SeriesAdminPage() {
   const [memberOnly, setMemberOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
 
   async function load() {
     const [seriesRes, categoriesRes] = await Promise.all([
@@ -102,11 +105,8 @@ export default function SeriesAdminPage() {
     await load();
   }
 
-  async function move(siblings: Series[], index: number, direction: "up" | "down") {
-    const swapIndex = direction === "up" ? index - 1 : index + 1;
-    if (swapIndex < 0 || swapIndex >= siblings.length) return;
-    const reordered = [...siblings];
-    [reordered[index], reordered[swapIndex]] = [reordered[swapIndex], reordered[index]];
+  async function reorderTo(siblings: Series[], fromIndex: number, toIndex: number) {
+    const reordered = reorderArray(siblings, fromIndex, toIndex);
     await Promise.all(
       reordered.map((s, i) =>
         fetch(`/api/admin/series/${s.id}`, {
@@ -117,6 +117,12 @@ export default function SeriesAdminPage() {
       ),
     );
     await load();
+  }
+
+  async function move(siblings: Series[], index: number, direction: "up" | "down") {
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= siblings.length) return;
+    await reorderTo(siblings, index, targetIndex);
   }
 
   const groups = groupByCategory(series);
@@ -174,17 +180,36 @@ export default function SeriesAdminPage() {
             {group.items.map((s, index) => (
               <li
                 key={s.id}
-                className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4"
+                className={`p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 ${draggingId === s.id ? "opacity-40" : ""}`}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const fromIndex = group.items.findIndex((item) => item.id === draggingId);
+                  if (fromIndex !== -1 && fromIndex !== index) reorderTo(group.items, fromIndex, index);
+                  setDraggingId(null);
+                }}
               >
-                <div className="min-w-0">
-                  <Link href={`/admin/series/${s.id}`} className="font-medium hover:underline">
-                    {s.title}
-                  </Link>
-                  <p className="text-sm text-zinc-500">
-                    {s._count.videos} videos · {s._count.files} files
-                  </p>
+                <div className="min-w-0 flex items-center gap-2">
+                  <DragHandle
+                    draggable
+                    onDragStart={() => setDraggingId(s.id)}
+                    onDragEnd={() => setDraggingId(null)}
+                  />
+                  <div className="min-w-0">
+                    <Link href={`/admin/series/${s.id}`} className="font-medium hover:underline">
+                      {s.title}
+                    </Link>
+                    <p className="text-sm text-zinc-500">
+                      {s._count.videos} videos · {s._count.files} files
+                    </p>
+                  </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <PositionInput
+                    index={index}
+                    total={group.items.length}
+                    onReorder={(toIndex) => reorderTo(group.items, index, toIndex)}
+                  />
                   <button
                     onClick={() => move(group.items, index, "up")}
                     disabled={index === 0}
