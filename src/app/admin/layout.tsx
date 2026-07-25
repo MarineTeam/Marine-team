@@ -32,14 +32,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 flex gap-8">
-      <aside className="w-48 shrink-0">
-        <nav className="space-y-1 text-sm">
+    <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8 flex flex-col sm:flex-row gap-4 sm:gap-8">
+      <aside className="sm:w-48 sm:shrink-0 -mx-4 px-4 sm:mx-0 sm:px-0 border-b border-zinc-200 pb-2 sm:border-none sm:pb-0 dark:border-zinc-800">
+        <nav className="flex gap-1 overflow-x-auto sm:flex-col sm:space-y-1 sm:overflow-visible text-sm">
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="block rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              className="block whitespace-nowrap rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800"
             >
               {link.label}
             </Link>

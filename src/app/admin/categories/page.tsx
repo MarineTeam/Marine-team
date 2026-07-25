@@ -120,15 +120,15 @@ export default function CategoriesPage() {
 
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
         {categories.map((category) => (
-          <li key={category.id} className="p-4 flex items-center justify-between gap-4">
-            <div>
+          <li key={category.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            <div className="min-w-0">
               <p className="font-medium">{category.name}</p>
               <p className="text-sm text-zinc-500">
                 {category.slug}
                 {category.parent && ` · under ${category.parent.name}`}
               </p>
             </div>
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
               <select
                 value={category.parentId ?? ""}
                 onChange={(e) => changeParent(category, e.target.value)}

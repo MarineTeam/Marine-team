@@ -218,7 +218,7 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
           className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
           required
         />
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {!seriesId && (
             <select
               value={pickedSeriesId}
@@ -237,13 +237,13 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
             type="file"
             accept="video/*"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="text-sm"
+            className="text-sm max-w-full"
             required
           />
           <button
             type="submit"
             disabled={progress !== null}
-            className="ml-auto rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+            className="sm:ml-auto rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
           >
             Upload
           </button>
@@ -343,12 +343,12 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
 
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
         {visibleVideos.map((v) => (
-          <li key={v.id} className="p-4 flex items-center justify-between gap-4">
-            <div>
+          <li key={v.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            <div className="min-w-0">
               <p className="font-medium">{v.title}</p>
               <p className="text-sm text-zinc-500">{v.status}</p>
             </div>
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
               {!seriesId && (
                 <select
                   value={v.series?.id ?? ""}

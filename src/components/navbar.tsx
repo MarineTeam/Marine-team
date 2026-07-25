@@ -7,11 +7,11 @@ export async function Navbar() {
 
   return (
     <header className="border-b border-zinc-200 bg-white/80 backdrop-blur sticky top-0 z-10 dark:bg-zinc-950/80 dark:border-zinc-800">
-      <nav className="max-w-6xl mx-auto flex items-center justify-between px-4 py-3">
-        <Link href="/" className="font-semibold text-lg tracking-tight">
+      <nav className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
+        <Link href="/" className="font-semibold text-lg tracking-tight shrink-0">
           Media Library
         </Link>
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:gap-4 text-sm">
           <Link href="/" className="hover:underline">
             Browse
           </Link>
@@ -22,7 +22,9 @@ export async function Navbar() {
           )}
           {user ? (
             <>
-              <span className="text-zinc-500">{user.name ?? user.email}</span>
+              <span className="text-zinc-500 max-w-[10rem] sm:max-w-none truncate">
+                {user.name ?? user.email}
+              </span>
               <a
                 href="/auth/logout"
                 className="rounded-md border border-zinc-300 px-3 py-1 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"

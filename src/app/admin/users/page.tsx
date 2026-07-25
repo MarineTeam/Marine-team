@@ -120,12 +120,12 @@ export default function UsersAdminPage() {
         </h2>
         <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
           {pending.map((u) => (
-            <li key={u.id} className="p-4 flex items-center justify-between gap-4">
-              <div>
+            <li key={u.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+              <div className="min-w-0">
                 <p className="font-medium">{u.name ?? u.email}</p>
                 <p className="text-sm text-zinc-500">{u.email} · tried to log in</p>
               </div>
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
                 <button
                   onClick={() => update(u.id, { authorized: true })}
                   className="rounded-md bg-zinc-900 text-white px-3 py-1.5 dark:bg-white dark:text-zinc-900"
@@ -148,14 +148,14 @@ export default function UsersAdminPage() {
         <h2 className="font-medium">Authorized</h2>
         <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
           {authorized.map((u) => (
-            <li key={u.id} className="p-4 flex items-center justify-between gap-4">
-              <div>
+            <li key={u.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+              <div className="min-w-0">
                 <p className="font-medium">{u.name ?? u.email}</p>
                 <p className="text-sm text-zinc-500">
                   {u.email} · {u.auth0Id ? "has logged in" : "invited, not yet logged in"}
                 </p>
               </div>
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
                 <select
                   value={u.role}
                   onChange={(e) => update(u.id, { role: e.target.value as "MEMBER" | "ADMIN" })}

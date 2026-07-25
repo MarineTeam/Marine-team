@@ -137,8 +137,8 @@ export default function SeriesAdminPage() {
 
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
         {series.map((s) => (
-          <li key={s.id} className="p-4 flex items-center justify-between gap-4">
-            <div>
+          <li key={s.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            <div className="min-w-0">
               <Link href={`/admin/series/${s.id}`} className="font-medium hover:underline">
                 {s.title}
               </Link>
@@ -147,7 +147,7 @@ export default function SeriesAdminPage() {
                 {s._count.files} files
               </p>
             </div>
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
               <Link
                 href={`/admin/series/${s.id}`}
                 className="rounded-md bg-zinc-900 text-white px-2 py-1 dark:bg-white dark:text-zinc-900"

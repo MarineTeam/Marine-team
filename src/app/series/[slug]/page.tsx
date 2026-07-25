@@ -34,8 +34,8 @@ export default async function SeriesPage({
                 {series.videos.map((video) => {
                   const locked = !canAccess(video.memberOnly, isLoggedIn);
                   return (
-                    <li key={video.id} className="p-4 flex items-center justify-between gap-4">
-                      <div>
+                    <li key={video.id} className="p-4 flex flex-wrap items-center justify-between gap-4">
+                      <div className="min-w-0">
                         <p className="font-medium">{video.title}</p>
                         {video.description && (
                           <p className="text-sm text-zinc-500 line-clamp-1">
