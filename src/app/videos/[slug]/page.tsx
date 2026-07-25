@@ -65,6 +65,7 @@ export default async function VideoPage({
     );
   }
 
+  const isLoggedIn = Boolean(user);
   const categoryId = video.series?.categoryId ?? null;
   const [
     progress,
@@ -105,9 +106,9 @@ export default async function VideoPage({
     ratingsOn && user ? getUserVideoRating(user.id, video.id) : Promise.resolve(null),
     likesOn ? getVideoReactionSummary(video.id) : Promise.resolve({ likes: 0, dislikes: 0 }),
     likesOn && user ? getUserVideoReaction(user.id, video.id) : Promise.resolve(null),
-    relatedOn ? getRelatedVideos(video) : Promise.resolve([]),
+    relatedOn ? getRelatedVideos(video, isLoggedIn) : Promise.resolve([]),
     commentsOn ? getComments("video", video.id) : Promise.resolve([]),
-    upNextOn ? getUpNextVideo(video) : Promise.resolve(null),
+    upNextOn ? getUpNextVideo(video, isLoggedIn) : Promise.resolve(null),
   ]);
   const initialComments = comments.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }));
 

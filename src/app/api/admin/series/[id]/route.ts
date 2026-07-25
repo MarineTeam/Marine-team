@@ -16,6 +16,7 @@ const updateSchema = z.object({
   coverImageUrl: z.string().url().optional().or(z.literal("")),
   categoryId: z.string().optional().nullable(),
   memberOnly: z.boolean().optional(),
+  hidden: z.boolean().optional(),
   published: z.boolean().optional(),
   publishAt: z.string().nullable().optional(),
   unpublishAt: z.string().nullable().optional(),

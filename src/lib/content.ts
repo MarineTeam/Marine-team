@@ -6,18 +6,29 @@ export function canAccess(memberOnly: boolean, isLoggedIn: boolean): boolean {
 }
 
 /**
- * Matches items that are marked published, whose publishAt gate (if any) has
- * passed, and whose unpublishAt gate (if any) hasn't passed yet.
+ * Matches items that are marked published, not admin-hidden, whose publishAt
+ * gate (if any) has passed, and whose unpublishAt gate (if any) hasn't
+ * passed yet.
  */
 function publishedNow() {
   const now = new Date();
   return {
     published: true,
+    hidden: false,
     AND: [
       { OR: [{ publishAt: null }, { publishAt: { lte: now } }] },
       { OR: [{ unpublishAt: null }, { unpublishAt: { gt: now } }] },
     ],
   };
+}
+
+/**
+ * Extra filter to merge alongside `publishedNow()` on guest/member-facing
+ * listing queries: guests (not logged in) never see member-only items,
+ * so member content is hidden by default until the viewer signs in.
+ */
+function guestFilter(isLoggedIn: boolean) {
+  return isLoggedIn ? {} : { memberOnly: false };
 }
 
 const seriesOrder: Prisma.SeriesOrderByWithRelationInput[] = [
@@ -30,12 +41,12 @@ const categoryOrder: Prisma.CategoryOrderByWithRelationInput[] = [
 ];
 
 /** Root-level categories (no parent) for the homepage — each may have its own series and/or child categories. */
-export async function getPublishedCategoriesWithSeries() {
+export async function getPublishedCategoriesWithSeries(isLoggedIn: boolean) {
   return prisma.category.findMany({
     where: { parentId: null },
     orderBy: categoryOrder,
     include: {
-      series: { where: publishedNow(), orderBy: seriesOrder },
+      series: { where: { ...publishedNow(), ...guestFilter(isLoggedIn) }, orderBy: seriesOrder },
       children: { orderBy: categoryOrder },
     },
   });
@@ -46,29 +57,31 @@ export async function getPublishedCategoriesWithSeries() {
  * series (most recently updated), falling back to the most recently
  * updated published series with a cover image, then any published series.
  */
-export async function getFeaturedSeries() {
+export async function getFeaturedSeries(isLoggedIn: boolean) {
+  const where = { ...publishedNow(), ...guestFilter(isLoggedIn) };
+
   const explicit = await prisma.series.findFirst({
-    where: { ...publishedNow(), featured: true },
+    where: { ...where, featured: true },
     orderBy: { updatedAt: "desc" },
   });
   if (explicit) return explicit;
 
   const withCover = await prisma.series.findFirst({
-    where: { ...publishedNow(), coverImageUrl: { not: null } },
+    where: { ...where, coverImageUrl: { not: null } },
     orderBy: { updatedAt: "desc" },
   });
   if (withCover) return withCover;
 
   return prisma.series.findFirst({
-    where: publishedNow(),
+    where,
     orderBy: { updatedAt: "desc" },
   });
 }
 
 /** Most recently added published series, for a homepage "Recently added" row. */
-export async function getRecentlyAddedSeries(limit = 10) {
+export async function getRecentlyAddedSeries(isLoggedIn: boolean, limit = 10) {
   return prisma.series.findMany({
-    where: publishedNow(),
+    where: { ...publishedNow(), ...guestFilter(isLoggedIn) },
     orderBy: { createdAt: "desc" },
     take: limit,
   });
@@ -90,15 +103,16 @@ export async function getContinueWatching(userId: string, limit = 10) {
   return progress;
 }
 
-export async function getCategoryBySlug(slug: string) {
+export async function getCategoryBySlug(slug: string, isLoggedIn: boolean) {
+  const seriesWhere = { ...publishedNow(), ...guestFilter(isLoggedIn) };
   return prisma.category.findFirst({
     where: { slug },
     include: {
-      series: { where: publishedNow(), orderBy: seriesOrder },
+      series: { where: seriesWhere, orderBy: seriesOrder },
       children: {
         orderBy: categoryOrder,
         include: {
-          series: { where: publishedNow(), orderBy: seriesOrder },
+          series: { where: seriesWhere, orderBy: seriesOrder },
           children: true,
         },
       },
@@ -107,9 +121,9 @@ export async function getCategoryBySlug(slug: string) {
   });
 }
 
-export async function getUncategorizedSeries() {
+export async function getUncategorizedSeries(isLoggedIn: boolean) {
   return prisma.series.findMany({
-    where: { ...publishedNow(), categoryId: null },
+    where: { ...publishedNow(), ...guestFilter(isLoggedIn), categoryId: null },
     orderBy: seriesOrder,
   });
 }
@@ -130,10 +144,15 @@ export async function getSeriesBySlug(slug: string) {
  * category first, then anything sharing a tag, capped at `limit` and never
  * including the series itself.
  */
-export async function getRelatedSeries(series: { id: string; categoryId: string | null; tags: string[] }, limit = 8) {
+export async function getRelatedSeries(
+  series: { id: string; categoryId: string | null; tags: string[] },
+  isLoggedIn: boolean,
+  limit = 8,
+) {
+  const where = { ...publishedNow(), ...guestFilter(isLoggedIn) };
   const byCategory = series.categoryId
     ? await prisma.series.findMany({
-        where: { ...publishedNow(), categoryId: series.categoryId, id: { not: series.id } },
+        where: { ...where, categoryId: series.categoryId, id: { not: series.id } },
         orderBy: seriesOrder,
         take: limit,
       })
@@ -142,7 +161,7 @@ export async function getRelatedSeries(series: { id: string; categoryId: string 
 
   const byTag = await prisma.series.findMany({
     where: {
-      ...publishedNow(),
+      ...where,
       id: { notIn: [series.id, ...byCategory.map((s) => s.id)] },
       tags: { hasSome: series.tags },
     },
@@ -153,17 +172,22 @@ export async function getRelatedSeries(series: { id: string; categoryId: string 
 }
 
 /** Other published, ready videos from the same series (or nearby videos if standalone), excluding itself. */
-export async function getRelatedVideos(video: { id: string; seriesId: string | null }, limit = 8) {
+export async function getRelatedVideos(
+  video: { id: string; seriesId: string | null },
+  isLoggedIn: boolean,
+  limit = 8,
+) {
+  const where = { ...publishedNow(), ...guestFilter(isLoggedIn), status: "READY" as const };
   if (video.seriesId) {
     return prisma.video.findMany({
-      where: { ...publishedNow(), status: "READY", seriesId: video.seriesId, id: { not: video.id } },
+      where: { ...where, seriesId: video.seriesId, id: { not: video.id } },
       orderBy: { position: "asc" },
       take: limit,
       include: { series: true },
     });
   }
   return prisma.video.findMany({
-    where: { ...publishedNow(), status: "READY", id: { not: video.id } },
+    where: { ...where, id: { not: video.id } },
     orderBy: { createdAt: "desc" },
     take: limit,
     include: { series: true },
@@ -213,9 +237,9 @@ export async function getFavorites(userId: string) {
 }
 
 /** Published series tagged with the given tag (case-insensitive, tags are stored lowercased). */
-export async function getSeriesByTag(tag: string) {
+export async function getSeriesByTag(tag: string, isLoggedIn: boolean) {
   return prisma.series.findMany({
-    where: { ...publishedNow(), tags: { has: tag.toLowerCase() } },
+    where: { ...publishedNow(), ...guestFilter(isLoggedIn), tags: { has: tag.toLowerCase() } },
     orderBy: seriesOrder,
   });
 }
@@ -240,17 +264,18 @@ function relevanceScore(q: string, title: string, description?: string | null): 
  * description/tags, ranked by relevance rather than database order —
  * an exact/prefix title match outranks a description-only hit.
  */
-export async function searchContent(query: string) {
+export async function searchContent(query: string, isLoggedIn: boolean) {
   const q = query.trim();
   if (!q) return { categories: [], series: [], videos: [] };
   const qLower = q.toLowerCase();
+  const where = { ...publishedNow(), ...guestFilter(isLoggedIn) };
 
   const [categories, seriesCandidates, videoCandidates] = await Promise.all([
     prisma.category.findMany({
       where: { name: { contains: q, mode: "insensitive" } },
       orderBy: categoryOrder,
       include: {
-        series: { where: publishedNow(), orderBy: seriesOrder },
+        series: { where, orderBy: seriesOrder },
         children: true,
       },
       take: 20,
@@ -258,7 +283,7 @@ export async function searchContent(query: string) {
     prisma.series.findMany({
       where: {
         AND: [
-          publishedNow(),
+          where,
           {
             OR: [
               { title: { contains: q, mode: "insensitive" } },
@@ -273,7 +298,7 @@ export async function searchContent(query: string) {
     prisma.video.findMany({
       where: {
         AND: [
-          publishedNow(),
+          where,
           { status: "READY" },
           {
             OR: [
@@ -569,7 +594,7 @@ export async function logVideoView(videoId: string, userId: string | null) {
 }
 
 /** Published series with the most views in the last `days` days, for a homepage "Trending" row. */
-export async function getTrendingSeries(limit = 10, days = 7) {
+export async function getTrendingSeries(isLoggedIn: boolean, limit = 10, days = 7) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   const grouped = await prisma.viewEvent.groupBy({
     by: ["seriesId"],
@@ -581,7 +606,9 @@ export async function getTrendingSeries(limit = 10, days = 7) {
   if (grouped.length === 0) return [];
 
   const ids = grouped.map((g) => g.seriesId as string);
-  const series = await prisma.series.findMany({ where: { id: { in: ids }, ...publishedNow() } });
+  const series = await prisma.series.findMany({
+    where: { id: { in: ids }, ...publishedNow(), ...guestFilter(isLoggedIn) },
+  });
   const byId = new Map(series.map((s) => [s.id, s]));
   return grouped
     .map((g) => byId.get(g.seriesId as string))
@@ -632,10 +659,19 @@ export async function getAnalyticsSummary(days = 30) {
 // --- Up next -----------------------------------------------------------------
 
 /** The next published, ready video in the same series (by position), for an "Up next" panel. */
-export async function getUpNextVideo(video: { id: string; position: number; seriesId: string | null }) {
+export async function getUpNextVideo(
+  video: { id: string; position: number; seriesId: string | null },
+  isLoggedIn: boolean,
+) {
   if (!video.seriesId) return null;
   return prisma.video.findFirst({
-    where: { seriesId: video.seriesId, position: { gt: video.position }, status: "READY", ...publishedNow() },
+    where: {
+      seriesId: video.seriesId,
+      position: { gt: video.position },
+      status: "READY",
+      ...publishedNow(),
+      ...guestFilter(isLoggedIn),
+    },
     orderBy: { position: "asc" },
     include: { series: true },
   });
@@ -656,15 +692,21 @@ export async function getVideoBySlugIncludingPremiere(slug: string) {
   if (published) return published;
 
   return prisma.video.findFirst({
-    where: { slug, published: true, isPremiere: true, publishAt: { gt: new Date() } },
+    where: { slug, published: true, hidden: false, isPremiere: true, publishAt: { gt: new Date() } },
     include: { series: true },
   });
 }
 
 /** Upcoming premieres (published, isPremiere, publishAt in the future), soonest first. */
-export async function getUpcomingPremieres(limit = 10) {
+export async function getUpcomingPremieres(isLoggedIn: boolean, limit = 10) {
   return prisma.video.findMany({
-    where: { published: true, isPremiere: true, publishAt: { gt: new Date() } },
+    where: {
+      published: true,
+      hidden: false,
+      isPremiere: true,
+      publishAt: { gt: new Date() },
+      ...guestFilter(isLoggedIn),
+    },
     orderBy: { publishAt: "asc" },
     take: limit,
     include: { series: true },

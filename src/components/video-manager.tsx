@@ -13,6 +13,7 @@ type Video = {
   slug: string;
   status: "PROCESSING" | "READY" | "FAILED";
   memberOnly: boolean;
+  hidden: boolean;
   published: boolean;
   unpublishAt: string | null;
   publishAt: string | null;
@@ -218,7 +219,7 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
     await load();
   }
 
-  async function toggle(v: Video, field: "published" | "memberOnly") {
+  async function toggle(v: Video, field: "published" | "memberOnly" | "hidden") {
     await fetch(`/api/admin/videos/${v.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -561,6 +562,12 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
                 className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
               >
                 {v.memberOnly ? "Members only" : "Public"}
+              </button>
+              <button
+                onClick={() => toggle(v, "hidden")}
+                className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${v.hidden ? "border-red-400 text-red-600 dark:text-red-400" : "border-zinc-300"}`}
+              >
+                {v.hidden ? "Hidden" : "Visible"}
               </button>
               <button
                 onClick={() => setPremiere(v)}

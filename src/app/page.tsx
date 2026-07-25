@@ -16,15 +16,16 @@ import {
 
 export default async function Home() {
   const user = await getCurrentUser();
+  const isLoggedIn = Boolean(user);
   const [featured, categories, uncategorized, recentlyAdded, continueWatching, viewCountsOn] = await Promise.all([
-    getFeaturedSeries(),
-    getPublishedCategoriesWithSeries(),
-    getUncategorizedSeries(),
-    getRecentlyAddedSeries(),
+    getFeaturedSeries(isLoggedIn),
+    getPublishedCategoriesWithSeries(isLoggedIn),
+    getUncategorizedSeries(isLoggedIn),
+    getRecentlyAddedSeries(isLoggedIn),
     user ? getContinueWatching(user.id) : Promise.resolve([]),
     isPluginEnabled("view-counts"),
   ]);
-  const trending = viewCountsOn ? await getTrendingSeries() : [];
+  const trending = viewCountsOn ? await getTrendingSeries(isLoggedIn) : [];
 
   const visibleCategories = categories.filter(
     (category) => category.series.length > 0 || category.children.length > 0,
