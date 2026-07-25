@@ -6,6 +6,26 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-25
+
+### Added
+
+- **Hide content**: a series, video, or file can be marked `hidden` from its
+  admin edit page, independent of `published`/`memberOnly`. Hidden content is
+  excluded from every guest- and member-facing listing, search, RSS/podcast
+  feed, and direct URL — it behaves like it doesn't exist for anyone except
+  admins/editors managing it in `/admin`.
+
+### Changed
+
+- **Member content hidden from guests by default**: `memberOnly` series and
+  videos are excluded outright from all public listings (homepage, category
+  pages, search, trending, related/up-next, RSS) for anyone not logged in —
+  a guest browsing the site never sees that the content exists. Logged-in
+  members see it normally. Visiting a member-only item's URL directly still
+  shows a "log in to view" gate rather than a 404, so a shared link still
+  invites sign-up.
+
 ## [1.1.0] - 2026-07-25
 
 ### Added
