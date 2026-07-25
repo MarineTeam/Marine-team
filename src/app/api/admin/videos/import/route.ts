@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { ensureAdmin, errorResponse } from "@/lib/api-guard";
+import { errorResponse } from "@/lib/api-guard";
+import { ensureStaff, ensureSeriesRelatedAccess } from "@/lib/permissions";
+import { logAudit } from "@/lib/audit";
 import { bunnyStreamThumbnailUrl, mapBunnyStreamStatus } from "@/lib/bunny";
 
 const importSchema = z.object({
@@ -17,8 +19,12 @@ const importSchema = z.object({
 /** Attaches an existing Bunny Stream video (uploaded outside the app) to a new DB row. */
 export async function POST(request: NextRequest) {
   try {
-    await ensureAdmin();
+    const user = await ensureStaff();
     const body = importSchema.parse(await request.json());
+    if (user.role !== "ADMIN" && !body.seriesId) {
+      return NextResponse.json({ error: "Choose a series" }, { status: 400 });
+    }
+    await ensureSeriesRelatedAccess(user, body.seriesId ?? null);
     const libraryId = process.env.BUNNY_STREAM_LIBRARY_ID!;
 
     const res = await fetch(
@@ -43,6 +49,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    await logAudit(user.email, "import", "video", video.id, video.title);
     return NextResponse.json(video, { status: 201 });
   } catch (error) {
     return errorResponse(error);

@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { ensureAdmin, errorResponse } from "@/lib/api-guard";
+import { errorResponse } from "@/lib/api-guard";
+import {
+  ensureStaff,
+  ensureSeriesRelatedAccess,
+  getEditableScope,
+  descendantCategoryIds,
+} from "@/lib/permissions";
+import { logAudit } from "@/lib/audit";
 import { bunnyCreateStreamVideo, bunnyStreamTusSignature } from "@/lib/bunny";
 
 const createSchema = z.object({
@@ -15,8 +22,23 @@ const createSchema = z.object({
 
 export async function GET() {
   try {
-    await ensureAdmin();
+    const user = await ensureStaff();
+    const scope = await getEditableScope(user);
+    const where = scope.isAdmin
+      ? {}
+      : {
+          seriesId: {
+            in: [
+              ...scope.seriesIds,
+              ...(await prisma.series.findMany({
+                where: { categoryId: { in: await descendantCategoryIds(scope.categoryIds) } },
+                select: { id: true },
+              })).map((s) => s.id),
+            ],
+          },
+        };
     const videos = await prisma.video.findMany({
+      where,
       orderBy: { createdAt: "desc" },
       include: { series: true },
     });
@@ -29,8 +51,12 @@ export async function GET() {
 /** Creates the DB row + a placeholder in Bunny Stream, then returns TUS upload credentials. */
 export async function POST(request: NextRequest) {
   try {
-    await ensureAdmin();
+    const user = await ensureStaff();
     const body = createSchema.parse(await request.json());
+    if (user.role !== "ADMIN" && !body.seriesId) {
+      return NextResponse.json({ error: "Choose a series" }, { status: 400 });
+    }
+    await ensureSeriesRelatedAccess(user, body.seriesId ?? null);
 
     const bunnyVideoId = await bunnyCreateStreamVideo(body.title);
     const video = await prisma.video.create({
@@ -42,6 +68,7 @@ export async function POST(request: NextRequest) {
         bunnyLibraryId: process.env.BUNNY_STREAM_LIBRARY_ID!,
       },
     });
+    await logAudit(user.email, "create", "video", video.id, video.title);
 
     const upload = bunnyStreamTusSignature(bunnyVideoId);
     return NextResponse.json({ video, upload }, { status: 201 });

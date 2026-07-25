@@ -28,85 +28,155 @@ enum VideoStatus {
 // pending row after seeing the attempt. ADMIN_EMAILS self-authorizes as
 // ADMIN on first login so there's always a way in.
 model User {
+  id              String           @id @default(cuid())
+  auth0Id         String?          @unique
+  email           String           @unique
+  name            String?
+  picture         String?
+  role            Role             @default(MEMBER)
+  authorized      Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  categoryEditors CategoryEditor[]
+  seriesEditors   SeriesEditor[]
+  watchProgress   WatchProgress[]
+}
+
+// Grants a non-admin user editor access to one category (and everything
+// under it) without making them a site-wide admin.
+model CategoryEditor {
   id         String   @id @default(cuid())
-  auth0Id    String?  @unique
-  email      String   @unique
-  name       String?
-  picture    String?
-  role       Role     @default(MEMBER)
-  authorized Boolean  @default(false)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId String
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, categoryId])
+}
+
+// Grants a non-admin user editor access to one specific series only.
+model SeriesEditor {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  series    Series   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  seriesId  String
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+  @@unique([userId, seriesId])
 }
 
 // Categories can nest arbitrarily deep (a category's children can themselves
 // have children), matching sites like Subsplash where browsing goes
 // Home -> category -> sub-category -> ... -> series -> videos/files.
 model Category {
-  id        String     @id @default(cuid())
+  id        String           @id @default(cuid())
   name      String
-  slug      String     @unique
-  position  Int        @default(0)
+  slug      String           @unique
+  position  Int              @default(0)
+  pinned    Boolean          @default(false)
   parentId  String?
-  parent    Category?  @relation("CategoryChildren", fields: [parentId], references: [id], onDelete: SetNull)
-  children  Category[] @relation("CategoryChildren")
+  parent    Category?        @relation("CategoryChildren", fields: [parentId], references: [id], onDelete: SetNull)
+  children  Category[]       @relation("CategoryChildren")
   series    Series[]
-  createdAt DateTime   @default(now())
+  editors   CategoryEditor[]
+  createdAt DateTime         @default(now())
 
   @@index([parentId])
 }
 
 model Series {
-  id            String      @id @default(cuid())
+  id            String         @id @default(cuid())
   title         String
-  slug          String      @unique
+  slug          String         @unique
   description   String?
   coverImageUrl String?
-  memberOnly    Boolean     @default(false)
-  published     Boolean     @default(true)
-  position      Int         @default(0)
-  category      Category?   @relation(fields: [categoryId], references: [id])
+  memberOnly    Boolean        @default(false)
+  published     Boolean        @default(true)
+  publishAt     DateTime?
+  featured      Boolean        @default(false)
+  pinned        Boolean        @default(false)
+  tags          String[]       @default([])
+  position      Int            @default(0)
+  category      Category?      @relation(fields: [categoryId], references: [id])
   categoryId    String?
   videos        Video[]
   files         FileAsset[]
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  editors       SeriesEditor[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model Video {
-  id              String      @id @default(cuid())
+  id              String          @id @default(cuid())
   title           String
-  slug            String      @unique
+  slug            String          @unique
   description     String?
   bunnyVideoId    String
   bunnyLibraryId  String
   thumbnailUrl    String?
   durationSeconds Int?
-  status          VideoStatus @default(PROCESSING)
-  memberOnly      Boolean     @default(false)
-  published       Boolean     @default(false)
-  position        Int         @default(0)
-  series          Series?     @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  status          VideoStatus     @default(PROCESSING)
+  memberOnly      Boolean         @default(false)
+  published       Boolean         @default(false)
+  publishAt       DateTime?
+  position        Int             @default(0)
+  series          Series?         @relation(fields: [seriesId], references: [id], onDelete: SetNull)
   seriesId        String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  watchProgress   WatchProgress[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   @@index([seriesId])
 }
 
+// Per-user resume position for a video, approximated from periodic
+// heartbeats sent while the video page is open (the Bunny Stream iframe
+// embed doesn't expose a documented postMessage API for exact play/pause/seek
+// events, so this tracks elapsed watch time rather than a precise scrub position).
+model WatchProgress {
+  id              String   @id @default(cuid())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+  video           Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId         String
+  positionSeconds Int      @default(0)
+  completed       Boolean  @default(false)
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, videoId])
+  @@index([userId])
+}
+
 model FileAsset {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   title      String
   bunnyPath  String
   url        String
   sizeBytes  Int?
   mimeType   String?
-  memberOnly Boolean  @default(false)
-  published  Boolean  @default(true)
-  position   Int      @default(0)
-  series     Series?  @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  memberOnly Boolean   @default(false)
+  published  Boolean   @default(true)
+  publishAt  DateTime?
+  position   Int       @default(0)
+  series     Series?   @relation(fields: [seriesId], references: [id], onDelete: SetNull)
   seriesId   String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   @@index([seriesId])
+}
+
+// Append-only record of admin/editor actions, kept even if the acting user
+// or the entity they touched is later deleted.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorEmail String
+  action     String
+  entityType String
+  entityId   String?
+  detail     String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
 }

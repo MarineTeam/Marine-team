@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DragHandle, PositionInput } from "@/components/reorder-controls";
 import { reorderArray } from "@/lib/reorder";
 
@@ -14,6 +14,8 @@ type Series = {
   categoryId: string | null;
   memberOnly: boolean;
   published: boolean;
+  featured: boolean;
+  pinned: boolean;
   category: Category | null;
   _count: { videos: number; files: number };
 };
@@ -46,6 +48,8 @@ export default function SeriesAdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   async function load() {
     const [seriesRes, categoriesRes] = await Promise.all([
@@ -89,7 +93,7 @@ export default function SeriesAdminPage() {
     }
   }
 
-  async function toggle(s: Series, field: "published" | "memberOnly") {
+  async function toggle(s: Series, field: "published" | "memberOnly" | "featured" | "pinned") {
     await fetch(`/api/admin/series/${s.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -125,7 +129,47 @@ export default function SeriesAdminPage() {
     await reorderTo(siblings, index, targetIndex);
   }
 
-  const groups = groupByCategory(series);
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function bulkSetPublished(published: boolean) {
+    await Promise.all(
+      Array.from(selectedIds).map((id) =>
+        fetch(`/api/admin/series/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ published }),
+        }),
+      ),
+    );
+    setSelectedIds(new Set());
+    await load();
+  }
+
+  async function bulkDelete() {
+    if (!confirm(`Delete ${selectedIds.size} series? Videos and files will be detached, not deleted.`))
+      return;
+    await Promise.all(
+      Array.from(selectedIds).map((id) => fetch(`/api/admin/series/${id}`, { method: "DELETE" })),
+    );
+    setSelectedIds(new Set());
+    await load();
+  }
+
+  const filteredSeries = useMemo(
+    () =>
+      query.trim()
+        ? series.filter((s) => s.title.toLowerCase().includes(query.trim().toLowerCase()))
+        : series,
+    [series, query],
+  );
+  const groups = groupByCategory(filteredSeries);
 
   return (
     <div className="space-y-6">
@@ -171,6 +215,37 @@ export default function SeriesAdminPage() {
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
 
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Filter series by title…"
+        className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+      />
+
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <span>{selectedIds.size} selected</span>
+          <button
+            onClick={() => bulkSetPublished(true)}
+            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+          >
+            Publish
+          </button>
+          <button
+            onClick={() => bulkSetPublished(false)}
+            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+          >
+            Unpublish
+          </button>
+          <button onClick={bulkDelete} className="rounded-md border border-red-300 px-2 py-1 text-red-600 dark:border-red-900">
+            Delete
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-zinc-500 hover:underline">
+            Clear selection
+          </button>
+        </div>
+      )}
+
       {groups.map((group) => (
         <section key={group.key} className="space-y-2">
           <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
@@ -190,6 +265,12 @@ export default function SeriesAdminPage() {
                 }}
               >
                 <div className="min-w-0 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(s.id)}
+                    onChange={() => toggleSelected(s.id)}
+                    aria-label={`Select ${s.title}`}
+                  />
                   <DragHandle
                     draggable
                     onDragStart={() => setDraggingId(s.id)}
@@ -244,6 +325,18 @@ export default function SeriesAdminPage() {
                   >
                     {s.memberOnly ? "Members only" : "Public"}
                   </button>
+                  <button
+                    onClick={() => toggle(s, "featured")}
+                    className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${s.featured ? "border-amber-400 text-amber-700 dark:text-amber-400" : "border-zinc-300"}`}
+                  >
+                    {s.featured ? "Featured" : "Feature"}
+                  </button>
+                  <button
+                    onClick={() => toggle(s, "pinned")}
+                    className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${s.pinned ? "border-amber-400 text-amber-700 dark:text-amber-400" : "border-zinc-300"}`}
+                  >
+                    {s.pinned ? "Pinned" : "Pin"}
+                  </button>
                   <button onClick={() => remove(s.id)} className="text-red-600 hover:underline">
                     Delete
                   </button>
@@ -253,7 +346,7 @@ export default function SeriesAdminPage() {
           </ul>
         </section>
       ))}
-      {series.length === 0 && <p className="text-sm text-zinc-500">No series yet.</p>}
+      {filteredSeries.length === 0 && <p className="text-sm text-zinc-500">No series match.</p>}
     </div>
   );
 }

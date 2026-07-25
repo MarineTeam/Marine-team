@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { ensureAdmin, errorResponse } from "@/lib/api-guard";
+import { logAudit } from "@/lib/audit";
 
 const categorySchema = z.object({
   name: z.string().min(1),
@@ -11,6 +12,7 @@ const categorySchema = z.object({
     .regex(/^[a-z0-9-]+$/, "slug must be lowercase letters, numbers, and hyphens"),
   parentId: z.string().optional().nullable(),
   position: z.number().int().optional(),
+  pinned: z.boolean().optional(),
 });
 
 export async function GET() {
@@ -28,9 +30,10 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    await ensureAdmin();
+    const admin = await ensureAdmin();
     const body = categorySchema.parse(await request.json());
     const category = await prisma.category.create({ data: body });
+    await logAudit(admin.email, "create", "category", category.id, category.name);
     return NextResponse.json(category, { status: 201 });
   } catch (error) {
     return errorResponse(error);

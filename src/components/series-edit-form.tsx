@@ -13,7 +13,19 @@ type Series = {
   categoryId: string | null;
   memberOnly: boolean;
   published: boolean;
+  publishAt: Date | string | null;
+  featured: boolean;
+  pinned: boolean;
+  tags: string[];
 };
+
+/** Converts a Date/ISO string to the value a <input type="datetime-local"> expects (local time, no seconds). */
+function toDatetimeLocal(value: Date | string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 export function SeriesEditForm({
   series,
@@ -30,6 +42,10 @@ export function SeriesEditForm({
   const [categoryId, setCategoryId] = useState(series.categoryId ?? "");
   const [memberOnly, setMemberOnly] = useState(series.memberOnly);
   const [published, setPublished] = useState(series.published);
+  const [featured, setFeatured] = useState(series.featured);
+  const [pinned, setPinned] = useState(series.pinned);
+  const [tags, setTags] = useState(series.tags.join(", "));
+  const [publishAt, setPublishAt] = useState(toDatetimeLocal(series.publishAt));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -51,6 +67,10 @@ export function SeriesEditForm({
           categoryId: categoryId || null,
           memberOnly,
           published,
+          featured,
+          pinned,
+          tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+          publishAt: publishAt ? new Date(publishAt).toISOString() : null,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed to save");
@@ -117,6 +137,26 @@ export function SeriesEditForm({
         />
       </label>
 
+      <label className="text-sm space-y-1 block">
+        <span className="text-zinc-500">Tags (comma-separated)</span>
+        <input
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
+          placeholder="worship, easter, youth"
+          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        />
+      </label>
+
+      <label className="text-sm space-y-1 block">
+        <span className="text-zinc-500">Publish at (leave blank to publish immediately)</span>
+        <input
+          type="datetime-local"
+          value={publishAt}
+          onChange={(e) => setPublishAt(e.target.value)}
+          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        />
+      </label>
+
       <div className="flex flex-wrap items-center gap-3">
         <select
           value={categoryId}
@@ -146,10 +186,22 @@ export function SeriesEditForm({
           />
           Members only
         </label>
+        <label className="flex items-center gap-1.5 text-sm">
+          <input
+            type="checkbox"
+            checked={featured}
+            onChange={(e) => setFeatured(e.target.checked)}
+          />
+          Featured (homepage hero)
+        </label>
+        <label className="flex items-center gap-1.5 text-sm">
+          <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
+          Pinned (shown first)
+        </label>
         <button
           type="submit"
           disabled={saving}
-          className="ml-auto rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+          className="sm:ml-auto rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
         >
           {saving ? "Saving…" : "Save"}
         </button>

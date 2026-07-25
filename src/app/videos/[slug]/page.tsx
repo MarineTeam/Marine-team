@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getVideoBySlug, canAccess } from "@/lib/content";
+import { getVideoBySlug, getWatchProgressForVideo, canAccess } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { bunnyStreamEmbedUrl } from "@/lib/bunny";
+import { WatchProgressTracker } from "@/components/watch-progress-tracker";
 
 export default async function VideoPage({
   params,
@@ -29,6 +30,9 @@ export default async function VideoPage({
     );
   }
 
+  const progress = user ? await getWatchProgressForVideo(user.id, video.id) : null;
+  const resumeAt = progress && !progress.completed ? progress.positionSeconds : 0;
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-4">
       {video.series && (
@@ -44,7 +48,7 @@ export default async function VideoPage({
       {video.status === "READY" ? (
         <div className="aspect-video overflow-hidden rounded-lg bg-black">
           <iframe
-            src={bunnyStreamEmbedUrl(video.bunnyVideoId)}
+            src={bunnyStreamEmbedUrl(video.bunnyVideoId, resumeAt)}
             className="h-full w-full"
             allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture"
             allowFullScreen
@@ -57,6 +61,14 @@ export default async function VideoPage({
       )}
 
       {video.description && <p className="text-zinc-600 dark:text-zinc-400">{video.description}</p>}
+
+      {user && video.status === "READY" && (
+        <WatchProgressTracker
+          videoId={video.id}
+          startPositionSeconds={resumeAt}
+          durationSeconds={video.durationSeconds}
+        />
+      )}
     </div>
   );
 }

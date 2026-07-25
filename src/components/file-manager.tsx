@@ -27,6 +27,8 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   async function load() {
     const [filesRes, seriesRes] = await Promise.all([
@@ -90,7 +92,44 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
     await load();
   }
 
-  const visibleFiles = seriesId ? files.filter((f) => f.series?.id === seriesId) : files;
+  const scopedFiles = seriesId ? files.filter((f) => f.series?.id === seriesId) : files;
+  const visibleFiles =
+    !seriesId && query.trim()
+      ? scopedFiles.filter((f) => f.title.toLowerCase().includes(query.trim().toLowerCase()))
+      : scopedFiles;
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function bulkSetPublished(published: boolean) {
+    await Promise.all(
+      Array.from(selectedIds).map((id) =>
+        fetch(`/api/admin/files/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ published }),
+        }),
+      ),
+    );
+    setSelectedIds(new Set());
+    await load();
+  }
+
+  async function bulkDelete() {
+    if (!confirm(`Delete ${selectedIds.size} file(s)? This also removes them from Bunny Storage.`))
+      return;
+    await Promise.all(
+      Array.from(selectedIds).map((id) => fetch(`/api/admin/files/${id}`, { method: "DELETE" })),
+    );
+    setSelectedIds(new Set());
+    await load();
+  }
 
   async function reorderTo(fromIndex: number, toIndex: number) {
     const reordered = reorderArray(visibleFiles, fromIndex, toIndex);
@@ -165,6 +204,39 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
 
+      {!seriesId && (
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Filter files by title…"
+          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        />
+      )}
+
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <span>{selectedIds.size} selected</span>
+          <button
+            onClick={() => bulkSetPublished(true)}
+            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+          >
+            Publish
+          </button>
+          <button
+            onClick={() => bulkSetPublished(false)}
+            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+          >
+            Unpublish
+          </button>
+          <button onClick={bulkDelete} className="rounded-md border border-red-300 px-2 py-1 text-red-600 dark:border-red-900">
+            Delete
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-zinc-500 hover:underline">
+            Clear selection
+          </button>
+        </div>
+      )}
+
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
         {visibleFiles.map((f, index) => (
           <li
@@ -173,6 +245,12 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
             {...(seriesId ? dropZoneProps(index) : {})}
           >
             <div className="min-w-0 flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={selectedIds.has(f.id)}
+                onChange={() => toggleSelected(f.id)}
+                aria-label={`Select ${f.title}`}
+              />
               {seriesId && <DragHandle {...handleProps(index)} />}
               <div className="min-w-0">
                 <p className="font-medium">{f.title}</p>

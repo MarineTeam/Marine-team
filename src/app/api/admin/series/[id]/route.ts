@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { ensureAdmin, errorResponse } from "@/lib/api-guard";
+import { errorResponse } from "@/lib/api-guard";
+import { ensureStaff, ensureSeriesAccess, ensureCategoryAccess } from "@/lib/permissions";
+import { logAudit } from "@/lib/audit";
 
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -15,12 +17,25 @@ const updateSchema = z.object({
   categoryId: z.string().optional().nullable(),
   memberOnly: z.boolean().optional(),
   published: z.boolean().optional(),
+  publishAt: z.string().nullable().optional(),
+  featured: z.boolean().optional(),
+  pinned: z.boolean().optional(),
+  tags: z.array(z.string().min(1)).optional(),
   position: z.number().int().optional(),
 });
 
+function normalizeSeriesData(body: z.infer<typeof updateSchema>) {
+  return {
+    ...body,
+    tags: body.tags?.map((t) => t.trim().toLowerCase()).filter(Boolean),
+    publishAt:
+      body.publishAt === undefined ? undefined : body.publishAt === null ? null : new Date(body.publishAt),
+  };
+}
+
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await ensureAdmin();
+    const user = await ensureStaff();
     const { id } = await params;
     const series = await prisma.series.findUniqueOrThrow({
       where: { id },
@@ -30,6 +45,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         files: { orderBy: { position: "asc" } },
       },
     });
+    await ensureSeriesAccess(user, series);
     return NextResponse.json(series);
   } catch (error) {
     return errorResponse(error);
@@ -41,10 +57,19 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await ensureAdmin();
+    const user = await ensureStaff();
     const { id } = await params;
+    const existing = await prisma.series.findUniqueOrThrow({ where: { id } });
+    await ensureSeriesAccess(user, existing);
     const body = updateSchema.parse(await request.json());
-    const series = await prisma.series.update({ where: { id }, data: body });
+    if (body.categoryId !== undefined && user.role !== "ADMIN") {
+      if (body.categoryId === null) {
+        return NextResponse.json({ error: "Choose a category" }, { status: 400 });
+      }
+      await ensureCategoryAccess(user, body.categoryId);
+    }
+    const series = await prisma.series.update({ where: { id }, data: normalizeSeriesData(body) });
+    await logAudit(user.email, "update", "series", series.id, JSON.stringify(body));
     return NextResponse.json(series);
   } catch (error) {
     return errorResponse(error);
@@ -56,9 +81,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await ensureAdmin();
+    const user = await ensureStaff();
     const { id } = await params;
+    const existing = await prisma.series.findUniqueOrThrow({ where: { id } });
+    await ensureSeriesAccess(user, existing);
     await prisma.series.delete({ where: { id } });
+    await logAudit(user.email, "delete", "series", id, existing.title);
     return NextResponse.json({ ok: true });
   } catch (error) {
     return errorResponse(error);

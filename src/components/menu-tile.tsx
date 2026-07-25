@@ -25,12 +25,14 @@ export function MenuTile({
   subtitle,
   thumbnailUrl,
   badge,
+  tags,
 }: {
   href: string;
   title: string;
   subtitle?: string | null;
   thumbnailUrl?: string | null;
   badge?: string;
+  tags?: string[];
 }) {
   return (
     <Link
@@ -55,6 +57,18 @@ export function MenuTile({
           )}
         </div>
         {subtitle && <p className="mt-0.5 line-clamp-1 text-sm text-zinc-500">{subtitle}</p>}
+        {tags && tags.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {tags.map((tag) => (
+              <span
+                key={tag}
+                className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       <span
         aria-hidden

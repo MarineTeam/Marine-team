@@ -73,11 +73,39 @@ files hosted on Bunny Storage.
   pre-authorize an email there before they ever log in. Someone who isn't
   authorized yet sees "Access not authorized" in the Navbar instead of
   being treated as a member.
-- **Admin CMS** (`/admin`, gated to `ADMIN` role): manage categories, series,
-  videos, and files. Video upload creates a placeholder in Bunny Stream,
-  signs a TUS upload session, and streams the file straight from the
-  browser to Bunny; small files (≤4.5MB) are uploaded to Bunny Storage via
-  the server.
+- **Admin CMS** (`/admin`): manage categories, series, videos, and files.
+  Video upload creates a placeholder in Bunny Stream, signs a TUS upload
+  session, and streams the file straight from the browser to Bunny; small
+  files (≤4.5MB) are uploaded to Bunny Storage via the server. Beyond
+  `ADMIN`, an admin can grant a `MEMBER` **content-editor** access to one
+  category (and everything under it) or one specific series from
+  `/admin/users` — that scopes their `/admin` view to just series/videos/
+  files they're allowed to touch (`src/lib/permissions.ts` enforces this
+  server-side on every admin API route, not just in the UI).
+- **Featured/pinned**: a series can be marked `featured` (used for the
+  homepage hero, overriding the recency-based default) or `pinned` (sorts
+  first in its listing regardless of `position`) from its edit page or the
+  series/category admin lists.
+- **Tags**: series can have free-form tags, shown as chips on the series
+  page and searchable; `/tags/[tag]` lists everything with a given tag.
+- **Scheduled publishing**: series/videos/files can have a `publishAt`
+  timestamp — even if `published` is true, the item stays hidden from the
+  public site until that time passes.
+- **Bulk actions & filtering**: the series/video/file admin lists support
+  multi-select (Publish/Unpublish/Delete) and a title filter box.
+- **Audit log** (`/admin/audit`, `ADMIN` only): an append-only record of
+  admin/editor create/update/delete/grant/revoke actions.
+- **Continue watching / recently added**: logged-in users get a periodic
+  heartbeat (`src/components/watch-progress-tracker.tsx`) that approximates
+  watch position (Bunny's iframe embed has no documented postMessage API
+  for exact play/pause/seek events, so this is elapsed-time based, not a
+  precise scrub position) — the homepage shows a "Continue watching" row
+  from that, resuming playback near where you left off via Bunny's `t=`
+  embed parameter, plus a "Recently added" row of newest published series.
+- **Feeds**: `/feed.xml` is a site-wide RSS feed of recently added series;
+  `/series/[slug]/podcast.xml` is an iTunes-compatible podcast feed of a
+  series' published audio files (skipped for `memberOnly` series, since
+  podcast apps can't authenticate).
 - **Bunny Stream playback**: `bunnyStreamEmbedUrl()` and
   `bunnyStreamThumbnailUrl()` (`src/lib/bunny.ts`) build the iframe/thumbnail
   URLs fresh on every request. If `BUNNY_STREAM_TOKEN_AUTH_KEY` is set, they
