@@ -18,6 +18,7 @@ const updateSchema = z.object({
   memberOnly: z.boolean().optional(),
   published: z.boolean().optional(),
   publishAt: z.string().nullable().optional(),
+  unpublishAt: z.string().nullable().optional(),
   featured: z.boolean().optional(),
   pinned: z.boolean().optional(),
   tags: z.array(z.string().min(1)).optional(),
@@ -30,6 +31,12 @@ function normalizeSeriesData(body: z.infer<typeof updateSchema>) {
     tags: body.tags?.map((t) => t.trim().toLowerCase()).filter(Boolean),
     publishAt:
       body.publishAt === undefined ? undefined : body.publishAt === null ? null : new Date(body.publishAt),
+    unpublishAt:
+      body.unpublishAt === undefined
+        ? undefined
+        : body.unpublishAt === null
+          ? null
+          : new Date(body.unpublishAt),
   };
 }
 

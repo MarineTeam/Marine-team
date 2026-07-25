@@ -90,11 +90,30 @@ files hosted on Bunny Storage.
   page and searchable; `/tags/[tag]` lists everything with a given tag.
 - **Scheduled publishing**: series/videos/files can have a `publishAt`
   timestamp — even if `published` is true, the item stays hidden from the
-  public site until that time passes.
+  public site until that time passes. They can also have an `unpublishAt`
+  timestamp (set from the series edit form, or via "Set expiry" on the
+  video/file admin lists) so time-limited content disappears automatically
+  without a manual unpublish step.
 - **Bulk actions & filtering**: the series/video/file admin lists support
-  multi-select (Publish/Unpublish/Delete) and a title filter box.
+  multi-select (Publish/Unpublish/Delete) and a title filter box; selected
+  series can also be bulk-moved to a different category (or uncategorized)
+  in one action, and any series row can be recategorized inline.
 - **Audit log** (`/admin/audit`, `ADMIN` only): an append-only record of
-  admin/editor create/update/delete/grant/revoke actions.
+  admin/editor create/update/delete/grant/revoke actions, exportable as CSV
+  or JSON for offline/compliance review.
+- **Favorites**: logged-in users can bookmark a series or video from its
+  page; `/favorites` lists everything they've saved.
+- **Comments**: logged-in users can leave comments on a series or video
+  page; authors can delete their own, admins can delete any.
+- **Related content**: series pages show a "More like this" row (same
+  category, then shared tags); video pages show "More from this series" or
+  "You might also like" for standalone videos.
+- **Relevance-ranked search**: `/search` and the navbar search box rank
+  results by how well they match — an exact or prefix title match outranks
+  a description-only hit — rather than raw database order.
+- **Permissions by user**: `/admin/users` manages each authorized user's
+  content-editor grants (category and series access) in one place next to
+  their role, instead of a separate free-form grant form.
 - **Continue watching / recently added**: logged-in users get a periodic
   heartbeat (`src/components/watch-progress-tracker.tsx`) that approximates
   watch position (Bunny's iframe embed has no documented postMessage API

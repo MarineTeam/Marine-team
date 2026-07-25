@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getSeriesBySlug, canAccess } from "@/lib/content";
+import { getSeriesBySlug, getRelatedSeries, isSeriesFavorited, canAccess } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
+import { FavoriteButton } from "@/components/favorite-button";
+import { SeriesTile } from "@/components/series-tile";
+import { CommentSection } from "@/components/comment-section";
 
 export default async function SeriesPage({
   params,
@@ -16,11 +19,20 @@ export default async function SeriesPage({
   const isLoggedIn = Boolean(user);
   const seriesLocked = !canAccess(series.memberOnly, isLoggedIn);
   const hasAudio = series.files.some((f) => f.mimeType?.startsWith("audio/"));
+  const [favorited, related] = await Promise.all([
+    user ? isSeriesFavorited(user.id, series.id) : Promise.resolve(false),
+    getRelatedSeries(series),
+  ]);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{series.title}</h1>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">{series.title}</h1>
+          {user && !seriesLocked && (
+            <FavoriteButton type="series" id={series.id} initialFavorited={favorited} />
+          )}
+        </div>
         {series.description && <p className="mt-2 text-zinc-500">{series.description}</p>}
         {series.tags.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
@@ -127,6 +139,28 @@ export default async function SeriesPage({
             <p className="text-zinc-500">Nothing published in this series yet.</p>
           )}
         </>
+      )}
+
+      {!seriesLocked && related.length > 0 && (
+        <section>
+          <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500 mb-3">
+            More like this
+          </h2>
+          <div className="space-y-3">
+            {related.map((s) => (
+              <SeriesTile key={s.id} series={s} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {!seriesLocked && (
+        <CommentSection
+          type="series"
+          id={series.id}
+          currentUserId={user?.id ?? null}
+          isAdmin={user?.role === "ADMIN"}
+        />
       )}
     </div>
   );

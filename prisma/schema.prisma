@@ -40,6 +40,9 @@ model User {
   categoryEditors CategoryEditor[]
   seriesEditors   SeriesEditor[]
   watchProgress   WatchProgress[]
+  seriesFavorites SeriesFavorite[]
+  videoFavorites  VideoFavorite[]
+  comments        Comment[]
 }
 
 // Grants a non-admin user editor access to one category (and everything
@@ -87,25 +90,28 @@ model Category {
 }
 
 model Series {
-  id            String         @id @default(cuid())
+  id            String           @id @default(cuid())
   title         String
-  slug          String         @unique
+  slug          String           @unique
   description   String?
   coverImageUrl String?
-  memberOnly    Boolean        @default(false)
-  published     Boolean        @default(true)
+  memberOnly    Boolean          @default(false)
+  published     Boolean          @default(true)
   publishAt     DateTime?
-  featured      Boolean        @default(false)
-  pinned        Boolean        @default(false)
-  tags          String[]       @default([])
-  position      Int            @default(0)
-  category      Category?      @relation(fields: [categoryId], references: [id])
+  unpublishAt   DateTime?
+  featured      Boolean          @default(false)
+  pinned        Boolean          @default(false)
+  tags          String[]         @default([])
+  position      Int              @default(0)
+  category      Category?        @relation(fields: [categoryId], references: [id])
   categoryId    String?
   videos        Video[]
   files         FileAsset[]
   editors       SeriesEditor[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  favoritedBy   SeriesFavorite[]
+  comments      Comment[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 }
 
 model Video {
@@ -121,14 +127,59 @@ model Video {
   memberOnly      Boolean         @default(false)
   published       Boolean         @default(false)
   publishAt       DateTime?
+  unpublishAt     DateTime?
   position        Int             @default(0)
   series          Series?         @relation(fields: [seriesId], references: [id], onDelete: SetNull)
   seriesId        String?
   watchProgress   WatchProgress[]
+  favoritedBy     VideoFavorite[]
+  comments        Comment[]
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
   @@index([seriesId])
+}
+
+// A member's bookmark of a series, for a "My Favorites" page.
+model SeriesFavorite {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  series    Series   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  seriesId  String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, seriesId])
+  @@index([seriesId])
+}
+
+// A member's bookmark of a video, for a "My Favorites" page.
+model VideoFavorite {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId   String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, videoId])
+  @@index([videoId])
+}
+
+// A member's comment on a series or a video (exactly one of seriesId/videoId is set).
+model Comment {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  series    Series?  @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  seriesId  String?
+  video     Video?   @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId   String?
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([seriesId])
+  @@index([videoId])
 }
 
 // Per-user resume position for a video, approximated from periodic
@@ -150,19 +201,20 @@ model WatchProgress {
 }
 
 model FileAsset {
-  id         String    @id @default(cuid())
-  title      String
-  bunnyPath  String
-  url        String
-  sizeBytes  Int?
-  mimeType   String?
-  memberOnly Boolean   @default(false)
-  published  Boolean   @default(true)
-  publishAt  DateTime?
-  position   Int       @default(0)
-  series     Series?   @relation(fields: [seriesId], references: [id], onDelete: SetNull)
-  seriesId   String?
-  createdAt  DateTime  @default(now())
+  id          String    @id @default(cuid())
+  title       String
+  bunnyPath   String
+  url         String
+  sizeBytes   Int?
+  mimeType    String?
+  memberOnly  Boolean   @default(false)
+  published   Boolean   @default(true)
+  publishAt   DateTime?
+  unpublishAt DateTime?
+  position    Int       @default(0)
+  series      Series?   @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  seriesId    String?
+  createdAt   DateTime  @default(now())
 
   @@index([seriesId])
 }

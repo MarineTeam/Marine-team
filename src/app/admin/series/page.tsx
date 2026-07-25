@@ -109,6 +109,29 @@ export default function SeriesAdminPage() {
     await load();
   }
 
+  async function reassignCategory(id: string, newCategoryId: string) {
+    await fetch(`/api/admin/series/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ categoryId: newCategoryId || null }),
+    });
+    await load();
+  }
+
+  async function bulkMoveToCategory(newCategoryId: string) {
+    await Promise.all(
+      Array.from(selectedIds).map((id) =>
+        fetch(`/api/admin/series/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ categoryId: newCategoryId || null }),
+        }),
+      ),
+    );
+    setSelectedIds(new Set());
+    await load();
+  }
+
   async function reorderTo(siblings: Series[], fromIndex: number, toIndex: number) {
     const reordered = reorderArray(siblings, fromIndex, toIndex);
     await Promise.all(
@@ -237,6 +260,24 @@ export default function SeriesAdminPage() {
           >
             Unpublish
           </button>
+          <select
+            defaultValue="__placeholder"
+            onChange={(e) => {
+              if (e.target.value !== "__placeholder") bulkMoveToCategory(e.target.value);
+              e.target.value = "__placeholder";
+            }}
+            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+          >
+            <option value="__placeholder" disabled>
+              Move to category…
+            </option>
+            <option value="">Uncategorized</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
           <button onClick={bulkDelete} className="rounded-md border border-red-300 px-2 py-1 text-red-600 dark:border-red-900">
             Delete
           </button>
@@ -307,6 +348,18 @@ export default function SeriesAdminPage() {
                   >
                     ↓
                   </button>
+                  <select
+                    value={s.categoryId ?? ""}
+                    onChange={(e) => reassignCategory(s.id, e.target.value)}
+                    className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+                  >
+                    <option value="">Uncategorized</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
                   <Link
                     href={`/admin/series/${s.id}`}
                     className="rounded-md bg-zinc-900 text-white px-2 py-1 dark:bg-white dark:text-zinc-900"

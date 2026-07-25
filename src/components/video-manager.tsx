@@ -13,6 +13,7 @@ type Video = {
   status: "PROCESSING" | "READY" | "FAILED";
   memberOnly: boolean;
   published: boolean;
+  unpublishAt: string | null;
   series: { id: string; title: string } | null;
 };
 type BunnyLibraryVideo = {
@@ -178,6 +179,21 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
 
   async function refreshStatus(id: string) {
     await fetch(`/api/admin/videos/${id}/sync-status`, { method: "POST" });
+    await load();
+  }
+
+  async function setExpiry(v: Video) {
+    const input = prompt(
+      "Unpublish this video at (YYYY-MM-DDTHH:MM, local time)? Leave blank to clear.",
+      "",
+    );
+    if (input === null) return;
+    const unpublishAt = input.trim() ? new Date(input.trim()).toISOString() : null;
+    await fetch(`/api/admin/videos/${v.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ unpublishAt }),
+    });
     await load();
   }
 
@@ -510,6 +526,13 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
                 className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
               >
                 {v.published ? "Published" : "Draft"}
+              </button>
+              <button
+                onClick={() => setExpiry(v)}
+                className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${v.unpublishAt ? "border-amber-400 text-amber-700 dark:text-amber-400" : "border-zinc-300"}`}
+                title={v.unpublishAt ? `Unpublishes ${new Date(v.unpublishAt).toLocaleString()}` : undefined}
+              >
+                {v.unpublishAt ? "Expires" : "Set expiry"}
               </button>
               <button
                 onClick={() => toggle(v, "memberOnly")}
