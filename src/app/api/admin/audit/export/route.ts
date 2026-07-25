@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { ensureAdmin, errorResponse } from "@/lib/api-guard";
+import { errorResponse } from "@/lib/api-guard";
+import { ensureStaff, ensureCapability } from "@/lib/permissions";
 
 function toCsv(rows: Record<string, unknown>[]): string {
   if (rows.length === 0) return "";
@@ -15,7 +16,8 @@ function toCsv(rows: Record<string, unknown>[]): string {
 /** Exports the full audit log as CSV or JSON for offline/compliance review. */
 export async function GET(request: NextRequest) {
   try {
-    await ensureAdmin();
+    const user = await ensureStaff();
+    await ensureCapability(user, "view_audit_log");
     const format = new URL(request.url).searchParams.get("format") === "csv" ? "csv" : "json";
     const entries = await prisma.auditLog.findMany({ orderBy: { createdAt: "desc" } });
 

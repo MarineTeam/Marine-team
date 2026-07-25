@@ -28,21 +28,22 @@ enum VideoStatus {
 // pending row after seeing the attempt. ADMIN_EMAILS self-authorizes as
 // ADMIN on first login so there's always a way in.
 model User {
-  id              String           @id @default(cuid())
-  auth0Id         String?          @unique
-  email           String           @unique
-  name            String?
-  picture         String?
-  role            Role             @default(MEMBER)
-  authorized      Boolean          @default(false)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  categoryEditors CategoryEditor[]
-  seriesEditors   SeriesEditor[]
-  watchProgress   WatchProgress[]
-  seriesFavorites SeriesFavorite[]
-  videoFavorites  VideoFavorite[]
-  comments        Comment[]
+  id               String            @id @default(cuid())
+  auth0Id          String?           @unique
+  email            String            @unique
+  name             String?
+  picture          String?
+  role             Role              @default(MEMBER)
+  authorized       Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  categoryEditors  CategoryEditor[]
+  seriesEditors    SeriesEditor[]
+  watchProgress    WatchProgress[]
+  seriesFavorites  SeriesFavorite[]
+  videoFavorites   VideoFavorite[]
+  comments         Comment[]
+  groupAssignments GroupAssignment[]
 }
 
 // Grants a non-admin user editor access to one category (and everything
@@ -74,44 +75,47 @@ model SeriesEditor {
 // have children), matching sites like Subsplash where browsing goes
 // Home -> category -> sub-category -> ... -> series -> videos/files.
 model Category {
-  id        String           @id @default(cuid())
-  name      String
-  slug      String           @unique
-  position  Int              @default(0)
-  pinned    Boolean          @default(false)
-  parentId  String?
-  parent    Category?        @relation("CategoryChildren", fields: [parentId], references: [id], onDelete: SetNull)
-  children  Category[]       @relation("CategoryChildren")
-  series    Series[]
-  editors   CategoryEditor[]
-  createdAt DateTime         @default(now())
+  id               String                   @id @default(cuid())
+  name             String
+  slug             String                   @unique
+  position         Int                      @default(0)
+  pinned           Boolean                  @default(false)
+  parentId         String?
+  parent           Category?                @relation("CategoryChildren", fields: [parentId], references: [id], onDelete: SetNull)
+  children         Category[]               @relation("CategoryChildren")
+  series           Series[]
+  editors          CategoryEditor[]
+  pluginOverrides  PluginCategoryOverride[]
+  groupAssignments GroupAssignment[]
+  createdAt        DateTime                 @default(now())
 
   @@index([parentId])
 }
 
 model Series {
-  id            String           @id @default(cuid())
-  title         String
-  slug          String           @unique
-  description   String?
-  coverImageUrl String?
-  memberOnly    Boolean          @default(false)
-  published     Boolean          @default(true)
-  publishAt     DateTime?
-  unpublishAt   DateTime?
-  featured      Boolean          @default(false)
-  pinned        Boolean          @default(false)
-  tags          String[]         @default([])
-  position      Int              @default(0)
-  category      Category?        @relation(fields: [categoryId], references: [id])
-  categoryId    String?
-  videos        Video[]
-  files         FileAsset[]
-  editors       SeriesEditor[]
-  favoritedBy   SeriesFavorite[]
-  comments      Comment[]
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  id               String            @id @default(cuid())
+  title            String
+  slug             String            @unique
+  description      String?
+  coverImageUrl    String?
+  memberOnly       Boolean           @default(false)
+  published        Boolean           @default(true)
+  publishAt        DateTime?
+  unpublishAt      DateTime?
+  featured         Boolean           @default(false)
+  pinned           Boolean           @default(false)
+  tags             String[]          @default([])
+  position         Int               @default(0)
+  category         Category?         @relation(fields: [categoryId], references: [id])
+  categoryId       String?
+  videos           Video[]
+  files            FileAsset[]
+  editors          SeriesEditor[]
+  favoritedBy      SeriesFavorite[]
+  comments         Comment[]
+  groupAssignments GroupAssignment[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 }
 
 model Video {
@@ -231,4 +235,56 @@ model AuditLog {
   createdAt  DateTime @default(now())
 
   @@index([createdAt])
+}
+
+// A WordPress-style toggleable feature. Site-wide `enabled` is the default;
+// PluginCategoryOverride lets a category (or one of its ancestors) flip that
+// default for everything under it. Known slugs live in src/lib/plugins.ts.
+model Plugin {
+  id          String                   @id @default(cuid())
+  slug        String                   @unique
+  name        String
+  description String?
+  enabled     Boolean                  @default(true)
+  overrides   PluginCategoryOverride[]
+  createdAt   DateTime                 @default(now())
+}
+
+model PluginCategoryOverride {
+  id         String   @id @default(cuid())
+  plugin     Plugin   @relation(fields: [pluginId], references: [id], onDelete: Cascade)
+  pluginId   String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId String
+  enabled    Boolean
+
+  @@unique([pluginId, categoryId])
+}
+
+// A phpBB/WordPress-style named permission group: an admin-defined bundle of
+// capabilities (see src/lib/capabilities.ts for the fixed capability list).
+// Assigning a group to a user grants those capabilities, either site-wide or
+// scoped to one category (and everything under it) or one series.
+model PermissionGroup {
+  id           String            @id @default(cuid())
+  name         String            @unique
+  description  String?
+  capabilities String[]          @default([])
+  assignments  GroupAssignment[]
+  createdAt    DateTime          @default(now())
+}
+
+model GroupAssignment {
+  id         String          @id @default(cuid())
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  group      PermissionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId    String
+  category   Category?       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId String?
+  series     Series?         @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  seriesId   String?
+  createdAt  DateTime        @default(now())
+
+  @@index([userId])
 }

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSeriesBySlug, getRelatedSeries, isSeriesFavorited, canAccess } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
+import { hasCapability } from "@/lib/permissions";
+import { isPluginEnabled } from "@/lib/plugins";
 import { FavoriteButton } from "@/components/favorite-button";
 import { SeriesTile } from "@/components/series-tile";
 import { CommentSection } from "@/components/comment-section";
@@ -19,9 +21,15 @@ export default async function SeriesPage({
   const isLoggedIn = Boolean(user);
   const seriesLocked = !canAccess(series.memberOnly, isLoggedIn);
   const hasAudio = series.files.some((f) => f.mimeType?.startsWith("audio/"));
-  const [favorited, related] = await Promise.all([
+  const [favorited, related, favoritesOn, commentsOn, relatedOn, canModerate] = await Promise.all([
     user ? isSeriesFavorited(user.id, series.id) : Promise.resolve(false),
     getRelatedSeries(series),
+    isPluginEnabled("favorites", series.categoryId),
+    isPluginEnabled("comments", series.categoryId),
+    isPluginEnabled("related-content", series.categoryId),
+    user
+      ? hasCapability(user, "moderate_comments", { categoryId: series.categoryId })
+      : Promise.resolve(false),
   ]);
 
   return (
@@ -29,7 +37,7 @@ export default async function SeriesPage({
       <div>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">{series.title}</h1>
-          {user && !seriesLocked && (
+          {user && !seriesLocked && favoritesOn && (
             <FavoriteButton type="series" id={series.id} initialFavorited={favorited} />
           )}
         </div>
@@ -141,7 +149,7 @@ export default async function SeriesPage({
         </>
       )}
 
-      {!seriesLocked && related.length > 0 && (
+      {!seriesLocked && relatedOn && related.length > 0 && (
         <section>
           <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500 mb-3">
             More like this
@@ -154,12 +162,12 @@ export default async function SeriesPage({
         </section>
       )}
 
-      {!seriesLocked && (
+      {!seriesLocked && commentsOn && (
         <CommentSection
           type="series"
           id={series.id}
           currentUserId={user?.id ?? null}
-          isAdmin={user?.role === "ADMIN"}
+          canModerate={canModerate}
         />
       )}
     </div>

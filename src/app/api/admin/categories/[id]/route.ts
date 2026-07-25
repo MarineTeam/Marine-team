@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { ensureAdmin, errorResponse } from "@/lib/api-guard";
+import { errorResponse } from "@/lib/api-guard";
+import { ensureStaff, ensureCapability } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 
 const updateSchema = z.object({
@@ -21,7 +22,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const admin = await ensureAdmin();
+    const user = await ensureStaff();
+    await ensureCapability(user, "manage_categories");
     const { id } = await params;
     const body = updateSchema.parse(await request.json());
     if (body.parentId === id) {
@@ -31,7 +33,7 @@ export async function PATCH(
       );
     }
     const category = await prisma.category.update({ where: { id }, data: body });
-    await logAudit(admin.email, "update", "category", category.id, JSON.stringify(body));
+    await logAudit(user.email, "update", "category", category.id, JSON.stringify(body));
     return NextResponse.json(category);
   } catch (error) {
     return errorResponse(error);
@@ -43,10 +45,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const admin = await ensureAdmin();
+    const user = await ensureStaff();
+    await ensureCapability(user, "manage_categories");
     const { id } = await params;
     const category = await prisma.category.delete({ where: { id } });
-    await logAudit(admin.email, "delete", "category", id, category.name);
+    await logAudit(user.email, "delete", "category", id, category.name);
     return NextResponse.json({ ok: true });
   } catch (error) {
     return errorResponse(error);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
+import { isPluginEnabled } from "@/lib/plugins";
 
 const querySchema = z.object({
   type: z.enum(["series", "video"]),
@@ -36,6 +37,16 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { type, id, body } = postSchema.parse(await request.json());
+
+  const categoryId =
+    type === "series"
+      ? (await prisma.series.findUnique({ where: { id }, select: { categoryId: true } }))?.categoryId ?? null
+      : (await prisma.video.findUnique({ where: { id }, select: { series: { select: { categoryId: true } } } }))
+          ?.series?.categoryId ?? null;
+  if (!(await isPluginEnabled("comments", categoryId))) {
+    return NextResponse.json({ error: "Comments are disabled here" }, { status: 403 });
+  }
+
   const comment = await prisma.comment.create({
     data: {
       userId: user.id,

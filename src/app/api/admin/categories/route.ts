@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { ensureAdmin, errorResponse } from "@/lib/api-guard";
+import { errorResponse } from "@/lib/api-guard";
+import { ensureStaff, ensureCapability } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 
 const categorySchema = z.object({
@@ -17,7 +18,7 @@ const categorySchema = z.object({
 
 export async function GET() {
   try {
-    await ensureAdmin();
+    await ensureStaff();
     const categories = await prisma.category.findMany({
       orderBy: { position: "asc" },
       include: { parent: true },
@@ -30,10 +31,11 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const admin = await ensureAdmin();
+    const user = await ensureStaff();
+    await ensureCapability(user, "manage_categories");
     const body = categorySchema.parse(await request.json());
     const category = await prisma.category.create({ data: body });
-    await logAudit(admin.email, "create", "category", category.id, category.name);
+    await logAudit(user.email, "create", "category", category.id, category.name);
     return NextResponse.json(category, { status: 201 });
   } catch (error) {
     return errorResponse(error);
