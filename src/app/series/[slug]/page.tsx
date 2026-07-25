@@ -9,6 +9,8 @@ import {
   incrementSeriesViewCount,
   logSeriesView,
   isVideoLockedBySequence,
+  canViewSeries,
+  canViewVideo,
   canAccess,
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
@@ -34,7 +36,6 @@ export default async function SeriesPage({
   if (!series) notFound();
 
   const isLoggedIn = Boolean(user);
-  const seriesLocked = !canAccess(series.memberOnly, isLoggedIn);
   const hasAudio = series.files.some((f) => f.mimeType?.startsWith("audio/"));
   const [
     favorited,
@@ -52,6 +53,8 @@ export default async function SeriesPage({
     likesOn,
     canModerate,
     lockedVideoIds,
+    seriesLocked,
+    viewableVideoIds,
   ] = await Promise.all([
     user ? isSeriesFavorited(user.id, series.id) : Promise.resolve(false),
     user ? isSeriesInWatchLater(user.id, series.id) : Promise.resolve(false),
@@ -74,6 +77,10 @@ export default async function SeriesPage({
           series.videos.map(async (v) => [v.id, await isVideoLockedBySequence(user?.id ?? null, v)] as const),
         ).then((entries) => new Set(entries.filter(([, locked]) => locked).map(([id]) => id)))
       : Promise.resolve(new Set<string>()),
+    canViewSeries(user, series).then((allowed) => !allowed),
+    Promise.all(series.videos.map(async (v) => [v.id, await canViewVideo(user, v)] as const)).then(
+      (entries) => new Set(entries.filter(([, allowed]) => allowed).map(([id]) => id)),
+    ),
   ]);
 
   if (viewCountsOn) {
@@ -149,7 +156,7 @@ export default async function SeriesPage({
               <h2 className="text-lg font-semibold mb-3">Videos</h2>
               <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
                 {series.videos.map((video) => {
-                  const locked = !canAccess(video.memberOnly, isLoggedIn);
+                  const locked = !viewableVideoIds.has(video.id);
                   const sequenceLocked = lockedVideoIds.has(video.id);
                   return (
                     <li key={video.id} className="p-4 flex flex-wrap items-center justify-between gap-4">

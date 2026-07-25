@@ -6,6 +6,7 @@ import { canEditSeries } from "@/lib/permissions";
 import { SeriesEditForm } from "@/components/series-edit-form";
 import { VideoManager } from "@/components/video-manager";
 import { FileManager } from "@/components/file-manager";
+import { ViewerAccessManager } from "@/components/viewer-access-manager";
 
 export default async function SeriesDetailPage({
   params,
@@ -32,6 +33,7 @@ export default async function SeriesDetailPage({
       </div>
 
       <SeriesEditForm series={series} categories={categories} />
+      <ViewerAccessManager type="series" id={series.id} />
       <VideoManager seriesId={series.id} />
       <FileManager seriesId={series.id} />
     </div>

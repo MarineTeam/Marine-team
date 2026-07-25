@@ -8,6 +8,12 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Granular viewing permissions**: a series or video can be restricted to
+  specific permission groups ("roles") and/or specific people by email,
+  instead of just the "Members only" on/off switch. Managed from a new
+  "Restricted viewing" panel on the series edit page and a "Viewers" button
+  per video.
+
 - **Subscriptions** (`/subscriptions`): follow a series or category and get
   push notifications when it publishes.
 - **Playlists** (`/playlists`): member-created, reorderable video playlists.

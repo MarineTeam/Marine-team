@@ -108,6 +108,12 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   "content-editor" grant in `/admin/users`. The real `ADMIN` role always has
   every capability and can only be granted by another `ADMIN` — a custom
   "manage_users" group can't be used to self-promote.
+- **Granular viewing permissions**: a series or video's edit page can
+  restrict viewing to specific permission groups ("roles") and/or specific
+  people by email, layered on top of the plain "Members only" checkbox. As
+  soon as any such grant exists for an item, "Members only" no longer gates
+  it — only the granted roles/people (and admins) can view it. Files aren't
+  covered — they stay governed by their own "Members only" flag.
 
 ## Admin analytics (`/admin/analytics`)
 

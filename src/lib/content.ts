@@ -632,3 +632,78 @@ export async function getUpcomingPremieres(limit = 10) {
     include: { series: true },
   });
 }
+
+// --- Granular viewing permissions (roles + per-user grants) -----------------
+
+type ViewerUser = { id: string; role: "MEMBER" | "ADMIN" };
+
+async function userInAnyGroup(userId: string, groupIds: string[]): Promise<boolean> {
+  if (groupIds.length === 0) return false;
+  const count = await prisma.groupAssignment.count({ where: { userId, groupId: { in: groupIds } } });
+  return count > 0;
+}
+
+/**
+ * Whether a user can view a series: admins always can; a series with no
+ * granular viewer grants falls back to the plain `memberOnly` gate; a
+ * series with at least one grant (role or specific user) requires the
+ * viewer to match one of those grants — `memberOnly` no longer applies.
+ */
+export async function canViewSeries(
+  user: ViewerUser | null,
+  series: { id: string; memberOnly: boolean },
+): Promise<boolean> {
+  if (user?.role === "ADMIN") return true;
+
+  const [groupGrants, userGrantCount] = await Promise.all([
+    prisma.seriesViewerGroup.findMany({ where: { seriesId: series.id }, select: { groupId: true } }),
+    prisma.seriesViewer.count({ where: { seriesId: series.id } }),
+  ]);
+  const isRestricted = groupGrants.length > 0 || userGrantCount > 0;
+  if (!isRestricted) return canAccess(series.memberOnly, Boolean(user));
+  if (!user) return false;
+
+  const [directGrant, inGroup] = await Promise.all([
+    prisma.seriesViewer.findUnique({ where: { seriesId_userId: { seriesId: series.id, userId: user.id } } }),
+    userInAnyGroup(user.id, groupGrants.map((g) => g.groupId)),
+  ]);
+  return Boolean(directGrant) || inGroup;
+}
+
+/** Same as canViewSeries, but for a video's own independent viewing grants. */
+export async function canViewVideo(
+  user: ViewerUser | null,
+  video: { id: string; memberOnly: boolean },
+): Promise<boolean> {
+  if (user?.role === "ADMIN") return true;
+
+  const [groupGrants, userGrantCount] = await Promise.all([
+    prisma.videoViewerGroup.findMany({ where: { videoId: video.id }, select: { groupId: true } }),
+    prisma.videoViewer.count({ where: { videoId: video.id } }),
+  ]);
+  const isRestricted = groupGrants.length > 0 || userGrantCount > 0;
+  if (!isRestricted) return canAccess(video.memberOnly, Boolean(user));
+  if (!user) return false;
+
+  const [directGrant, inGroup] = await Promise.all([
+    prisma.videoViewer.findUnique({ where: { videoId_userId: { videoId: video.id, userId: user.id } } }),
+    userInAnyGroup(user.id, groupGrants.map((g) => g.groupId)),
+  ]);
+  return Boolean(directGrant) || inGroup;
+}
+
+export async function getSeriesViewerGroups(seriesId: string) {
+  return prisma.seriesViewerGroup.findMany({ where: { seriesId }, include: { group: true }, orderBy: { createdAt: "asc" } });
+}
+
+export async function getSeriesViewers(seriesId: string) {
+  return prisma.seriesViewer.findMany({ where: { seriesId }, include: { user: true }, orderBy: { createdAt: "asc" } });
+}
+
+export async function getVideoViewerGroups(videoId: string) {
+  return prisma.videoViewerGroup.findMany({ where: { videoId }, include: { group: true }, orderBy: { createdAt: "asc" } });
+}
+
+export async function getVideoViewers(videoId: string) {
+  return prisma.videoViewer.findMany({ where: { videoId }, include: { user: true }, orderBy: { createdAt: "asc" } });
+}

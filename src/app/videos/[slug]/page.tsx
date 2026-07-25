@@ -11,7 +11,7 @@ import {
   incrementVideoViewCount,
   logVideoView,
   isVideoLockedBySequence,
-  canAccess,
+  canViewVideo,
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
@@ -42,17 +42,20 @@ export default async function VideoPage({
 
   const isPendingPremiere = Boolean(video.isPremiere && video.publishAt && video.publishAt > new Date());
 
-  const isLoggedIn = Boolean(user);
-  if (!canAccess(video.memberOnly, isLoggedIn)) {
+  if (!(await canViewVideo(user, video))) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-        <p className="font-medium">This video is for members only.</p>
-        <a
-          href="/auth/login"
-          className="mt-4 inline-block rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
-        >
-          Log in to watch
-        </a>
+        <p className="font-medium">
+          {user ? "You don't have access to this video." : "This video is for members only."}
+        </p>
+        {!user && (
+          <a
+            href="/auth/login"
+            className="mt-4 inline-block rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+          >
+            Log in to watch
+          </a>
+        )}
       </div>
     );
   }

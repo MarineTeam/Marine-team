@@ -163,6 +163,16 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   always has every capability and can't be granted through a group (only
   another `ADMIN` can promote someone to `ADMIN`, to avoid a
   privilege-escalation hole via a custom "manage_users" group).
+- **Granular viewing permissions**: beyond the plain "Members only"
+  checkbox, a series or video's edit page has a "Restricted viewing" panel
+  (`src/components/viewer-access-manager.tsx`) that grants view access to
+  specific permission groups (reusing the groups from Permissions above as
+  "roles") and/or specific people by email. As soon as either exists for an
+  item, "Members only" is ignored for it and only those roles/people (plus
+  admins) can view it — checked by `canViewSeries`/`canViewVideo` in
+  `src/lib/content.ts`. With no grants, behavior is unchanged. This only
+  applies to series and videos, not files, which stay governed by their own
+  "Members only" flag.
 - **Continue watching / recently added**: logged-in users get a periodic
   heartbeat (`src/components/watch-progress-tracker.tsx`) that approximates
   watch position (Bunny's iframe embed has no documented postMessage API
