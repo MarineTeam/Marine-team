@@ -15,12 +15,34 @@ export default async function SeriesPage({
 
   const isLoggedIn = Boolean(user);
   const seriesLocked = !canAccess(series.memberOnly, isLoggedIn);
+  const hasAudio = series.files.some((f) => f.mimeType?.startsWith("audio/"));
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{series.title}</h1>
         {series.description && <p className="mt-2 text-zinc-500">{series.description}</p>}
+        {series.tags.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {series.tags.map((tag) => (
+              <Link
+                key={tag}
+                href={`/tags/${encodeURIComponent(tag)}`}
+                className="rounded bg-zinc-100 px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              >
+                #{tag}
+              </Link>
+            ))}
+          </div>
+        )}
+        {hasAudio && (
+          <a
+            href={`/series/${series.slug}/podcast.xml`}
+            className="mt-3 inline-block text-xs text-zinc-500 hover:underline"
+          >
+            Podcast RSS feed
+          </a>
+        )}
       </div>
 
       {seriesLocked ? (

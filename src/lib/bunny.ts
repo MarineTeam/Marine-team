@@ -147,9 +147,10 @@ export function bunnyStreamThumbnailUrl(videoId: string): string {
   return `https://${cdnHostname}/${videoId}/thumbnail.jpg${authParams ? `?${authParams}` : ""}`;
 }
 
-export function bunnyStreamEmbedUrl(videoId: string): string {
+export function bunnyStreamEmbedUrl(videoId: string, startSeconds?: number): string {
   const authParams = bunnyStreamAuthParams(videoId);
-  const query = ["autoplay=false", authParams].filter(Boolean).join("&");
+  const startParam = startSeconds && startSeconds > 0 ? `t=${Math.floor(startSeconds)}s` : "";
+  const query = ["autoplay=false", authParams, startParam].filter(Boolean).join("&");
   return `https://iframe.mediadelivery.net/embed/${streamLibraryId()}/${videoId}?${query}`;
 }
 

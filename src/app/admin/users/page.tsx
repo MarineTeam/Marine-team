@@ -11,6 +11,11 @@ type User = {
   authorized: boolean;
 };
 
+type Category = { id: string; name: string };
+type Series = { id: string; title: string };
+type CategoryEditor = { id: string; user: User; category: Category };
+type SeriesEditor = { id: string; user: User; series: Series };
+
 export default function UsersAdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [email, setEmail] = useState("");
@@ -18,15 +23,86 @@ export default function UsersAdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [seriesList, setSeriesList] = useState<Series[]>([]);
+  const [categoryEditors, setCategoryEditors] = useState<CategoryEditor[]>([]);
+  const [seriesEditors, setSeriesEditors] = useState<SeriesEditor[]>([]);
+  const [editorEmail, setEditorEmail] = useState("");
+  const [editorCategoryId, setEditorCategoryId] = useState("");
+  const [editorSeriesId, setEditorSeriesId] = useState("");
+  const [editorError, setEditorError] = useState<string | null>(null);
+
   async function load() {
     const res = await fetch("/api/admin/users");
     if (res.ok) setUsers(await res.json());
   }
 
+  async function loadEditors() {
+    const [categoriesRes, seriesRes, editorsRes] = await Promise.all([
+      fetch("/api/admin/categories"),
+      fetch("/api/admin/series"),
+      fetch("/api/admin/editors"),
+    ]);
+    if (categoriesRes.ok) setCategories(await categoriesRes.json());
+    if (seriesRes.ok) setSeriesList(await seriesRes.json());
+    if (editorsRes.ok) {
+      const data = await editorsRes.json();
+      setCategoryEditors(data.categoryEditors);
+      setSeriesEditors(data.seriesEditors);
+    }
+  }
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
+    loadEditors();
   }, []);
+
+  async function addCategoryEditor(e: React.FormEvent) {
+    e.preventDefault();
+    setEditorError(null);
+    try {
+      const res = await fetch("/api/admin/editors/category", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userEmail: editorEmail, categoryId: editorCategoryId }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed to add editor");
+      setEditorEmail("");
+      setEditorCategoryId("");
+      await loadEditors();
+    } catch (err) {
+      setEditorError(err instanceof Error ? err.message : "Failed to add editor");
+    }
+  }
+
+  async function addSeriesEditor(e: React.FormEvent) {
+    e.preventDefault();
+    setEditorError(null);
+    try {
+      const res = await fetch("/api/admin/editors/series", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userEmail: editorEmail, seriesId: editorSeriesId }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed to add editor");
+      setEditorEmail("");
+      setEditorSeriesId("");
+      await loadEditors();
+    } catch (err) {
+      setEditorError(err instanceof Error ? err.message : "Failed to add editor");
+    }
+  }
+
+  async function removeCategoryEditor(id: string) {
+    await fetch(`/api/admin/editors/category/${id}`, { method: "DELETE" });
+    await loadEditors();
+  }
+
+  async function removeSeriesEditor(id: string) {
+    await fetch(`/api/admin/editors/series/${id}`, { method: "DELETE" });
+    await loadEditors();
+  }
 
   async function addUser(e: React.FormEvent) {
     e.preventDefault();
@@ -178,6 +254,127 @@ export default function UsersAdminPage() {
           ))}
           {authorized.length === 0 && (
             <li className="p-4 text-sm text-zinc-500">No authorized users yet.</li>
+          )}
+        </ul>
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="font-medium">Content editors</h2>
+          <p className="text-sm text-zinc-500">
+            Grant an already-authorized user editor access to one category (and everything under
+            it) or one specific series, without making them a site-wide admin.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <form
+            onSubmit={addCategoryEditor}
+            className="space-y-2 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4"
+          >
+            <p className="text-sm font-medium">Category editor</p>
+            <input
+              type="email"
+              value={editorEmail}
+              onChange={(e) => setEditorEmail(e.target.value)}
+              placeholder="person@example.com"
+              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              required
+            />
+            <select
+              value={editorCategoryId}
+              onChange={(e) => setEditorCategoryId(e.target.value)}
+              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              required
+            >
+              <option value="">Choose a category…</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="w-full rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+            >
+              Add category editor
+            </button>
+          </form>
+
+          <form
+            onSubmit={addSeriesEditor}
+            className="space-y-2 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4"
+          >
+            <p className="text-sm font-medium">Series editor</p>
+            <input
+              type="email"
+              value={editorEmail}
+              onChange={(e) => setEditorEmail(e.target.value)}
+              placeholder="person@example.com"
+              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              required
+            />
+            <select
+              value={editorSeriesId}
+              onChange={(e) => setEditorSeriesId(e.target.value)}
+              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              required
+            >
+              <option value="">Choose a series…</option>
+              {seriesList.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.title}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="w-full rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+            >
+              Add series editor
+            </button>
+          </form>
+        </div>
+        {editorError && <p className="text-sm text-red-600">{editorError}</p>}
+
+        <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
+          {categoryEditors.map((editor) => (
+            <li
+              key={editor.id}
+              className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4"
+            >
+              <p className="text-sm">
+                <span className="font-medium">{editor.user.email}</span> — category{" "}
+                <span className="font-medium">{editor.category.name}</span>
+              </p>
+              <button
+                onClick={() => removeCategoryEditor(editor.id)}
+                className="text-sm text-red-600 hover:underline"
+              >
+                Revoke
+              </button>
+            </li>
+          ))}
+          {seriesEditors.map((editor) => (
+            <li
+              key={editor.id}
+              className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4"
+            >
+              <p className="text-sm">
+                <span className="font-medium">{editor.user.email}</span> — series{" "}
+                <span className="font-medium">{editor.series.title}</span>
+              </p>
+              <button
+                onClick={() => removeSeriesEditor(editor.id)}
+                className="text-sm text-red-600 hover:underline"
+              >
+                Revoke
+              </button>
+            </li>
+          ))}
+          {categoryEditors.length === 0 && seriesEditors.length === 0 && (
+            <li className="p-4 text-sm text-zinc-500">No content editors assigned yet.</li>
           )}
         </ul>
       </section>

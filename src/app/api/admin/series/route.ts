@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { ensureAdmin, errorResponse } from "@/lib/api-guard";
+import { errorResponse } from "@/lib/api-guard";
+import { ensureStaff, ensureCategoryAccess, getEditableScope, descendantCategoryIds } from "@/lib/permissions";
+import { logAudit } from "@/lib/audit";
 
 const seriesSchema = z.object({
   title: z.string().min(1),
@@ -14,14 +16,37 @@ const seriesSchema = z.object({
   categoryId: z.string().optional().nullable(),
   memberOnly: z.boolean().optional(),
   published: z.boolean().optional(),
+  publishAt: z.string().nullable().optional(),
+  featured: z.boolean().optional(),
+  pinned: z.boolean().optional(),
+  tags: z.array(z.string().min(1)).optional(),
   position: z.number().int().optional(),
 });
 
+function normalizeSeriesData(body: z.infer<typeof seriesSchema>) {
+  return {
+    ...body,
+    tags: body.tags?.map((t) => t.trim().toLowerCase()).filter(Boolean),
+    publishAt:
+      body.publishAt === undefined ? undefined : body.publishAt === null ? null : new Date(body.publishAt),
+  };
+}
+
 export async function GET() {
   try {
-    await ensureAdmin();
+    const user = await ensureStaff();
+    const scope = await getEditableScope(user);
+    const where = scope.isAdmin
+      ? {}
+      : {
+          OR: [
+            { id: { in: scope.seriesIds } },
+            { categoryId: { in: await descendantCategoryIds(scope.categoryIds) } },
+          ],
+        };
     const series = await prisma.series.findMany({
-      orderBy: { position: "asc" },
+      where,
+      orderBy: [{ pinned: "desc" }, { position: "asc" }],
       include: { category: true, _count: { select: { videos: true, files: true } } },
     });
     return NextResponse.json(series);
@@ -32,9 +57,16 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    await ensureAdmin();
+    const user = await ensureStaff();
     const body = seriesSchema.parse(await request.json());
-    const series = await prisma.series.create({ data: body });
+    if (user.role !== "ADMIN") {
+      if (!body.categoryId) {
+        return NextResponse.json({ error: "Choose a category" }, { status: 400 });
+      }
+      await ensureCategoryAccess(user, body.categoryId);
+    }
+    const series = await prisma.series.create({ data: normalizeSeriesData(body) });
+    await logAudit(user.email, "create", "series", series.id, series.title);
     return NextResponse.json(series, { status: 201 });
   } catch (error) {
     return errorResponse(error);

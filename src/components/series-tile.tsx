@@ -6,6 +6,7 @@ type SeriesTileData = {
   description: string | null;
   coverImageUrl: string | null;
   memberOnly: boolean;
+  tags?: string[];
 };
 
 export function SeriesTile({ series }: { series: SeriesTileData }) {
@@ -16,6 +17,7 @@ export function SeriesTile({ series }: { series: SeriesTileData }) {
       subtitle={series.description}
       thumbnailUrl={series.coverImageUrl}
       badge={series.memberOnly ? "Members" : undefined}
+      tags={series.tags}
     />
   );
 }

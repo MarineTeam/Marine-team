@@ -9,6 +9,7 @@ type Category = {
   name: string;
   slug: string;
   position: number;
+  pinned: boolean;
   parentId: string | null;
   parent: { id: string; name: string } | null;
 };
@@ -126,6 +127,15 @@ export default function CategoriesPage() {
     await reorderTo(siblings, index, targetIndex);
   }
 
+  async function togglePinned(category: Category) {
+    await fetch(`/api/admin/categories/${category.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinned: !category.pinned }),
+    });
+    await load();
+  }
+
   async function remove(id: string) {
     if (
       !confirm(
@@ -201,6 +211,12 @@ export default function CategoriesPage() {
                 </option>
               ))}
           </select>
+          <button
+            onClick={() => togglePinned(node)}
+            className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${node.pinned ? "border-amber-400 text-amber-700 dark:text-amber-400" : "border-zinc-300"}`}
+          >
+            {node.pinned ? "Pinned" : "Pin"}
+          </button>
           <button onClick={() => remove(node.id)} className="text-red-600 hover:underline">
             Delete
           </button>

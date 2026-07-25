@@ -1,21 +1,30 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser, getSessionIdentity } from "@/lib/current-user";
+import { isStaff } from "@/lib/permissions";
 
-const links = [
+const adminLinks = [
   { href: "/admin", label: "Overview" },
   { href: "/admin/categories", label: "Categories" },
   { href: "/admin/series", label: "Series" },
   { href: "/admin/videos", label: "Videos" },
   { href: "/admin/files", label: "Files" },
   { href: "/admin/users", label: "Access" },
+  { href: "/admin/audit", label: "Audit log" },
+];
+
+const editorLinks = [
+  { href: "/admin/series", label: "Series" },
+  { href: "/admin/videos", label: "Videos" },
+  { href: "/admin/files", label: "Files" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const [user, identity] = await Promise.all([getCurrentUser(), getSessionIdentity()]);
 
   if (!user && !identity) redirect("/auth/login?returnTo=/admin");
-  if (!user || user.role !== "ADMIN") {
+  const staff = user ? await isStaff(user) : false;
+  if (!user || !staff) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-16 text-center space-y-4">
         <p className="font-medium">You don&apos;t have access to the admin dashboard.</p>
@@ -30,6 +39,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       </div>
     );
   }
+
+  const links = user.role === "ADMIN" ? adminLinks : editorLinks;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8 flex flex-col sm:flex-row gap-4 sm:gap-8">

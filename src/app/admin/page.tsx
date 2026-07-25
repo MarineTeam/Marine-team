@@ -1,6 +1,11 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/current-user";
 
 export default async function AdminOverview() {
+  const user = await getCurrentUser();
+  if (user?.role !== "ADMIN") redirect("/admin/series");
+
   const [categories, series, videos, files] = await Promise.all([
     prisma.category.count(),
     prisma.series.count(),
