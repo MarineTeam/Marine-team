@@ -38,7 +38,13 @@ export async function getCategoryBySlug(slug: string) {
     where: { slug },
     include: {
       series: { where: { published: true }, orderBy: { position: "asc" } },
-      children: { orderBy: { position: "asc" } },
+      children: {
+        orderBy: { position: "asc" },
+        include: {
+          series: { where: { published: true }, orderBy: { position: "asc" } },
+          children: true,
+        },
+      },
       parent: true,
     },
   });
