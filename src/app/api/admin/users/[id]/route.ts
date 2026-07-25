@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { ensureAdmin, errorResponse } from "@/lib/api-guard";
+import { errorResponse } from "@/lib/api-guard";
+import { ensureStaff, ensureCapability } from "@/lib/permissions";
 
 const updateSchema = z.object({
   role: z.enum(["MEMBER", "ADMIN"]).optional(),
@@ -13,14 +14,18 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const admin = await ensureAdmin();
+    const actor = await ensureStaff();
+    await ensureCapability(actor, "manage_users");
     const { id } = await params;
     const body = updateSchema.parse(await request.json());
-    if (id === admin.id && body.authorized === false) {
+    if (id === actor.id && body.authorized === false) {
       return NextResponse.json(
         { error: "You can't revoke your own access" },
         { status: 400 },
       );
+    }
+    if (body.role === "ADMIN" && actor.role !== "ADMIN") {
+      return NextResponse.json({ error: "Only a site admin can grant the Admin role" }, { status: 403 });
     }
     const user = await prisma.user.update({
       where: { id },
@@ -37,9 +42,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const admin = await ensureAdmin();
+    const actor = await ensureStaff();
+    await ensureCapability(actor, "manage_users");
     const { id } = await params;
-    if (id === admin.id) {
+    if (id === actor.id) {
       return NextResponse.json(
         { error: "You can't remove your own access" },
         { status: 400 },

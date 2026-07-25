@@ -98,22 +98,40 @@ files hosted on Bunny Storage.
   multi-select (Publish/Unpublish/Delete) and a title filter box; selected
   series can also be bulk-moved to a different category (or uncategorized)
   in one action, and any series row can be recategorized inline.
-- **Audit log** (`/admin/audit`, `ADMIN` only): an append-only record of
-  admin/editor create/update/delete/grant/revoke actions, exportable as CSV
-  or JSON for offline/compliance review.
+- **Audit log** (`/admin/audit`, needs the `view_audit_log` capability): an
+  append-only record of admin/editor create/update/delete/grant/revoke
+  actions, exportable as CSV or JSON for offline/compliance review.
 - **Favorites**: logged-in users can bookmark a series or video from its
-  page; `/favorites` lists everything they've saved.
+  page; `/favorites` lists everything they've saved. Gated by the
+  `favorites` plugin (see Plugins below).
 - **Comments**: logged-in users can leave comments on a series or video
-  page; authors can delete their own, admins can delete any.
+  page; authors can delete their own, admins or `moderate_comments`
+  capability holders can delete any. Gated by the `comments` plugin.
 - **Related content**: series pages show a "More like this" row (same
   category, then shared tags); video pages show "More from this series" or
-  "You might also like" for standalone videos.
+  "You might also like" for standalone videos. Gated by the
+  `related-content` plugin.
 - **Relevance-ranked search**: `/search` and the navbar search box rank
   results by how well they match — an exact or prefix title match outranks
   a description-only hit — rather than raw database order.
-- **Permissions by user**: `/admin/users` manages each authorized user's
-  content-editor grants (category and series access) in one place next to
-  their role, instead of a separate free-form grant form.
+- **Plugins** (`/admin/plugins`, needs `manage_plugins`): a WordPress-style
+  list of optional features (Favorites, Comments, Related content) with a
+  site-wide Active/Inactive toggle, plus per-category overrides — e.g.
+  disable Comments just under "Kids" while leaving it on everywhere else.
+  Nearest-ancestor override wins; falls back to the site-wide default.
+  `src/lib/plugins.ts` has the plugin registry and `isPluginEnabled()`.
+- **Permissions** (`/admin/permissions`, needs `manage_permissions`): a
+  phpBB/WordPress-style permission builder — define named groups (e.g.
+  "Moderators") as a custom bundle of capabilities from a fixed list
+  (`src/lib/capabilities.ts`: manage categories/series/videos/files, publish
+  content, moderate comments, manage users/permissions/plugins, view audit
+  log), then assign a group to a user site-wide or scoped to one category
+  (and everything under it) or one series. This sits alongside the older
+  simple per-category/series "content-editor" grants in `/admin/users` —
+  both are checked by `src/lib/permissions.ts`. The real `ADMIN` role
+  always has every capability and can't be granted through a group (only
+  another `ADMIN` can promote someone to `ADMIN`, to avoid a
+  privilege-escalation hole via a custom "manage_users" group).
 - **Continue watching / recently added**: logged-in users get a periodic
   heartbeat (`src/components/watch-progress-tracker.tsx`) that approximates
   watch position (Bunny's iframe embed has no documented postMessage API

@@ -14,12 +14,12 @@ export function CommentSection({
   type,
   id,
   currentUserId,
-  isAdmin,
+  canModerate,
 }: {
   type: "series" | "video";
   id: string;
   currentUserId: string | null;
-  isAdmin: boolean;
+  canModerate: boolean;
 }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -108,7 +108,7 @@ export function CommentSection({
                 <span className="text-xs text-zinc-400">
                   {new Date(c.createdAt).toLocaleString()}
                 </span>
-                {(c.userId === currentUserId || isAdmin) && (
+                {(c.userId === currentUserId || canModerate) && (
                   <button
                     onClick={() => remove(c.id)}
                     className="text-xs text-red-600 hover:underline"

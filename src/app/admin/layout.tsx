@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser, getSessionIdentity } from "@/lib/current-user";
-import { isStaff } from "@/lib/permissions";
+import { isStaff, hasCapability } from "@/lib/permissions";
 
 const adminLinks = [
   { href: "/admin", label: "Overview" },
@@ -10,13 +10,9 @@ const adminLinks = [
   { href: "/admin/videos", label: "Videos" },
   { href: "/admin/files", label: "Files" },
   { href: "/admin/users", label: "Access" },
+  { href: "/admin/permissions", label: "Permissions" },
+  { href: "/admin/plugins", label: "Plugins" },
   { href: "/admin/audit", label: "Audit log" },
-];
-
-const editorLinks = [
-  { href: "/admin/series", label: "Series" },
-  { href: "/admin/videos", label: "Videos" },
-  { href: "/admin/files", label: "Files" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -40,7 +36,24 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     );
   }
 
-  const links = user.role === "ADMIN" ? adminLinks : editorLinks;
+  let links = adminLinks;
+  if (user.role !== "ADMIN") {
+    const [canManageUsers, canManagePermissions, canManagePlugins, canViewAuditLog] = await Promise.all([
+      hasCapability(user, "manage_users"),
+      hasCapability(user, "manage_permissions"),
+      hasCapability(user, "manage_plugins"),
+      hasCapability(user, "view_audit_log"),
+    ]);
+    links = [
+      { href: "/admin/series", label: "Series" },
+      { href: "/admin/videos", label: "Videos" },
+      { href: "/admin/files", label: "Files" },
+      ...(canManageUsers ? [{ href: "/admin/users", label: "Access" }] : []),
+      ...(canManagePermissions ? [{ href: "/admin/permissions", label: "Permissions" }] : []),
+      ...(canManagePlugins ? [{ href: "/admin/plugins", label: "Plugins" }] : []),
+      ...(canViewAuditLog ? [{ href: "/admin/audit", label: "Audit log" }] : []),
+    ];
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8 flex flex-col sm:flex-row gap-4 sm:gap-8">

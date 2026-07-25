@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { ensureAdmin, errorResponse } from "@/lib/api-guard";
+import { errorResponse } from "@/lib/api-guard";
+import { ensureStaff, ensureCapability } from "@/lib/permissions";
 
 const createSchema = z.object({
   email: z.string().email(),
@@ -10,7 +11,8 @@ const createSchema = z.object({
 
 export async function GET() {
   try {
-    await ensureAdmin();
+    const user = await ensureStaff();
+    await ensureCapability(user, "manage_users");
     const users = await prisma.user.findMany({
       orderBy: [{ authorized: "asc" }, { createdAt: "asc" }],
     });
@@ -23,8 +25,12 @@ export async function GET() {
 /** Pre-authorizes an email to log in. The row is a placeholder (no auth0Id) until they first sign in. */
 export async function POST(request: NextRequest) {
   try {
-    await ensureAdmin();
+    const actor = await ensureStaff();
+    await ensureCapability(actor, "manage_users");
     const body = createSchema.parse(await request.json());
+    if (body.role === "ADMIN" && actor.role !== "ADMIN") {
+      return NextResponse.json({ error: "Only a site admin can grant the Admin role" }, { status: 403 });
+    }
     const email = body.email.toLowerCase();
 
     const existing = await prisma.user.findUnique({ where: { email } });
