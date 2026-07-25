@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { SeriesTile } from "@/components/series-tile";
 import { getSeriesByTag } from "@/lib/content";
+import { getCurrentUser } from "@/lib/current-user";
 
 export default async function TagPage({
   params,
 }: {
   params: Promise<{ tag: string }>;
 }) {
-  const { tag } = await params;
-  const series = await getSeriesByTag(decodeURIComponent(tag));
+  const [{ tag }, user] = await Promise.all([params, getCurrentUser()]);
+  const series = await getSeriesByTag(decodeURIComponent(tag), Boolean(user));
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">

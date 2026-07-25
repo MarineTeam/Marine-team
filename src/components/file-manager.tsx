@@ -10,6 +10,7 @@ type FileAsset = {
   title: string;
   url: string;
   memberOnly: boolean;
+  hidden: boolean;
   published: boolean;
   unpublishAt: string | null;
   series: { id: string; title: string } | null;
@@ -84,7 +85,7 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
     await load();
   }
 
-  async function toggle(f: FileAsset, field: "published" | "memberOnly") {
+  async function toggle(f: FileAsset, field: "published" | "memberOnly" | "hidden") {
     await fetch(`/api/admin/files/${f.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -330,6 +331,12 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
                 className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
               >
                 {f.memberOnly ? "Members only" : "Public"}
+              </button>
+              <button
+                onClick={() => toggle(f, "hidden")}
+                className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${f.hidden ? "border-red-400 text-red-600 dark:text-red-400" : "border-zinc-300"}`}
+              >
+                {f.hidden ? "Hidden" : "Visible"}
               </button>
               <button onClick={() => remove(f.id)} className="text-red-600 hover:underline">
                 Delete

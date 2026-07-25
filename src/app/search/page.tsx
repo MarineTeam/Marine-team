@@ -2,6 +2,7 @@ import { CategoryTile } from "@/components/category-tile";
 import { SeriesTile } from "@/components/series-tile";
 import { MenuTile } from "@/components/menu-tile";
 import { searchContent } from "@/lib/content";
+import { getCurrentUser } from "@/lib/current-user";
 import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
 
 export default async function SearchPage({
@@ -9,10 +10,10 @@ export default async function SearchPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
-  const { q } = await searchParams;
+  const [{ q }, user] = await Promise.all([searchParams, getCurrentUser()]);
   const query = (q ?? "").trim();
   const results = query
-    ? await searchContent(query)
+    ? await searchContent(query, Boolean(user))
     : { categories: [], series: [], videos: [] };
   const hasResults =
     results.categories.length + results.series.length + results.videos.length > 0;

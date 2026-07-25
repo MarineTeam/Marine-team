@@ -114,6 +114,7 @@ model Series {
   description       String?
   coverImageUrl     String?
   memberOnly        Boolean            @default(false)
+  hidden            Boolean            @default(false)
   published         Boolean            @default(true)
   publishAt         DateTime?
   unpublishAt       DateTime?
@@ -153,6 +154,7 @@ model Video {
   durationSeconds Int?
   status          VideoStatus       @default(PROCESSING)
   memberOnly      Boolean           @default(false)
+  hidden          Boolean           @default(false)
   published       Boolean           @default(false)
   publishAt       DateTime?
   unpublishAt     DateTime?
@@ -245,6 +247,7 @@ model FileAsset {
   sizeBytes   Int?
   mimeType    String?
   memberOnly  Boolean   @default(false)
+  hidden      Boolean   @default(false)
   published   Boolean   @default(true)
   publishAt   DateTime?
   unpublishAt DateTime?
