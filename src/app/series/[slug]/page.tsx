@@ -10,7 +10,7 @@ import {
   logSeriesView,
   isVideoLockedBySequence,
   canViewSeries,
-  canViewVideo,
+  getViewableVideoIds,
   canAccess,
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
@@ -78,9 +78,7 @@ export default async function SeriesPage({
         ).then((entries) => new Set(entries.filter(([, locked]) => locked).map(([id]) => id)))
       : Promise.resolve(new Set<string>()),
     canViewSeries(user, series).then((allowed) => !allowed),
-    Promise.all(series.videos.map(async (v) => [v.id, await canViewVideo(user, v)] as const)).then(
-      (entries) => new Set(entries.filter(([, allowed]) => allowed).map(([id]) => id)),
-    ),
+    getViewableVideoIds(user, series.videos),
   ]);
 
   if (viewCountsOn) {

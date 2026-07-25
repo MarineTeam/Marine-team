@@ -692,6 +692,71 @@ export async function canViewVideo(
   return Boolean(directGrant) || inGroup;
 }
 
+/**
+ * Batched version of canViewVideo for a whole list of videos (e.g. a
+ * series' episode list) — avoids the N+1 query pattern of calling
+ * canViewVideo once per video, which for a restriction check meant up to
+ * 4 queries *per video*. This does at most 4 queries total regardless of
+ * how many videos are passed in.
+ */
+export async function getViewableVideoIds(
+  user: ViewerUser | null,
+  videos: { id: string; memberOnly: boolean }[],
+): Promise<Set<string>> {
+  if (videos.length === 0) return new Set();
+  if (user?.role === "ADMIN") return new Set(videos.map((v) => v.id));
+
+  const ids = videos.map((v) => v.id);
+  const [groupGrants, userGrantVideoIds] = await Promise.all([
+    prisma.videoViewerGroup.findMany({ where: { videoId: { in: ids } }, select: { videoId: true, groupId: true } }),
+    prisma.videoViewer.findMany({ where: { videoId: { in: ids } }, select: { videoId: true } }),
+  ]);
+  const restrictedIds = new Set([...groupGrants.map((g) => g.videoId), ...userGrantVideoIds.map((g) => g.videoId)]);
+
+  const result = new Set<string>();
+  const stillToCheck: typeof videos = [];
+  for (const v of videos) {
+    if (!restrictedIds.has(v.id)) {
+      if (canAccess(v.memberOnly, Boolean(user))) result.add(v.id);
+    } else {
+      stillToCheck.push(v);
+    }
+  }
+  if (stillToCheck.length === 0 || !user) return result;
+
+  const groupIdsNeeded = Array.from(new Set(groupGrants.map((g) => g.groupId)));
+  const [directGrants, memberGroupIds] = await Promise.all([
+    prisma.videoViewer.findMany({
+      where: { userId: user.id, videoId: { in: stillToCheck.map((v) => v.id) } },
+      select: { videoId: true },
+    }),
+    groupIdsNeeded.length > 0
+      ? prisma.groupAssignment.findMany({
+          where: { userId: user.id, groupId: { in: groupIdsNeeded } },
+          select: { groupId: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  const directVideoIds = new Set(directGrants.map((g) => g.videoId));
+  const memberGroupIdSet = new Set(memberGroupIds.map((g) => g.groupId));
+  const videoGroupMap = new Map<string, string[]>();
+  for (const g of groupGrants) {
+    const arr = videoGroupMap.get(g.videoId) ?? [];
+    arr.push(g.groupId);
+    videoGroupMap.set(g.videoId, arr);
+  }
+
+  for (const v of stillToCheck) {
+    if (directVideoIds.has(v.id)) {
+      result.add(v.id);
+      continue;
+    }
+    const groupsForVideo = videoGroupMap.get(v.id) ?? [];
+    if (groupsForVideo.some((gid) => memberGroupIdSet.has(gid))) result.add(v.id);
+  }
+  return result;
+}
+
 export async function getSeriesViewerGroups(seriesId: string) {
   return prisma.seriesViewerGroup.findMany({ where: { seriesId }, include: { group: true }, orderBy: { createdAt: "asc" } });
 }
