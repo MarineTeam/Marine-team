@@ -88,6 +88,23 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
     await load();
   }
 
+  async function move(index: number, direction: "up" | "down") {
+    const swapIndex = direction === "up" ? index - 1 : index + 1;
+    if (swapIndex < 0 || swapIndex >= visibleFiles.length) return;
+    const reordered = [...visibleFiles];
+    [reordered[index], reordered[swapIndex]] = [reordered[swapIndex], reordered[index]];
+    await Promise.all(
+      reordered.map((f, i) =>
+        fetch(`/api/admin/files/${f.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ position: i }),
+        }),
+      ),
+    );
+    await load();
+  }
+
   const visibleFiles = seriesId ? files.filter((f) => f.series?.id === seriesId) : files;
 
   return (
@@ -142,12 +159,32 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
-        {visibleFiles.map((f) => (
+        {visibleFiles.map((f, index) => (
           <li key={f.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
             <div className="min-w-0">
               <p className="font-medium">{f.title}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-sm">
+              {seriesId && (
+                <>
+                  <button
+                    onClick={() => move(index, "up")}
+                    disabled={index === 0}
+                    className="rounded-md border border-zinc-300 px-2 py-1 disabled:opacity-30 dark:border-zinc-700"
+                    aria-label="Move up"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    onClick={() => move(index, "down")}
+                    disabled={index === visibleFiles.length - 1}
+                    className="rounded-md border border-zinc-300 px-2 py-1 disabled:opacity-30 dark:border-zinc-700"
+                    aria-label="Move down"
+                  >
+                    ↓
+                  </button>
+                </>
+              )}
               {!seriesId && (
                 <select
                   value={f.series?.id ?? ""}

@@ -45,13 +45,22 @@ files hosted on Bunny Storage.
 
 ## How it works
 
-- **Public site** (`/`, `/categories/[slug]`, `/series/[slug]`, `/videos/[slug]`):
-  browse published categories/series, watch videos (embedded Bunny Stream
-  player), download files. Content flagged `memberOnly` requires login.
-  Categories can nest arbitrarily deep (a category's children can themselves
-  have children) via `Category.parentId` — the homepage only shows top-level
-  categories, each linking to a `/categories/[slug]` page that shows that
-  category's own series plus a card for each child category, recursively.
+- **Public site** (`/`, `/categories/[slug]`, `/series/[slug]`, `/videos/[slug]`,
+  `/search`): browse published categories/series as a vertical list of tiles
+  (thumbnail, title, item count), watch videos (embedded Bunny Stream player),
+  download files. Content flagged `memberOnly` requires login. Categories can
+  nest arbitrarily deep (a category's children can themselves have children)
+  via `Category.parentId` — the homepage shows top-level categories and any
+  uncategorized series as tiles, each category tile linking to a
+  `/categories/[slug]` page that shows that category's own series plus a tile
+  for each child category, recursively. The search box in the navbar (and the
+  `/search` page) does a case-insensitive substring search across category
+  names, series titles/descriptions, and video titles/descriptions.
+- **Ordering**: every list (categories, series, videos, files) has a
+  `position` field. The admin CMS shows ↑/↓ buttons next to each item to
+  reorder it among its siblings — categories among the same parent, series
+  within the same category, and videos/files within the same series — which
+  is what every public listing sorts by.
 - **Auth**: `/auth/login`, `/auth/logout`, `/auth/callback` are handled
   automatically by the Auth0 SDK's `proxy.ts` (Next.js 16 renamed Middleware
   to Proxy). Logging in with Auth0 only proves identity — it does **not**

@@ -11,12 +11,42 @@ type Category = {
   parent: { id: string; name: string } | null;
 };
 
+type CategoryNode = Category & { children: CategoryNode[] };
+
 function slugify(value: string) {
   return value
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
+}
+
+function buildTree(categories: Category[]): CategoryNode[] {
+  const byId = new Map<string, CategoryNode>();
+  categories.forEach((c) => byId.set(c.id, { ...c, children: [] }));
+  const roots: CategoryNode[] = [];
+  byId.forEach((node) => {
+    const parent = node.parentId ? byId.get(node.parentId) : undefined;
+    if (parent) parent.children.push(node);
+    else roots.push(node);
+  });
+  return roots;
+}
+
+/** A category's own id plus every id nested beneath it, so the parent picker can't create a cycle. */
+function descendantIds(category: Category, all: Category[]): Set<string> {
+  const ids = new Set([category.id]);
+  let added = true;
+  while (added) {
+    added = false;
+    for (const c of all) {
+      if (c.parentId && ids.has(c.parentId) && !ids.has(c.id)) {
+        ids.add(c.id);
+        added = true;
+      }
+    }
+  }
+  return ids;
 }
 
 export default function CategoriesPage() {
@@ -73,6 +103,23 @@ export default function CategoriesPage() {
     await load();
   }
 
+  async function move(siblings: CategoryNode[], index: number, direction: "up" | "down") {
+    const swapIndex = direction === "up" ? index - 1 : index + 1;
+    if (swapIndex < 0 || swapIndex >= siblings.length) return;
+    const reordered = [...siblings];
+    [reordered[index], reordered[swapIndex]] = [reordered[swapIndex], reordered[index]];
+    await Promise.all(
+      reordered.map((node, i) =>
+        fetch(`/api/admin/categories/${node.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ position: i }),
+        }),
+      ),
+    );
+    await load();
+  }
+
   async function remove(id: string) {
     if (
       !confirm(
@@ -83,6 +130,62 @@ export default function CategoriesPage() {
     await fetch(`/api/admin/categories/${id}`, { method: "DELETE" });
     await load();
   }
+
+  function renderNodes(nodes: CategoryNode[], depth: number): React.ReactNode[] {
+    return nodes.flatMap((node, index) => [
+      <li
+        key={node.id}
+        className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4"
+        style={{ paddingLeft: `${1 + depth * 1.5}rem` }}
+      >
+        <div className="min-w-0">
+          <p className="font-medium">{node.name}</p>
+          <p className="text-sm text-zinc-500">
+            {node.slug}
+            {node.parent && ` · under ${node.parent.name}`}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <button
+            onClick={() => move(nodes, index, "up")}
+            disabled={index === 0}
+            className="rounded-md border border-zinc-300 px-2 py-1 disabled:opacity-30 dark:border-zinc-700"
+            aria-label="Move up"
+          >
+            ↑
+          </button>
+          <button
+            onClick={() => move(nodes, index, "down")}
+            disabled={index === nodes.length - 1}
+            className="rounded-md border border-zinc-300 px-2 py-1 disabled:opacity-30 dark:border-zinc-700"
+            aria-label="Move down"
+          >
+            ↓
+          </button>
+          <select
+            value={node.parentId ?? ""}
+            onChange={(e) => changeParent(node, e.target.value)}
+            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+          >
+            <option value="">No parent (top-level)</option>
+            {categories
+              .filter((c) => !descendantIds(node, categories).has(c.id))
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+          </select>
+          <button onClick={() => remove(node.id)} className="text-red-600 hover:underline">
+            Delete
+          </button>
+        </div>
+      </li>,
+      ...renderNodes(node.children, depth + 1),
+    ]);
+  }
+
+  const tree = buildTree(categories);
 
   return (
     <div className="space-y-6">
@@ -119,39 +222,7 @@ export default function CategoriesPage() {
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
-        {categories.map((category) => (
-          <li key={category.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-            <div className="min-w-0">
-              <p className="font-medium">{category.name}</p>
-              <p className="text-sm text-zinc-500">
-                {category.slug}
-                {category.parent && ` · under ${category.parent.name}`}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <select
-                value={category.parentId ?? ""}
-                onChange={(e) => changeParent(category, e.target.value)}
-                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
-              >
-                <option value="">No parent (top-level)</option>
-                {categories
-                  .filter((c) => c.id !== category.id)
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-              </select>
-              <button
-                onClick={() => remove(category.id)}
-                className="text-red-600 hover:underline"
-              >
-                Delete
-              </button>
-            </div>
-          </li>
-        ))}
+        {renderNodes(tree, 0)}
         {categories.length === 0 && (
           <li className="p-4 text-sm text-zinc-500">No categories yet.</li>
         )}

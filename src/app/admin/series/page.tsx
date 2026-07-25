@@ -24,6 +24,17 @@ function slugify(value: string) {
     .replace(/(^-|-$)/g, "");
 }
 
+/** Groups series by category so up/down reordering stays within the same category's siblings. */
+function groupByCategory(series: Series[]): { key: string; label: string; items: Series[] }[] {
+  const groups = new Map<string, { label: string; items: Series[] }>();
+  for (const s of series) {
+    const key = s.categoryId ?? "__none";
+    if (!groups.has(key)) groups.set(key, { label: s.category?.name ?? "Uncategorized", items: [] });
+    groups.get(key)!.items.push(s);
+  }
+  return Array.from(groups.entries()).map(([key, g]) => ({ key, ...g }));
+}
+
 export default function SeriesAdminPage() {
   const [series, setSeries] = useState<Series[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -91,6 +102,25 @@ export default function SeriesAdminPage() {
     await load();
   }
 
+  async function move(siblings: Series[], index: number, direction: "up" | "down") {
+    const swapIndex = direction === "up" ? index - 1 : index + 1;
+    if (swapIndex < 0 || swapIndex >= siblings.length) return;
+    const reordered = [...siblings];
+    [reordered[index], reordered[swapIndex]] = [reordered[swapIndex], reordered[index]];
+    await Promise.all(
+      reordered.map((s, i) =>
+        fetch(`/api/admin/series/${s.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ position: i }),
+        }),
+      ),
+    );
+    await load();
+  }
+
+  const groups = groupByCategory(series);
+
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold">Series</h1>
@@ -135,45 +165,70 @@ export default function SeriesAdminPage() {
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
-        {series.map((s) => (
-          <li key={s.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-            <div className="min-w-0">
-              <Link href={`/admin/series/${s.id}`} className="font-medium hover:underline">
-                {s.title}
-              </Link>
-              <p className="text-sm text-zinc-500">
-                {s.category?.name ?? "Uncategorized"} · {s._count.videos} videos ·{" "}
-                {s._count.files} files
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <Link
-                href={`/admin/series/${s.id}`}
-                className="rounded-md bg-zinc-900 text-white px-2 py-1 dark:bg-white dark:text-zinc-900"
+      {groups.map((group) => (
+        <section key={group.key} className="space-y-2">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+            {group.label}
+          </h2>
+          <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
+            {group.items.map((s, index) => (
+              <li
+                key={s.id}
+                className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4"
               >
-                Manage episodes
-              </Link>
-              <button
-                onClick={() => toggle(s, "published")}
-                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
-              >
-                {s.published ? "Published" : "Draft"}
-              </button>
-              <button
-                onClick={() => toggle(s, "memberOnly")}
-                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
-              >
-                {s.memberOnly ? "Members only" : "Public"}
-              </button>
-              <button onClick={() => remove(s.id)} className="text-red-600 hover:underline">
-                Delete
-              </button>
-            </div>
-          </li>
-        ))}
-        {series.length === 0 && <li className="p-4 text-sm text-zinc-500">No series yet.</li>}
-      </ul>
+                <div className="min-w-0">
+                  <Link href={`/admin/series/${s.id}`} className="font-medium hover:underline">
+                    {s.title}
+                  </Link>
+                  <p className="text-sm text-zinc-500">
+                    {s._count.videos} videos · {s._count.files} files
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <button
+                    onClick={() => move(group.items, index, "up")}
+                    disabled={index === 0}
+                    className="rounded-md border border-zinc-300 px-2 py-1 disabled:opacity-30 dark:border-zinc-700"
+                    aria-label="Move up"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    onClick={() => move(group.items, index, "down")}
+                    disabled={index === group.items.length - 1}
+                    className="rounded-md border border-zinc-300 px-2 py-1 disabled:opacity-30 dark:border-zinc-700"
+                    aria-label="Move down"
+                  >
+                    ↓
+                  </button>
+                  <Link
+                    href={`/admin/series/${s.id}`}
+                    className="rounded-md bg-zinc-900 text-white px-2 py-1 dark:bg-white dark:text-zinc-900"
+                  >
+                    Manage episodes
+                  </Link>
+                  <button
+                    onClick={() => toggle(s, "published")}
+                    className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+                  >
+                    {s.published ? "Published" : "Draft"}
+                  </button>
+                  <button
+                    onClick={() => toggle(s, "memberOnly")}
+                    className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+                  >
+                    {s.memberOnly ? "Members only" : "Public"}
+                  </button>
+                  <button onClick={() => remove(s.id)} className="text-red-600 hover:underline">
+                    Delete
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+      {series.length === 0 && <p className="text-sm text-zinc-500">No series yet.</p>}
     </div>
   );
 }

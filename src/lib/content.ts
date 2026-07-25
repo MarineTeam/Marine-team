@@ -74,3 +74,47 @@ export async function getVideoBySlug(slug: string) {
     include: { series: true },
   });
 }
+
+/** Public search across categories, series, and videos by name/title/description. */
+export async function searchContent(query: string) {
+  const q = query.trim();
+  if (!q) return { categories: [], series: [], videos: [] };
+
+  const [categories, series, videos] = await Promise.all([
+    prisma.category.findMany({
+      where: { name: { contains: q, mode: "insensitive" } },
+      orderBy: { position: "asc" },
+      include: {
+        series: { where: { published: true }, orderBy: { position: "asc" } },
+        children: true,
+      },
+      take: 20,
+    }),
+    prisma.series.findMany({
+      where: {
+        published: true,
+        OR: [
+          { title: { contains: q, mode: "insensitive" } },
+          { description: { contains: q, mode: "insensitive" } },
+        ],
+      },
+      orderBy: { position: "asc" },
+      take: 20,
+    }),
+    prisma.video.findMany({
+      where: {
+        published: true,
+        status: "READY",
+        OR: [
+          { title: { contains: q, mode: "insensitive" } },
+          { description: { contains: q, mode: "insensitive" } },
+        ],
+      },
+      include: { series: true },
+      orderBy: { position: "asc" },
+      take: 20,
+    }),
+  ]);
+
+  return { categories, series, videos };
+}
