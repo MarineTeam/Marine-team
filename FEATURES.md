@@ -139,6 +139,13 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Playback speed** is handled by Bunny Stream's own player UI (the ⚙️
   settings icon) — there's nothing to build server-side since the iframe
   embed already exposes it.
+- **ViewEvent writes are throttled per browser per item** (`/api/view-events`,
+  fired client-side by `ViewEventBeacon`) using a 30-minute cookie rather
+  than a DB check: a cookie read is free, so a throttled repeat view costs
+  zero database operations, instead of trading a write for a read (which
+  wouldn't actually save anything, since reads are billed too on a
+  Postgres free tier). The plain `viewCount` counter is unaffected and
+  still increments on every view like before.
 - **The PWA service worker** deliberately does not cache pages or API
   responses. This site's content is dynamic and often member-gated, so an
   aggressive offline cache would risk showing stale or wrong-audience

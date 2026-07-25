@@ -6,6 +6,15 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Fixed an N+1 query pattern where the series page checked viewer-access
+  permissions once per video (up to 4 queries each); now batched into a
+  single set of queries regardless of episode count.
+- `ViewEvent` writes (Trending/Analytics) are now throttled per browser
+  per item via a 30-minute cookie, moved to a client-side beacon instead
+  of an inline write on every page render, to cut Prisma operation volume.
+
 ### Added
 
 - **Granular viewing permissions**: a series or video can be restricted to

@@ -7,7 +7,6 @@ import {
   isSeriesInWatchLater,
   isSeriesSubscribed,
   incrementSeriesViewCount,
-  logSeriesView,
   isVideoLockedBySequence,
   canViewSeries,
   getViewableVideoIds,
@@ -24,6 +23,7 @@ import { ReactionButtons } from "@/components/reaction-buttons";
 import { ShareButtons } from "@/components/share-buttons";
 import { SeriesTile } from "@/components/series-tile";
 import { CommentSection } from "@/components/comment-section";
+import { ViewEventBeacon } from "@/components/view-event-beacon";
 
 export default async function SeriesPage({
   params,
@@ -81,13 +81,11 @@ export default async function SeriesPage({
     getViewableVideoIds(user, series.videos),
   ]);
 
-  if (viewCountsOn) {
-    await incrementSeriesViewCount(series.id);
-    await logSeriesView(series.id, user?.id ?? null);
-  }
+  if (viewCountsOn) await incrementSeriesViewCount(series.id);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-8">
+      {viewCountsOn && !seriesLocked && <ViewEventBeacon type="series" id={series.id} />}
       <div>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">{series.title}</h1>

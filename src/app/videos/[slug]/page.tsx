@@ -9,7 +9,6 @@ import {
   isVideoInWatchLater,
   isSeriesSubscribed,
   incrementVideoViewCount,
-  logVideoView,
   isVideoLockedBySequence,
   canViewVideo,
 } from "@/lib/content";
@@ -29,6 +28,7 @@ import { MenuTile } from "@/components/menu-tile";
 import { CommentSection } from "@/components/comment-section";
 import { UpNextPanel } from "@/components/up-next-panel";
 import { PremiereCountdown } from "@/components/premiere-countdown";
+import { ViewEventBeacon } from "@/components/view-event-beacon";
 
 export default async function VideoPage({
   params,
@@ -106,13 +106,11 @@ export default async function VideoPage({
   ]);
   const resumeAt = progress && !progress.completed ? progress.positionSeconds : 0;
 
-  if (!isPendingPremiere && viewCountsOn) {
-    await incrementVideoViewCount(video.id);
-    await logVideoView(video.id, user?.id ?? null);
-  }
+  if (!isPendingPremiere && viewCountsOn) await incrementVideoViewCount(video.id);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-4">
+      {!isPendingPremiere && viewCountsOn && <ViewEventBeacon type="video" id={video.id} />}
       {video.series && (
         <Link
           href={`/series/${video.series.slug}`}
