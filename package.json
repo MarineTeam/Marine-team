@@ -9,11 +9,7 @@
     "lint": "eslint",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio",
-    "db:seed": "prisma db seed"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "db:studio": "prisma studio"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "^4.25.0",
@@ -33,7 +29,6 @@
     "eslint-config-next": "16.2.11",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
-    "tsx": "^4.19.2",
     "typescript": "^5"
   }
 }

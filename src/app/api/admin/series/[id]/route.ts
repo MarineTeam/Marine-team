@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { prisma } from "@/lib/db";
 import { ensureAdmin, errorResponse } from "@/lib/api-guard";
-import { getTargetDb } from "@/lib/admin-target";
 
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -18,10 +18,9 @@ const updateSchema = z.object({
   position: z.number().int().optional(),
 });
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await ensureAdmin();
-    const prisma = getTargetDb(request);
     const { id } = await params;
     const series = await prisma.series.findUniqueOrThrow({
       where: { id },
@@ -43,7 +42,6 @@ export async function PATCH(
 ) {
   try {
     await ensureAdmin();
-    const prisma = getTargetDb(request);
     const { id } = await params;
     const body = updateSchema.parse(await request.json());
     const series = await prisma.series.update({ where: { id }, data: body });
@@ -54,12 +52,11 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await ensureAdmin();
-    const prisma = getTargetDb(request);
     const { id } = await params;
     await prisma.series.delete({ where: { id } });
     return NextResponse.json({ ok: true });

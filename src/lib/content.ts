@@ -1,12 +1,11 @@
 import { prisma } from "@/lib/db";
-import type { PrismaClient } from "@prisma/client";
 
 export function canAccess(memberOnly: boolean, isLoggedIn: boolean): boolean {
   return !memberOnly || isLoggedIn;
 }
 
-export async function getPublishedCategoriesWithSeries(db: PrismaClient = prisma) {
-  return db.category.findMany({
+export async function getPublishedCategoriesWithSeries() {
+  return prisma.category.findMany({
     orderBy: { position: "asc" },
     include: {
       series: {
@@ -18,28 +17,28 @@ export async function getPublishedCategoriesWithSeries(db: PrismaClient = prisma
 }
 
 /** The series shown in the homepage hero banner: most recently published with a cover image. */
-export async function getFeaturedSeries(db: PrismaClient = prisma) {
-  const withCover = await db.series.findFirst({
+export async function getFeaturedSeries() {
+  const withCover = await prisma.series.findFirst({
     where: { published: true, coverImageUrl: { not: null } },
     orderBy: { updatedAt: "desc" },
   });
   if (withCover) return withCover;
 
-  return db.series.findFirst({
+  return prisma.series.findFirst({
     where: { published: true },
     orderBy: { updatedAt: "desc" },
   });
 }
 
-export async function getUncategorizedSeries(db: PrismaClient = prisma) {
-  return db.series.findMany({
+export async function getUncategorizedSeries() {
+  return prisma.series.findMany({
     where: { published: true, categoryId: null },
     orderBy: { position: "asc" },
   });
 }
 
-export async function getSeriesBySlug(slug: string, db: PrismaClient = prisma) {
-  return db.series.findFirst({
+export async function getSeriesBySlug(slug: string) {
+  return prisma.series.findFirst({
     where: { slug, published: true },
     include: {
       category: true,
@@ -49,8 +48,8 @@ export async function getSeriesBySlug(slug: string, db: PrismaClient = prisma) {
   });
 }
 
-export async function getVideoBySlug(slug: string, db: PrismaClient = prisma) {
-  return db.video.findFirst({
+export async function getVideoBySlug(slug: string) {
+  return prisma.video.findFirst({
     where: { slug, published: true },
     include: { series: true },
   });

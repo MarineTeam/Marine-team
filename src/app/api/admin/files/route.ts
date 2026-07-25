@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
 import { ensureAdmin, errorResponse } from "@/lib/api-guard";
-import { getTargetDb } from "@/lib/admin-target";
 import { bunnyStorageUpload } from "@/lib/bunny";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     await ensureAdmin();
-    const prisma = getTargetDb(request);
     const files = await prisma.fileAsset.findMany({
       orderBy: { createdAt: "desc" },
       include: { series: true },
@@ -25,7 +24,6 @@ const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 export async function POST(request: NextRequest) {
   try {
     await ensureAdmin();
-    const prisma = getTargetDb(request);
     const form = await request.formData();
     const file = form.get("file");
     const title = form.get("title");

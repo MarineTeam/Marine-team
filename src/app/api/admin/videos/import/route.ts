@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { prisma } from "@/lib/db";
 import { ensureAdmin, errorResponse } from "@/lib/api-guard";
-import { getTargetDb } from "@/lib/admin-target";
 import { bunnyStreamThumbnailUrl, mapBunnyStreamStatus } from "@/lib/bunny";
 
 const importSchema = z.object({
@@ -18,7 +18,6 @@ const importSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     await ensureAdmin();
-    const prisma = getTargetDb(request);
     const body = importSchema.parse(await request.json());
     const libraryId = process.env.BUNNY_STREAM_LIBRARY_ID!;
 

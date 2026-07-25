@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { prisma } from "@/lib/db";
 import { ensureAdmin, errorResponse } from "@/lib/api-guard";
-import { getTargetDb } from "@/lib/admin-target";
 import { bunnyStorageDelete } from "@/lib/bunny";
 
 const updateSchema = z.object({
@@ -18,7 +18,6 @@ export async function PATCH(
 ) {
   try {
     await ensureAdmin();
-    const prisma = getTargetDb(request);
     const { id } = await params;
     const body = updateSchema.parse(await request.json());
     const file = await prisma.fileAsset.update({ where: { id }, data: body });
@@ -29,12 +28,11 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await ensureAdmin();
-    const prisma = getTargetDb(request);
     const { id } = await params;
     const file = await prisma.fileAsset.findUniqueOrThrow({ where: { id } });
     await bunnyStorageDelete(file.bunnyPath);

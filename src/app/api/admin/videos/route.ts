@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { prisma } from "@/lib/db";
 import { ensureAdmin, errorResponse } from "@/lib/api-guard";
-import { getTargetDb } from "@/lib/admin-target";
 import { bunnyCreateStreamVideo, bunnyStreamTusSignature } from "@/lib/bunny";
 
 const createSchema = z.object({
@@ -13,10 +13,9 @@ const createSchema = z.object({
   seriesId: z.string().optional().nullable(),
 });
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     await ensureAdmin();
-    const prisma = getTargetDb(request);
     const videos = await prisma.video.findMany({
       orderBy: { createdAt: "desc" },
       include: { series: true },
@@ -31,7 +30,6 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     await ensureAdmin();
-    const prisma = getTargetDb(request);
     const body = createSchema.parse(await request.json());
 
     const bunnyVideoId = await bunnyCreateStreamVideo(body.title);

@@ -1,10 +1,10 @@
 import Link from "next/link";
 import type { Series } from "@prisma/client";
 
-export function SeriesCard({ series, basePath = "" }: { series: Series; basePath?: string }) {
+export function SeriesCard({ series }: { series: Series }) {
   return (
     <Link
-      href={`${basePath}/series/${series.slug}`}
+      href={`/series/${series.slug}`}
       className="group block w-56 sm:w-64 shrink-0 snap-start overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900"
     >
       <div className="aspect-video bg-zinc-100 dark:bg-zinc-800">

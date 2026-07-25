@@ -41,25 +41,7 @@ export default async function VideoPage({
       )}
       <h1 className="text-2xl font-semibold tracking-tight">{video.title}</h1>
 
-      {video.bunnyLibraryId === "demo" ? (
-        <div className="aspect-video relative overflow-hidden rounded-lg bg-zinc-900 text-white">
-          {video.thumbnailUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={video.thumbnailUrl}
-              alt=""
-              className="absolute inset-0 h-full w-full object-cover opacity-50"
-            />
-          )}
-          <div className="relative flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-            <span className="rounded-full bg-white/90 p-4 text-zinc-900">▶</span>
-            <p className="font-medium">Demo entry — no Bunny Stream video attached</p>
-            <p className="text-sm text-zinc-300 max-w-sm">
-              In production this plays through the embedded Bunny Stream player.
-            </p>
-          </div>
-        </div>
-      ) : video.status === "READY" ? (
+      {video.status === "READY" ? (
         <div className="aspect-video overflow-hidden rounded-lg bg-black">
           <iframe
             src={bunnyStreamEmbedUrl(video.bunnyVideoId)}

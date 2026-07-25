@@ -9,7 +9,6 @@ const links = [
   { href: "/admin/videos", label: "Videos" },
   { href: "/admin/files", label: "Files" },
   { href: "/admin/users", label: "Access" },
-  { href: "/admin/demo", label: "Demo Setup" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

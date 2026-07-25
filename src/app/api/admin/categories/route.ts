@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { prisma } from "@/lib/db";
 import { ensureAdmin, errorResponse } from "@/lib/api-guard";
-import { getTargetDb } from "@/lib/admin-target";
 
 const categorySchema = z.object({
   name: z.string().min(1),
@@ -12,10 +12,9 @@ const categorySchema = z.object({
   position: z.number().int().optional(),
 });
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     await ensureAdmin();
-    const prisma = getTargetDb(request);
     const categories = await prisma.category.findMany({ orderBy: { position: "asc" } });
     return NextResponse.json(categories);
   } catch (error) {
@@ -26,7 +25,6 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     await ensureAdmin();
-    const prisma = getTargetDb(request);
     const body = categorySchema.parse(await request.json());
     const category = await prisma.category.create({ data: body });
     return NextResponse.json(category, { status: 201 });

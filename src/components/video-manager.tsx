@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Upload } from "tus-js-client";
-import { useAdminTarget } from "@/lib/use-admin-target";
 
 type Series = { id: string; title: string };
 type Video = {
@@ -37,7 +36,6 @@ function slugify(value: string) {
  * global "All videos" view, which shows every video with a series picker.
  */
 export function VideoManager({ seriesId }: { seriesId?: string }) {
-  const { apiPath } = useAdminTarget();
   const [videos, setVideos] = useState<Video[]>([]);
   const [seriesList, setSeriesList] = useState<Series[]>([]);
   const [title, setTitle] = useState("");
@@ -56,8 +54,8 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
 
   async function load() {
     const [videosRes, seriesRes] = await Promise.all([
-      fetch(apiPath("/api/admin/videos")),
-      fetch(apiPath("/api/admin/series")),
+      fetch("/api/admin/videos"),
+      fetch("/api/admin/series"),
     ]);
     if (videosRes.ok) setVideos(await videosRes.json());
     if (seriesRes.ok) setSeriesList(await seriesRes.json());
@@ -66,14 +64,13 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadBunnyLibrary() {
     setBunnyLoading(true);
     setError(null);
     try {
-      const res = await fetch(apiPath("/api/admin/videos/bunny-library"));
+      const res = await fetch("/api/admin/videos/bunny-library");
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed to list Bunny videos");
       const items: BunnyLibraryVideo[] = await res.json();
       setBunnyLibrary(items);
@@ -105,7 +102,7 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
     setImportingGuid(guid);
     setError(null);
     try {
-      const res = await fetch(apiPath("/api/admin/videos/import"), {
+      const res = await fetch("/api/admin/videos/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -132,7 +129,7 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
     setProgress(0);
 
     try {
-      const createRes = await fetch(apiPath("/api/admin/videos"), {
+      const createRes = await fetch("/api/admin/videos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -162,7 +159,7 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
         tusUpload.start();
       });
 
-      await fetch(apiPath(`/api/admin/videos/${video.id}/sync-status`), { method: "POST" });
+      await fetch(`/api/admin/videos/${video.id}/sync-status`, { method: "POST" });
 
       setTitle("");
       setPickedSeriesId("");
@@ -176,12 +173,12 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
   }
 
   async function refreshStatus(id: string) {
-    await fetch(apiPath(`/api/admin/videos/${id}/sync-status`), { method: "POST" });
+    await fetch(`/api/admin/videos/${id}/sync-status`, { method: "POST" });
     await load();
   }
 
   async function toggle(v: Video, field: "published" | "memberOnly") {
-    await fetch(apiPath(`/api/admin/videos/${v.id}`), {
+    await fetch(`/api/admin/videos/${v.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [field]: !v[field] }),
@@ -190,7 +187,7 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
   }
 
   async function reassignSeries(id: string, newSeriesId: string) {
-    await fetch(apiPath(`/api/admin/videos/${id}`), {
+    await fetch(`/api/admin/videos/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ seriesId: newSeriesId || null }),
@@ -200,7 +197,7 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
 
   async function remove(id: string) {
     if (!confirm("Delete this video? This also removes it from Bunny Stream.")) return;
-    await fetch(apiPath(`/api/admin/videos/${id}`), { method: "DELETE" });
+    await fetch(`/api/admin/videos/${id}`, { method: "DELETE" });
     await load();
   }
 

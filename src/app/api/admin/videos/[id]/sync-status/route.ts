@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
 import { ensureAdmin, errorResponse } from "@/lib/api-guard";
-import { getTargetDb } from "@/lib/admin-target";
 import { bunnyStreamThumbnailUrl, mapBunnyStreamStatus } from "@/lib/bunny";
 
 /**
@@ -9,12 +9,11 @@ import { bunnyStreamThumbnailUrl, mapBunnyStreamStatus } from "@/lib/bunny";
  * https://docs.bunny.net/reference/video_getvideo
  */
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     await ensureAdmin();
-    const prisma = getTargetDb(request);
     const { id } = await params;
     const video = await prisma.video.findUniqueOrThrow({ where: { id } });
 

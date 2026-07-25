@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAdminTarget } from "@/lib/use-admin-target";
 
 type Category = { id: string; name: string; slug: string; position: number };
 
@@ -14,21 +13,19 @@ function slugify(value: string) {
 }
 
 export default function CategoriesPage() {
-  const { apiPath } = useAdminTarget();
   const [categories, setCategories] = useState<Category[]>([]);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function load() {
-    const res = await fetch(apiPath("/api/admin/categories"));
+    const res = await fetch("/api/admin/categories");
     if (res.ok) setCategories(await res.json());
   }
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function createCategory(e: React.FormEvent) {
@@ -36,7 +33,7 @@ export default function CategoriesPage() {
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch(apiPath("/api/admin/categories"), {
+      const res = await fetch("/api/admin/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, slug: slugify(name), position: categories.length }),
@@ -53,7 +50,7 @@ export default function CategoriesPage() {
 
   async function remove(id: string) {
     if (!confirm("Delete this category? Series in it will become uncategorized.")) return;
-    await fetch(apiPath(`/api/admin/categories/${id}`), { method: "DELETE" });
+    await fetch(`/api/admin/categories/${id}`, { method: "DELETE" });
     await load();
   }
 
