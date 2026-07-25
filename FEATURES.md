@@ -28,6 +28,17 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   watch position (see note below) and powers a homepage "Continue watching"
   row with resume-from-where-you-left-off; a "Recently added" row shows the
   newest published series.
+- **Trending** — a homepage "Trending this week" row of the series with the
+  most logged views in the last 7 days (gated by the View counts plugin,
+  which now also logs timestamped view events, not just the all-time counter).
+- **Up next** — a panel under a video showing the next episode in its series,
+  with an autoplay toggle (persisted per-browser) that best-effort advances
+  once the current video's known duration elapses — see the technical note
+  below on why this isn't a real "ended" event.
+- **Scheduled premieres** — a video can be marked as a premiere with a future
+  publish time: unlike a normal scheduled video (fully hidden until then), a
+  premiere's page is visible early with a live countdown to the exact
+  publish time, then swaps to the real player automatically.
 - **Related content** — series pages show "More like this" (same category,
   then shared tags); video pages show "More from this series" or "You might
   also like" for standalone videos.
@@ -54,6 +65,14 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Social share** — copy-link and share-to-X/Facebook buttons.
 - **Announcements** — a dismissible (per browser session) site-wide banner.
 - **Notifications** — opt-in Web Push, sent when an admin publishes a video.
+- **Subscriptions** (`/subscriptions`) — follow a series or category; when a
+  followed series publishes a new video, its subscribers get a push
+  notification (in addition to, and independent from, the general
+  Notifications plugin above).
+- **Playlists** (`/playlists`) — member-created, ordered, reorderable video
+  collections, separate from the single site-wide Watch Later queue.
+- **Likes / dislikes** — a thumbs up/down on a series or video, shown
+  alongside (and independent from) the 1-5 star Ratings plugin.
 
 ## Auth
 
@@ -89,6 +108,19 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   "content-editor" grant in `/admin/users`. The real `ADMIN` role always has
   every capability and can only be granted by another `ADMIN` — a custom
   "manage_users" group can't be used to self-promote.
+- **Granular viewing permissions**: a series or video's edit page can
+  restrict viewing to specific permission groups ("roles") and/or specific
+  people by email, layered on top of the plain "Members only" checkbox. As
+  soon as any such grant exists for an item, "Members only" no longer gates
+  it — only the granted roles/people (and admins) can view it. Files aren't
+  covered — they stay governed by their own "Members only" flag.
+
+## Admin analytics (`/admin/analytics`)
+
+- Needs the `view_analytics` capability. Shows total views over the last 30
+  days plus the top 10 series and top 10 videos by view count in that
+  window, built from the same timestamped view log that powers the
+  homepage Trending row.
 
 ## Technical notes
 
@@ -96,8 +128,24 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   Bunny's Stream iframe embed has no documented postMessage API for exact
   play/pause/seek events, so progress is inferred from elapsed time while
   the page is open rather than a precise scrub position.
+- **Up next autoplay** has the same limitation: there's no "video ended"
+  event to hook, so autoplay fires a timer based on the video's known
+  duration rather than a real end-of-playback signal.
 - **View counts** are a simple per-page-load counter, not deduplicated or
-  spam-resistant — a basic "how many hits" number, not analytics.
+  spam-resistant — a basic "how many hits" number, not analytics. Trending
+  and the admin analytics dashboard use a separate timestamped view log for
+  the same reason (recency-windowed counts need timestamps, the simple
+  counter doesn't have any).
+- **Playback speed** is handled by Bunny Stream's own player UI (the ⚙️
+  settings icon) — there's nothing to build server-side since the iframe
+  embed already exposes it.
+- **ViewEvent writes are throttled per browser per item** (`/api/view-events`,
+  fired client-side by `ViewEventBeacon`) using a 30-minute cookie rather
+  than a DB check: a cookie read is free, so a throttled repeat view costs
+  zero database operations, instead of trading a write for a read (which
+  wouldn't actually save anything, since reads are billed too on a
+  Postgres free tier). The plain `viewCount` counter is unaffected and
+  still increments on every view like before.
 - **The PWA service worker** deliberately does not cache pages or API
   responses. This site's content is dynamic and often member-gated, so an
   aggressive offline cache would risk showing stale or wrong-audience

@@ -5,19 +5,30 @@ import {
   getRelatedSeries,
   isSeriesFavorited,
   isSeriesInWatchLater,
+  isSeriesSubscribed,
   incrementSeriesViewCount,
-  isVideoLockedBySequence,
+  getSequentialLockedVideoIds,
+  canViewSeries,
+  getViewableVideoIds,
   canAccess,
+  getSeriesRatingSummary,
+  getUserSeriesRating,
+  getSeriesReactionSummary,
+  getUserSeriesReaction,
+  getComments,
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
-import { isPluginEnabled } from "@/lib/plugins";
+import { getPluginStates } from "@/lib/plugins";
 import { FavoriteButton } from "@/components/favorite-button";
 import { WatchLaterButton } from "@/components/watch-later-button";
+import { SubscribeButton } from "@/components/subscribe-button";
 import { StarRating } from "@/components/star-rating";
+import { ReactionButtons } from "@/components/reaction-buttons";
 import { ShareButtons } from "@/components/share-buttons";
 import { SeriesTile } from "@/components/series-tile";
 import { CommentSection } from "@/components/comment-section";
+import { ViewEventBeacon } from "@/components/view-event-beacon";
 
 export default async function SeriesPage({
   params,
@@ -30,46 +41,55 @@ export default async function SeriesPage({
   if (!series) notFound();
 
   const isLoggedIn = Boolean(user);
-  const seriesLocked = !canAccess(series.memberOnly, isLoggedIn);
   const hasAudio = series.files.some((f) => f.mimeType?.startsWith("audio/"));
   const [
     favorited,
     queued,
-    related,
-    favoritesOn,
-    commentsOn,
-    relatedOn,
-    ratingsOn,
-    watchLaterOn,
-    viewCountsOn,
-    socialShareOn,
+    subscribed,
+    plugins,
     canModerate,
     lockedVideoIds,
+    seriesLocked,
+    viewableVideoIds,
   ] = await Promise.all([
     user ? isSeriesFavorited(user.id, series.id) : Promise.resolve(false),
     user ? isSeriesInWatchLater(user.id, series.id) : Promise.resolve(false),
-    getRelatedSeries(series),
-    isPluginEnabled("favorites", series.categoryId),
-    isPluginEnabled("comments", series.categoryId),
-    isPluginEnabled("related-content", series.categoryId),
-    isPluginEnabled("ratings", series.categoryId),
-    isPluginEnabled("watch-later", series.categoryId),
-    isPluginEnabled("view-counts", series.categoryId),
-    isPluginEnabled("social-share", series.categoryId),
+    user ? isSeriesSubscribed(user.id, series.id) : Promise.resolve(false),
+    getPluginStates(series.categoryId),
     user
       ? hasCapability(user, "moderate_comments", { categoryId: series.categoryId })
       : Promise.resolve(false),
-    series.requireSequential
-      ? Promise.all(
-          series.videos.map(async (v) => [v.id, await isVideoLockedBySequence(user?.id ?? null, v)] as const),
-        ).then((entries) => new Set(entries.filter(([, locked]) => locked).map(([id]) => id)))
-      : Promise.resolve(new Set<string>()),
+    getSequentialLockedVideoIds(user?.id ?? null, series),
+    canViewSeries(user, series).then((allowed) => !allowed),
+    getViewableVideoIds(user, series.videos),
   ]);
+  const {
+    favorites: favoritesOn,
+    comments: commentsOn,
+    "related-content": relatedOn,
+    ratings: ratingsOn,
+    "watch-later": watchLaterOn,
+    "view-counts": viewCountsOn,
+    "social-share": socialShareOn,
+    subscriptions: subscriptionsOn,
+    "likes-dislikes": likesOn,
+  } = plugins;
+
+  const [ratingSummary, myRating, reactionSummary, myReaction, related, comments] = await Promise.all([
+    ratingsOn ? getSeriesRatingSummary(series.id) : Promise.resolve({ average: 0, count: 0 }),
+    ratingsOn && user ? getUserSeriesRating(user.id, series.id) : Promise.resolve(null),
+    likesOn ? getSeriesReactionSummary(series.id) : Promise.resolve({ likes: 0, dislikes: 0 }),
+    likesOn && user ? getUserSeriesReaction(user.id, series.id) : Promise.resolve(null),
+    relatedOn && !seriesLocked ? getRelatedSeries(series) : Promise.resolve([]),
+    commentsOn && !seriesLocked ? getComments("series", series.id) : Promise.resolve([]),
+  ]);
+  const initialComments = comments.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }));
 
   if (viewCountsOn) await incrementSeriesViewCount(series.id);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-8">
+      {viewCountsOn && !seriesLocked && <ViewEventBeacon type="series" id={series.id} />}
       <div>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">{series.title}</h1>
@@ -81,13 +101,31 @@ export default async function SeriesPage({
               {user && watchLaterOn && (
                 <WatchLaterButton type="series" id={series.id} initialQueued={queued} />
               )}
+              {user && subscriptionsOn && (
+                <SubscribeButton type="series" id={series.id} initialSubscribed={subscribed} />
+              )}
             </div>
           )}
         </div>
         {series.description && <p className="mt-2 text-zinc-500">{series.description}</p>}
-        {!seriesLocked && (ratingsOn || viewCountsOn) && (
+        {!seriesLocked && (ratingsOn || viewCountsOn || likesOn) && (
           <div className="mt-3 flex flex-wrap items-center gap-4">
-            {ratingsOn && <StarRating type="series" id={series.id} canRate={Boolean(user)} />}
+            {ratingsOn && (
+              <StarRating
+                type="series"
+                id={series.id}
+                canRate={Boolean(user)}
+                initial={{ ...ratingSummary, mine: myRating }}
+              />
+            )}
+            {likesOn && (
+              <ReactionButtons
+                type="series"
+                id={series.id}
+                canReact={Boolean(user)}
+                initial={{ ...reactionSummary, mine: myReaction }}
+              />
+            )}
             {viewCountsOn && (
               <span className="text-sm text-zinc-500">
                 {series.viewCount + 1} view{series.viewCount === 0 ? "" : "s"}
@@ -132,7 +170,7 @@ export default async function SeriesPage({
               <h2 className="text-lg font-semibold mb-3">Videos</h2>
               <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
                 {series.videos.map((video) => {
-                  const locked = !canAccess(video.memberOnly, isLoggedIn);
+                  const locked = !viewableVideoIds.has(video.id);
                   const sequenceLocked = lockedVideoIds.has(video.id);
                   return (
                     <li key={video.id} className="p-4 flex flex-wrap items-center justify-between gap-4">
@@ -232,6 +270,7 @@ export default async function SeriesPage({
           id={series.id}
           currentUserId={user?.id ?? null}
           canModerate={canModerate}
+          initialComments={initialComments}
         />
       )}
     </div>

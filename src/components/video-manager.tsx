@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Upload } from "tus-js-client";
 import { DragHandle, PositionInput, useDragReorder } from "@/components/reorder-controls";
 import { reorderArray } from "@/lib/reorder";
+import { ViewerAccessManager } from "@/components/viewer-access-manager";
 
 type Series = { id: string; title: string };
 type Video = {
@@ -14,6 +15,8 @@ type Video = {
   memberOnly: boolean;
   published: boolean;
   unpublishAt: string | null;
+  publishAt: string | null;
+  isPremiere: boolean;
   series: { id: string; title: string } | null;
 };
 type BunnyLibraryVideo = {
@@ -56,6 +59,7 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
   const [importingGuid, setImportingGuid] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [managingAccessId, setManagingAccessId] = useState<string | null>(null);
 
   async function load() {
     const [videosRes, seriesRes] = await Promise.all([
@@ -193,6 +197,23 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ unpublishAt }),
+    });
+    await load();
+  }
+
+  async function setPremiere(v: Video) {
+    const input = prompt(
+      "Premiere at (YYYY-MM-DDTHH:MM, local time)? The video shows a countdown until then. Leave blank to clear.",
+      v.publishAt ? v.publishAt.slice(0, 16) : "",
+    );
+    if (input === null) return;
+    const body = input.trim()
+      ? { isPremiere: true, published: true, publishAt: new Date(input.trim()).toISOString() }
+      : { isPremiere: false };
+    await fetch(`/api/admin/videos/${v.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     });
     await load();
   }
@@ -457,9 +478,10 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
         {visibleVideos.map((v, index) => (
           <li
             key={v.id}
-            className={`p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 ${draggingIndex === index ? "opacity-40" : ""}`}
+            className={draggingIndex === index ? "opacity-40" : ""}
             {...(seriesId ? dropZoneProps(index) : {})}
           >
+          <div className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
             <div className="min-w-0 flex items-center gap-2">
               <input
                 type="checkbox"
@@ -540,10 +562,29 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
               >
                 {v.memberOnly ? "Members only" : "Public"}
               </button>
+              <button
+                onClick={() => setPremiere(v)}
+                className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${v.isPremiere ? "border-purple-400 text-purple-700 dark:text-purple-400" : "border-zinc-300"}`}
+                title={v.isPremiere && v.publishAt ? `Premieres ${new Date(v.publishAt).toLocaleString()}` : undefined}
+              >
+                {v.isPremiere ? "Premiere set" : "Schedule premiere"}
+              </button>
+              <button
+                onClick={() => setManagingAccessId(managingAccessId === v.id ? null : v.id)}
+                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+              >
+                Viewers
+              </button>
               <button onClick={() => remove(v.id)} className="text-red-600 hover:underline">
                 Delete
               </button>
             </div>
+          </div>
+          {managingAccessId === v.id && (
+            <div className="px-4 pb-4">
+              <ViewerAccessManager type="video" id={v.id} />
+            </div>
+          )}
           </li>
         ))}
         {visibleVideos.length === 0 && (

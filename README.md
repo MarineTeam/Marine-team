@@ -138,6 +138,13 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   - **Notifications**: Web Push to subscribed members when an admin flips a
     video from unpublished to published (see PWA below) — a no-op if VAPID
     keys aren't configured.
+  - **Subscriptions** (`/subscriptions`): follow a series or category; its
+    subscribers get a targeted push notification when it publishes a new
+    video, on top of the general Notifications above.
+  - **Playlists** (`/playlists`): member-created, reorderable video
+    playlists, separate from the single Watch Later queue.
+  - **Likes / dislikes**: a thumbs up/down on a series or video, alongside
+    (and independent from) the star Ratings plugin.
 - **Sequential unlock**: a per-series "Require watching in order" toggle
   (`Series.requireSequential`, set on the series edit page — not a plugin,
   since it's a property of one series rather than a site feature). When on,
@@ -156,6 +163,16 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   always has every capability and can't be granted through a group (only
   another `ADMIN` can promote someone to `ADMIN`, to avoid a
   privilege-escalation hole via a custom "manage_users" group).
+- **Granular viewing permissions**: beyond the plain "Members only"
+  checkbox, a series or video's edit page has a "Restricted viewing" panel
+  (`src/components/viewer-access-manager.tsx`) that grants view access to
+  specific permission groups (reusing the groups from Permissions above as
+  "roles") and/or specific people by email. As soon as either exists for an
+  item, "Members only" is ignored for it and only those roles/people (plus
+  admins) can view it — checked by `canViewSeries`/`canViewVideo` in
+  `src/lib/content.ts`. With no grants, behavior is unchanged. This only
+  applies to series and videos, not files, which stay governed by their own
+  "Members only" flag.
 - **Continue watching / recently added**: logged-in users get a periodic
   heartbeat (`src/components/watch-progress-tracker.tsx`) that approximates
   watch position (Bunny's iframe embed has no documented postMessage API
@@ -163,6 +180,14 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   precise scrub position) — the homepage shows a "Continue watching" row
   from that, resuming playback near where you left off via Bunny's `t=`
   embed parameter, plus a "Recently added" row of newest published series.
+- **Trending / Up next / premieres**: the homepage shows a "Trending this
+  week" row (from a timestamped view log, distinct from the simple
+  `viewCount` counter); video pages show an "Up next" panel with an
+  autoplay toggle for the next episode in the series; a video can be marked
+  a premiere with a future publish time to show a live countdown instead of
+  staying fully hidden until then.
+- **Admin analytics** (`/admin/analytics`, `view_analytics` capability):
+  30-day view totals and top series/videos, from the same view log.
 - **Feeds**: `/feed.xml` is a site-wide RSS feed of recently added series;
   `/series/[slug]/podcast.xml` is an iTunes-compatible podcast feed of a
   series' published audio files (skipped for `memberOnly` series, since
@@ -182,6 +207,28 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   `notificationclick` events for the Notifications plugin. Icons are plain
   placeholders (`public/icon-192.png`, `public/icon-512.png`) — swap them for
   real branding whenever you like.
+
+## Performance notes
+
+Written for a Postgres free tier, where every query counts:
+
+- `getCurrentUser()`/`getSessionIdentity()` (`src/lib/current-user.ts`) are
+  wrapped in React's `cache()` so the many call sites that each need the
+  current user in a single request (root layout's Navbar, the page itself,
+  admin layout, ...) share one query instead of hitting the DB repeatedly.
+- `getPluginStates()` (`src/lib/plugins.ts`) resolves every plugin's
+  enabled state for a page in one pass (2-3 queries total, regardless of
+  category-tree depth or how many plugins exist) instead of checking each
+  plugin individually — use it instead of calling `isPluginEnabled()` in a
+  loop or a `Promise.all` of several calls.
+- Series/video pages fetch ratings, reactions, and comments server-side and
+  pass them down as initial props instead of letting the client component
+  fetch on mount, and skip that work entirely when the relevant plugin is
+  off rather than fetching and hiding it in the UI.
+- `ViewEvent` writes (Trending/Analytics) go through a client-side beacon
+  (`/api/view-events`, `src/components/view-event-beacon.tsx`) throttled by
+  a 30-minute cookie rather than a DB check — a cookie read is free, so a
+  throttled repeat view costs zero database operations.
 
 ## Useful scripts
 

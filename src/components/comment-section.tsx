@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type Comment = {
   id: string;
@@ -15,14 +15,15 @@ export function CommentSection({
   id,
   currentUserId,
   canModerate,
+  initialComments,
 }: {
   type: "series" | "video";
   id: string;
   currentUserId: string | null;
   canModerate: boolean;
+  initialComments: Comment[];
 }) {
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [comments, setComments] = useState(initialComments);
   const [body, setBody] = useState("");
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,14 +31,7 @@ export function CommentSection({
   async function load() {
     const res = await fetch(`/api/comments?type=${type}&id=${id}`);
     if (res.ok) setComments(await res.json());
-    setLoaded(true);
   }
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   async function post(e: React.FormEvent) {
     e.preventDefault();
@@ -123,9 +117,7 @@ export function CommentSection({
             </p>
           </li>
         ))}
-        {loaded && comments.length === 0 && (
-          <li className="text-sm text-zinc-500">No comments yet.</li>
-        )}
+        {comments.length === 0 && <li className="text-sm text-zinc-500">No comments yet.</li>}
       </ul>
     </section>
   );

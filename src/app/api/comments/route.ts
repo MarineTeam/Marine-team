@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { isPluginEnabled } from "@/lib/plugins";
+import { getComments } from "@/lib/content";
 
 const querySchema = z.object({
   type: z.enum(["series", "video"]),
@@ -23,12 +24,7 @@ export async function GET(request: NextRequest) {
     id: searchParams.get("id"),
   });
 
-  const comments = await prisma.comment.findMany({
-    where: type === "series" ? { seriesId: id } : { videoId: id },
-    include: { user: { select: { id: true, name: true, email: true, picture: true } } },
-    orderBy: { createdAt: "desc" },
-  });
-  return NextResponse.json(comments);
+  return NextResponse.json(await getComments(type, id));
 }
 
 /** Posting a comment requires being an authorized, logged-in user. */

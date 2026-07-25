@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { bunnyDeleteStreamVideo } from "@/lib/bunny";
 import { isPluginEnabled } from "@/lib/plugins";
 import { notifySubscribers } from "@/lib/push";
+import { getSubscriberUserIdsForSeries } from "@/lib/content";
 
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -21,6 +22,7 @@ const updateSchema = z.object({
   published: z.boolean().optional(),
   publishAt: z.string().nullable().optional(),
   unpublishAt: z.string().nullable().optional(),
+  isPremiere: z.boolean().optional(),
   position: z.number().int().optional(),
 });
 
@@ -65,6 +67,15 @@ export async function PATCH(
           body: video.title,
           url: `/videos/${video.slug}`,
         });
+      }
+      if (video.seriesId && (await isPluginEnabled("subscriptions", categoryId))) {
+        const subscriberIds = await getSubscriberUserIdsForSeries(video.seriesId, categoryId);
+        if (subscriberIds.length > 0) {
+          await notifySubscribers(
+            { title: `New video in ${video.series?.title ?? "a series you follow"}`, body: video.title, url: `/videos/${video.slug}` },
+            subscriberIds,
+          );
+        }
       }
     }
 

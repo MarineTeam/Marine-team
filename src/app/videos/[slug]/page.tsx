@@ -1,26 +1,39 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  getVideoBySlug,
+  getVideoBySlugIncludingPremiere,
   getWatchProgressForVideo,
   getRelatedVideos,
+  getUpNextVideo,
   isVideoFavorited,
   isVideoInWatchLater,
+  isSeriesSubscribed,
   incrementVideoViewCount,
   isVideoLockedBySequence,
-  canAccess,
+  canViewVideo,
+  getVideoRatingSummary,
+  getUserVideoRating,
+  getVideoReactionSummary,
+  getUserVideoReaction,
+  getComments,
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
-import { isPluginEnabled } from "@/lib/plugins";
+import { getPluginStates } from "@/lib/plugins";
 import { bunnyStreamEmbedUrl, bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { WatchProgressTracker } from "@/components/watch-progress-tracker";
 import { FavoriteButton } from "@/components/favorite-button";
 import { WatchLaterButton } from "@/components/watch-later-button";
+import { SubscribeButton } from "@/components/subscribe-button";
+import { AddToPlaylistButton } from "@/components/add-to-playlist-button";
 import { StarRating } from "@/components/star-rating";
+import { ReactionButtons } from "@/components/reaction-buttons";
 import { ShareButtons } from "@/components/share-buttons";
 import { MenuTile } from "@/components/menu-tile";
 import { CommentSection } from "@/components/comment-section";
+import { UpNextPanel } from "@/components/up-next-panel";
+import { PremiereCountdown } from "@/components/premiere-countdown";
+import { ViewEventBeacon } from "@/components/view-event-beacon";
 
 export default async function VideoPage({
   params,
@@ -28,21 +41,26 @@ export default async function VideoPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [video, user] = await Promise.all([getVideoBySlug(slug), getCurrentUser()]);
+  const [video, user] = await Promise.all([getVideoBySlugIncludingPremiere(slug), getCurrentUser()]);
 
   if (!video) notFound();
 
-  const isLoggedIn = Boolean(user);
-  if (!canAccess(video.memberOnly, isLoggedIn)) {
+  const isPendingPremiere = Boolean(video.isPremiere && video.publishAt && video.publishAt > new Date());
+
+  if (!(await canViewVideo(user, video))) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-        <p className="font-medium">This video is for members only.</p>
-        <a
-          href="/auth/login"
-          className="mt-4 inline-block rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
-        >
-          Log in to watch
-        </a>
+        <p className="font-medium">
+          {user ? "You don't have access to this video." : "This video is for members only."}
+        </p>
+        {!user && (
+          <a
+            href="/auth/login"
+            className="mt-4 inline-block rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+          >
+            Log in to watch
+          </a>
+        )}
       </div>
     );
   }
@@ -52,39 +70,52 @@ export default async function VideoPage({
     progress,
     favorited,
     queued,
-    related,
-    favoritesOn,
-    commentsOn,
-    relatedOn,
-    ratingsOn,
-    watchLaterOn,
-    viewCountsOn,
-    socialShareOn,
+    subscribed,
+    plugins,
     canModerate,
     sequenceLocked,
   ] = await Promise.all([
     user ? getWatchProgressForVideo(user.id, video.id) : Promise.resolve(null),
     user ? isVideoFavorited(user.id, video.id) : Promise.resolve(false),
     user ? isVideoInWatchLater(user.id, video.id) : Promise.resolve(false),
-    getRelatedVideos(video),
-    isPluginEnabled("favorites", categoryId),
-    isPluginEnabled("comments", categoryId),
-    isPluginEnabled("related-content", categoryId),
-    isPluginEnabled("ratings", categoryId),
-    isPluginEnabled("watch-later", categoryId),
-    isPluginEnabled("view-counts", categoryId),
-    isPluginEnabled("social-share", categoryId),
+    user && video.seriesId ? isSeriesSubscribed(user.id, video.seriesId) : Promise.resolve(false),
+    getPluginStates(categoryId),
     user
       ? hasCapability(user, "moderate_comments", { categoryId, seriesId: video.seriesId })
       : Promise.resolve(false),
     isVideoLockedBySequence(user?.id ?? null, video),
   ]);
+  const {
+    favorites: favoritesOn,
+    comments: commentsOn,
+    "related-content": relatedOn,
+    ratings: ratingsOn,
+    "watch-later": watchLaterOn,
+    "view-counts": viewCountsOn,
+    "social-share": socialShareOn,
+    subscriptions: subscriptionsOn,
+    playlists: playlistsOn,
+    "likes-dislikes": likesOn,
+    "up-next": upNextOn,
+  } = plugins;
   const resumeAt = progress && !progress.completed ? progress.positionSeconds : 0;
 
-  if (viewCountsOn) await incrementVideoViewCount(video.id);
+  const [ratingSummary, myRating, reactionSummary, myReaction, related, comments, upNext] = await Promise.all([
+    ratingsOn ? getVideoRatingSummary(video.id) : Promise.resolve({ average: 0, count: 0 }),
+    ratingsOn && user ? getUserVideoRating(user.id, video.id) : Promise.resolve(null),
+    likesOn ? getVideoReactionSummary(video.id) : Promise.resolve({ likes: 0, dislikes: 0 }),
+    likesOn && user ? getUserVideoReaction(user.id, video.id) : Promise.resolve(null),
+    relatedOn ? getRelatedVideos(video) : Promise.resolve([]),
+    commentsOn ? getComments("video", video.id) : Promise.resolve([]),
+    upNextOn ? getUpNextVideo(video) : Promise.resolve(null),
+  ]);
+  const initialComments = comments.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }));
+
+  if (!isPendingPremiere && viewCountsOn) await incrementVideoViewCount(video.id);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-4">
+      {!isPendingPremiere && viewCountsOn && <ViewEventBeacon type="video" id={video.id} />}
       {video.series && (
         <Link
           href={`/series/${video.series.slug}`}
@@ -98,12 +129,31 @@ export default async function VideoPage({
         <div className="flex flex-wrap items-center gap-2">
           {user && favoritesOn && <FavoriteButton type="video" id={video.id} initialFavorited={favorited} />}
           {user && watchLaterOn && <WatchLaterButton type="video" id={video.id} initialQueued={queued} />}
+          {user && playlistsOn && <AddToPlaylistButton videoId={video.id} />}
+          {user && video.seriesId && subscriptionsOn && (
+            <SubscribeButton type="series" id={video.seriesId} initialSubscribed={subscribed} />
+          )}
         </div>
       </div>
 
-      {(ratingsOn || viewCountsOn) && (
+      {(ratingsOn || viewCountsOn || likesOn) && (
         <div className="flex flex-wrap items-center gap-4">
-          {ratingsOn && <StarRating type="video" id={video.id} canRate={Boolean(user)} />}
+          {ratingsOn && (
+            <StarRating
+              type="video"
+              id={video.id}
+              canRate={Boolean(user)}
+              initial={{ ...ratingSummary, mine: myRating }}
+            />
+          )}
+          {likesOn && (
+            <ReactionButtons
+              type="video"
+              id={video.id}
+              canReact={Boolean(user)}
+              initial={{ ...reactionSummary, mine: myReaction }}
+            />
+          )}
           {viewCountsOn && (
             <span className="text-sm text-zinc-500">
               {video.viewCount + 1} view{video.viewCount === 0 ? "" : "s"}
@@ -113,7 +163,9 @@ export default async function VideoPage({
       )}
       {socialShareOn && <ShareButtons title={video.title} path={`/videos/${video.slug}`} />}
 
-      {sequenceLocked ? (
+      {isPendingPremiere && video.publishAt ? (
+        <PremiereCountdown premiereAt={video.publishAt.toISOString()} />
+      ) : sequenceLocked ? (
         <div className="aspect-video flex flex-col items-center justify-center gap-2 rounded-lg bg-zinc-100 text-zinc-500 dark:bg-zinc-800">
           <p>🔒 Watch the previous episode in this series first.</p>
           {video.series && (
@@ -136,6 +188,11 @@ export default async function VideoPage({
           This video is still processing. Please check back soon.
         </div>
       )}
+      {!isPendingPremiere && video.status === "READY" && !sequenceLocked && (
+        <p className="text-xs text-zinc-400">
+          Tip: use the player&apos;s ⚙️ settings icon to change playback speed.
+        </p>
+      )}
 
       {video.description && <p className="text-zinc-600 dark:text-zinc-400">{video.description}</p>}
 
@@ -144,6 +201,16 @@ export default async function VideoPage({
           videoId={video.id}
           startPositionSeconds={resumeAt}
           durationSeconds={video.durationSeconds}
+        />
+      )}
+
+      {upNextOn && upNext && !isPendingPremiere && (
+        <UpNextPanel
+          href={`/videos/${upNext.slug}`}
+          title={upNext.title}
+          thumbnailUrl={bunnyStreamThumbnailUrl(upNext.bunnyVideoId)}
+          durationSeconds={video.durationSeconds}
+          resumeAtSeconds={resumeAt}
         />
       )}
 
@@ -172,6 +239,7 @@ export default async function VideoPage({
           id={video.id}
           currentUserId={user?.id ?? null}
           canModerate={canModerate}
+          initialComments={initialComments}
         />
       )}
     </div>

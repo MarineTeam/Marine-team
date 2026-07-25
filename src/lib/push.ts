@@ -17,15 +17,23 @@ function ensureConfigured() {
 }
 
 /**
- * Sends a web push notification to every subscribed user. Silently does
- * nothing if VAPID keys aren't configured, so notifications are fully
- * optional. Prunes subscriptions the push service reports as gone (410/404).
+ * Sends a web push notification to every subscribed user, or only to the
+ * given `userIds` when provided (e.g. subscribers of a specific series).
+ * Silently does nothing if VAPID keys aren't configured, so notifications
+ * are fully optional. Prunes subscriptions the push service reports as gone
+ * (410/404).
  */
-export async function notifySubscribers(payload: { title: string; body: string; url?: string }) {
+export async function notifySubscribers(
+  payload: { title: string; body: string; url?: string },
+  userIds?: string[],
+) {
   ensureConfigured();
   if (!configured) return;
+  if (userIds && userIds.length === 0) return;
 
-  const subscriptions = await prisma.pushSubscription.findMany();
+  const subscriptions = await prisma.pushSubscription.findMany(
+    userIds ? { where: { userId: { in: userIds } } } : undefined,
+  );
   const data = JSON.stringify(payload);
 
   await Promise.all(
