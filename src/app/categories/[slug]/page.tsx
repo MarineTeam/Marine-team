@@ -2,7 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CategoryTile } from "@/components/category-tile";
 import { SeriesTile } from "@/components/series-tile";
-import { getCategoryBySlug } from "@/lib/content";
+import { SubscribeButton } from "@/components/subscribe-button";
+import { getCategoryBySlug, isCategorySubscribed } from "@/lib/content";
+import { getCurrentUser } from "@/lib/current-user";
+import { isPluginEnabled } from "@/lib/plugins";
 
 export default async function CategoryPage({
   params,
@@ -14,6 +17,12 @@ export default async function CategoryPage({
 
   if (!category) notFound();
 
+  const [user, subscriptionsOn] = await Promise.all([
+    getCurrentUser(),
+    isPluginEnabled("subscriptions", category.id),
+  ]);
+  const subscribed = user ? await isCategorySubscribed(user.id, category.id) : false;
+
   const backHref = category.parent ? `/categories/${category.parent.slug}` : "/";
   const backLabel = category.parent ? category.parent.name : "Browse";
   const isEmpty = category.series.length === 0 && category.children.length === 0;
@@ -24,7 +33,12 @@ export default async function CategoryPage({
         <Link href={backHref} className="text-sm text-zinc-500 hover:underline">
           ← {backLabel}
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight mt-1">{category.name}</h1>
+        <div className="flex flex-wrap items-start justify-between gap-3 mt-1">
+          <h1 className="text-2xl font-semibold tracking-tight">{category.name}</h1>
+          {user && subscriptionsOn && (
+            <SubscribeButton type="category" id={category.id} initialSubscribed={subscribed} />
+          )}
+        </div>
       </div>
 
       {isEmpty && <p className="text-zinc-500">Nothing published in this category yet.</p>}

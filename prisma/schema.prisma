@@ -20,6 +20,11 @@ enum VideoStatus {
   FAILED
 }
 
+enum ReactionType {
+  LIKE
+  DISLIKE
+}
+
 // Auth0 login only proves identity, not that we let someone in: anyone
 // who attempts to log in gets a row here (so admins can see the attempt
 // at /admin/users), but `authorized` starts false and getCurrentUser()
@@ -48,6 +53,9 @@ model User {
   seriesWatchLater  SeriesWatchLater[]
   videoWatchLater   VideoWatchLater[]
   pushSubscriptions PushSubscription[]
+  subscriptions     Subscription[]
+  playlists         Playlist[]
+  reactions         Reaction[]
 }
 
 // Grants a non-admin user editor access to one category (and everything
@@ -91,6 +99,7 @@ model Category {
   editors          CategoryEditor[]
   pluginOverrides  PluginCategoryOverride[]
   groupAssignments GroupAssignment[]
+  subscriptions    Subscription[]
   createdAt        DateTime                 @default(now())
 
   @@index([parentId])
@@ -122,6 +131,9 @@ model Series {
   watchLaterBy      SeriesWatchLater[]
   viewCount         Int                @default(0)
   requireSequential Boolean            @default(false)
+  subscriptions     Subscription[]
+  reactions         Reaction[]
+  viewEvents        ViewEvent[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 }
@@ -140,6 +152,7 @@ model Video {
   published       Boolean           @default(false)
   publishAt       DateTime?
   unpublishAt     DateTime?
+  isPremiere      Boolean           @default(false)
   position        Int               @default(0)
   series          Series?           @relation(fields: [seriesId], references: [id], onDelete: SetNull)
   seriesId        String?
@@ -149,6 +162,9 @@ model Video {
   ratings         Rating[]
   watchLaterBy    VideoWatchLater[]
   viewCount       Int               @default(0)
+  reactions       Reaction[]
+  viewEvents      ViewEvent[]
+  playlistItems   PlaylistItem[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -365,4 +381,89 @@ model Announcement {
   message   String
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
+}
+
+// A member following a series or category (exactly one of seriesId/categoryId
+// is set), so they can be notified when new content is published under it
+// and see it on a "Subscriptions" page. Distinct from Favorites/Watch Later,
+// which bookmark specific items rather than following a source going forward.
+model Subscription {
+  id         String    @id @default(cuid())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  series     Series?   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  seriesId   String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId String?
+  createdAt  DateTime  @default(now())
+
+  @@unique([userId, seriesId])
+  @@unique([userId, categoryId])
+  @@index([seriesId])
+  @@index([categoryId])
+}
+
+// A member-created ordered collection of videos, distinct from the single
+// site-wide "Watch later" queue.
+model Playlist {
+  id        String         @id @default(cuid())
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  title     String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  items     PlaylistItem[]
+
+  @@index([userId])
+}
+
+model PlaylistItem {
+  id         String   @id @default(cuid())
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  playlistId String
+  video      Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId    String
+  position   Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@unique([playlistId, videoId])
+  @@index([videoId])
+}
+
+// A member's like/dislike on a series or video (exactly one of seriesId/videoId
+// is set), separate from the 1-5 star Ratings plugin.
+model Reaction {
+  id        String       @id @default(cuid())
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  series    Series?      @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  seriesId  String?
+  video     Video?       @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId   String?
+  type      ReactionType
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([userId, seriesId])
+  @@unique([userId, videoId])
+  @@index([seriesId])
+  @@index([videoId])
+}
+
+// A timestamped view of a series or video (exactly one of seriesId/videoId is
+// set), distinct from the simple all-time `viewCount` counter. Powers the
+// homepage "Trending" row (views in a recent window) and the admin analytics
+// dashboard. Logged for anonymous viewers too, with userId left null.
+model ViewEvent {
+  id        String   @id @default(cuid())
+  series    Series?  @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  seriesId  String?
+  video     Video?   @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId   String?
+  userId    String?
+  createdAt DateTime @default(now())
+
+  @@index([seriesId, createdAt])
+  @@index([videoId, createdAt])
+  @@index([createdAt])
 }

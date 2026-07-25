@@ -6,6 +6,21 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Subscriptions** (`/subscriptions`): follow a series or category and get
+  push notifications when it publishes.
+- **Playlists** (`/playlists`): member-created, reorderable video playlists.
+- **Likes / dislikes**: thumbs up/down on a series or video.
+- **Trending row** on the homepage, from a new timestamped view log.
+- **Up next** panel on video pages with an autoplay toggle.
+- **Scheduled premieres**: a video can show a live countdown before its
+  publish time instead of staying fully hidden.
+- **Admin analytics** (`/admin/analytics`, `view_analytics` capability):
+  30-day view totals plus top series/videos.
+- A note on playback speed: it's already available via Bunny Stream's own
+  player settings, so no custom control was needed.
+
 ## [1.0.0] - 2026-07-25
 
 Initial release. See [FEATURES.md](./FEATURES.md) for the full feature list.

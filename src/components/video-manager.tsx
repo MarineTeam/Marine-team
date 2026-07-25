@@ -14,6 +14,8 @@ type Video = {
   memberOnly: boolean;
   published: boolean;
   unpublishAt: string | null;
+  publishAt: string | null;
+  isPremiere: boolean;
   series: { id: string; title: string } | null;
 };
 type BunnyLibraryVideo = {
@@ -193,6 +195,23 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ unpublishAt }),
+    });
+    await load();
+  }
+
+  async function setPremiere(v: Video) {
+    const input = prompt(
+      "Premiere at (YYYY-MM-DDTHH:MM, local time)? The video shows a countdown until then. Leave blank to clear.",
+      v.publishAt ? v.publishAt.slice(0, 16) : "",
+    );
+    if (input === null) return;
+    const body = input.trim()
+      ? { isPremiere: true, published: true, publishAt: new Date(input.trim()).toISOString() }
+      : { isPremiere: false };
+    await fetch(`/api/admin/videos/${v.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     });
     await load();
   }
@@ -539,6 +558,13 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
                 className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
               >
                 {v.memberOnly ? "Members only" : "Public"}
+              </button>
+              <button
+                onClick={() => setPremiere(v)}
+                className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${v.isPremiere ? "border-purple-400 text-purple-700 dark:text-purple-400" : "border-zinc-300"}`}
+                title={v.isPremiere && v.publishAt ? `Premieres ${new Date(v.publishAt).toLocaleString()}` : undefined}
+              >
+                {v.isPremiere ? "Premiere set" : "Schedule premiere"}
               </button>
               <button onClick={() => remove(v.id)} className="text-red-600 hover:underline">
                 Delete

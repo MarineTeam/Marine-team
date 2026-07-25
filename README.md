@@ -138,6 +138,13 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   - **Notifications**: Web Push to subscribed members when an admin flips a
     video from unpublished to published (see PWA below) — a no-op if VAPID
     keys aren't configured.
+  - **Subscriptions** (`/subscriptions`): follow a series or category; its
+    subscribers get a targeted push notification when it publishes a new
+    video, on top of the general Notifications above.
+  - **Playlists** (`/playlists`): member-created, reorderable video
+    playlists, separate from the single Watch Later queue.
+  - **Likes / dislikes**: a thumbs up/down on a series or video, alongside
+    (and independent from) the star Ratings plugin.
 - **Sequential unlock**: a per-series "Require watching in order" toggle
   (`Series.requireSequential`, set on the series edit page — not a plugin,
   since it's a property of one series rather than a site feature). When on,
@@ -163,6 +170,14 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   precise scrub position) — the homepage shows a "Continue watching" row
   from that, resuming playback near where you left off via Bunny's `t=`
   embed parameter, plus a "Recently added" row of newest published series.
+- **Trending / Up next / premieres**: the homepage shows a "Trending this
+  week" row (from a timestamped view log, distinct from the simple
+  `viewCount` counter); video pages show an "Up next" panel with an
+  autoplay toggle for the next episode in the series; a video can be marked
+  a premiere with a future publish time to show a live countdown instead of
+  staying fully hidden until then.
+- **Admin analytics** (`/admin/analytics`, `view_analytics` capability):
+  30-day view totals and top series/videos, from the same view log.
 - **Feeds**: `/feed.xml` is a site-wide RSS feed of recently added series;
   `/series/[slug]/podcast.xml` is an iTunes-compatible podcast feed of a
   series' published audio files (skipped for `memberOnly` series, since

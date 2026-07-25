@@ -409,3 +409,226 @@ export async function isVideoLockedBySequence(
   });
   return !progress?.completed;
 }
+
+// --- Subscriptions -------------------------------------------------------
+
+export async function isSeriesSubscribed(userId: string, seriesId: string) {
+  return (await prisma.subscription.findUnique({ where: { userId_seriesId: { userId, seriesId } } })) !== null;
+}
+
+export async function isCategorySubscribed(userId: string, categoryId: string) {
+  return (
+    (await prisma.subscription.findUnique({ where: { userId_categoryId: { userId, categoryId } } })) !== null
+  );
+}
+
+/** A logged-in user's followed series and categories, for a "Subscriptions" page. */
+export async function getSubscriptions(userId: string) {
+  const [seriesSubs, categorySubs] = await Promise.all([
+    prisma.subscription.findMany({
+      where: { userId, seriesId: { not: null }, series: publishedNow() },
+      include: { series: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.subscription.findMany({
+      where: { userId, categoryId: { not: null } },
+      include: { category: true },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+  return { seriesSubs, categorySubs };
+}
+
+/** Users subscribed to a series itself, or to its category (or an ancestor of it). */
+export async function getSubscriberUserIdsForSeries(seriesId: string, categoryId: string | null): Promise<string[]> {
+  const categoryChain = categoryId ? await categoryChainIds(categoryId) : [];
+  const subs = await prisma.subscription.findMany({
+    where: {
+      OR: [{ seriesId }, ...(categoryChain.length > 0 ? [{ categoryId: { in: categoryChain } }] : [])],
+    },
+    select: { userId: true },
+  });
+  return Array.from(new Set(subs.map((s) => s.userId)));
+}
+
+async function categoryChainIds(categoryId: string): Promise<string[]> {
+  const ids: string[] = [];
+  let currentId: string | null = categoryId;
+  while (currentId) {
+    ids.push(currentId);
+    const category: { parentId: string | null } | null = await prisma.category.findUnique({
+      where: { id: currentId },
+      select: { parentId: true },
+    });
+    currentId = category?.parentId ?? null;
+  }
+  return ids;
+}
+
+// --- Playlists -------------------------------------------------------------
+
+export async function getUserPlaylists(userId: string) {
+  return prisma.playlist.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    include: { items: { orderBy: { position: "asc" }, include: { video: { include: { series: true } } } } },
+  });
+}
+
+export async function getPlaylist(playlistId: string, userId: string) {
+  return prisma.playlist.findFirst({
+    where: { id: playlistId, userId },
+    include: { items: { orderBy: { position: "asc" }, include: { video: { include: { series: true } } } } },
+  });
+}
+
+/** Every playlist a user has, flagged with whether the given video is already in it (for an "Add to playlist" menu). */
+export async function getUserPlaylistsWithMembership(userId: string, videoId: string) {
+  const playlists = await prisma.playlist.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    include: { items: { where: { videoId }, select: { id: true } } },
+  });
+  return playlists.map((p) => ({ id: p.id, title: p.title, hasVideo: p.items.length > 0 }));
+}
+
+// --- Reactions (likes/dislikes) ---------------------------------------------
+
+export async function getSeriesReactionSummary(seriesId: string) {
+  const [likes, dislikes] = await Promise.all([
+    prisma.reaction.count({ where: { seriesId, type: "LIKE" } }),
+    prisma.reaction.count({ where: { seriesId, type: "DISLIKE" } }),
+  ]);
+  return { likes, dislikes };
+}
+
+export async function getVideoReactionSummary(videoId: string) {
+  const [likes, dislikes] = await Promise.all([
+    prisma.reaction.count({ where: { videoId, type: "LIKE" } }),
+    prisma.reaction.count({ where: { videoId, type: "DISLIKE" } }),
+  ]);
+  return { likes, dislikes };
+}
+
+export async function getUserSeriesReaction(userId: string, seriesId: string) {
+  const reaction = await prisma.reaction.findUnique({ where: { userId_seriesId: { userId, seriesId } } });
+  return reaction?.type ?? null;
+}
+
+export async function getUserVideoReaction(userId: string, videoId: string) {
+  const reaction = await prisma.reaction.findUnique({ where: { userId_videoId: { userId, videoId } } });
+  return reaction?.type ?? null;
+}
+
+// --- View events (trending + analytics) -------------------------------------
+
+export async function logSeriesView(seriesId: string, userId: string | null) {
+  await prisma.viewEvent.create({ data: { seriesId, userId } });
+}
+
+export async function logVideoView(videoId: string, userId: string | null) {
+  await prisma.viewEvent.create({ data: { videoId, userId } });
+}
+
+/** Published series with the most views in the last `days` days, for a homepage "Trending" row. */
+export async function getTrendingSeries(limit = 10, days = 7) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const grouped = await prisma.viewEvent.groupBy({
+    by: ["seriesId"],
+    where: { seriesId: { not: null }, createdAt: { gte: since } },
+    _count: { seriesId: true },
+    orderBy: { _count: { seriesId: "desc" } },
+    take: limit * 2, // over-fetch since some may since be unpublished
+  });
+  if (grouped.length === 0) return [];
+
+  const ids = grouped.map((g) => g.seriesId as string);
+  const series = await prisma.series.findMany({ where: { id: { in: ids }, ...publishedNow() } });
+  const byId = new Map(series.map((s) => [s.id, s]));
+  return grouped
+    .map((g) => byId.get(g.seriesId as string))
+    .filter((s): s is NonNullable<typeof s> => Boolean(s))
+    .slice(0, limit);
+}
+
+/** Site-wide view totals over `days` days, for the admin analytics dashboard. */
+export async function getAnalyticsSummary(days = 30) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  const [totalViews, topSeriesGrouped, topVideosGrouped] = await Promise.all([
+    prisma.viewEvent.count({ where: { createdAt: { gte: since } } }),
+    prisma.viewEvent.groupBy({
+      by: ["seriesId"],
+      where: { seriesId: { not: null }, createdAt: { gte: since } },
+      _count: { seriesId: true },
+      orderBy: { _count: { seriesId: "desc" } },
+      take: 10,
+    }),
+    prisma.viewEvent.groupBy({
+      by: ["videoId"],
+      where: { videoId: { not: null }, createdAt: { gte: since } },
+      _count: { videoId: true },
+      orderBy: { _count: { videoId: "desc" } },
+      take: 10,
+    }),
+  ]);
+
+  const [seriesById, videosById] = await Promise.all([
+    prisma.series.findMany({ where: { id: { in: topSeriesGrouped.map((g) => g.seriesId as string) } } }),
+    prisma.video.findMany({ where: { id: { in: topVideosGrouped.map((g) => g.videoId as string) } } }),
+  ]);
+  const seriesMap = new Map(seriesById.map((s) => [s.id, s]));
+  const videoMap = new Map(videosById.map((v) => [v.id, v]));
+
+  return {
+    totalViews,
+    topSeries: topSeriesGrouped
+      .map((g) => ({ series: seriesMap.get(g.seriesId as string), views: g._count.seriesId }))
+      .filter((r): r is { series: NonNullable<typeof r.series>; views: number } => Boolean(r.series)),
+    topVideos: topVideosGrouped
+      .map((g) => ({ video: videoMap.get(g.videoId as string), views: g._count.videoId }))
+      .filter((r): r is { video: NonNullable<typeof r.video>; views: number } => Boolean(r.video)),
+  };
+}
+
+// --- Up next -----------------------------------------------------------------
+
+/** The next published, ready video in the same series (by position), for an "Up next" panel. */
+export async function getUpNextVideo(video: { id: string; position: number; seriesId: string | null }) {
+  if (!video.seriesId) return null;
+  return prisma.video.findFirst({
+    where: { seriesId: video.seriesId, position: { gt: video.position }, status: "READY", ...publishedNow() },
+    orderBy: { position: "asc" },
+    include: { series: true },
+  });
+}
+
+// --- Scheduled premieres -------------------------------------------------
+
+/**
+ * A video marked as a premiere is visible (with a countdown) before its
+ * publishAt time, unlike a normal scheduled video which stays fully hidden.
+ * Falls back to the normal published lookup if it's not a pending premiere.
+ */
+export async function getVideoBySlugIncludingPremiere(slug: string) {
+  const published = await prisma.video.findFirst({
+    where: { slug, ...publishedNow() },
+    include: { series: true },
+  });
+  if (published) return published;
+
+  return prisma.video.findFirst({
+    where: { slug, published: true, isPremiere: true, publishAt: { gt: new Date() } },
+    include: { series: true },
+  });
+}
+
+/** Upcoming premieres (published, isPremiere, publishAt in the future), soonest first. */
+export async function getUpcomingPremieres(limit = 10) {
+  return prisma.video.findMany({
+    where: { published: true, isPremiere: true, publishAt: { gt: new Date() } },
+    orderBy: { publishAt: "asc" },
+    take: limit,
+    include: { series: true },
+  });
+}

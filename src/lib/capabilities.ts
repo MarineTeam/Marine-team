@@ -10,6 +10,7 @@ export const CAPABILITIES = [
   { key: "manage_permissions", label: "Manage permissions", hint: "Create groups and assign them to users" },
   { key: "manage_plugins", label: "Manage plugins", hint: "Enable or disable optional features" },
   { key: "view_audit_log", label: "View audit log", hint: "See the history of admin/editor actions" },
+  { key: "view_analytics", label: "View analytics", hint: "See the views dashboard and trending content" },
 ] as const;
 
 export type CapabilityKey = (typeof CAPABILITIES)[number]["key"];
@@ -22,5 +23,6 @@ export const SITE_WIDE_ONLY_CAPABILITIES: CapabilityKey[] = [
   "manage_permissions",
   "manage_plugins",
   "view_audit_log",
+  "view_analytics",
   "manage_categories",
 ];

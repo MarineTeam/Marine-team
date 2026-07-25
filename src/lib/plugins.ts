@@ -10,6 +10,10 @@ export const PLUGIN_META = [
   { slug: "view-counts", name: "View counts", description: "Shows a play/view counter on series and video pages." },
   { slug: "social-share", name: "Social share", description: "Shows copy-link and share-to buttons on series and video pages." },
   { slug: "announcements", name: "Announcements", description: "Shows a dismissible site-wide banner message." },
+  { slug: "subscriptions", name: "Subscriptions", description: "Lets members follow a series or category and get notified when it publishes new content." },
+  { slug: "playlists", name: "Playlists", description: "Lets members build their own ordered video playlists." },
+  { slug: "likes-dislikes", name: "Likes / dislikes", description: "Lets members like or dislike a series or video." },
+  { slug: "up-next", name: "Up next", description: "Shows an \"Up next\" panel with the next video in a series, with an autoplay option." },
 ] as const;
 
 export type PluginSlug = (typeof PLUGIN_META)[number]["slug"];

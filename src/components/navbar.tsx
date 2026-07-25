@@ -4,11 +4,13 @@ import { isPluginEnabled } from "@/lib/plugins";
 import { PushNotificationToggle } from "@/components/push-notification-toggle";
 
 export async function Navbar() {
-  const [user, identity, watchLaterOn, notificationsOn] = await Promise.all([
+  const [user, identity, watchLaterOn, notificationsOn, subscriptionsOn, playlistsOn] = await Promise.all([
     getCurrentUser(),
     getSessionIdentity(),
     isPluginEnabled("watch-later"),
     isPluginEnabled("notifications"),
+    isPluginEnabled("subscriptions"),
+    isPluginEnabled("playlists"),
   ]);
   const unauthorized = !user && identity !== null;
 
@@ -43,6 +45,16 @@ export async function Navbar() {
           {user && watchLaterOn && (
             <Link href="/watch-later" className="hover:underline">
               Watch Later
+            </Link>
+          )}
+          {user && playlistsOn && (
+            <Link href="/playlists" className="hover:underline">
+              Playlists
+            </Link>
+          )}
+          {user && subscriptionsOn && (
+            <Link href="/subscriptions" className="hover:underline">
+              Subscriptions
             </Link>
           )}
           {user && notificationsOn && <PushNotificationToggle />}

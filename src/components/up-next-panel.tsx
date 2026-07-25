@@ -1,0 +1,70 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
+const AUTOPLAY_KEY = "up-next-autoplay";
+
+/**
+ * Shows the next video in the series with an autoplay toggle. Since Bunny's
+ * iframe embed has no documented postMessage API for an exact "ended" event
+ * (same limitation noted for watch progress), autoplay is a best-effort
+ * timer keyed off the video's known duration rather than a real end event.
+ */
+export function UpNextPanel({
+  href,
+  title,
+  thumbnailUrl,
+  durationSeconds,
+  resumeAtSeconds,
+}: {
+  href: string;
+  title: string;
+  thumbnailUrl: string;
+  durationSeconds: number | null;
+  resumeAtSeconds: number;
+}) {
+  const router = useRouter();
+  const [autoplay, setAutoplay] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAutoplay(typeof window !== "undefined" && localStorage.getItem(AUTOPLAY_KEY) === "true");
+  }, []);
+
+  useEffect(() => {
+    if (!autoplay || !durationSeconds) return;
+    const remainingMs = Math.max(0, durationSeconds - resumeAtSeconds) * 1000;
+    const timer = setTimeout(() => router.push(href), remainingMs);
+    return () => clearTimeout(timer);
+  }, [autoplay, durationSeconds, resumeAtSeconds, href, router]);
+
+  const counting = autoplay && Boolean(durationSeconds);
+
+  function toggleAutoplay() {
+    const next = !autoplay;
+    setAutoplay(next);
+    localStorage.setItem(AUTOPLAY_KEY, String(next));
+  }
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+      {thumbnailUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={thumbnailUrl} alt="" className="h-16 w-28 shrink-0 rounded object-cover" />
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="text-xs uppercase tracking-wide text-zinc-500">
+          Up next{counting ? " · playing soon…" : ""}
+        </p>
+        <a href={href} className="block truncate font-medium hover:underline">
+          {title}
+        </a>
+      </div>
+      <label className="flex shrink-0 items-center gap-1 text-xs text-zinc-500">
+        <input type="checkbox" checked={autoplay} onChange={toggleAutoplay} />
+        Autoplay
+      </label>
+    </div>
+  );
+}

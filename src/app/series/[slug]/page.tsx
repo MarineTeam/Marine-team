@@ -5,7 +5,9 @@ import {
   getRelatedSeries,
   isSeriesFavorited,
   isSeriesInWatchLater,
+  isSeriesSubscribed,
   incrementSeriesViewCount,
+  logSeriesView,
   isVideoLockedBySequence,
   canAccess,
 } from "@/lib/content";
@@ -14,7 +16,9 @@ import { hasCapability } from "@/lib/permissions";
 import { isPluginEnabled } from "@/lib/plugins";
 import { FavoriteButton } from "@/components/favorite-button";
 import { WatchLaterButton } from "@/components/watch-later-button";
+import { SubscribeButton } from "@/components/subscribe-button";
 import { StarRating } from "@/components/star-rating";
+import { ReactionButtons } from "@/components/reaction-buttons";
 import { ShareButtons } from "@/components/share-buttons";
 import { SeriesTile } from "@/components/series-tile";
 import { CommentSection } from "@/components/comment-section";
@@ -35,6 +39,7 @@ export default async function SeriesPage({
   const [
     favorited,
     queued,
+    subscribed,
     related,
     favoritesOn,
     commentsOn,
@@ -43,11 +48,14 @@ export default async function SeriesPage({
     watchLaterOn,
     viewCountsOn,
     socialShareOn,
+    subscriptionsOn,
+    likesOn,
     canModerate,
     lockedVideoIds,
   ] = await Promise.all([
     user ? isSeriesFavorited(user.id, series.id) : Promise.resolve(false),
     user ? isSeriesInWatchLater(user.id, series.id) : Promise.resolve(false),
+    user ? isSeriesSubscribed(user.id, series.id) : Promise.resolve(false),
     getRelatedSeries(series),
     isPluginEnabled("favorites", series.categoryId),
     isPluginEnabled("comments", series.categoryId),
@@ -56,6 +64,8 @@ export default async function SeriesPage({
     isPluginEnabled("watch-later", series.categoryId),
     isPluginEnabled("view-counts", series.categoryId),
     isPluginEnabled("social-share", series.categoryId),
+    isPluginEnabled("subscriptions", series.categoryId),
+    isPluginEnabled("likes-dislikes", series.categoryId),
     user
       ? hasCapability(user, "moderate_comments", { categoryId: series.categoryId })
       : Promise.resolve(false),
@@ -66,7 +76,10 @@ export default async function SeriesPage({
       : Promise.resolve(new Set<string>()),
   ]);
 
-  if (viewCountsOn) await incrementSeriesViewCount(series.id);
+  if (viewCountsOn) {
+    await incrementSeriesViewCount(series.id);
+    await logSeriesView(series.id, user?.id ?? null);
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-8">
@@ -81,13 +94,17 @@ export default async function SeriesPage({
               {user && watchLaterOn && (
                 <WatchLaterButton type="series" id={series.id} initialQueued={queued} />
               )}
+              {user && subscriptionsOn && (
+                <SubscribeButton type="series" id={series.id} initialSubscribed={subscribed} />
+              )}
             </div>
           )}
         </div>
         {series.description && <p className="mt-2 text-zinc-500">{series.description}</p>}
-        {!seriesLocked && (ratingsOn || viewCountsOn) && (
+        {!seriesLocked && (ratingsOn || viewCountsOn || likesOn) && (
           <div className="mt-3 flex flex-wrap items-center gap-4">
             {ratingsOn && <StarRating type="series" id={series.id} canRate={Boolean(user)} />}
+            {likesOn && <ReactionButtons type="series" id={series.id} canReact={Boolean(user)} />}
             {viewCountsOn && (
               <span className="text-sm text-zinc-500">
                 {series.viewCount + 1} view{series.viewCount === 0 ? "" : "s"}
