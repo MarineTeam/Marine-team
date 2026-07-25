@@ -4,6 +4,12 @@ export const PLUGIN_META = [
   { slug: "favorites", name: "Favorites", description: "Lets members bookmark series and videos to a My Favorites page." },
   { slug: "comments", name: "Comments", description: "Lets members discuss a series or video underneath it." },
   { slug: "related-content", name: "Related content", description: "Shows \"More like this\" / \"You might also like\" rows." },
+  { slug: "ratings", name: "Ratings", description: "Lets members leave a 1-5 star rating on a series or video." },
+  { slug: "watch-later", name: "Watch later", description: "Lets members queue a series or video to a Watch Later page, separate from Favorites." },
+  { slug: "notifications", name: "Notifications", description: "Sends a web push notification to subscribed members when new content is published." },
+  { slug: "view-counts", name: "View counts", description: "Shows a play/view counter on series and video pages." },
+  { slug: "social-share", name: "Social share", description: "Shows copy-link and share-to buttons on series and video pages." },
+  { slug: "announcements", name: "Announcements", description: "Shows a dismissible site-wide banner message." },
 ] as const;
 
 export type PluginSlug = (typeof PLUGIN_META)[number]["slug"];

@@ -5,6 +5,8 @@ import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureSeriesRelatedAccess } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { bunnyDeleteStreamVideo } from "@/lib/bunny";
+import { isPluginEnabled } from "@/lib/plugins";
+import { notifySubscribers } from "@/lib/push";
 
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -47,8 +49,25 @@ export async function PATCH(
     await ensureSeriesRelatedAccess(user, existing.seriesId);
     const body = updateSchema.parse(await request.json());
     if (body.seriesId !== undefined) await ensureSeriesRelatedAccess(user, body.seriesId);
-    const video = await prisma.video.update({ where: { id }, data: normalizeData(body) });
+    const video = await prisma.video.update({
+      where: { id },
+      data: normalizeData(body),
+      include: { series: true },
+    });
     await logAudit(user.email, "update", "video", video.id, JSON.stringify(body));
+
+    const justPublished = existing.published === false && body.published === true;
+    if (justPublished && video.status === "READY") {
+      const categoryId = video.series?.categoryId ?? null;
+      if (await isPluginEnabled("notifications", categoryId)) {
+        await notifySubscribers({
+          title: "New video published",
+          body: video.title,
+          url: `/videos/${video.slug}`,
+        });
+      }
+    }
+
     return NextResponse.json(video);
   } catch (error) {
     return errorResponse(error);

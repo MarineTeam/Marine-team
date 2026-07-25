@@ -18,6 +18,7 @@ type Series = {
   pinned: boolean;
   tags: string[];
   unpublishAt: Date | string | null;
+  requireSequential: boolean;
 };
 
 /** Converts a Date/ISO string to the value a <input type="datetime-local"> expects (local time, no seconds). */
@@ -48,6 +49,7 @@ export function SeriesEditForm({
   const [tags, setTags] = useState(series.tags.join(", "));
   const [publishAt, setPublishAt] = useState(toDatetimeLocal(series.publishAt));
   const [unpublishAt, setUnpublishAt] = useState(toDatetimeLocal(series.unpublishAt));
+  const [requireSequential, setRequireSequential] = useState(series.requireSequential);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -74,6 +76,7 @@ export function SeriesEditForm({
           tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
           publishAt: publishAt ? new Date(publishAt).toISOString() : null,
           unpublishAt: unpublishAt ? new Date(unpublishAt).toISOString() : null,
+          requireSequential,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed to save");
@@ -211,6 +214,14 @@ export function SeriesEditForm({
         <label className="flex items-center gap-1.5 text-sm">
           <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
           Pinned (shown first)
+        </label>
+        <label className="flex items-center gap-1.5 text-sm">
+          <input
+            type="checkbox"
+            checked={requireSequential}
+            onChange={(e) => setRequireSequential(e.target.checked)}
+          />
+          Require watching in order
         </label>
         <button
           type="submit"

@@ -23,6 +23,7 @@ const updateSchema = z.object({
   pinned: z.boolean().optional(),
   tags: z.array(z.string().min(1)).optional(),
   position: z.number().int().optional(),
+  requireSequential: z.boolean().optional(),
 });
 
 function normalizeSeriesData(body: z.infer<typeof updateSchema>) {

@@ -28,22 +28,26 @@ enum VideoStatus {
 // pending row after seeing the attempt. ADMIN_EMAILS self-authorizes as
 // ADMIN on first login so there's always a way in.
 model User {
-  id               String            @id @default(cuid())
-  auth0Id          String?           @unique
-  email            String            @unique
-  name             String?
-  picture          String?
-  role             Role              @default(MEMBER)
-  authorized       Boolean           @default(false)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  categoryEditors  CategoryEditor[]
-  seriesEditors    SeriesEditor[]
-  watchProgress    WatchProgress[]
-  seriesFavorites  SeriesFavorite[]
-  videoFavorites   VideoFavorite[]
-  comments         Comment[]
-  groupAssignments GroupAssignment[]
+  id                String             @id @default(cuid())
+  auth0Id           String?            @unique
+  email             String             @unique
+  name              String?
+  picture           String?
+  role              Role               @default(MEMBER)
+  authorized        Boolean            @default(false)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  categoryEditors   CategoryEditor[]
+  seriesEditors     SeriesEditor[]
+  watchProgress     WatchProgress[]
+  seriesFavorites   SeriesFavorite[]
+  videoFavorites    VideoFavorite[]
+  comments          Comment[]
+  groupAssignments  GroupAssignment[]
+  ratings           Rating[]
+  seriesWatchLater  SeriesWatchLater[]
+  videoWatchLater   VideoWatchLater[]
+  pushSubscriptions PushSubscription[]
 }
 
 // Grants a non-admin user editor access to one category (and everything
@@ -93,53 +97,60 @@ model Category {
 }
 
 model Series {
-  id               String            @id @default(cuid())
-  title            String
-  slug             String            @unique
-  description      String?
-  coverImageUrl    String?
-  memberOnly       Boolean           @default(false)
-  published        Boolean           @default(true)
-  publishAt        DateTime?
-  unpublishAt      DateTime?
-  featured         Boolean           @default(false)
-  pinned           Boolean           @default(false)
-  tags             String[]          @default([])
-  position         Int               @default(0)
-  category         Category?         @relation(fields: [categoryId], references: [id])
-  categoryId       String?
-  videos           Video[]
-  files            FileAsset[]
-  editors          SeriesEditor[]
-  favoritedBy      SeriesFavorite[]
-  comments         Comment[]
-  groupAssignments GroupAssignment[]
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  id                String             @id @default(cuid())
+  title             String
+  slug              String             @unique
+  description       String?
+  coverImageUrl     String?
+  memberOnly        Boolean            @default(false)
+  published         Boolean            @default(true)
+  publishAt         DateTime?
+  unpublishAt       DateTime?
+  featured          Boolean            @default(false)
+  pinned            Boolean            @default(false)
+  tags              String[]           @default([])
+  position          Int                @default(0)
+  category          Category?          @relation(fields: [categoryId], references: [id])
+  categoryId        String?
+  videos            Video[]
+  files             FileAsset[]
+  editors           SeriesEditor[]
+  favoritedBy       SeriesFavorite[]
+  comments          Comment[]
+  groupAssignments  GroupAssignment[]
+  ratings           Rating[]
+  watchLaterBy      SeriesWatchLater[]
+  viewCount         Int                @default(0)
+  requireSequential Boolean            @default(false)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 }
 
 model Video {
-  id              String          @id @default(cuid())
+  id              String            @id @default(cuid())
   title           String
-  slug            String          @unique
+  slug            String            @unique
   description     String?
   bunnyVideoId    String
   bunnyLibraryId  String
   thumbnailUrl    String?
   durationSeconds Int?
-  status          VideoStatus     @default(PROCESSING)
-  memberOnly      Boolean         @default(false)
-  published       Boolean         @default(false)
+  status          VideoStatus       @default(PROCESSING)
+  memberOnly      Boolean           @default(false)
+  published       Boolean           @default(false)
   publishAt       DateTime?
   unpublishAt     DateTime?
-  position        Int             @default(0)
-  series          Series?         @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  position        Int               @default(0)
+  series          Series?           @relation(fields: [seriesId], references: [id], onDelete: SetNull)
   seriesId        String?
   watchProgress   WatchProgress[]
   favoritedBy     VideoFavorite[]
   comments        Comment[]
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  ratings         Rating[]
+  watchLaterBy    VideoWatchLater[]
+  viewCount       Int               @default(0)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   @@index([seriesId])
 }
@@ -287,4 +298,71 @@ model GroupAssignment {
   createdAt  DateTime        @default(now())
 
   @@index([userId])
+}
+
+// A 1-5 star rating on a series or video (exactly one of seriesId/videoId is set).
+model Rating {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  series    Series?  @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  seriesId  String?
+  video     Video?   @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId   String?
+  value     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, seriesId])
+  @@unique([userId, videoId])
+  @@index([seriesId])
+  @@index([videoId])
+}
+
+// A member's "watch later" queue entry for a series, distinct from Favorites.
+model SeriesWatchLater {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  series    Series   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  seriesId  String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, seriesId])
+  @@index([seriesId])
+}
+
+// A member's "watch later" queue entry for a video, distinct from Favorites.
+model VideoWatchLater {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId   String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, videoId])
+  @@index([videoId])
+}
+
+// A browser's Web Push subscription for a logged-in user, used to notify
+// them when new content is published (see src/lib/push.ts).
+model PushSubscription {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// A dismissible site-wide banner message; only the most recent `active` one shows.
+model Announcement {
+  id        String   @id @default(cuid())
+  message   String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
 }
