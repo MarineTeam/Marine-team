@@ -17,6 +17,7 @@ type Series = {
   featured: boolean;
   pinned: boolean;
   tags: string[];
+  unpublishAt: Date | string | null;
 };
 
 /** Converts a Date/ISO string to the value a <input type="datetime-local"> expects (local time, no seconds). */
@@ -46,6 +47,7 @@ export function SeriesEditForm({
   const [pinned, setPinned] = useState(series.pinned);
   const [tags, setTags] = useState(series.tags.join(", "));
   const [publishAt, setPublishAt] = useState(toDatetimeLocal(series.publishAt));
+  const [unpublishAt, setUnpublishAt] = useState(toDatetimeLocal(series.unpublishAt));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -71,6 +73,7 @@ export function SeriesEditForm({
           pinned,
           tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
           publishAt: publishAt ? new Date(publishAt).toISOString() : null,
+          unpublishAt: unpublishAt ? new Date(unpublishAt).toISOString() : null,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed to save");
@@ -147,15 +150,26 @@ export function SeriesEditForm({
         />
       </label>
 
-      <label className="text-sm space-y-1 block">
-        <span className="text-zinc-500">Publish at (leave blank to publish immediately)</span>
-        <input
-          type="datetime-local"
-          value={publishAt}
-          onChange={(e) => setPublishAt(e.target.value)}
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-        />
-      </label>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label className="text-sm space-y-1 block">
+          <span className="text-zinc-500">Publish at (leave blank to publish immediately)</span>
+          <input
+            type="datetime-local"
+            value={publishAt}
+            onChange={(e) => setPublishAt(e.target.value)}
+            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          />
+        </label>
+        <label className="text-sm space-y-1 block">
+          <span className="text-zinc-500">Unpublish at (leave blank to never expire)</span>
+          <input
+            type="datetime-local"
+            value={unpublishAt}
+            onChange={(e) => setUnpublishAt(e.target.value)}
+            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          />
+        </label>
+      </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <select

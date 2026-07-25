@@ -27,9 +27,25 @@ export default function AuditLogPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Audit log</h1>
-        <p className="text-sm text-zinc-500">The most recent 200 admin/editor actions.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">Audit log</h1>
+          <p className="text-sm text-zinc-500">The most recent 200 admin/editor actions.</p>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <a
+            href="/api/admin/audit/export?format=csv"
+            className="rounded-md border border-zinc-300 px-3 py-1.5 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          >
+            Export CSV
+          </a>
+          <a
+            href="/api/admin/audit/export?format=json"
+            className="rounded-md border border-zinc-300 px-3 py-1.5 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          >
+            Export JSON
+          </a>
+        </div>
       </div>
 
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">

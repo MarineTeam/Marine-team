@@ -5,9 +5,19 @@ export function canAccess(memberOnly: boolean, isLoggedIn: boolean): boolean {
   return !memberOnly || isLoggedIn;
 }
 
-/** Matches items that are marked published AND (have no publishAt gate, or its time has passed). */
+/**
+ * Matches items that are marked published, whose publishAt gate (if any) has
+ * passed, and whose unpublishAt gate (if any) hasn't passed yet.
+ */
 function publishedNow() {
-  return { published: true, OR: [{ publishAt: null }, { publishAt: { lte: new Date() } }] };
+  const now = new Date();
+  return {
+    published: true,
+    AND: [
+      { OR: [{ publishAt: null }, { publishAt: { lte: now } }] },
+      { OR: [{ unpublishAt: null }, { unpublishAt: { gt: now } }] },
+    ],
+  };
 }
 
 const seriesOrder: Prisma.SeriesOrderByWithRelationInput[] = [
@@ -115,6 +125,51 @@ export async function getSeriesBySlug(slug: string) {
   });
 }
 
+/**
+ * Other published series worth surfacing alongside the given one: same
+ * category first, then anything sharing a tag, capped at `limit` and never
+ * including the series itself.
+ */
+export async function getRelatedSeries(series: { id: string; categoryId: string | null; tags: string[] }, limit = 8) {
+  const byCategory = series.categoryId
+    ? await prisma.series.findMany({
+        where: { ...publishedNow(), categoryId: series.categoryId, id: { not: series.id } },
+        orderBy: seriesOrder,
+        take: limit,
+      })
+    : [];
+  if (byCategory.length >= limit || series.tags.length === 0) return byCategory.slice(0, limit);
+
+  const byTag = await prisma.series.findMany({
+    where: {
+      ...publishedNow(),
+      id: { notIn: [series.id, ...byCategory.map((s) => s.id)] },
+      tags: { hasSome: series.tags },
+    },
+    orderBy: seriesOrder,
+    take: limit - byCategory.length,
+  });
+  return [...byCategory, ...byTag];
+}
+
+/** Other published, ready videos from the same series (or nearby videos if standalone), excluding itself. */
+export async function getRelatedVideos(video: { id: string; seriesId: string | null }, limit = 8) {
+  if (video.seriesId) {
+    return prisma.video.findMany({
+      where: { ...publishedNow(), status: "READY", seriesId: video.seriesId, id: { not: video.id } },
+      orderBy: { position: "asc" },
+      take: limit,
+      include: { series: true },
+    });
+  }
+  return prisma.video.findMany({
+    where: { ...publishedNow(), status: "READY", id: { not: video.id } },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    include: { series: true },
+  });
+}
+
 export async function getVideoBySlug(slug: string) {
   return prisma.video.findFirst({
     where: { slug, ...publishedNow() },
@@ -128,6 +183,35 @@ export async function getWatchProgressForVideo(userId: string, videoId: string) 
   });
 }
 
+export async function isSeriesFavorited(userId: string, seriesId: string) {
+  return (await prisma.seriesFavorite.findUnique({
+    where: { userId_seriesId: { userId, seriesId } },
+  })) !== null;
+}
+
+export async function isVideoFavorited(userId: string, videoId: string) {
+  return (await prisma.videoFavorite.findUnique({
+    where: { userId_videoId: { userId, videoId } },
+  })) !== null;
+}
+
+/** A logged-in user's bookmarked series and videos, for a "My Favorites" page. */
+export async function getFavorites(userId: string) {
+  const [seriesFavorites, videoFavorites] = await Promise.all([
+    prisma.seriesFavorite.findMany({
+      where: { userId, series: publishedNow() },
+      include: { series: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.videoFavorite.findMany({
+      where: { userId, video: publishedNow() },
+      include: { video: { include: { series: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+  return { seriesFavorites, videoFavorites };
+}
+
 /** Published series tagged with the given tag (case-insensitive, tags are stored lowercased). */
 export async function getSeriesByTag(tag: string) {
   return prisma.series.findMany({
@@ -136,12 +220,32 @@ export async function getSeriesByTag(tag: string) {
   });
 }
 
-/** Public search across categories, series, and videos by name/title/description/tags. */
+/**
+ * Relevance score for a title/description match: an exact title match ranks
+ * highest, then a title starting with the query, then any title match, then
+ * a description-only match. Higher is more relevant.
+ */
+function relevanceScore(q: string, title: string, description?: string | null): number {
+  const query = q.toLowerCase();
+  const t = title.toLowerCase();
+  if (t === query) return 100;
+  if (t.startsWith(query)) return 80;
+  if (t.includes(query)) return 60;
+  if (description?.toLowerCase().includes(query)) return 30;
+  return 10;
+}
+
+/**
+ * Public search across categories, series, and videos by name/title/
+ * description/tags, ranked by relevance rather than database order —
+ * an exact/prefix title match outranks a description-only hit.
+ */
 export async function searchContent(query: string) {
   const q = query.trim();
   if (!q) return { categories: [], series: [], videos: [] };
+  const qLower = q.toLowerCase();
 
-  const [categories, series, videos] = await Promise.all([
+  const [categories, seriesCandidates, videoCandidates] = await Promise.all([
     prisma.category.findMany({
       where: { name: { contains: q, mode: "insensitive" } },
       orderBy: categoryOrder,
@@ -159,13 +263,12 @@ export async function searchContent(query: string) {
             OR: [
               { title: { contains: q, mode: "insensitive" } },
               { description: { contains: q, mode: "insensitive" } },
-              { tags: { has: q.toLowerCase() } },
+              { tags: { has: qLower } },
             ],
           },
         ],
       },
-      orderBy: seriesOrder,
-      take: 20,
+      take: 50,
     }),
     prisma.video.findMany({
       where: {
@@ -181,10 +284,21 @@ export async function searchContent(query: string) {
         ],
       },
       include: { series: true },
-      orderBy: { position: "asc" },
-      take: 20,
+      take: 50,
     }),
   ]);
+
+  const series = seriesCandidates
+    .map((s) => ({ item: s, score: relevanceScore(q, s.title, s.description) + (s.tags.includes(qLower) ? 15 : 0) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20)
+    .map((r) => r.item);
+
+  const videos = videoCandidates
+    .map((v) => ({ item: v, score: relevanceScore(q, v.title, v.description) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20)
+    .map((r) => r.item);
 
   return { categories, series, videos };
 }

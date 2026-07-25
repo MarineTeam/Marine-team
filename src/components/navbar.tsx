@@ -28,6 +28,11 @@ export async function Navbar() {
               Admin
             </Link>
           )}
+          {user && (
+            <Link href="/favorites" className="hover:underline">
+              Favorites
+            </Link>
+          )}
           {user ? (
             <>
               <span className="text-zinc-500 max-w-[10rem] sm:max-w-none truncate">

@@ -1,9 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getVideoBySlug, getWatchProgressForVideo, canAccess } from "@/lib/content";
+import {
+  getVideoBySlug,
+  getWatchProgressForVideo,
+  getRelatedVideos,
+  isVideoFavorited,
+  canAccess,
+} from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
-import { bunnyStreamEmbedUrl } from "@/lib/bunny";
+import { bunnyStreamEmbedUrl, bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { WatchProgressTracker } from "@/components/watch-progress-tracker";
+import { FavoriteButton } from "@/components/favorite-button";
+import { MenuTile } from "@/components/menu-tile";
+import { CommentSection } from "@/components/comment-section";
 
 export default async function VideoPage({
   params,
@@ -30,7 +39,11 @@ export default async function VideoPage({
     );
   }
 
-  const progress = user ? await getWatchProgressForVideo(user.id, video.id) : null;
+  const [progress, favorited, related] = await Promise.all([
+    user ? getWatchProgressForVideo(user.id, video.id) : Promise.resolve(null),
+    user ? isVideoFavorited(user.id, video.id) : Promise.resolve(false),
+    getRelatedVideos(video),
+  ]);
   const resumeAt = progress && !progress.completed ? progress.positionSeconds : 0;
 
   return (
@@ -43,7 +56,10 @@ export default async function VideoPage({
           ← {video.series.title}
         </Link>
       )}
-      <h1 className="text-2xl font-semibold tracking-tight">{video.title}</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight">{video.title}</h1>
+        {user && <FavoriteButton type="video" id={video.id} initialFavorited={favorited} />}
+      </div>
 
       {video.status === "READY" ? (
         <div className="aspect-video overflow-hidden rounded-lg bg-black">
@@ -69,6 +85,32 @@ export default async function VideoPage({
           durationSeconds={video.durationSeconds}
         />
       )}
+
+      {related.length > 0 && (
+        <section className="pt-4">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500 mb-3">
+            {video.series ? "More from this series" : "You might also like"}
+          </h2>
+          <div className="space-y-3">
+            {related.map((v) => (
+              <MenuTile
+                key={v.id}
+                href={`/videos/${v.slug}`}
+                title={v.title}
+                subtitle={v.series?.title}
+                thumbnailUrl={bunnyStreamThumbnailUrl(v.bunnyVideoId)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <CommentSection
+        type="video"
+        id={video.id}
+        currentUserId={user?.id ?? null}
+        isAdmin={user?.role === "ADMIN"}
+      />
     </div>
   );
 }

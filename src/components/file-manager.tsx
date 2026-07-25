@@ -11,6 +11,7 @@ type FileAsset = {
   url: string;
   memberOnly: boolean;
   published: boolean;
+  unpublishAt: string | null;
   series: { id: string; title: string } | null;
 };
 
@@ -66,6 +67,21 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
     } finally {
       setUploading(false);
     }
+  }
+
+  async function setExpiry(f: FileAsset) {
+    const input = prompt(
+      "Unpublish this file at (YYYY-MM-DDTHH:MM, local time)? Leave blank to clear.",
+      "",
+    );
+    if (input === null) return;
+    const unpublishAt = input.trim() ? new Date(input.trim()).toISOString() : null;
+    await fetch(`/api/admin/files/${f.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ unpublishAt }),
+    });
+    await load();
   }
 
   async function toggle(f: FileAsset, field: "published" | "memberOnly") {
@@ -301,6 +317,13 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
                 className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
               >
                 {f.published ? "Published" : "Draft"}
+              </button>
+              <button
+                onClick={() => setExpiry(f)}
+                className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${f.unpublishAt ? "border-amber-400 text-amber-700 dark:text-amber-400" : "border-zinc-300"}`}
+                title={f.unpublishAt ? `Unpublishes ${new Date(f.unpublishAt).toLocaleString()}` : undefined}
+              >
+                {f.unpublishAt ? "Expires" : "Set expiry"}
               </button>
               <button
                 onClick={() => toggle(f, "memberOnly")}
