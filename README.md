@@ -208,6 +208,28 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   placeholders (`public/icon-192.png`, `public/icon-512.png`) — swap them for
   real branding whenever you like.
 
+## Performance notes
+
+Written for a Postgres free tier, where every query counts:
+
+- `getCurrentUser()`/`getSessionIdentity()` (`src/lib/current-user.ts`) are
+  wrapped in React's `cache()` so the many call sites that each need the
+  current user in a single request (root layout's Navbar, the page itself,
+  admin layout, ...) share one query instead of hitting the DB repeatedly.
+- `getPluginStates()` (`src/lib/plugins.ts`) resolves every plugin's
+  enabled state for a page in one pass (2-3 queries total, regardless of
+  category-tree depth or how many plugins exist) instead of checking each
+  plugin individually — use it instead of calling `isPluginEnabled()` in a
+  loop or a `Promise.all` of several calls.
+- Series/video pages fetch ratings, reactions, and comments server-side and
+  pass them down as initial props instead of letting the client component
+  fetch on mount, and skip that work entirely when the relevant plugin is
+  off rather than fetching and hiding it in the UI.
+- `ViewEvent` writes (Trending/Analytics) go through a client-side beacon
+  (`/api/view-events`, `src/components/view-event-beacon.tsx`) throttled by
+  a 30-minute cookie rather than a DB check — a cookie read is free, so a
+  throttled repeat view costs zero database operations.
+
 ## Useful scripts
 
 - `npm run db:studio` — browse the database with Prisma Studio

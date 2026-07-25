@@ -6,6 +6,28 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-25
+
+### Added
+
+- **Subscriptions** (`/subscriptions`): follow a series or category and get
+  push notifications when it publishes.
+- **Playlists** (`/playlists`): member-created, reorderable video playlists.
+- **Likes / dislikes**: thumbs up/down on a series or video.
+- **Trending row** on the homepage, from a new timestamped view log.
+- **Up next** panel on video pages with an autoplay toggle.
+- **Scheduled premieres**: a video can show a live countdown before its
+  publish time instead of staying fully hidden.
+- **Admin analytics** (`/admin/analytics`, `view_analytics` capability):
+  30-day view totals plus top series/videos.
+- **Granular viewing permissions**: a series or video can be restricted to
+  specific permission groups ("roles") and/or specific people by email,
+  instead of just the "Members only" on/off switch. Managed from a new
+  "Restricted viewing" panel on the series edit page and a "Viewers" button
+  per video.
+- A note on playback speed: it's already available via Bunny Stream's own
+  player settings, so no custom control was needed.
+
 ### Changed
 
 Database query reduction pass (Prisma free-tier operation budget):
@@ -47,27 +69,6 @@ Database query reduction pass (Prisma free-tier operation budget):
   are now conditional on their plugin actually being on (and, for series,
   on the series not being member-gated) instead of running unconditionally
   and only being hidden in the UI.
-
-### Added
-
-- **Granular viewing permissions**: a series or video can be restricted to
-  specific permission groups ("roles") and/or specific people by email,
-  instead of just the "Members only" on/off switch. Managed from a new
-  "Restricted viewing" panel on the series edit page and a "Viewers" button
-  per video.
-
-- **Subscriptions** (`/subscriptions`): follow a series or category and get
-  push notifications when it publishes.
-- **Playlists** (`/playlists`): member-created, reorderable video playlists.
-- **Likes / dislikes**: thumbs up/down on a series or video.
-- **Trending row** on the homepage, from a new timestamped view log.
-- **Up next** panel on video pages with an autoplay toggle.
-- **Scheduled premieres**: a video can show a live countdown before its
-  publish time instead of staying fully hidden.
-- **Admin analytics** (`/admin/analytics`, `view_analytics` capability):
-  30-day view totals plus top series/videos.
-- A note on playback speed: it's already available via Bunny Stream's own
-  player settings, so no custom control was needed.
 
 ## [1.0.0] - 2026-07-25
 
