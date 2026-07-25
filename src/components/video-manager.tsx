@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Upload } from "tus-js-client";
+import { DragHandle, PositionInput, useDragReorder } from "@/components/reorder-controls";
+import { reorderArray } from "@/lib/reorder";
 
 type Series = { id: string; title: string };
 type Video = {
@@ -201,11 +203,10 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
     await load();
   }
 
-  async function move(index: number, direction: "up" | "down") {
-    const swapIndex = direction === "up" ? index - 1 : index + 1;
-    if (swapIndex < 0 || swapIndex >= visibleVideos.length) return;
-    const reordered = [...visibleVideos];
-    [reordered[index], reordered[swapIndex]] = [reordered[swapIndex], reordered[index]];
+  const visibleVideos = seriesId ? videos.filter((v) => v.series?.id === seriesId) : videos;
+
+  async function reorderTo(fromIndex: number, toIndex: number) {
+    const reordered = reorderArray(visibleVideos, fromIndex, toIndex);
     await Promise.all(
       reordered.map((v, i) =>
         fetch(`/api/admin/videos/${v.id}`, {
@@ -218,7 +219,13 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
     await load();
   }
 
-  const visibleVideos = seriesId ? videos.filter((v) => v.series?.id === seriesId) : videos;
+  async function move(index: number, direction: "up" | "down") {
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= visibleVideos.length) return;
+    await reorderTo(index, targetIndex);
+  }
+
+  const { draggingIndex, handleProps, dropZoneProps } = useDragReorder(reorderTo);
 
   return (
     <div className="space-y-6">
@@ -360,14 +367,26 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
 
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
         {visibleVideos.map((v, index) => (
-          <li key={v.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-            <div className="min-w-0">
-              <p className="font-medium">{v.title}</p>
-              <p className="text-sm text-zinc-500">{v.status}</p>
+          <li
+            key={v.id}
+            className={`p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 ${draggingIndex === index ? "opacity-40" : ""}`}
+            {...(seriesId ? dropZoneProps(index) : {})}
+          >
+            <div className="min-w-0 flex items-center gap-2">
+              {seriesId && <DragHandle {...handleProps(index)} />}
+              <div className="min-w-0">
+                <p className="font-medium">{v.title}</p>
+                <p className="text-sm text-zinc-500">{v.status}</p>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-sm">
               {seriesId && (
                 <>
+                  <PositionInput
+                    index={index}
+                    total={visibleVideos.length}
+                    onReorder={(toIndex) => reorderTo(index, toIndex)}
+                  />
                   <button
                     onClick={() => move(index, "up")}
                     disabled={index === 0}

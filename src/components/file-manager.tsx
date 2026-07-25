@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DragHandle, PositionInput, useDragReorder } from "@/components/reorder-controls";
+import { reorderArray } from "@/lib/reorder";
 
 type Series = { id: string; title: string };
 type FileAsset = {
@@ -88,11 +90,10 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
     await load();
   }
 
-  async function move(index: number, direction: "up" | "down") {
-    const swapIndex = direction === "up" ? index - 1 : index + 1;
-    if (swapIndex < 0 || swapIndex >= visibleFiles.length) return;
-    const reordered = [...visibleFiles];
-    [reordered[index], reordered[swapIndex]] = [reordered[swapIndex], reordered[index]];
+  const visibleFiles = seriesId ? files.filter((f) => f.series?.id === seriesId) : files;
+
+  async function reorderTo(fromIndex: number, toIndex: number) {
+    const reordered = reorderArray(visibleFiles, fromIndex, toIndex);
     await Promise.all(
       reordered.map((f, i) =>
         fetch(`/api/admin/files/${f.id}`, {
@@ -105,7 +106,13 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
     await load();
   }
 
-  const visibleFiles = seriesId ? files.filter((f) => f.series?.id === seriesId) : files;
+  async function move(index: number, direction: "up" | "down") {
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= visibleFiles.length) return;
+    await reorderTo(index, targetIndex);
+  }
+
+  const { draggingIndex, handleProps, dropZoneProps } = useDragReorder(reorderTo);
 
   return (
     <div className="space-y-6">
@@ -160,13 +167,25 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
 
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
         {visibleFiles.map((f, index) => (
-          <li key={f.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-            <div className="min-w-0">
-              <p className="font-medium">{f.title}</p>
+          <li
+            key={f.id}
+            className={`p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 ${draggingIndex === index ? "opacity-40" : ""}`}
+            {...(seriesId ? dropZoneProps(index) : {})}
+          >
+            <div className="min-w-0 flex items-center gap-2">
+              {seriesId && <DragHandle {...handleProps(index)} />}
+              <div className="min-w-0">
+                <p className="font-medium">{f.title}</p>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-sm">
               {seriesId && (
                 <>
+                  <PositionInput
+                    index={index}
+                    total={visibleFiles.length}
+                    onReorder={(toIndex) => reorderTo(index, toIndex)}
+                  />
                   <button
                     onClick={() => move(index, "up")}
                     disabled={index === 0}
