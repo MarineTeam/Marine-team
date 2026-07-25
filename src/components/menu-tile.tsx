@@ -1,5 +1,24 @@
 import Link from "next/link";
 
+function PlaceholderIcon() {
+  return (
+    <div className="flex h-full items-center justify-center text-zinc-300 dark:text-zinc-600">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        className="h-7 w-7 sm:h-8 sm:w-8"
+        aria-hidden
+      >
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <circle cx="8.5" cy="9.5" r="1.5" />
+        <path d="M21 16l-5.5-5.5a1 1 0 0 0-1.4 0L4 20" />
+      </svg>
+    </div>
+  );
+}
+
 export function MenuTile({
   href,
   title,
@@ -23,9 +42,7 @@ export function MenuTile({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={thumbnailUrl} alt="" className="h-full w-full object-cover" />
         ) : (
-          <div className="flex h-full items-center justify-center text-2xl text-zinc-300 dark:text-zinc-600">
-            ▸
-          </div>
+          <PlaceholderIcon />
         )}
       </div>
       <div className="min-w-0 flex-1">
