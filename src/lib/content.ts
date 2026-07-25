@@ -302,3 +302,110 @@ export async function searchContent(query: string) {
 
   return { categories, series, videos };
 }
+
+// --- Ratings ---------------------------------------------------------------
+
+export async function getSeriesRatingSummary(seriesId: string) {
+  const agg = await prisma.rating.aggregate({
+    where: { seriesId },
+    _avg: { value: true },
+    _count: { value: true },
+  });
+  return { average: agg._avg.value ?? 0, count: agg._count.value };
+}
+
+export async function getVideoRatingSummary(videoId: string) {
+  const agg = await prisma.rating.aggregate({
+    where: { videoId },
+    _avg: { value: true },
+    _count: { value: true },
+  });
+  return { average: agg._avg.value ?? 0, count: agg._count.value };
+}
+
+export async function getUserSeriesRating(userId: string, seriesId: string) {
+  const rating = await prisma.rating.findUnique({ where: { userId_seriesId: { userId, seriesId } } });
+  return rating?.value ?? null;
+}
+
+export async function getUserVideoRating(userId: string, videoId: string) {
+  const rating = await prisma.rating.findUnique({ where: { userId_videoId: { userId, videoId } } });
+  return rating?.value ?? null;
+}
+
+// --- Watch later -------------------------------------------------------------
+
+export async function isSeriesInWatchLater(userId: string, seriesId: string) {
+  return (
+    (await prisma.seriesWatchLater.findUnique({ where: { userId_seriesId: { userId, seriesId } } })) !== null
+  );
+}
+
+export async function isVideoInWatchLater(userId: string, videoId: string) {
+  return (
+    (await prisma.videoWatchLater.findUnique({ where: { userId_videoId: { userId, videoId } } })) !== null
+  );
+}
+
+/** A logged-in user's queued series and videos, for a "Watch Later" page. */
+export async function getWatchLater(userId: string) {
+  const [seriesQueue, videoQueue] = await Promise.all([
+    prisma.seriesWatchLater.findMany({
+      where: { userId, series: publishedNow() },
+      include: { series: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.videoWatchLater.findMany({
+      where: { userId, video: publishedNow() },
+      include: { video: { include: { series: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+  return { seriesQueue, videoQueue };
+}
+
+// --- View counts -------------------------------------------------------------
+
+export async function incrementSeriesViewCount(seriesId: string) {
+  await prisma.series.update({ where: { id: seriesId }, data: { viewCount: { increment: 1 } } });
+}
+
+export async function incrementVideoViewCount(videoId: string) {
+  await prisma.video.update({ where: { id: videoId }, data: { viewCount: { increment: 1 } } });
+}
+
+// --- Announcements -----------------------------------------------------------
+
+export async function getActiveAnnouncement() {
+  return prisma.announcement.findFirst({ where: { active: true }, orderBy: { createdAt: "desc" } });
+}
+
+// --- Sequential unlock -------------------------------------------------------
+
+/**
+ * When a series has `requireSequential` on, a video is locked until the
+ * previous video (by position) is marked completed in the viewer's
+ * WatchProgress. Anonymous viewers (no progress tracking) never get locked out.
+ */
+export async function isVideoLockedBySequence(
+  userId: string | null,
+  video: { id: string; position: number; seriesId: string | null },
+): Promise<boolean> {
+  if (!userId || !video.seriesId) return false;
+  const series = await prisma.series.findUnique({
+    where: { id: video.seriesId },
+    select: { requireSequential: true },
+  });
+  if (!series?.requireSequential) return false;
+
+  const previous = await prisma.video.findFirst({
+    where: { seriesId: video.seriesId, position: { lt: video.position }, ...publishedNow() },
+    orderBy: { position: "desc" },
+  });
+  if (!previous) return false;
+
+  const progress = await prisma.watchProgress.findUnique({
+    where: { userId_videoId: { userId, videoId: previous.id } },
+  });
+  return !progress?.completed;
+}

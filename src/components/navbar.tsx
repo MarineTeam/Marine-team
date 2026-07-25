@@ -1,8 +1,15 @@
 import Link from "next/link";
 import { getCurrentUser, getSessionIdentity } from "@/lib/current-user";
+import { isPluginEnabled } from "@/lib/plugins";
+import { PushNotificationToggle } from "@/components/push-notification-toggle";
 
 export async function Navbar() {
-  const [user, identity] = await Promise.all([getCurrentUser(), getSessionIdentity()]);
+  const [user, identity, watchLaterOn, notificationsOn] = await Promise.all([
+    getCurrentUser(),
+    getSessionIdentity(),
+    isPluginEnabled("watch-later"),
+    isPluginEnabled("notifications"),
+  ]);
   const unauthorized = !user && identity !== null;
 
   return (
@@ -33,6 +40,12 @@ export async function Navbar() {
               Favorites
             </Link>
           )}
+          {user && watchLaterOn && (
+            <Link href="/watch-later" className="hover:underline">
+              Watch Later
+            </Link>
+          )}
+          {user && notificationsOn && <PushNotificationToggle />}
           {user ? (
             <>
               <span className="text-zinc-500 max-w-[10rem] sm:max-w-none truncate">

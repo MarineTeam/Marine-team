@@ -1,0 +1,105 @@
+# Features
+
+A complete list of what's built. See [README.md](./README.md) for setup and
+[CHANGELOG.md](./CHANGELOG.md) for release history.
+
+## Public site
+
+- **Browsing** — a vertical list of tiles (thumbnail, title, item count),
+  Subsplash-style. Categories nest arbitrarily deep (a category's children
+  can themselves have children); the homepage shows top-level categories and
+  any uncategorized series, each linking one level deeper.
+- **Series & video pages** — description, tags, cover image, video playback
+  (embedded Bunny Stream player), file downloads, inline playback for audio
+  files.
+- **Featured/pinned content** — a series can be marked `featured` (used for
+  the homepage hero, overriding the recency-based default) or `pinned`
+  (sorts first in its listing regardless of position).
+- **Tags** — free-form tags on a series, shown as chips, searchable;
+  `/tags/[tag]` lists everything with a given tag.
+- **Scheduled publishing** — `publishAt`/`unpublishAt` timestamps on
+  series/videos/files gate visibility independently of the `published` flag,
+  so content can go live or expire automatically without a manual step.
+- **Search** — `/search` and the navbar search box rank results by
+  relevance (exact/prefix title match outranks a description-only hit)
+  across category names, series titles/descriptions/tags, and video
+  titles/descriptions.
+- **Continue watching / recently added** — a periodic heartbeat approximates
+  watch position (see note below) and powers a homepage "Continue watching"
+  row with resume-from-where-you-left-off; a "Recently added" row shows the
+  newest published series.
+- **Related content** — series pages show "More like this" (same category,
+  then shared tags); video pages show "More from this series" or "You might
+  also like" for standalone videos.
+- **Sequential unlock** — a per-series "require watching in order" toggle
+  locks a video until the previous one (by position) is marked completed in
+  the viewer's watch history. Anonymous viewers are never locked out (no
+  progress tracking without an account).
+- **Feeds** — `/feed.xml` (site-wide RSS of recently added series) and
+  `/series/[slug]/podcast.xml` (iTunes-compatible podcast feed of a series'
+  audio files, skipped for member-only series since podcast apps can't
+  authenticate).
+- **PWA** — installable (Add to Home Screen / desktop install prompt) with
+  a minimal service worker; see the PWA section below.
+
+## Member features (optional plugins — see Plugins below)
+
+- **Favorites** (`/favorites`) — bookmark a series or video.
+- **Watch later** (`/watch-later`) — a separate queue from Favorites.
+- **Comments** — discuss a series or video; authors can delete their own,
+  moderators can delete any (see Permissions).
+- **Ratings** — a 1-5 star rating on a series or video; average and count
+  shown to everyone, the stars are only clickable when logged in.
+- **View counts** — a simple counter shown on series/video pages.
+- **Social share** — copy-link and share-to-X/Facebook buttons.
+- **Announcements** — a dismissible (per browser session) site-wide banner.
+- **Notifications** — opt-in Web Push, sent when an admin publishes a video.
+
+## Auth
+
+- Auth0 login (`/auth/login`, `/auth/logout`, `/auth/callback`) proves
+  identity only — it does not grant access by itself. Every login attempt
+  creates a `User` row; `authorized` starts `false` and must be granted by
+  an admin (or pre-authorized before the person ever logs in) before
+  they're treated as logged in anywhere else on the site.
+- Emails listed in `ADMIN_EMAILS` self-authorize as `ADMIN` on first login,
+  so there's always a way in.
+
+## Admin CMS (`/admin`)
+
+- **Content management** — categories (with drag/position/type-to-reorder),
+  series, videos (direct upload via TUS + import from an existing Bunny
+  Stream library), and files (small uploads or link-by-URL for larger
+  files hosted directly in Bunny).
+- **Bulk actions & filtering** — multi-select Publish/Unpublish/Delete and
+  a title filter box on the series/video/file lists; series can be
+  recategorized individually or in bulk.
+- **Audit log** (`/admin/audit`) — an append-only record of admin/editor
+  actions, exportable as CSV or JSON.
+- **Plugins** (`/admin/plugins`) — a WordPress-style list of the optional
+  member features above, each with a site-wide Active/Inactive toggle plus
+  per-category overrides (nearest-ancestor override wins, falls back to the
+  site-wide default) — e.g. disable Comments just under "Kids".
+- **Permissions** (`/admin/permissions`) — a phpBB/WordPress-style builder:
+  define named groups as a custom bundle of capabilities (manage
+  categories/series/videos/files, publish content, moderate comments,
+  manage users/permissions/plugins, view audit log), then assign a group to
+  a user site-wide or scoped to one category (and everything under it) or
+  one series. This sits alongside a simpler built-in per-category/series
+  "content-editor" grant in `/admin/users`. The real `ADMIN` role always has
+  every capability and can only be granted by another `ADMIN` — a custom
+  "manage_users" group can't be used to self-promote.
+
+## Technical notes
+
+- **Watch progress** is a heartbeat-based approximation, not frame-accurate:
+  Bunny's Stream iframe embed has no documented postMessage API for exact
+  play/pause/seek events, so progress is inferred from elapsed time while
+  the page is open rather than a precise scrub position.
+- **View counts** are a simple per-page-load counter, not deduplicated or
+  spam-resistant — a basic "how many hits" number, not analytics.
+- **The PWA service worker** deliberately does not cache pages or API
+  responses. This site's content is dynamic and often member-gated, so an
+  aggressive offline cache would risk showing stale or wrong-audience
+  content; it only caches its own static shell (manifest + icons) and
+  handles push notifications.

@@ -5,6 +5,9 @@ import {
   getWatchProgressForVideo,
   getRelatedVideos,
   isVideoFavorited,
+  isVideoInWatchLater,
+  incrementVideoViewCount,
+  isVideoLockedBySequence,
   canAccess,
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
@@ -13,6 +16,9 @@ import { isPluginEnabled } from "@/lib/plugins";
 import { bunnyStreamEmbedUrl, bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { WatchProgressTracker } from "@/components/watch-progress-tracker";
 import { FavoriteButton } from "@/components/favorite-button";
+import { WatchLaterButton } from "@/components/watch-later-button";
+import { StarRating } from "@/components/star-rating";
+import { ShareButtons } from "@/components/share-buttons";
 import { MenuTile } from "@/components/menu-tile";
 import { CommentSection } from "@/components/comment-section";
 
@@ -42,18 +48,40 @@ export default async function VideoPage({
   }
 
   const categoryId = video.series?.categoryId ?? null;
-  const [progress, favorited, related, favoritesOn, commentsOn, relatedOn, canModerate] = await Promise.all([
+  const [
+    progress,
+    favorited,
+    queued,
+    related,
+    favoritesOn,
+    commentsOn,
+    relatedOn,
+    ratingsOn,
+    watchLaterOn,
+    viewCountsOn,
+    socialShareOn,
+    canModerate,
+    sequenceLocked,
+  ] = await Promise.all([
     user ? getWatchProgressForVideo(user.id, video.id) : Promise.resolve(null),
     user ? isVideoFavorited(user.id, video.id) : Promise.resolve(false),
+    user ? isVideoInWatchLater(user.id, video.id) : Promise.resolve(false),
     getRelatedVideos(video),
     isPluginEnabled("favorites", categoryId),
     isPluginEnabled("comments", categoryId),
     isPluginEnabled("related-content", categoryId),
+    isPluginEnabled("ratings", categoryId),
+    isPluginEnabled("watch-later", categoryId),
+    isPluginEnabled("view-counts", categoryId),
+    isPluginEnabled("social-share", categoryId),
     user
       ? hasCapability(user, "moderate_comments", { categoryId, seriesId: video.seriesId })
       : Promise.resolve(false),
+    isVideoLockedBySequence(user?.id ?? null, video),
   ]);
   const resumeAt = progress && !progress.completed ? progress.positionSeconds : 0;
+
+  if (viewCountsOn) await incrementVideoViewCount(video.id);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-4">
@@ -67,10 +95,34 @@ export default async function VideoPage({
       )}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">{video.title}</h1>
-        {user && favoritesOn && <FavoriteButton type="video" id={video.id} initialFavorited={favorited} />}
+        <div className="flex flex-wrap items-center gap-2">
+          {user && favoritesOn && <FavoriteButton type="video" id={video.id} initialFavorited={favorited} />}
+          {user && watchLaterOn && <WatchLaterButton type="video" id={video.id} initialQueued={queued} />}
+        </div>
       </div>
 
-      {video.status === "READY" ? (
+      {(ratingsOn || viewCountsOn) && (
+        <div className="flex flex-wrap items-center gap-4">
+          {ratingsOn && <StarRating type="video" id={video.id} canRate={Boolean(user)} />}
+          {viewCountsOn && (
+            <span className="text-sm text-zinc-500">
+              {video.viewCount + 1} view{video.viewCount === 0 ? "" : "s"}
+            </span>
+          )}
+        </div>
+      )}
+      {socialShareOn && <ShareButtons title={video.title} path={`/videos/${video.slug}`} />}
+
+      {sequenceLocked ? (
+        <div className="aspect-video flex flex-col items-center justify-center gap-2 rounded-lg bg-zinc-100 text-zinc-500 dark:bg-zinc-800">
+          <p>🔒 Watch the previous episode in this series first.</p>
+          {video.series && (
+            <Link href={`/series/${video.series.slug}`} className="text-sm underline">
+              Back to {video.series.title}
+            </Link>
+          )}
+        </div>
+      ) : video.status === "READY" ? (
         <div className="aspect-video overflow-hidden rounded-lg bg-black">
           <iframe
             src={bunnyStreamEmbedUrl(video.bunnyVideoId, resumeAt)}
@@ -87,7 +139,7 @@ export default async function VideoPage({
 
       {video.description && <p className="text-zinc-600 dark:text-zinc-400">{video.description}</p>}
 
-      {user && video.status === "READY" && (
+      {user && video.status === "READY" && !sequenceLocked && (
         <WatchProgressTracker
           videoId={video.id}
           startPositionSeconds={resumeAt}

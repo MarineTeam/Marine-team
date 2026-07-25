@@ -4,6 +4,9 @@ A Subsplash-style media library: Auth0 login, an admin CMS for managing
 series/categories/videos/files, video hosted on Bunny Stream, and downloadable
 files hosted on Bunny Storage.
 
+See [FEATURES.md](./FEATURES.md) for the full feature list and
+[CHANGELOG.md](./CHANGELOG.md) for release history.
+
 ## Stack
 
 - Next.js 16 (App Router, Turbopack) + TypeScript + Tailwind CSS
@@ -115,11 +118,32 @@ files hosted on Bunny Storage.
   results by how well they match — an exact or prefix title match outranks
   a description-only hit — rather than raw database order.
 - **Plugins** (`/admin/plugins`, needs `manage_plugins`): a WordPress-style
-  list of optional features (Favorites, Comments, Related content) with a
-  site-wide Active/Inactive toggle, plus per-category overrides — e.g.
-  disable Comments just under "Kids" while leaving it on everywhere else.
-  Nearest-ancestor override wins; falls back to the site-wide default.
-  `src/lib/plugins.ts` has the plugin registry and `isPluginEnabled()`.
+  list of optional features with a site-wide Active/Inactive toggle, plus
+  per-category overrides — e.g. disable Comments just under "Kids" while
+  leaving it on everywhere else. Nearest-ancestor override wins; falls back
+  to the site-wide default. `src/lib/plugins.ts` has the plugin registry and
+  `isPluginEnabled()`. Current plugins:
+  - **Favorites** / **Watch later**: two independent per-user lists (bookmark
+    vs. queue) at `/favorites` and `/watch-later`.
+  - **Comments**: see above.
+  - **Related content**: see above.
+  - **Ratings**: a 1-5 star rating on a series/video; average + count shown
+    to everyone, the star row itself is only clickable when logged in.
+  - **View counts**: a simple counter incremented on each page load — no
+    dedup/anti-spam, it's a basic "how many hits" number, not analytics.
+  - **Social share**: copy-link plus share-to-X/Facebook buttons.
+  - **Announcements** (`/admin/announcements`): a dismissible (per-browser-
+    session) site-wide banner; only the newest `active` one shows, checked
+    site-wide only (no per-category override — it's a global message).
+  - **Notifications**: Web Push to subscribed members when an admin flips a
+    video from unpublished to published (see PWA below) — a no-op if VAPID
+    keys aren't configured.
+- **Sequential unlock**: a per-series "Require watching in order" toggle
+  (`Series.requireSequential`, set on the series edit page — not a plugin,
+  since it's a property of one series rather than a site feature). When on,
+  a video is locked until the previous one (by position) is marked
+  `completed` in the viewer's `WatchProgress`; anonymous viewers (no
+  progress tracking) are never locked out by this.
 - **Permissions** (`/admin/permissions`, needs `manage_permissions`): a
   phpBB/WordPress-style permission builder — define named groups (e.g.
   "Moderators") as a custom bundle of capabilities from a fixed list
@@ -149,6 +173,15 @@ files hosted on Bunny Storage.
   sign a short-lived `token`/`expires` pair per Bunny's token authentication
   formula (`sha256_hex(tokenAuthKey + videoId + expires)`); if it's unset,
   plain unsigned URLs are used instead.
+- **PWA**: `public/manifest.json` + `public/sw.js` make the site installable
+  (Add to Home Screen / desktop install prompt) and able to receive Web Push.
+  The service worker deliberately does **not** cache pages or API responses —
+  this site's content is dynamic and often auth-gated, so an aggressive
+  offline cache would risk showing stale or wrong-audience content; it only
+  caches its own static shell assets (manifest + icons) and handles `push`/
+  `notificationclick` events for the Notifications plugin. Icons are plain
+  placeholders (`public/icon-192.png`, `public/icon-512.png`) — swap them for
+  real branding whenever you like.
 
 ## Useful scripts
 
