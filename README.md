@@ -4,6 +4,9 @@ A Subsplash-style media library: Auth0 login, an admin CMS for managing
 series/categories/videos/files, video hosted on Bunny Stream, and downloadable
 files hosted on Bunny Storage.
 
+See [FEATURES.md](./FEATURES.md) for the full feature list and
+[CHANGELOG.md](./CHANGELOG.md) for release history.
+
 ## Stack
 
 - Next.js 16 (App Router, Turbopack) + TypeScript + Tailwind CSS
