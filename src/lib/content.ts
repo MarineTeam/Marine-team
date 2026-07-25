@@ -303,6 +303,16 @@ export async function searchContent(query: string) {
   return { categories, series, videos };
 }
 
+// --- Comments ----------------------------------------------------------------
+
+export async function getComments(type: "series" | "video", id: string) {
+  return prisma.comment.findMany({
+    where: type === "series" ? { seriesId: id } : { videoId: id },
+    include: { user: { select: { id: true, name: true, email: true, picture: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
 // --- Ratings ---------------------------------------------------------------
 
 export async function getSeriesRatingSummary(seriesId: string) {

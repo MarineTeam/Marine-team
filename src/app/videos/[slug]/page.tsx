@@ -15,6 +15,7 @@ import {
   getUserVideoRating,
   getVideoReactionSummary,
   getUserVideoReaction,
+  getComments,
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
@@ -70,8 +71,6 @@ export default async function VideoPage({
     favorited,
     queued,
     subscribed,
-    related,
-    upNext,
     plugins,
     canModerate,
     sequenceLocked,
@@ -80,8 +79,6 @@ export default async function VideoPage({
     user ? isVideoFavorited(user.id, video.id) : Promise.resolve(false),
     user ? isVideoInWatchLater(user.id, video.id) : Promise.resolve(false),
     user && video.seriesId ? isSeriesSubscribed(user.id, video.seriesId) : Promise.resolve(false),
-    getRelatedVideos(video),
-    getUpNextVideo(video),
     getPluginStates(categoryId),
     user
       ? hasCapability(user, "moderate_comments", { categoryId, seriesId: video.seriesId })
@@ -103,12 +100,16 @@ export default async function VideoPage({
   } = plugins;
   const resumeAt = progress && !progress.completed ? progress.positionSeconds : 0;
 
-  const [ratingSummary, myRating, reactionSummary, myReaction] = await Promise.all([
+  const [ratingSummary, myRating, reactionSummary, myReaction, related, comments, upNext] = await Promise.all([
     ratingsOn ? getVideoRatingSummary(video.id) : Promise.resolve({ average: 0, count: 0 }),
     ratingsOn && user ? getUserVideoRating(user.id, video.id) : Promise.resolve(null),
     likesOn ? getVideoReactionSummary(video.id) : Promise.resolve({ likes: 0, dislikes: 0 }),
     likesOn && user ? getUserVideoReaction(user.id, video.id) : Promise.resolve(null),
+    relatedOn ? getRelatedVideos(video) : Promise.resolve([]),
+    commentsOn ? getComments("video", video.id) : Promise.resolve([]),
+    upNextOn ? getUpNextVideo(video) : Promise.resolve(null),
   ]);
+  const initialComments = comments.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }));
 
   if (!isPendingPremiere && viewCountsOn) await incrementVideoViewCount(video.id);
 
@@ -238,6 +239,7 @@ export default async function VideoPage({
           id={video.id}
           currentUserId={user?.id ?? null}
           canModerate={canModerate}
+          initialComments={initialComments}
         />
       )}
     </div>

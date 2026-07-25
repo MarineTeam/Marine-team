@@ -39,6 +39,14 @@ Database query reduction pass (Prisma free-tier operation budget):
   reactions data they're already fetching, and pass it down as initial
   props — matching the pattern already used by Favorite/WatchLater/
   Subscribe buttons.
+- `CommentSection` no longer self-fetches its comment list on mount either;
+  the series/video pages prefetch it server-side (only when the Comments
+  plugin is on) and pass it down. `getComments()` is now shared between the
+  page and the `/api/comments` GET route instead of duplicated.
+- Related-content, comment, and up-next lookups on the series/video pages
+  are now conditional on their plugin actually being on (and, for series,
+  on the series not being member-gated) instead of running unconditionally
+  and only being hidden in the UI.
 
 ### Added
 

@@ -15,6 +15,7 @@ import {
   getUserSeriesRating,
   getSeriesReactionSummary,
   getUserSeriesReaction,
+  getComments,
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
@@ -45,7 +46,6 @@ export default async function SeriesPage({
     favorited,
     queued,
     subscribed,
-    related,
     plugins,
     canModerate,
     lockedVideoIds,
@@ -55,7 +55,6 @@ export default async function SeriesPage({
     user ? isSeriesFavorited(user.id, series.id) : Promise.resolve(false),
     user ? isSeriesInWatchLater(user.id, series.id) : Promise.resolve(false),
     user ? isSeriesSubscribed(user.id, series.id) : Promise.resolve(false),
-    getRelatedSeries(series),
     getPluginStates(series.categoryId),
     user
       ? hasCapability(user, "moderate_comments", { categoryId: series.categoryId })
@@ -76,12 +75,15 @@ export default async function SeriesPage({
     "likes-dislikes": likesOn,
   } = plugins;
 
-  const [ratingSummary, myRating, reactionSummary, myReaction] = await Promise.all([
+  const [ratingSummary, myRating, reactionSummary, myReaction, related, comments] = await Promise.all([
     ratingsOn ? getSeriesRatingSummary(series.id) : Promise.resolve({ average: 0, count: 0 }),
     ratingsOn && user ? getUserSeriesRating(user.id, series.id) : Promise.resolve(null),
     likesOn ? getSeriesReactionSummary(series.id) : Promise.resolve({ likes: 0, dislikes: 0 }),
     likesOn && user ? getUserSeriesReaction(user.id, series.id) : Promise.resolve(null),
+    relatedOn && !seriesLocked ? getRelatedSeries(series) : Promise.resolve([]),
+    commentsOn && !seriesLocked ? getComments("series", series.id) : Promise.resolve([]),
   ]);
+  const initialComments = comments.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }));
 
   if (viewCountsOn) await incrementSeriesViewCount(series.id);
 
@@ -268,6 +270,7 @@ export default async function SeriesPage({
           id={series.id}
           currentUserId={user?.id ?? null}
           canModerate={canModerate}
+          initialComments={initialComments}
         />
       )}
     </div>
