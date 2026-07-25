@@ -1,17 +1,18 @@
 import Link from "next/link";
 import { getCurrentUser, getSessionIdentity } from "@/lib/current-user";
-import { isPluginEnabled } from "@/lib/plugins";
+import { getPluginStates } from "@/lib/plugins";
 import { PushNotificationToggle } from "@/components/push-notification-toggle";
 
 export async function Navbar() {
-  const [user, identity, watchLaterOn, notificationsOn, subscriptionsOn, playlistsOn] = await Promise.all([
+  const [user, identity, plugins] = await Promise.all([
     getCurrentUser(),
     getSessionIdentity(),
-    isPluginEnabled("watch-later"),
-    isPluginEnabled("notifications"),
-    isPluginEnabled("subscriptions"),
-    isPluginEnabled("playlists"),
+    getPluginStates(),
   ]);
+  const watchLaterOn = plugins["watch-later"];
+  const notificationsOn = plugins.notifications;
+  const subscriptionsOn = plugins.subscriptions;
+  const playlistsOn = plugins.playlists;
   const unauthorized = !user && identity !== null;
 
   return (

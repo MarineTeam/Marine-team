@@ -1,38 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export function StarRating({
   type,
   id,
   canRate,
+  initial,
 }: {
   type: "series" | "video";
   id: string;
   canRate: boolean;
+  initial: { average: number; count: number; mine: number | null };
 }) {
-  const [average, setAverage] = useState(0);
-  const [count, setCount] = useState(0);
-  const [mine, setMine] = useState<number | null>(null);
+  const [average, setAverage] = useState(initial.average);
+  const [count, setCount] = useState(initial.count);
+  const [mine, setMine] = useState(initial.mine);
   const [hover, setHover] = useState<number | null>(null);
-  const [loaded, setLoaded] = useState(false);
-
-  async function load() {
-    const res = await fetch(`/api/ratings?type=${type}&id=${id}`);
-    if (res.ok) {
-      const data = await res.json();
-      setAverage(data.average);
-      setCount(data.count);
-      setMine(data.mine);
-    }
-    setLoaded(true);
-  }
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   async function rate(value: number) {
     if (!canRate) return;
@@ -48,8 +32,6 @@ export function StarRating({
       setMine(data.mine);
     }
   }
-
-  if (!loaded) return null;
 
   const displayValue = hover ?? mine ?? Math.round(average);
 

@@ -8,12 +8,37 @@ All notable changes to this project are documented here. Format follows
 
 ### Changed
 
-- Fixed an N+1 query pattern where the series page checked viewer-access
-  permissions once per video (up to 4 queries each); now batched into a
-  single set of queries regardless of episode count.
+Database query reduction pass (Prisma free-tier operation budget):
+
+- Fixed an N+1 where the series page checked viewer-access permissions
+  once per video (up to 4 queries each); now batched into a single set of
+  queries regardless of episode count.
 - `ViewEvent` writes (Trending/Analytics) are now throttled per browser
   per item via a 30-minute cookie, moved to a client-side beacon instead
   of an inline write on every page render, to cut Prisma operation volume.
+- `getCurrentUser()`/`getSessionIdentity()` are now wrapped in React's
+  `cache()` so the ~30 call sites that each need the current user (Navbar
+  on every page, every page itself, admin layout, ...) share one query per
+  request instead of hitting the DB 2-3x. `getCurrentUser()` also dropped
+  a redundant `findUnique` before its `upsert` — down to 1 query from 2.
+  Combined, this cuts the per-request auth cost by roughly 4-6x.
+- Plugin checks: a video/series page used to call `isPluginEnabled()` once
+  per plugin (11 calls on a video page), each doing its own plugin lookup,
+  category-chain walk (1 query per tree level), and override lookup. New
+  `getPluginStates()` resolves every plugin's state for a page in 2-3
+  queries total, reused across all of them.
+- Fixed a pre-existing N+1 in the series page's "require watching in
+  order" check: it looked up the same series row and re-derived "the
+  previous video" from the DB for every video in the series (up to 3
+  queries each). Since the series page already has the ordered video
+  list, `getSequentialLockedVideoIds()` resolves the whole series in a
+  single `WatchProgress` query.
+- `StarRating`/`ReactionButtons` no longer self-fetch their summary on
+  mount (an extra round-trip + queries per page load); the series/video
+  pages now compute that server-side, alongside the plugin/ratings/
+  reactions data they're already fetching, and pass it down as initial
+  props — matching the pattern already used by Favorite/WatchLater/
+  Subscribe buttons.
 
 ### Added
 

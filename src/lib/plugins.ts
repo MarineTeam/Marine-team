@@ -18,20 +18,6 @@ export const PLUGIN_META = [
 
 export type PluginSlug = (typeof PLUGIN_META)[number]["slug"];
 
-async function categoryChainIds(categoryId: string): Promise<string[]> {
-  const ids: string[] = [];
-  let currentId: string | null = categoryId;
-  while (currentId) {
-    ids.push(currentId);
-    const category: { parentId: string | null } | null = await prisma.category.findUnique({
-      where: { id: currentId },
-      select: { parentId: true },
-    });
-    currentId = category?.parentId ?? null;
-  }
-  return ids;
-}
-
 /** Creates any missing known plugin rows (default enabled), so admin pages always have something to show. */
 export async function ensurePluginsSeeded(): Promise<void> {
   await Promise.all(
@@ -46,26 +32,71 @@ export async function ensurePluginsSeeded(): Promise<void> {
 }
 
 /**
- * Whether a plugin is enabled for the given category context. Falls back to
- * the site-wide default if there's no override; the nearest ancestor's
- * override wins over a more distant one. Fails open (enabled) if the plugin
- * row doesn't exist yet, matching pre-plugin-system behavior.
+ * Every plugin's enabled state for a given category context, in a fixed 2-3
+ * queries total regardless of how many plugin slugs are checked or how deep
+ * the category tree is: the `Plugin`, `Category`, and `PluginCategoryOverride`
+ * tables are each small (tens of rows on a real site, not millions), so
+ * fetching each in full and resolving the category chain + override
+ * precedence in memory beats querying per-plugin. A page that used to call
+ * `isPluginEnabled()` once per plugin — each doing its own plugin lookup,
+ * category-chain walk (1 query per level), and override lookup — now does
+ * this once for all of them. `isPluginEnabled` below is a thin wrapper
+ * around this for call sites that only need one flag.
+ */
+export async function getPluginStates(categoryId?: string | null): Promise<Record<PluginSlug, boolean>> {
+  const [plugins, overrides, categories] = await Promise.all([
+    prisma.plugin.findMany(),
+    prisma.pluginCategoryOverride.findMany(),
+    categoryId ? prisma.category.findMany({ select: { id: true, parentId: true } }) : Promise.resolve([]),
+  ]);
+
+  const chain: string[] = [];
+  if (categoryId) {
+    const parentById = new Map(categories.map((c) => [c.id, c.parentId]));
+    let currentId: string | null = categoryId;
+    while (currentId) {
+      chain.push(currentId);
+      currentId = parentById.get(currentId) ?? null;
+    }
+  }
+
+  const overridesByPlugin = new Map<string, Map<string, boolean>>();
+  for (const o of overrides) {
+    if (!overridesByPlugin.has(o.pluginId)) overridesByPlugin.set(o.pluginId, new Map());
+    overridesByPlugin.get(o.pluginId)!.set(o.categoryId, o.enabled);
+  }
+
+  const pluginBySlug = new Map(plugins.map((p) => [p.slug, p]));
+  const result = {} as Record<PluginSlug, boolean>;
+  for (const meta of PLUGIN_META) {
+    const plugin = pluginBySlug.get(meta.slug);
+    if (!plugin) {
+      result[meta.slug] = true; // fails open, matching pre-plugin-system behavior
+      continue;
+    }
+    let enabled = plugin.enabled;
+    const overrideMap = overridesByPlugin.get(plugin.id);
+    if (overrideMap) {
+      for (const id of chain) {
+        const match = overrideMap.get(id);
+        if (match !== undefined) {
+          enabled = match;
+          break;
+        }
+      }
+    }
+    result[meta.slug] = enabled;
+  }
+  return result;
+}
+
+/**
+ * Whether a single plugin is enabled for the given category context. For a
+ * call site that only needs one flag; if you need several, call
+ * getPluginStates() once instead — this still does the full 2-3 query
+ * resolution under the hood.
  */
 export async function isPluginEnabled(slug: PluginSlug, categoryId?: string | null): Promise<boolean> {
-  const plugin = await prisma.plugin.findUnique({ where: { slug } });
-  if (!plugin) return true;
-  if (!categoryId) return plugin.enabled;
-
-  const chain = await categoryChainIds(categoryId);
-  const overrides = await prisma.pluginCategoryOverride.findMany({
-    where: { pluginId: plugin.id, categoryId: { in: chain } },
-  });
-  if (overrides.length === 0) return plugin.enabled;
-
-  const overrideByCategory = new Map(overrides.map((o) => [o.categoryId, o.enabled]));
-  for (const id of chain) {
-    const match = overrideByCategory.get(id);
-    if (match !== undefined) return match;
-  }
-  return plugin.enabled;
+  const states = await getPluginStates(categoryId);
+  return states[slug];
 }

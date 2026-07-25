@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type ReactionType = "LIKE" | "DISLIKE";
 
@@ -8,32 +8,16 @@ export function ReactionButtons({
   type,
   id,
   canReact,
+  initial,
 }: {
   type: "series" | "video";
   id: string;
   canReact: boolean;
+  initial: { likes: number; dislikes: number; mine: ReactionType | null };
 }) {
-  const [likes, setLikes] = useState(0);
-  const [dislikes, setDislikes] = useState(0);
-  const [mine, setMine] = useState<ReactionType | null>(null);
-  const [loaded, setLoaded] = useState(false);
-
-  async function load() {
-    const res = await fetch(`/api/reactions?type=${type}&id=${id}`);
-    if (res.ok) {
-      const data = await res.json();
-      setLikes(data.likes);
-      setDislikes(data.dislikes);
-      setMine(data.mine);
-    }
-    setLoaded(true);
-  }
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const [likes, setLikes] = useState(initial.likes);
+  const [dislikes, setDislikes] = useState(initial.dislikes);
+  const [mine, setMine] = useState(initial.mine);
 
   async function react(value: ReactionType) {
     if (!canReact) return;
@@ -50,8 +34,6 @@ export function ReactionButtons({
       setMine(data.mine);
     }
   }
-
-  if (!loaded) return null;
 
   return (
     <div className="flex items-center gap-2 text-sm">

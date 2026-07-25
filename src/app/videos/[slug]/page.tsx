@@ -11,10 +11,14 @@ import {
   incrementVideoViewCount,
   isVideoLockedBySequence,
   canViewVideo,
+  getVideoRatingSummary,
+  getUserVideoRating,
+  getVideoReactionSummary,
+  getUserVideoReaction,
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
-import { isPluginEnabled } from "@/lib/plugins";
+import { getPluginStates } from "@/lib/plugins";
 import { bunnyStreamEmbedUrl, bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { WatchProgressTracker } from "@/components/watch-progress-tracker";
 import { FavoriteButton } from "@/components/favorite-button";
@@ -68,17 +72,7 @@ export default async function VideoPage({
     subscribed,
     related,
     upNext,
-    favoritesOn,
-    commentsOn,
-    relatedOn,
-    ratingsOn,
-    watchLaterOn,
-    viewCountsOn,
-    socialShareOn,
-    subscriptionsOn,
-    playlistsOn,
-    likesOn,
-    upNextOn,
+    plugins,
     canModerate,
     sequenceLocked,
   ] = await Promise.all([
@@ -88,23 +82,33 @@ export default async function VideoPage({
     user && video.seriesId ? isSeriesSubscribed(user.id, video.seriesId) : Promise.resolve(false),
     getRelatedVideos(video),
     getUpNextVideo(video),
-    isPluginEnabled("favorites", categoryId),
-    isPluginEnabled("comments", categoryId),
-    isPluginEnabled("related-content", categoryId),
-    isPluginEnabled("ratings", categoryId),
-    isPluginEnabled("watch-later", categoryId),
-    isPluginEnabled("view-counts", categoryId),
-    isPluginEnabled("social-share", categoryId),
-    isPluginEnabled("subscriptions", categoryId),
-    isPluginEnabled("playlists", categoryId),
-    isPluginEnabled("likes-dislikes", categoryId),
-    isPluginEnabled("up-next", categoryId),
+    getPluginStates(categoryId),
     user
       ? hasCapability(user, "moderate_comments", { categoryId, seriesId: video.seriesId })
       : Promise.resolve(false),
     isVideoLockedBySequence(user?.id ?? null, video),
   ]);
+  const {
+    favorites: favoritesOn,
+    comments: commentsOn,
+    "related-content": relatedOn,
+    ratings: ratingsOn,
+    "watch-later": watchLaterOn,
+    "view-counts": viewCountsOn,
+    "social-share": socialShareOn,
+    subscriptions: subscriptionsOn,
+    playlists: playlistsOn,
+    "likes-dislikes": likesOn,
+    "up-next": upNextOn,
+  } = plugins;
   const resumeAt = progress && !progress.completed ? progress.positionSeconds : 0;
+
+  const [ratingSummary, myRating, reactionSummary, myReaction] = await Promise.all([
+    ratingsOn ? getVideoRatingSummary(video.id) : Promise.resolve({ average: 0, count: 0 }),
+    ratingsOn && user ? getUserVideoRating(user.id, video.id) : Promise.resolve(null),
+    likesOn ? getVideoReactionSummary(video.id) : Promise.resolve({ likes: 0, dislikes: 0 }),
+    likesOn && user ? getUserVideoReaction(user.id, video.id) : Promise.resolve(null),
+  ]);
 
   if (!isPendingPremiere && viewCountsOn) await incrementVideoViewCount(video.id);
 
@@ -133,8 +137,22 @@ export default async function VideoPage({
 
       {(ratingsOn || viewCountsOn || likesOn) && (
         <div className="flex flex-wrap items-center gap-4">
-          {ratingsOn && <StarRating type="video" id={video.id} canRate={Boolean(user)} />}
-          {likesOn && <ReactionButtons type="video" id={video.id} canReact={Boolean(user)} />}
+          {ratingsOn && (
+            <StarRating
+              type="video"
+              id={video.id}
+              canRate={Boolean(user)}
+              initial={{ ...ratingSummary, mine: myRating }}
+            />
+          )}
+          {likesOn && (
+            <ReactionButtons
+              type="video"
+              id={video.id}
+              canReact={Boolean(user)}
+              initial={{ ...reactionSummary, mine: myReaction }}
+            />
+          )}
           {viewCountsOn && (
             <span className="text-sm text-zinc-500">
               {video.viewCount + 1} view{video.viewCount === 0 ? "" : "s"}

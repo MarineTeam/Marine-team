@@ -7,14 +7,18 @@ import {
   isSeriesInWatchLater,
   isSeriesSubscribed,
   incrementSeriesViewCount,
-  isVideoLockedBySequence,
+  getSequentialLockedVideoIds,
   canViewSeries,
   getViewableVideoIds,
   canAccess,
+  getSeriesRatingSummary,
+  getUserSeriesRating,
+  getSeriesReactionSummary,
+  getUserSeriesReaction,
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
-import { isPluginEnabled } from "@/lib/plugins";
+import { getPluginStates } from "@/lib/plugins";
 import { FavoriteButton } from "@/components/favorite-button";
 import { WatchLaterButton } from "@/components/watch-later-button";
 import { SubscribeButton } from "@/components/subscribe-button";
@@ -42,15 +46,7 @@ export default async function SeriesPage({
     queued,
     subscribed,
     related,
-    favoritesOn,
-    commentsOn,
-    relatedOn,
-    ratingsOn,
-    watchLaterOn,
-    viewCountsOn,
-    socialShareOn,
-    subscriptionsOn,
-    likesOn,
+    plugins,
     canModerate,
     lockedVideoIds,
     seriesLocked,
@@ -60,25 +56,31 @@ export default async function SeriesPage({
     user ? isSeriesInWatchLater(user.id, series.id) : Promise.resolve(false),
     user ? isSeriesSubscribed(user.id, series.id) : Promise.resolve(false),
     getRelatedSeries(series),
-    isPluginEnabled("favorites", series.categoryId),
-    isPluginEnabled("comments", series.categoryId),
-    isPluginEnabled("related-content", series.categoryId),
-    isPluginEnabled("ratings", series.categoryId),
-    isPluginEnabled("watch-later", series.categoryId),
-    isPluginEnabled("view-counts", series.categoryId),
-    isPluginEnabled("social-share", series.categoryId),
-    isPluginEnabled("subscriptions", series.categoryId),
-    isPluginEnabled("likes-dislikes", series.categoryId),
+    getPluginStates(series.categoryId),
     user
       ? hasCapability(user, "moderate_comments", { categoryId: series.categoryId })
       : Promise.resolve(false),
-    series.requireSequential
-      ? Promise.all(
-          series.videos.map(async (v) => [v.id, await isVideoLockedBySequence(user?.id ?? null, v)] as const),
-        ).then((entries) => new Set(entries.filter(([, locked]) => locked).map(([id]) => id)))
-      : Promise.resolve(new Set<string>()),
+    getSequentialLockedVideoIds(user?.id ?? null, series),
     canViewSeries(user, series).then((allowed) => !allowed),
     getViewableVideoIds(user, series.videos),
+  ]);
+  const {
+    favorites: favoritesOn,
+    comments: commentsOn,
+    "related-content": relatedOn,
+    ratings: ratingsOn,
+    "watch-later": watchLaterOn,
+    "view-counts": viewCountsOn,
+    "social-share": socialShareOn,
+    subscriptions: subscriptionsOn,
+    "likes-dislikes": likesOn,
+  } = plugins;
+
+  const [ratingSummary, myRating, reactionSummary, myReaction] = await Promise.all([
+    ratingsOn ? getSeriesRatingSummary(series.id) : Promise.resolve({ average: 0, count: 0 }),
+    ratingsOn && user ? getUserSeriesRating(user.id, series.id) : Promise.resolve(null),
+    likesOn ? getSeriesReactionSummary(series.id) : Promise.resolve({ likes: 0, dislikes: 0 }),
+    likesOn && user ? getUserSeriesReaction(user.id, series.id) : Promise.resolve(null),
   ]);
 
   if (viewCountsOn) await incrementSeriesViewCount(series.id);
@@ -106,8 +108,22 @@ export default async function SeriesPage({
         {series.description && <p className="mt-2 text-zinc-500">{series.description}</p>}
         {!seriesLocked && (ratingsOn || viewCountsOn || likesOn) && (
           <div className="mt-3 flex flex-wrap items-center gap-4">
-            {ratingsOn && <StarRating type="series" id={series.id} canRate={Boolean(user)} />}
-            {likesOn && <ReactionButtons type="series" id={series.id} canReact={Boolean(user)} />}
+            {ratingsOn && (
+              <StarRating
+                type="series"
+                id={series.id}
+                canRate={Boolean(user)}
+                initial={{ ...ratingSummary, mine: myRating }}
+              />
+            )}
+            {likesOn && (
+              <ReactionButtons
+                type="series"
+                id={series.id}
+                canReact={Boolean(user)}
+                initial={{ ...reactionSummary, mine: myReaction }}
+              />
+            )}
             {viewCountsOn && (
               <span className="text-sm text-zinc-500">
                 {series.viewCount + 1} view{series.viewCount === 0 ? "" : "s"}

@@ -410,6 +410,34 @@ export async function isVideoLockedBySequence(
   return !progress?.completed;
 }
 
+/**
+ * Batched version of isVideoLockedBySequence for a whole series' video list
+ * (already ordered by position, already the published set) — the
+ * single-video version re-queries the same series row and re-derives
+ * "the previous video" from the DB for every video; here that's known from
+ * the list itself, so the only query needed is one WatchProgress lookup for
+ * the whole series instead of up to 3 queries per video.
+ */
+export async function getSequentialLockedVideoIds(
+  userId: string | null,
+  series: { requireSequential: boolean; videos: { id: string; position: number }[] },
+): Promise<Set<string>> {
+  if (!userId || !series.requireSequential || series.videos.length === 0) return new Set();
+
+  const sorted = [...series.videos].sort((a, b) => a.position - b.position);
+  const progress = await prisma.watchProgress.findMany({
+    where: { userId, videoId: { in: sorted.map((v) => v.id) } },
+    select: { videoId: true, completed: true },
+  });
+  const completedIds = new Set(progress.filter((p) => p.completed).map((p) => p.videoId));
+
+  const locked = new Set<string>();
+  for (let i = 1; i < sorted.length; i++) {
+    if (!completedIds.has(sorted[i - 1].id)) locked.add(sorted[i].id);
+  }
+  return locked;
+}
+
 // --- Subscriptions -------------------------------------------------------
 
 export async function isSeriesSubscribed(userId: string, seriesId: string) {
