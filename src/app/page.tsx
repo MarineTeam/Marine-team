@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { HeroBanner } from "@/components/hero-banner";
 import { SeriesRow } from "@/components/series-row";
+import { CategoryRow } from "@/components/category-row";
 import {
   getFeaturedSeries,
   getPublishedCategoriesWithSeries,
@@ -14,7 +16,8 @@ export default async function Home() {
   ]);
 
   const hasContent =
-    categories.some((category) => category.series.length > 0) || uncategorized.length > 0;
+    categories.some((category) => category.series.length > 0 || category.children.length > 0) ||
+    uncategorized.length > 0;
 
   return (
     <div className="space-y-10 pb-12">
@@ -33,17 +36,26 @@ export default async function Home() {
         )}
 
         {categories
-          .filter((category) => category.series.length > 0)
+          .filter((category) => category.series.length > 0 || category.children.length > 0)
           .map((category) => (
-            <SeriesRow
-              key={category.id}
-              title={category.name}
-              href={`/categories/${category.slug}`}
-              series={category.series}
-            />
+            <section key={category.id} className="space-y-4">
+              <Link
+                href={`/categories/${category.slug}`}
+                className="block px-4 sm:px-0 text-lg font-semibold hover:underline"
+              >
+                {category.name} <span aria-hidden>→</span>
+              </Link>
+              {category.children.length > 0 && <CategoryRow categories={category.children} />}
+              {category.series.length > 0 && <SeriesRow series={category.series} />}
+            </section>
           ))}
 
-        <SeriesRow title="More" series={uncategorized} />
+        {uncategorized.length > 0 && (
+          <section>
+            <h2 className="text-lg font-semibold mb-3 px-4 sm:px-0">More</h2>
+            <SeriesRow series={uncategorized} />
+          </section>
+        )}
       </div>
     </div>
   );

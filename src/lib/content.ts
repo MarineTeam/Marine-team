@@ -4,14 +4,17 @@ export function canAccess(memberOnly: boolean, isLoggedIn: boolean): boolean {
   return !memberOnly || isLoggedIn;
 }
 
+/** Root-level categories (no parent) for the homepage — each may have its own series and/or child categories. */
 export async function getPublishedCategoriesWithSeries() {
   return prisma.category.findMany({
+    where: { parentId: null },
     orderBy: { position: "asc" },
     include: {
       series: {
         where: { published: true },
         orderBy: { position: "asc" },
       },
+      children: { orderBy: { position: "asc" } },
     },
   });
 }
@@ -35,6 +38,8 @@ export async function getCategoryBySlug(slug: string) {
     where: { slug },
     include: {
       series: { where: { published: true }, orderBy: { position: "asc" } },
+      children: { orderBy: { position: "asc" } },
+      parent: true,
     },
   });
 }

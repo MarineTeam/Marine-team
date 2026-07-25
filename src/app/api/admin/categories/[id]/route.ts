@@ -10,6 +10,7 @@ const updateSchema = z.object({
     .min(1)
     .regex(/^[a-z0-9-]+$/)
     .optional(),
+  parentId: z.string().optional().nullable(),
   position: z.number().int().optional(),
 });
 
@@ -21,6 +22,12 @@ export async function PATCH(
     await ensureAdmin();
     const { id } = await params;
     const body = updateSchema.parse(await request.json());
+    if (body.parentId === id) {
+      return NextResponse.json(
+        { error: "A category can't be its own parent" },
+        { status: 400 },
+      );
+    }
     const category = await prisma.category.update({ where: { id }, data: body });
     return NextResponse.json(category);
   } catch (error) {

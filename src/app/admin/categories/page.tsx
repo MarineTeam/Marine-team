@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 
-type Category = { id: string; name: string; slug: string; position: number };
+type Category = {
+  id: string;
+  name: string;
+  slug: string;
+  position: number;
+  parentId: string | null;
+  parent: { id: string; name: string } | null;
+};
 
 function slugify(value: string) {
   return value
@@ -15,6 +22,7 @@ function slugify(value: string) {
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [name, setName] = useState("");
+  const [parentId, setParentId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -36,10 +44,16 @@ export default function CategoriesPage() {
       const res = await fetch("/api/admin/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, slug: slugify(name), position: categories.length }),
+        body: JSON.stringify({
+          name,
+          slug: slugify(name),
+          parentId: parentId || null,
+          position: categories.length,
+        }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed to create");
       setName("");
+      setParentId("");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create");
@@ -48,8 +62,24 @@ export default function CategoriesPage() {
     }
   }
 
+  async function changeParent(category: Category, newParentId: string) {
+    setError(null);
+    const res = await fetch(`/api/admin/categories/${category.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ parentId: newParentId || null }),
+    });
+    if (!res.ok) setError((await res.json()).error ?? "Failed to update");
+    await load();
+  }
+
   async function remove(id: string) {
-    if (!confirm("Delete this category? Series in it will become uncategorized.")) return;
+    if (
+      !confirm(
+        "Delete this category? Series in it will become uncategorized, and any sub-categories will become top-level.",
+      )
+    )
+      return;
     await fetch(`/api/admin/categories/${id}`, { method: "DELETE" });
     await load();
   }
@@ -58,7 +88,7 @@ export default function CategoriesPage() {
     <div className="space-y-6">
       <h1 className="text-xl font-semibold">Categories</h1>
 
-      <form onSubmit={createCategory} className="flex gap-2">
+      <form onSubmit={createCategory} className="flex flex-wrap gap-2">
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -66,6 +96,18 @@ export default function CategoriesPage() {
           className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
           required
         />
+        <select
+          value={parentId}
+          onChange={(e) => setParentId(e.target.value)}
+          className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        >
+          <option value="">No parent (top-level)</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
         <button
           type="submit"
           disabled={loading}
@@ -78,17 +120,36 @@ export default function CategoriesPage() {
 
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
         {categories.map((category) => (
-          <li key={category.id} className="p-4 flex items-center justify-between">
+          <li key={category.id} className="p-4 flex items-center justify-between gap-4">
             <div>
               <p className="font-medium">{category.name}</p>
-              <p className="text-sm text-zinc-500">{category.slug}</p>
+              <p className="text-sm text-zinc-500">
+                {category.slug}
+                {category.parent && ` · under ${category.parent.name}`}
+              </p>
             </div>
-            <button
-              onClick={() => remove(category.id)}
-              className="text-sm text-red-600 hover:underline"
-            >
-              Delete
-            </button>
+            <div className="flex items-center gap-2 text-sm">
+              <select
+                value={category.parentId ?? ""}
+                onChange={(e) => changeParent(category, e.target.value)}
+                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+              >
+                <option value="">No parent (top-level)</option>
+                {categories
+                  .filter((c) => c.id !== category.id)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+              </select>
+              <button
+                onClick={() => remove(category.id)}
+                className="text-red-600 hover:underline"
+              >
+                Delete
+              </button>
+            </div>
           </li>
         ))}
         {categories.length === 0 && (

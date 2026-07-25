@@ -9,13 +9,17 @@ const categorySchema = z.object({
     .string()
     .min(1)
     .regex(/^[a-z0-9-]+$/, "slug must be lowercase letters, numbers, and hyphens"),
+  parentId: z.string().optional().nullable(),
   position: z.number().int().optional(),
 });
 
 export async function GET() {
   try {
     await ensureAdmin();
-    const categories = await prisma.category.findMany({ orderBy: { position: "asc" } });
+    const categories = await prisma.category.findMany({
+      orderBy: { position: "asc" },
+      include: { parent: true },
+    });
     return NextResponse.json(categories);
   } catch (error) {
     return errorResponse(error);

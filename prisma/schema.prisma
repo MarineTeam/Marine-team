@@ -39,13 +39,21 @@ model User {
   updatedAt DateTime @updatedAt
 }
 
+// Categories can nest arbitrarily deep (a category's children can themselves
+// have children), matching sites like Subsplash where browsing goes
+// Home -> category -> sub-category -> ... -> series -> videos/files.
 model Category {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   name      String
-  slug      String   @unique
-  position  Int      @default(0)
+  slug      String     @unique
+  position  Int        @default(0)
+  parentId  String?
+  parent    Category?  @relation("CategoryChildren", fields: [parentId], references: [id], onDelete: SetNull)
+  children  Category[] @relation("CategoryChildren")
   series    Series[]
-  createdAt DateTime @default(now())
+  createdAt DateTime   @default(now())
+
+  @@index([parentId])
 }
 
 model Series {

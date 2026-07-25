@@ -45,9 +45,13 @@ files hosted on Bunny Storage.
 
 ## How it works
 
-- **Public site** (`/`, `/series/[slug]`, `/videos/[slug]`): browse published
-  categories/series, watch videos (embedded Bunny Stream player), download
-  files. Content flagged `memberOnly` requires login.
+- **Public site** (`/`, `/categories/[slug]`, `/series/[slug]`, `/videos/[slug]`):
+  browse published categories/series, watch videos (embedded Bunny Stream
+  player), download files. Content flagged `memberOnly` requires login.
+  Categories can nest arbitrarily deep (a category's children can themselves
+  have children) via `Category.parentId` — the homepage only shows top-level
+  categories, each linking to a `/categories/[slug]` page that shows that
+  category's own series plus a card for each child category, recursively.
 - **Auth**: `/auth/login`, `/auth/logout`, `/auth/callback` are handled
   automatically by the Auth0 SDK's `proxy.ts` (Next.js 16 renamed Middleware
   to Proxy). Logging in with Auth0 only proves identity — it does **not**
