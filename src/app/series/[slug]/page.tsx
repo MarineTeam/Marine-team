@@ -27,6 +27,7 @@ import { StarRating } from "@/components/star-rating";
 import { ReactionButtons } from "@/components/reaction-buttons";
 import { ShareButtons } from "@/components/share-buttons";
 import { SeriesTile } from "@/components/series-tile";
+import { MenuTile } from "@/components/menu-tile";
 import { FileList } from "@/components/file-list";
 import { CommentSection } from "@/components/comment-section";
 import { ViewEventBeacon } from "@/components/view-event-beacon";
@@ -167,62 +168,45 @@ export default async function SeriesPage({
       ) : (
         <>
           {series.videos.length > 0 && (
-            <section>
-              <h2 className="text-lg font-semibold mb-3">Videos</h2>
-              <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
+            <section className="space-y-3">
+              <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Videos</h2>
+              <div className="space-y-3">
                 {series.videos.map((video) => {
                   const locked = !viewableVideoIds.has(video.id);
                   const sequenceLocked = lockedVideoIds.has(video.id);
-                  const thumbnailUrl = bunnyStreamThumbnailUrl(
-                    video.bunnyVideoId,
-                    video.thumbnailFileName,
-                  );
+                  // The video page re-checks access and sequential locking, so a
+                  // locked episode still links through and explains itself there
+                  // rather than being a dead row — same as the category page.
+                  const badge = locked
+                    ? "Members"
+                    : sequenceLocked
+                      ? "🔒 Locked"
+                      : video.status !== "READY"
+                        ? "Processing"
+                        : undefined;
                   return (
-                    <li key={video.id} className="p-4 flex flex-wrap items-center justify-between gap-4">
-                      <div className="min-w-0 flex items-center gap-3">
-                        <div className="h-14 w-24 shrink-0 overflow-hidden rounded bg-zinc-100 dark:bg-zinc-800">
-                          {thumbnailUrl && (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={thumbnailUrl} alt="" className="h-full w-full object-cover" />
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-medium">{video.title}</p>
-                          {video.description && (
-                            <p className="text-sm text-zinc-500 line-clamp-1">
-                              {video.description}
-                            </p>
-                          )}
-                          {video.status !== "READY" && (
-                            <p className="text-xs text-amber-600 mt-1">Processing…</p>
-                          )}
-                          {sequenceLocked && (
-                            <p className="text-xs text-zinc-400 mt-1">Watch the previous episode first</p>
-                          )}
-                        </div>
-                      </div>
-                      {locked ? (
-                        <span className="text-sm text-zinc-400">Members only</span>
-                      ) : sequenceLocked ? (
-                        <span className="text-sm text-zinc-400">🔒 Locked</span>
-                      ) : (
-                        <Link
-                          href={`/videos/${video.slug}`}
-                          className="rounded-md bg-zinc-900 text-white px-3 py-1.5 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
-                        >
-                          Watch
-                        </Link>
+                    <MenuTile
+                      key={video.id}
+                      href={`/videos/${video.slug}`}
+                      title={video.title}
+                      subtitle={
+                        sequenceLocked ? "Watch the previous episode first" : video.description
+                      }
+                      thumbnailUrl={bunnyStreamThumbnailUrl(
+                        video.bunnyVideoId,
+                        video.thumbnailFileName,
                       )}
-                    </li>
+                      badge={badge}
+                    />
                   );
                 })}
-              </ul>
+              </div>
             </section>
           )}
 
           {series.files.length > 0 && (
-            <section>
-              <h2 className="text-lg font-semibold mb-3">Files</h2>
+            <section className="space-y-3">
+              <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Files</h2>
               <FileList files={series.files} isLoggedIn={isLoggedIn} />
             </section>
           )}

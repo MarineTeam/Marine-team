@@ -408,9 +408,17 @@ export async function isVideoInWatchLater(userId: string, videoId: string) {
   );
 }
 
-/** A logged-in user's queued series and videos, for a "Watch Later" page. */
+export async function isCategoryInWatchLater(userId: string, categoryId: string) {
+  return (
+    (await prisma.categoryWatchLater.findUnique({
+      where: { userId_categoryId: { userId, categoryId } },
+    })) !== null
+  );
+}
+
+/** A logged-in user's queued series, videos, and categories, for a "Watch Later" page. */
 export async function getWatchLater(userId: string) {
-  const [seriesQueue, videoQueue] = await Promise.all([
+  const [seriesQueue, videoQueue, categoryQueue] = await Promise.all([
     prisma.seriesWatchLater.findMany({
       where: { userId, series: publishedNow() },
       include: { series: true },
@@ -421,8 +429,17 @@ export async function getWatchLater(userId: string) {
       include: { video: { include: { series: true } } },
       orderBy: { createdAt: "desc" },
     }),
+    prisma.categoryWatchLater.findMany({
+      where: { userId, category: publishedNow() },
+      include: {
+        category: {
+          include: { series: true, children: true, videos: true, files: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
-  return { seriesQueue, videoQueue };
+  return { seriesQueue, videoQueue, categoryQueue };
 }
 
 // --- View counts -------------------------------------------------------------

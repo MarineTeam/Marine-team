@@ -3,11 +3,17 @@ import { notFound } from "next/navigation";
 import { CategoryTile } from "@/components/category-tile";
 import { SeriesTile } from "@/components/series-tile";
 import { SubscribeButton } from "@/components/subscribe-button";
+import { WatchLaterButton } from "@/components/watch-later-button";
 import { MenuTile } from "@/components/menu-tile";
 import { FileList } from "@/components/file-list";
-import { getCategoryBySlug, isCategorySubscribed, canAccess } from "@/lib/content";
+import {
+  getCategoryBySlug,
+  isCategorySubscribed,
+  isCategoryInWatchLater,
+  canAccess,
+} from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
-import { isPluginEnabled } from "@/lib/plugins";
+import { getPluginStates } from "@/lib/plugins";
 import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
 
 export default async function CategoryPage({
@@ -24,10 +30,12 @@ export default async function CategoryPage({
   const isLoggedIn = Boolean(user);
   const locked = !canAccess(category.memberOnly, isLoggedIn);
 
-  const [subscriptionsOn, subscribed] = await Promise.all([
-    isPluginEnabled("subscriptions", category.id),
+  const [plugins, subscribed, queued] = await Promise.all([
+    getPluginStates(category.id),
     user ? isCategorySubscribed(user.id, category.id) : Promise.resolve(false),
+    user ? isCategoryInWatchLater(user.id, category.id) : Promise.resolve(false),
   ]);
+  const { subscriptions: subscriptionsOn, "watch-later": watchLaterOn } = plugins;
 
   const backHref = category.parent ? `/categories/${category.parent.slug}` : "/";
   const backLabel = category.parent ? category.parent.name : "Browse";
@@ -45,8 +53,15 @@ export default async function CategoryPage({
         </Link>
         <div className="flex flex-wrap items-start justify-between gap-3 mt-1">
           <h1 className="text-2xl font-semibold tracking-tight">{category.name}</h1>
-          {!locked && user && subscriptionsOn && (
-            <SubscribeButton type="category" id={category.id} initialSubscribed={subscribed} />
+          {!locked && user && (
+            <div className="flex flex-wrap items-center gap-2">
+              {watchLaterOn && (
+                <WatchLaterButton type="category" id={category.id} initialQueued={queued} />
+              )}
+              {subscriptionsOn && (
+                <SubscribeButton type="category" id={category.id} initialSubscribed={subscribed} />
+              )}
+            </div>
           )}
         </div>
         {category.description && <p className="mt-2 text-zinc-500">{category.description}</p>}

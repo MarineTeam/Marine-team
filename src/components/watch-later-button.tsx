@@ -7,7 +7,7 @@ export function WatchLaterButton({
   id,
   initialQueued,
 }: {
-  type: "series" | "video";
+  type: "series" | "video" | "category";
   id: string;
   initialQueued: boolean;
 }) {

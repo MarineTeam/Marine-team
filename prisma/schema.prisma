@@ -33,31 +33,32 @@ enum ReactionType {
 // pending row after seeing the attempt. ADMIN_EMAILS self-authorizes as
 // ADMIN on first login so there's always a way in.
 model User {
-  id                String             @id @default(cuid())
-  auth0Id           String?            @unique
-  email             String             @unique
-  name              String?
-  picture           String?
-  role              Role               @default(MEMBER)
-  authorized        Boolean            @default(false)
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  categoryEditors   CategoryEditor[]
-  seriesEditors     SeriesEditor[]
-  watchProgress     WatchProgress[]
-  seriesFavorites   SeriesFavorite[]
-  videoFavorites    VideoFavorite[]
-  comments          Comment[]
-  groupAssignments  GroupAssignment[]
-  ratings           Rating[]
-  seriesWatchLater  SeriesWatchLater[]
-  videoWatchLater   VideoWatchLater[]
-  pushSubscriptions PushSubscription[]
-  subscriptions     Subscription[]
-  playlists         Playlist[]
-  reactions         Reaction[]
-  seriesViewGrants  SeriesViewer[]
-  videoViewGrants   VideoViewer[]
+  id                 String               @id @default(cuid())
+  auth0Id            String?              @unique
+  email              String               @unique
+  name               String?
+  picture            String?
+  role               Role                 @default(MEMBER)
+  authorized         Boolean              @default(false)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  categoryEditors    CategoryEditor[]
+  seriesEditors      SeriesEditor[]
+  watchProgress      WatchProgress[]
+  seriesFavorites    SeriesFavorite[]
+  videoFavorites     VideoFavorite[]
+  comments           Comment[]
+  groupAssignments   GroupAssignment[]
+  ratings            Rating[]
+  seriesWatchLater   SeriesWatchLater[]
+  videoWatchLater    VideoWatchLater[]
+  categoryWatchLater CategoryWatchLater[]
+  pushSubscriptions  PushSubscription[]
+  subscriptions      Subscription[]
+  playlists          Playlist[]
+  reactions          Reaction[]
+  seriesViewGrants   SeriesViewer[]
+  videoViewGrants    VideoViewer[]
 }
 
 // Grants a non-admin user editor access to one category (and everything
@@ -116,6 +117,7 @@ model Category {
   pluginOverrides   PluginCategoryOverride[]
   groupAssignments  GroupAssignment[]
   subscriptions     Subscription[]
+  watchLaterBy      CategoryWatchLater[]
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @default(now()) @updatedAt
 
@@ -386,6 +388,20 @@ model SeriesWatchLater {
 
   @@unique([userId, seriesId])
   @@index([seriesId])
+}
+
+// A member's "watch later" queue entry for a whole category, for categories
+// that hold content directly (see Video.categoryId) rather than via a series.
+model CategoryWatchLater {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId String
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, categoryId])
+  @@index([categoryId])
 }
 
 // A member's "watch later" queue entry for a video, distinct from Favorites.
