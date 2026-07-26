@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { PushNotificationToggle } from "@/components/push-notification-toggle";
 
@@ -34,7 +35,7 @@ export function MobileMenu({
         <MenuIcon className="h-6 w-6" />
       </button>
 
-      {open && (
+      {open && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-zinc-950">
           <div className="flex items-center gap-4 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
             <button
@@ -118,7 +119,8 @@ export function MobileMenu({
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
