@@ -10,7 +10,7 @@ import {
   descendantCategoryIds,
 } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
-import { bunnyCreateStreamVideo, bunnyStreamTusSignature } from "@/lib/bunny";
+import { bunnyCreateStreamVideo, bunnyStreamTusSignature, bunnyStreamThumbnailUrl } from "@/lib/bunny";
 
 const createSchema = z
   .object({
@@ -55,7 +55,13 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
       include: { series: true, category: true },
     });
-    return NextResponse.json(videos);
+    // Computed server-side so the admin UI never needs to import bunny.ts
+    // (which uses node:crypto and can't be bundled into a client component).
+    const withThumbnails = videos.map((v) => ({
+      ...v,
+      thumbnailPreviewUrl: bunnyStreamThumbnailUrl(v.bunnyVideoId),
+    }));
+    return NextResponse.json(withThumbnails);
   } catch (error) {
     return errorResponse(error);
   }
