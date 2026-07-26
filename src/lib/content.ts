@@ -44,11 +44,15 @@ const categoryOrder: Prisma.CategoryOrderByWithRelationInput[] = [
 export async function getPublishedCategoriesWithSeries(isLoggedIn: boolean) {
   const where = { ...publishedNow(), ...guestFilter(isLoggedIn) };
   return prisma.category.findMany({
-    where: { parentId: null, ...where },
+    // Deliberately no guestFilter on the categories themselves: a member-only
+    // category still lists for guests, carrying a "Members" badge, and gates
+    // on click (see the category page's MemberGate) rather than being
+    // invisible. Their *contents* stay guest-filtered, so nothing leaks.
+    where: { parentId: null, ...publishedNow() },
     orderBy: categoryOrder,
     include: {
       series: { where, orderBy: seriesOrder },
-      children: { where, orderBy: categoryOrder },
+      children: { where: publishedNow(), orderBy: categoryOrder },
       videos: { where, orderBy: { position: "asc" } },
       files: { where, orderBy: { position: "asc" } },
     },
@@ -131,7 +135,9 @@ export async function getCategoryBySlug(slug: string, isLoggedIn: boolean) {
       videos: { where, orderBy: { position: "asc" } },
       files: { where, orderBy: { position: "asc" } },
       children: {
-        where,
+        // Same as the top-level listing: sub-categories stay visible (badged
+        // and gated) even when member-only.
+        where: publishedNow(),
         orderBy: categoryOrder,
         include: {
           series: { where, orderBy: seriesOrder },
@@ -296,7 +302,9 @@ export async function searchContent(query: string, isLoggedIn: boolean) {
 
   const [categories, seriesCandidates, videoCandidates] = await Promise.all([
     prisma.category.findMany({
-      where: { name: { contains: q, mode: "insensitive" }, ...where },
+      // Member-only categories stay findable (badged and gated), matching the
+      // homepage listing.
+      where: { name: { contains: q, mode: "insensitive" }, ...publishedNow() },
       orderBy: categoryOrder,
       include: {
         series: { where, orderBy: seriesOrder },
