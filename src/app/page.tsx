@@ -18,14 +18,14 @@ export default async function Home() {
   const user = await getCurrentUser();
   const isLoggedIn = Boolean(user);
   const [featured, categories, uncategorized, recentlyAdded, continueWatching, viewCountsOn] = await Promise.all([
-    getFeaturedSeries(isLoggedIn),
+    getFeaturedSeries(),
     getPublishedCategoriesWithSeries(isLoggedIn),
-    getUncategorizedSeries(isLoggedIn),
-    getRecentlyAddedSeries(isLoggedIn),
+    getUncategorizedSeries(),
+    getRecentlyAddedSeries(),
     user ? getContinueWatching(user.id) : Promise.resolve([]),
     isPluginEnabled("view-counts"),
   ]);
-  const trending = viewCountsOn ? await getTrendingSeries(isLoggedIn) : [];
+  const trending = viewCountsOn ? await getTrendingSeries() : [];
 
   // Every published category lists, empty or not — matching how an empty
   // series still appears, so a category isn't invisible until it has content.

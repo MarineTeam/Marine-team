@@ -11,7 +11,7 @@ function escapeXml(value: string): string {
 
 export async function GET() {
   const baseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
-  const series = await getRecentlyAddedSeries(false, 50);
+  const series = await getRecentlyAddedSeries(50, true);
 
   const items = series
     .map(

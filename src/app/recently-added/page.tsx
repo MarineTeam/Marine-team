@@ -1,11 +1,8 @@
-import { getCurrentUser } from "@/lib/current-user";
 import { getRecentlyAddedSeries } from "@/lib/content";
 import { SeriesTile } from "@/components/series-tile";
 
 export default async function RecentlyAddedPage() {
-  const user = await getCurrentUser();
-  const isLoggedIn = Boolean(user);
-  const recentlyAdded = await getRecentlyAddedSeries(isLoggedIn, 30);
+  const recentlyAdded = await getRecentlyAddedSeries(30);
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-8">
