@@ -5,16 +5,33 @@ import { getCurrentUser } from "@/lib/current-user";
 import { isPluginEnabled } from "@/lib/plugins";
 
 const schema = z.object({
-  type: z.enum(["series", "video"]),
+  type: z.enum(["series", "video", "category"]),
   id: z.string().min(1),
 });
 
-/** Toggles a logged-in user's Watch Later queue entry for a series or video, returning the new state. */
+/** Toggles a logged-in user's Watch Later queue entry for a series, video, or category, returning the new state. */
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { type, id } = schema.parse(await request.json());
+
+  if (type === "category") {
+    const category = await prisma.category.findUnique({ where: { id }, select: { id: true } });
+    if (!category) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!(await isPluginEnabled("watch-later", id))) {
+      return NextResponse.json({ error: "Watch Later is disabled here" }, { status: 403 });
+    }
+    const existing = await prisma.categoryWatchLater.findUnique({
+      where: { userId_categoryId: { userId: user.id, categoryId: id } },
+    });
+    if (existing) {
+      await prisma.categoryWatchLater.delete({ where: { id: existing.id } });
+      return NextResponse.json({ queued: false });
+    }
+    await prisma.categoryWatchLater.create({ data: { userId: user.id, categoryId: id } });
+    return NextResponse.json({ queued: true });
+  }
 
   if (type === "series") {
     const series = await prisma.series.findUnique({ where: { id }, select: { categoryId: true } });

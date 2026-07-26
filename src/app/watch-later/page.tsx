@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/current-user";
 import { getWatchLater } from "@/lib/content";
 import { SeriesTile } from "@/components/series-tile";
 import { MenuTile } from "@/components/menu-tile";
+import { CategoryTile } from "@/components/category-tile";
 import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
 
 export default async function WatchLaterPage() {
@@ -21,16 +22,27 @@ export default async function WatchLaterPage() {
     );
   }
 
-  const { seriesQueue, videoQueue } = await getWatchLater(user.id);
+  const { seriesQueue, videoQueue, categoryQueue } = await getWatchLater(user.id);
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-8">
       <h1 className="text-2xl font-semibold tracking-tight">Watch Later</h1>
 
-      {seriesQueue.length === 0 && videoQueue.length === 0 && (
+      {seriesQueue.length === 0 && videoQueue.length === 0 && categoryQueue.length === 0 && (
         <p className="text-zinc-500">
-          Nothing queued yet — look for the Watch Later button on a series or video.
+          Nothing queued yet — look for the Watch Later button on a category, series, or video.
         </p>
+      )}
+
+      {categoryQueue.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Categories</h2>
+          <div className="space-y-3">
+            {categoryQueue.map((entry) => (
+              <CategoryTile key={entry.id} category={entry.category} />
+            ))}
+          </div>
+        </section>
       )}
 
       {seriesQueue.length > 0 && (
