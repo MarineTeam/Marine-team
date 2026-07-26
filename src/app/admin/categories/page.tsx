@@ -11,6 +11,10 @@ type Category = {
   slug: string;
   position: number;
   pinned: boolean;
+  published: boolean;
+  memberOnly: boolean;
+  hidden: boolean;
+  featured: boolean;
   parentId: string | null;
   parent: { id: string; name: string } | null;
 };
@@ -137,6 +141,15 @@ export default function CategoriesPage() {
     await load();
   }
 
+  async function toggle(category: Category, field: "published" | "memberOnly" | "hidden" | "featured") {
+    await fetch(`/api/admin/categories/${category.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [field]: !category[field] }),
+    });
+    await load();
+  }
+
   async function remove(id: string) {
     if (
       !confirm(
@@ -169,7 +182,9 @@ export default function CategoriesPage() {
             onDragEnd={() => setDraggingId(null)}
           />
           <div className="min-w-0">
-            <p className="font-medium">{node.name}</p>
+            <Link href={`/admin/categories/${node.id}`} className="font-medium hover:underline">
+              {node.name}
+            </Link>
             <p className="text-sm text-zinc-500">
               {node.slug}
               {node.parent && ` · under ${node.parent.name}`}
@@ -212,18 +227,42 @@ export default function CategoriesPage() {
                 </option>
               ))}
           </select>
+          <Link
+            href={`/admin/categories/${node.id}`}
+            className="rounded-md bg-zinc-900 text-white px-2 py-1 dark:bg-white dark:text-zinc-900"
+          >
+            Edit
+          </Link>
+          <button
+            onClick={() => toggle(node, "published")}
+            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+          >
+            {node.published ? "Published" : "Draft"}
+          </button>
+          <button
+            onClick={() => toggle(node, "memberOnly")}
+            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+          >
+            {node.memberOnly ? "Members only" : "Public"}
+          </button>
+          <button
+            onClick={() => toggle(node, "hidden")}
+            className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${node.hidden ? "border-red-400 text-red-600 dark:text-red-400" : "border-zinc-300"}`}
+          >
+            {node.hidden ? "Hidden" : "Visible"}
+          </button>
+          <button
+            onClick={() => toggle(node, "featured")}
+            className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${node.featured ? "border-amber-400 text-amber-700 dark:text-amber-400" : "border-zinc-300"}`}
+          >
+            {node.featured ? "Featured" : "Feature"}
+          </button>
           <button
             onClick={() => togglePinned(node)}
             className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${node.pinned ? "border-amber-400 text-amber-700 dark:text-amber-400" : "border-zinc-300"}`}
           >
             {node.pinned ? "Pinned" : "Pin"}
           </button>
-          <Link
-            href={`/admin/categories/${node.id}`}
-            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-          >
-            Videos &amp; files
-          </Link>
           <button onClick={() => remove(node.id)} className="text-red-600 hover:underline">
             Delete
           </button>
