@@ -31,6 +31,19 @@ function storageHost(): string {
   return region ? `${region}.storage.bunnycdn.com` : "storage.bunnycdn.com";
 }
 
+/**
+ * CDN hostname env vars are documented as a bare hostname (e.g.
+ * "xxxxxxxx.b-cdn.net"), but it's an easy mistake to paste the full URL
+ * copied from the Bunny dashboard instead — this strips any protocol
+ * prefix and trailing/leading slashes so either form works.
+ */
+function normalizeHostname(value: string): string {
+  return value
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/^\/+|\/+$/g, "");
+}
+
 export type BunnyStreamVideoSummary = {
   guid: string;
   title: string;
@@ -184,8 +197,9 @@ export async function bunnySetStreamThumbnail(videoId: string, thumbnailUrl: str
  * expires, base64), not the embed-specific one (video id + expires, hex).
  */
 export function bunnyStreamThumbnailUrl(videoId: string): string {
-  const cdnHostname = process.env.BUNNY_STREAM_CDN_HOSTNAME;
-  if (!cdnHostname) return "";
+  const rawHostname = process.env.BUNNY_STREAM_CDN_HOSTNAME;
+  if (!rawHostname) return "";
+  const cdnHostname = normalizeHostname(rawHostname);
   const tokenAuthKey = process.env.BUNNY_STREAM_TOKEN_AUTH_KEY;
   const path = `/${videoId}/thumbnail.jpg`;
   const authParams = tokenAuthKey ? pullZoneAuthParams(tokenAuthKey, path, 6 * 60 * 60) : "";
@@ -241,8 +255,9 @@ export async function bunnyStorageDelete(path: string): Promise<void> {
  * fetching the file right now.
  */
 export function bunnyStoragePublicUrl(path: string): string {
-  const pullZoneHost = process.env.BUNNY_STORAGE_PULL_ZONE_HOSTNAME;
-  if (!pullZoneHost) throw new Error("Missing BUNNY_STORAGE_PULL_ZONE_HOSTNAME env var");
+  const rawHost = process.env.BUNNY_STORAGE_PULL_ZONE_HOSTNAME;
+  if (!rawHost) throw new Error("Missing BUNNY_STORAGE_PULL_ZONE_HOSTNAME env var");
+  const pullZoneHost = normalizeHostname(rawHost);
   return `https://${pullZoneHost}/${path.replace(/^\/+/, "")}`;
 }
 
