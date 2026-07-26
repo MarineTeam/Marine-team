@@ -159,41 +159,46 @@ model Series {
 }
 
 model Video {
-  id              String             @id @default(cuid())
-  title           String
-  slug            String             @unique
-  description     String?
-  bunnyVideoId    String
-  bunnyLibraryId  String
-  thumbnailUrl    String?
-  durationSeconds Int?
-  status          VideoStatus        @default(PROCESSING)
-  memberOnly      Boolean            @default(false)
-  hidden          Boolean            @default(false)
-  published       Boolean            @default(false)
-  publishAt       DateTime?
-  unpublishAt     DateTime?
-  isPremiere      Boolean            @default(false)
-  position        Int                @default(0)
-  series          Series?            @relation(fields: [seriesId], references: [id], onDelete: SetNull)
-  seriesId        String?
+  id                String             @id @default(cuid())
+  title             String
+  slug              String             @unique
+  description       String?
+  bunnyVideoId      String
+  bunnyLibraryId    String
+  thumbnailUrl      String?
+  // Bunny stores the thumbnail under a per-video file name, which is only
+  // "thumbnail.jpg" for auto-generated ones — setting a custom thumbnail
+  // (via our admin UI or Bunny's dashboard) changes it. Synced from the
+  // Bunny API; null falls back to the "thumbnail.jpg" default.
+  thumbnailFileName String?
+  durationSeconds   Int?
+  status            VideoStatus        @default(PROCESSING)
+  memberOnly        Boolean            @default(false)
+  hidden            Boolean            @default(false)
+  published         Boolean            @default(false)
+  publishAt         DateTime?
+  unpublishAt       DateTime?
+  isPremiere        Boolean            @default(false)
+  position          Int                @default(0)
+  series            Series?            @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  seriesId          String?
   // Set only when seriesId is null: a video attached straight to a category,
   // skipping the series layer for categories that don't need it (see FileAsset.categoryId too).
-  category        Category?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  categoryId      String?
-  watchProgress   WatchProgress[]
-  favoritedBy     VideoFavorite[]
-  comments        Comment[]
-  ratings         Rating[]
-  watchLaterBy    VideoWatchLater[]
-  viewCount       Int                @default(0)
-  reactions       Reaction[]
-  viewEvents      ViewEvent[]
-  playlistItems   PlaylistItem[]
-  viewerGroups    VideoViewerGroup[]
-  viewers         VideoViewer[]
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  category          Category?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId        String?
+  watchProgress     WatchProgress[]
+  favoritedBy       VideoFavorite[]
+  comments          Comment[]
+  ratings           Rating[]
+  watchLaterBy      VideoWatchLater[]
+  viewCount         Int                @default(0)
+  reactions         Reaction[]
+  viewEvents        ViewEvent[]
+  playlistItems     PlaylistItem[]
+  viewerGroups      VideoViewerGroup[]
+  viewers           VideoViewer[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   @@index([seriesId])
   @@index([categoryId])

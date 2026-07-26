@@ -175,9 +175,7 @@ function bunnyStreamEmbedAuthParams(videoId: string): string {
  * Overrides Bunny Stream's auto-generated thumbnail with an image fetched
  * from `thumbnailUrl` (which can itself be a Bunny Storage URL, letting
  * "manually uploaded" reuse the same call as "set from URL" — the file just
- * goes to Bunny Storage first). The result is served from the same
- * predictable thumbnail.jpg URL as before, so nothing that reads
- * bunnyStreamThumbnailUrl() needs to change.
+ * goes to Bunny Storage first).
  */
 export async function bunnySetStreamThumbnail(videoId: string, thumbnailUrl: string): Promise<void> {
   const res = await fetch(
@@ -189,19 +187,44 @@ export async function bunnySetStreamThumbnail(videoId: string, thumbnailUrl: str
   }
 }
 
+export type BunnyStreamVideo = {
+  guid: string;
+  status: number;
+  length?: number;
+  thumbnailFileName?: string | null;
+};
+
+/** Fetches a single video's current state from Bunny (status, duration, thumbnail file name). */
+export async function bunnyGetStreamVideo(videoId: string): Promise<BunnyStreamVideo> {
+  const res = await fetch(`${STREAM_API_BASE}/library/${streamLibraryId()}/videos/${videoId}`, {
+    headers: { AccessKey: streamApiKey() },
+  });
+  if (!res.ok) {
+    throw new Error(`Bunny Stream get video failed: ${res.status} ${await res.text()}`);
+  }
+  return (await res.json()) as BunnyStreamVideo;
+}
+
+/** Bunny's file name for an auto-generated thumbnail; custom ones get their own name. */
+const DEFAULT_THUMBNAIL_FILE_NAME = "thumbnail.jpg";
+
 /**
  * The thumbnail is a plain file served off the Stream library's own CDN
  * pull zone (BUNNY_STREAM_CDN_HOSTNAME) — a different mechanism from the
  * embed player below, even though both live under "Token Authentication" in
  * the Bunny dashboard. This uses the general CDN pull zone scheme (path +
  * expires, base64), not the embed-specific one (video id + expires, hex).
+ *
+ * `fileName` must be the video's own `thumbnailFileName` from Bunny: only
+ * auto-generated thumbnails are literally "thumbnail.jpg", so hardcoding
+ * that name 403s for any video whose thumbnail was set or regenerated.
  */
-export function bunnyStreamThumbnailUrl(videoId: string): string {
+export function bunnyStreamThumbnailUrl(videoId: string, fileName?: string | null): string {
   const rawHostname = process.env.BUNNY_STREAM_CDN_HOSTNAME;
   if (!rawHostname) return "";
   const cdnHostname = normalizeHostname(rawHostname);
   const tokenAuthKey = process.env.BUNNY_STREAM_TOKEN_AUTH_KEY;
-  const path = `/${videoId}/thumbnail.jpg`;
+  const path = `/${videoId}/${fileName || DEFAULT_THUMBNAIL_FILE_NAME}`;
   const authParams = tokenAuthKey ? pullZoneAuthParams(tokenAuthKey, path, 6 * 60 * 60) : "";
   return `https://${cdnHostname}${path}${authParams ? `?${authParams}` : ""}`;
 }

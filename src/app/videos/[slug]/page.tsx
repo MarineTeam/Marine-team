@@ -209,7 +209,7 @@ export default async function VideoPage({
         <UpNextPanel
           href={`/videos/${upNext.slug}`}
           title={upNext.title}
-          thumbnailUrl={bunnyStreamThumbnailUrl(upNext.bunnyVideoId)}
+          thumbnailUrl={bunnyStreamThumbnailUrl(upNext.bunnyVideoId, upNext.thumbnailFileName)}
           durationSeconds={video.durationSeconds}
           resumeAtSeconds={resumeAt}
         />
@@ -227,7 +227,7 @@ export default async function VideoPage({
                 href={`/videos/${v.slug}`}
                 title={v.title}
                 subtitle={v.series?.title}
-                thumbnailUrl={bunnyStreamThumbnailUrl(v.bunnyVideoId)}
+                thumbnailUrl={bunnyStreamThumbnailUrl(v.bunnyVideoId, v.thumbnailFileName)}
               />
             ))}
           </div>

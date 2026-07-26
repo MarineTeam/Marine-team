@@ -8,7 +8,14 @@ import { reorderArray } from "@/lib/reorder";
 
 type Item = {
   id: string;
-  video: { id: string; slug: string; title: string; bunnyVideoId: string; series: { title: string } | null };
+  video: {
+    id: string;
+    slug: string;
+    title: string;
+    bunnyVideoId: string;
+    thumbnailFileName: string | null;
+    series: { title: string } | null;
+  };
 };
 type Playlist = { id: string; title: string; items: Item[] };
 
@@ -121,7 +128,7 @@ export function PlaylistDetail({ playlist: initial }: { playlist: Playlist }) {
             </div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={bunnyStreamThumbnailUrl(item.video.bunnyVideoId)}
+              src={bunnyStreamThumbnailUrl(item.video.bunnyVideoId, item.video.thumbnailFileName)}
               alt=""
               className="h-14 w-24 shrink-0 rounded object-cover bg-zinc-100 dark:bg-zinc-800"
             />

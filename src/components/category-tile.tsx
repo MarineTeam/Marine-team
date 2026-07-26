@@ -6,14 +6,16 @@ type CategoryTileData = {
   name: string;
   series: { coverImageUrl: string | null }[];
   children: { id: string }[];
-  videos: { bunnyVideoId: string }[];
+  videos: { bunnyVideoId: string; thumbnailFileName: string | null }[];
   files: { id: string }[];
 };
 
 export function CategoryTile({ category }: { category: CategoryTileData }) {
   const seriesThumbnail = category.series.find((s) => s.coverImageUrl)?.coverImageUrl ?? null;
+  const firstVideo = category.videos[0];
   const thumbnailUrl =
-    seriesThumbnail ?? (category.videos[0] ? bunnyStreamThumbnailUrl(category.videos[0].bunnyVideoId) : null);
+    seriesThumbnail ??
+    (firstVideo ? bunnyStreamThumbnailUrl(firstVideo.bunnyVideoId, firstVideo.thumbnailFileName) : null);
   const itemCount =
     category.series.length + category.children.length + category.videos.length + category.files.length;
 

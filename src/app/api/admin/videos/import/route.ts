@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureContentAccess } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
-import { bunnyStreamThumbnailUrl, mapBunnyStreamStatus } from "@/lib/bunny";
+import { bunnyGetStreamVideo, mapBunnyStreamStatus } from "@/lib/bunny";
 
 const importSchema = z
   .object({
@@ -32,14 +32,7 @@ export async function POST(request: NextRequest) {
     await ensureContentAccess(user, { seriesId: body.seriesId ?? null, categoryId: body.categoryId ?? null });
     const libraryId = process.env.BUNNY_STREAM_LIBRARY_ID!;
 
-    const res = await fetch(
-      `https://video.bunnycdn.com/library/${libraryId}/videos/${body.bunnyVideoId}`,
-      { headers: { AccessKey: process.env.BUNNY_STREAM_API_KEY! } },
-    );
-    if (!res.ok) {
-      throw new Error(`Bunny video lookup failed: ${res.status} ${await res.text()}`);
-    }
-    const bunnyVideo = (await res.json()) as { status: number; length?: number };
+    const bunnyVideo = await bunnyGetStreamVideo(body.bunnyVideoId);
 
     const video = await prisma.video.create({
       data: {
@@ -51,7 +44,7 @@ export async function POST(request: NextRequest) {
         bunnyLibraryId: libraryId,
         status: mapBunnyStreamStatus(bunnyVideo.status),
         durationSeconds: bunnyVideo.length ?? null,
-        thumbnailUrl: bunnyStreamThumbnailUrl(body.bunnyVideoId),
+        thumbnailFileName: bunnyVideo.thumbnailFileName ?? null,
       },
     });
 

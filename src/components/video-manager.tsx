@@ -552,14 +552,16 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
                   categoryList={categoryList}
                 />
               )}
-              {v.status !== "READY" && (
-                <button
-                  onClick={() => refreshStatus(v.id)}
-                  className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
-                >
-                  Refresh status
-                </button>
-              )}
+              {/* Always available, not just while encoding: this also re-syncs
+                  the thumbnail file name, which changes whenever a thumbnail is
+                  set outside this app (e.g. in Bunny's own dashboard). */}
+              <button
+                onClick={() => refreshStatus(v.id)}
+                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+                title="Re-read status, duration, and thumbnail from Bunny"
+              >
+                {v.status === "READY" ? "Sync from Bunny" : "Refresh status"}
+              </button>
               <button
                 onClick={() => toggle(v, "published")}
                 className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
