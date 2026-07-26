@@ -19,6 +19,7 @@ import {
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
 import { getPluginStates } from "@/lib/plugins";
+import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { FavoriteButton } from "@/components/favorite-button";
 import { WatchLaterButton } from "@/components/watch-later-button";
 import { SubscribeButton } from "@/components/subscribe-button";
@@ -172,21 +173,33 @@ export default async function SeriesPage({
                 {series.videos.map((video) => {
                   const locked = !viewableVideoIds.has(video.id);
                   const sequenceLocked = lockedVideoIds.has(video.id);
+                  const thumbnailUrl = bunnyStreamThumbnailUrl(
+                    video.bunnyVideoId,
+                    video.thumbnailFileName,
+                  );
                   return (
                     <li key={video.id} className="p-4 flex flex-wrap items-center justify-between gap-4">
-                      <div className="min-w-0">
-                        <p className="font-medium">{video.title}</p>
-                        {video.description && (
-                          <p className="text-sm text-zinc-500 line-clamp-1">
-                            {video.description}
-                          </p>
-                        )}
-                        {video.status !== "READY" && (
-                          <p className="text-xs text-amber-600 mt-1">Processing…</p>
-                        )}
-                        {sequenceLocked && (
-                          <p className="text-xs text-zinc-400 mt-1">Watch the previous episode first</p>
-                        )}
+                      <div className="min-w-0 flex items-center gap-3">
+                        <div className="h-14 w-24 shrink-0 overflow-hidden rounded bg-zinc-100 dark:bg-zinc-800">
+                          {thumbnailUrl && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={thumbnailUrl} alt="" className="h-full w-full object-cover" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium">{video.title}</p>
+                          {video.description && (
+                            <p className="text-sm text-zinc-500 line-clamp-1">
+                              {video.description}
+                            </p>
+                          )}
+                          {video.status !== "READY" && (
+                            <p className="text-xs text-amber-600 mt-1">Processing…</p>
+                          )}
+                          {sequenceLocked && (
+                            <p className="text-xs text-zinc-400 mt-1">Watch the previous episode first</p>
+                          )}
+                        </div>
                       </div>
                       {locked ? (
                         <span className="text-sm text-zinc-400">Members only</span>
