@@ -1,4 +1,4 @@
-# Media Library
+# Marine Team
 
 A Subsplash-style media library: Auth0 login, an admin CMS for managing
 series/categories/videos/files, video hosted on Bunny Stream, and downloadable
@@ -37,7 +37,7 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
    ```bash
    npm install
    ```
-3. Push the schema to your database:
+3. Apply the schema to your database:
    ```bash
    npm run db:migrate
    ```
@@ -204,9 +204,12 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   this site's content is dynamic and often auth-gated, so an aggressive
   offline cache would risk showing stale or wrong-audience content; it only
   caches its own static shell assets (manifest + icons) and handles `push`/
-  `notificationclick` events for the Notifications plugin. Icons are plain
-  placeholders (`public/icon-192.png`, `public/icon-512.png`) — swap them for
-  real branding whenever you like.
+  `notificationclick` events for the Notifications plugin. Icons are rendered
+  from two committed SVG sources — `public/icon.svg` and the full-bleed
+  `public/icon-maskable.svg`, whose artwork sits inside the 80% safe zone
+  because launchers apply their own mask. Editing an SVG means re-rendering
+  the PNGs beside it. The service worker caches the icons by name, so bump
+  its `CACHE_NAME` when they change or installed PWAs keep the old artwork.
 
 ## Performance notes
 
@@ -230,7 +233,56 @@ Written for a Postgres free tier, where every query counts:
   a 30-minute cookie rather than a DB check — a cookie read is free, so a
   throttled repeat view costs zero database operations.
 
+## Deployment
+
+Vercel builds run `prisma migrate deploy && next build` (see `vercel.json`).
+Schema changes are tracked as migration files under `prisma/migrations/` —
+`prisma db push` is no longer used anywhere, because it has no history, no
+rollback, and refuses (or destroys data) on changes it can't make in place.
+
+To change the schema:
+
+1. Edit `prisma/schema.prisma`.
+2. Run `npm run db:migrate` locally to generate and apply a migration.
+3. Commit the generated `prisma/migrations/<timestamp>_<name>/` directory
+   **with** the schema change. Without it the deploy has nothing to apply.
+
+### Preview deployments need their own database
+
+Vercel exposes one `DATABASE_URL` to every environment unless you scope it,
+so an unscoped value means **preview builds run `migrate deploy` against
+production** — a migration in an unmerged PR would hit real data before
+anyone reviewed it.
+
+In Vercel → Settings → Environment Variables:
+
+- Scope the production connection string to **Production** only.
+- Add a second `DATABASE_URL`, scoped to **Preview**, pointing at a separate
+  database.
+
+For Prisma Postgres, create that second database in
+[Prisma Console](https://console.prisma.io) or with the Platform CLI:
+
+```bash
+npx -y @prisma/cli@latest database create preview --branch main
+npx -y @prisma/cli@latest database connection create <database-id>
+```
+
+The connection URL is shown **once** at creation — copy it straight into
+Vercel. It looks like
+`postgres://<id>:<key>@db.prisma.io:5432/postgres?sslmode=require`.
+
+No baselining is needed for a fresh preview database: it starts empty, so the
+first preview build applies `0_init` and every later migration normally. (The
+production database needed a one-time
+`prisma migrate resolve --applied 0_init` because its tables already existed
+from the old `db push` era — that's already done.)
+
 ## Useful scripts
 
+- `npm run db:migrate` — create and apply a migration locally (`migrate dev`)
+- `npm run db:deploy` — apply pending migrations (what Vercel builds run)
+- `npm run db:baseline` — mark `0_init` as already applied, for adopting
+  migrations on a database whose tables already exist
 - `npm run db:studio` — browse the database with Prisma Studio
 - `npm run build` — production build
