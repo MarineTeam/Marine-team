@@ -3,7 +3,7 @@
 // site's content is dynamic and often auth-gated, so an aggressive cache
 // would risk showing stale or wrong-audience content offline. It only
 // caches its own static shell assets.
-const CACHE_NAME = "media-library-shell-v1";
+const CACHE_NAME = "marine-team-shell-v2";
 const SHELL_ASSETS = ["/manifest.json", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -23,7 +23,7 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("push", (event) => {
   if (!event.data) return;
-  let payload = { title: "Media Library", body: "" };
+  let payload = { title: "Marine Team", body: "" };
   try {
     payload = event.data.json();
   } catch {

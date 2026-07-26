@@ -19,14 +19,23 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Media Library",
+  title: "Marine Team",
   description: "Watch sermons, series, and downloads.",
   manifest: "/manifest.json",
-  icons: { icon: "/icon-192.png", apple: "/icon-192.png" },
+  appleWebApp: { capable: true, title: "Marine Team", statusBarStyle: "black-translucent" },
+  icons: {
+    // SVG first for crisp tabs on browsers that support it; the .ico is the
+    // fallback for those that don't.
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "32x32" },
+    ],
+    apple: "/apple-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#18181b",
+  themeColor: "#0C4A6E",
   viewportFit: "cover",
 };
 

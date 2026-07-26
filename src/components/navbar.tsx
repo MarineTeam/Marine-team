@@ -20,7 +20,7 @@ export async function Navbar() {
     <header className="border-b border-zinc-200 bg-white/80 backdrop-blur sticky top-0 z-10 dark:bg-zinc-950/80 dark:border-zinc-800">
       <nav className="max-w-6xl mx-auto flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
         <Link href="/" className="font-semibold text-lg tracking-tight shrink-0">
-          Media Library
+          Marine Team
         </Link>
         <form action="/search" method="get" className="order-3 w-full sm:order-none sm:w-auto sm:flex-1 sm:max-w-xs">
           <input

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Marine Team">
+  <!--
+    Maskable variant of icon.svg: the launcher applies its own shape (circle,
+    squircle, ...), so the background runs full bleed with no rounded rect of
+    its own, and the artwork is scaled to sit inside the 80% safe zone.
+  -->
+  <defs>
+    <linearGradient id="seaMask" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#38BDF8" />
+      <stop offset="0.55" stop-color="#0284C7" />
+      <stop offset="1" stop-color="#0C4A6E" />
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="url(#seaMask)" />
+
+  <g transform="translate(256 256) scale(0.68) translate(-256 -262)">
+    <path
+      d="M206 134 L370 220 a18 18 0 0 1 0 32 L206 338 a18 18 0 0 1 -26 -16 V150 a18 18 0 0 1 26 -16 Z"
+      fill="#FFFFFF"
+    />
+    <path
+      d="M124 396 q 33 -30 66 0 t 66 0 t 66 0 t 66 0"
+      fill="none"
+      stroke="#FFFFFF"
+      stroke-width="30"
+      stroke-linecap="round"
+      opacity="0.92"
+    />
+  </g>
+</svg>

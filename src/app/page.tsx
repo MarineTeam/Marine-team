@@ -42,7 +42,7 @@ export default async function Home() {
       <div className="max-w-2xl mx-auto px-4 py-8 sm:py-10 space-y-8">
         {!featured && (
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Media Library</h1>
+            <h1 className="text-3xl font-semibold tracking-tight">Marine Team</h1>
             <p className="mt-2 text-zinc-500">Browse series, watch videos, and download files.</p>
           </div>
         )}
