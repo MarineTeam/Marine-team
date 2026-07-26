@@ -2,34 +2,42 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
-import { ensureStaff, ensureSeriesRelatedAccess } from "@/lib/permissions";
+import { ensureStaff, ensureContentAccess } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { bunnyDeleteStreamVideo } from "@/lib/bunny";
 import { isPluginEnabled } from "@/lib/plugins";
 import { notifySubscribers } from "@/lib/push";
-import { getSubscriberUserIdsForSeries } from "@/lib/content";
+import { getSubscriberUserIdsForSeries, getSubscriberUserIdsForCategory } from "@/lib/content";
 
-const updateSchema = z.object({
-  title: z.string().min(1).optional(),
-  slug: z
-    .string()
-    .min(1)
-    .regex(/^[a-z0-9-]+$/)
-    .optional(),
-  description: z.string().optional(),
-  seriesId: z.string().optional().nullable(),
-  memberOnly: z.boolean().optional(),
-  hidden: z.boolean().optional(),
-  published: z.boolean().optional(),
-  publishAt: z.string().nullable().optional(),
-  unpublishAt: z.string().nullable().optional(),
-  isPremiere: z.boolean().optional(),
-  position: z.number().int().optional(),
-});
+const updateSchema = z
+  .object({
+    title: z.string().min(1).optional(),
+    slug: z
+      .string()
+      .min(1)
+      .regex(/^[a-z0-9-]+$/)
+      .optional(),
+    description: z.string().optional(),
+    seriesId: z.string().optional().nullable(),
+    categoryId: z.string().optional().nullable(),
+    memberOnly: z.boolean().optional(),
+    hidden: z.boolean().optional(),
+    published: z.boolean().optional(),
+    publishAt: z.string().nullable().optional(),
+    unpublishAt: z.string().nullable().optional(),
+    isPremiere: z.boolean().optional(),
+    position: z.number().int().optional(),
+  })
+  .refine((body) => !(body.seriesId && body.categoryId), {
+    message: "Choose either a series or a category, not both",
+  });
 
 function normalizeData(body: z.infer<typeof updateSchema>) {
   return {
     ...body,
+    // Assigning one of series/category clears the other, keeping them mutually exclusive.
+    categoryId: body.seriesId ? null : body.categoryId,
+    seriesId: body.categoryId ? null : body.seriesId,
     publishAt:
       body.publishAt === undefined ? undefined : body.publishAt === null ? null : new Date(body.publishAt),
     unpublishAt:
@@ -49,9 +57,11 @@ export async function PATCH(
     const user = await ensureStaff();
     const { id } = await params;
     const existing = await prisma.video.findUniqueOrThrow({ where: { id } });
-    await ensureSeriesRelatedAccess(user, existing.seriesId);
+    await ensureContentAccess(user, { seriesId: existing.seriesId, categoryId: existing.categoryId });
     const body = updateSchema.parse(await request.json());
-    if (body.seriesId !== undefined) await ensureSeriesRelatedAccess(user, body.seriesId);
+    if (body.seriesId !== undefined || body.categoryId !== undefined) {
+      await ensureContentAccess(user, { seriesId: body.seriesId ?? null, categoryId: body.categoryId ?? null });
+    }
     const video = await prisma.video.update({
       where: { id },
       data: normalizeData(body),
@@ -61,7 +71,7 @@ export async function PATCH(
 
     const justPublished = existing.published === false && body.published === true;
     if (justPublished && video.status === "READY") {
-      const categoryId = video.series?.categoryId ?? null;
+      const categoryId = video.series?.categoryId ?? video.categoryId ?? null;
       if (await isPluginEnabled("notifications", categoryId)) {
         await notifySubscribers({
           title: "New video published",
@@ -69,11 +79,15 @@ export async function PATCH(
           url: `/videos/${video.slug}`,
         });
       }
-      if (video.seriesId && (await isPluginEnabled("subscriptions", categoryId))) {
-        const subscriberIds = await getSubscriberUserIdsForSeries(video.seriesId, categoryId);
+      if (await isPluginEnabled("subscriptions", categoryId)) {
+        const subscriberIds = video.seriesId
+          ? await getSubscriberUserIdsForSeries(video.seriesId, categoryId)
+          : video.categoryId
+            ? await getSubscriberUserIdsForCategory(video.categoryId)
+            : [];
         if (subscriberIds.length > 0) {
           await notifySubscribers(
-            { title: `New video in ${video.series?.title ?? "a series you follow"}`, body: video.title, url: `/videos/${video.slug}` },
+            { title: `New video in ${video.series?.title ?? "a category you follow"}`, body: video.title, url: `/videos/${video.slug}` },
             subscriberIds,
           );
         }
@@ -94,7 +108,7 @@ export async function DELETE(
     const user = await ensureStaff();
     const { id } = await params;
     const video = await prisma.video.findUniqueOrThrow({ where: { id } });
-    await ensureSeriesRelatedAccess(user, video.seriesId);
+    await ensureContentAccess(user, { seriesId: video.seriesId, categoryId: video.categoryId });
     await bunnyDeleteStreamVideo(video.bunnyVideoId);
     await prisma.video.delete({ where: { id } });
     await logAudit(user.email, "delete", "video", id, video.title);

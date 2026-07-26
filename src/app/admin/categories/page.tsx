@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DragHandle, PositionInput } from "@/components/reorder-controls";
 import { reorderArray } from "@/lib/reorder";
@@ -217,6 +218,12 @@ export default function CategoriesPage() {
           >
             {node.pinned ? "Pinned" : "Pin"}
           </button>
+          <Link
+            href={`/admin/categories/${node.id}`}
+            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          >
+            Videos &amp; files
+          </Link>
           <button onClick={() => remove(node.id)} className="text-red-600 hover:underline">
             Delete
           </button>

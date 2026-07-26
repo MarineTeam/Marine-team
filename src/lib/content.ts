@@ -40,14 +40,17 @@ const categoryOrder: Prisma.CategoryOrderByWithRelationInput[] = [
   { position: "asc" },
 ];
 
-/** Root-level categories (no parent) for the homepage — each may have its own series and/or child categories. */
+/** Root-level categories (no parent) for the homepage — each may have its own series, child categories, and/or videos/files attached directly (skipping the series layer). */
 export async function getPublishedCategoriesWithSeries(isLoggedIn: boolean) {
+  const where = { ...publishedNow(), ...guestFilter(isLoggedIn) };
   return prisma.category.findMany({
     where: { parentId: null },
     orderBy: categoryOrder,
     include: {
-      series: { where: { ...publishedNow(), ...guestFilter(isLoggedIn) }, orderBy: seriesOrder },
+      series: { where, orderBy: seriesOrder },
       children: { orderBy: categoryOrder },
+      videos: { where, orderBy: { position: "asc" } },
+      files: { where, orderBy: { position: "asc" } },
     },
   });
 }
@@ -118,15 +121,19 @@ export async function getRecentlyPlayed(userId: string, limit = 30) {
 }
 
 export async function getCategoryBySlug(slug: string, isLoggedIn: boolean) {
-  const seriesWhere = { ...publishedNow(), ...guestFilter(isLoggedIn) };
+  const where = { ...publishedNow(), ...guestFilter(isLoggedIn) };
   return prisma.category.findFirst({
     where: { slug },
     include: {
-      series: { where: seriesWhere, orderBy: seriesOrder },
+      series: { where, orderBy: seriesOrder },
+      videos: { where, orderBy: { position: "asc" } },
+      files: { where, orderBy: { position: "asc" } },
       children: {
         orderBy: categoryOrder,
         include: {
-          series: { where: seriesWhere, orderBy: seriesOrder },
+          series: { where, orderBy: seriesOrder },
+          videos: { where, orderBy: { position: "asc" } },
+          files: { where, orderBy: { position: "asc" } },
           children: true,
         },
       },
@@ -291,6 +298,8 @@ export async function searchContent(query: string, isLoggedIn: boolean) {
       include: {
         series: { where, orderBy: seriesOrder },
         children: true,
+        videos: { where, orderBy: { position: "asc" } },
+        files: { where, orderBy: { position: "asc" } },
       },
       take: 20,
     }),
@@ -523,6 +532,16 @@ export async function getSubscriberUserIdsForSeries(seriesId: string, categoryId
     where: {
       OR: [{ seriesId }, ...(categoryChain.length > 0 ? [{ categoryId: { in: categoryChain } }] : [])],
     },
+    select: { userId: true },
+  });
+  return Array.from(new Set(subs.map((s) => s.userId)));
+}
+
+/** Users subscribed to a category directly (or to an ancestor of it) — for a video/file attached straight to a category. */
+export async function getSubscriberUserIdsForCategory(categoryId: string): Promise<string[]> {
+  const categoryChain = await categoryChainIds(categoryId);
+  const subs = await prisma.subscription.findMany({
+    where: { categoryId: { in: categoryChain } },
     select: { userId: true },
   });
   return Array.from(new Set(subs.map((s) => s.userId)));

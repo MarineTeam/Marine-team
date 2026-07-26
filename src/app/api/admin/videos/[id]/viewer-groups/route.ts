@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
-import { ensureStaff, ensureSeriesRelatedAccess } from "@/lib/permissions";
+import { ensureStaff, ensureContentAccess } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({ groupId: z.string().min(1) });
@@ -13,7 +13,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const user = await ensureStaff();
     const { id } = await params;
     const video = await prisma.video.findUniqueOrThrow({ where: { id } });
-    await ensureSeriesRelatedAccess(user, video.seriesId);
+    await ensureContentAccess(user, { seriesId: video.seriesId, categoryId: video.categoryId });
     const [granted, available] = await Promise.all([
       prisma.videoViewerGroup.findMany({ where: { videoId: id }, include: { group: true } }),
       prisma.permissionGroup.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const user = await ensureStaff();
     const { id } = await params;
     const video = await prisma.video.findUniqueOrThrow({ where: { id } });
-    await ensureSeriesRelatedAccess(user, video.seriesId);
+    await ensureContentAccess(user, { seriesId: video.seriesId, categoryId: video.categoryId });
     const { groupId } = schema.parse(await request.json());
     const grant = await prisma.videoViewerGroup.create({
       data: { videoId: id, groupId },

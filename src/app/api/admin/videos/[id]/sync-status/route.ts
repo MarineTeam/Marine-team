@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
-import { ensureStaff, ensureSeriesRelatedAccess } from "@/lib/permissions";
+import { ensureStaff, ensureContentAccess } from "@/lib/permissions";
 import { bunnyStreamThumbnailUrl, mapBunnyStreamStatus } from "@/lib/bunny";
 
 /**
@@ -17,7 +17,7 @@ export async function POST(
     const user = await ensureStaff();
     const { id } = await params;
     const video = await prisma.video.findUniqueOrThrow({ where: { id } });
-    await ensureSeriesRelatedAccess(user, video.seriesId);
+    await ensureContentAccess(user, { seriesId: video.seriesId, categoryId: video.categoryId });
 
     const res = await fetch(
       `https://video.bunnycdn.com/library/${video.bunnyLibraryId}/videos/${video.bunnyVideoId}`,

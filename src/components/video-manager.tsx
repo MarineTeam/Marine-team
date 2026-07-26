@@ -5,8 +5,14 @@ import { Upload } from "tus-js-client";
 import { DragHandle, PositionInput, useDragReorder } from "@/components/reorder-controls";
 import { reorderArray } from "@/lib/reorder";
 import { ViewerAccessManager } from "@/components/viewer-access-manager";
+import {
+  TargetSelect,
+  formatTarget,
+  parseTarget,
+  type SeriesOption,
+  type CategoryOption,
+} from "@/components/content-target-picker";
 
-type Series = { id: string; title: string };
 type Video = {
   id: string;
   title: string;
@@ -19,6 +25,7 @@ type Video = {
   publishAt: string | null;
   isPremiere: boolean;
   series: { id: string; title: string } | null;
+  category: { id: string; name: string } | null;
 };
 type BunnyLibraryVideo = {
   guid: string;
@@ -39,14 +46,17 @@ function slugify(value: string) {
 /**
  * Manages videos: upload, import from an existing Bunny Stream library,
  * publish/visibility toggles, and delete. Pass `seriesId` to scope this to
- * one series' episodes (used on the series detail page); omit it for the
- * global "All videos" view, which shows every video with a series picker.
+ * one series' episodes, or `categoryId` to scope it to videos attached
+ * straight to a category (skipping the series layer); omit both for the
+ * global "All videos" view, which shows every video with a series/category picker.
  */
-export function VideoManager({ seriesId }: { seriesId?: string }) {
+export function VideoManager({ seriesId, categoryId }: { seriesId?: string; categoryId?: string }) {
+  const scoped = Boolean(seriesId || categoryId);
   const [videos, setVideos] = useState<Video[]>([]);
-  const [seriesList, setSeriesList] = useState<Series[]>([]);
+  const [seriesList, setSeriesList] = useState<SeriesOption[]>([]);
+  const [categoryList, setCategoryList] = useState<CategoryOption[]>([]);
   const [title, setTitle] = useState("");
-  const [pickedSeriesId, setPickedSeriesId] = useState("");
+  const [pickedTarget, setPickedTarget] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +65,7 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
   const [bunnyLibrary, setBunnyLibrary] = useState<BunnyLibraryVideo[] | null>(null);
   const [bunnyLoading, setBunnyLoading] = useState(false);
   const [importDrafts, setImportDrafts] = useState<
-    Record<string, { title: string; slug: string; seriesId: string }>
+    Record<string, { title: string; slug: string; target: string }>
   >({});
   const [importingGuid, setImportingGuid] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -63,12 +73,14 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
   const [managingAccessId, setManagingAccessId] = useState<string | null>(null);
 
   async function load() {
-    const [videosRes, seriesRes] = await Promise.all([
+    const [videosRes, seriesRes, categoriesRes] = await Promise.all([
       fetch("/api/admin/videos"),
       fetch("/api/admin/series"),
+      fetch("/api/admin/categories"),
     ]);
     if (videosRes.ok) setVideos(await videosRes.json());
     if (seriesRes.ok) setSeriesList(await seriesRes.json());
+    if (categoriesRes.ok) setCategoryList(await categoriesRes.json());
   }
 
   useEffect(() => {
@@ -88,7 +100,7 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
         Object.fromEntries(
           items.map((v) => [
             v.guid,
-            { title: v.title, slug: slugify(v.title), seriesId: seriesId ?? "" },
+            { title: v.title, slug: slugify(v.title), target: formatTarget(seriesId, categoryId) },
           ]),
         ),
       );
@@ -99,7 +111,7 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
     }
   }
 
-  function updateDraft(guid: string, field: "title" | "slug" | "seriesId", value: string) {
+  function updateDraft(guid: string, field: "title" | "slug" | "target", value: string) {
     setImportDrafts((prev) => ({ ...prev, [guid]: { ...prev[guid], [field]: value } }));
   }
 
@@ -109,6 +121,9 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
       setError("Title and slug are required to import a video");
       return;
     }
+    const target = scoped
+      ? { seriesId: seriesId ?? null, categoryId: categoryId ?? null }
+      : parseTarget(draft.target);
     setImportingGuid(guid);
     setError(null);
     try {
@@ -119,7 +134,8 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
           bunnyVideoId: guid,
           title: draft.title,
           slug: draft.slug,
-          seriesId: seriesId ?? draft.seriesId ?? null,
+          seriesId: target.seriesId,
+          categoryId: target.categoryId,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Import failed");
@@ -138,6 +154,10 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
     setError(null);
     setProgress(0);
 
+    const target = scoped
+      ? { seriesId: seriesId ?? null, categoryId: categoryId ?? null }
+      : parseTarget(pickedTarget);
+
     try {
       const createRes = await fetch("/api/admin/videos", {
         method: "POST",
@@ -145,7 +165,8 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
         body: JSON.stringify({
           title,
           slug: slugify(title),
-          seriesId: seriesId ?? pickedSeriesId ?? null,
+          seriesId: target.seriesId,
+          categoryId: target.categoryId,
         }),
       });
       if (!createRes.ok) throw new Error((await createRes.json()).error ?? "Failed to create");
@@ -172,7 +193,7 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
       await fetch(`/api/admin/videos/${video.id}/sync-status`, { method: "POST" });
 
       setTitle("");
-      setPickedSeriesId("");
+      setPickedTarget("");
       setFile(null);
       setProgress(null);
       await load();
@@ -228,11 +249,12 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
     await load();
   }
 
-  async function reassignSeries(id: string, newSeriesId: string) {
+  async function reassignTarget(id: string, target: string) {
+    const parsed = parseTarget(target);
     await fetch(`/api/admin/videos/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seriesId: newSeriesId || null }),
+      body: JSON.stringify({ seriesId: parsed.seriesId, categoryId: parsed.categoryId }),
     });
     await load();
   }
@@ -243,9 +265,13 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
     await load();
   }
 
-  const scopedVideos = seriesId ? videos.filter((v) => v.series?.id === seriesId) : videos;
+  const scopedVideos = seriesId
+    ? videos.filter((v) => v.series?.id === seriesId)
+    : categoryId
+      ? videos.filter((v) => v.category?.id === categoryId)
+      : videos;
   const visibleVideos =
-    !seriesId && query.trim()
+    !scoped && query.trim()
       ? scopedVideos.filter((v) => v.title.toLowerCase().includes(query.trim().toLowerCase()))
       : scopedVideos;
 
@@ -306,7 +332,9 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold">{seriesId ? "Episodes" : "All videos"}</h2>
+      <h2 className="text-lg font-semibold">
+        {seriesId ? "Episodes" : categoryId ? "Videos in category" : "All videos"}
+      </h2>
 
       <form
         onSubmit={uploadVideo}
@@ -320,19 +348,8 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
           required
         />
         <div className="flex flex-wrap items-center gap-3">
-          {!seriesId && (
-            <select
-              value={pickedSeriesId}
-              onChange={(e) => setPickedSeriesId(e.target.value)}
-              className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-            >
-              <option value="">No series</option>
-              {seriesList.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.title}
-                </option>
-              ))}
-            </select>
+          {!scoped && (
+            <TargetSelect value={pickedTarget} onChange={setPickedTarget} seriesList={seriesList} categoryList={categoryList} />
           )}
           <input
             type="file"
@@ -412,19 +429,13 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
                         placeholder="slug"
                         className="rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
                       />
-                      {!seriesId && (
-                        <select
-                          value={draft?.seriesId ?? ""}
-                          onChange={(e) => updateDraft(v.guid, "seriesId", e.target.value)}
-                          className="rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-                        >
-                          <option value="">No series</option>
-                          {seriesList.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.title}
-                            </option>
-                          ))}
-                        </select>
+                      {!scoped && (
+                        <TargetSelect
+                          value={draft?.target ?? ""}
+                          onChange={(value) => updateDraft(v.guid, "target", value)}
+                          seriesList={seriesList}
+                          categoryList={categoryList}
+                        />
                       )}
                       <button
                         onClick={() => importVideo(v.guid)}
@@ -442,7 +453,7 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
         )}
       </div>
 
-      {!seriesId && (
+      {!scoped && (
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -480,7 +491,7 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
           <li
             key={v.id}
             className={draggingIndex === index ? "opacity-40" : ""}
-            {...(seriesId ? dropZoneProps(index) : {})}
+            {...(scoped ? dropZoneProps(index) : {})}
           >
           <div className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
             <div className="min-w-0 flex items-center gap-2">
@@ -490,14 +501,14 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
                 onChange={() => toggleSelected(v.id)}
                 aria-label={`Select ${v.title}`}
               />
-              {seriesId && <DragHandle {...handleProps(index)} />}
+              {scoped && <DragHandle {...handleProps(index)} />}
               <div className="min-w-0">
                 <p className="font-medium">{v.title}</p>
                 <p className="text-sm text-zinc-500">{v.status}</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              {seriesId && (
+              {scoped && (
                 <>
                   <PositionInput
                     index={index}
@@ -522,19 +533,13 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
                   </button>
                 </>
               )}
-              {!seriesId && (
-                <select
-                  value={v.series?.id ?? ""}
-                  onChange={(e) => reassignSeries(v.id, e.target.value)}
-                  className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
-                >
-                  <option value="">No series</option>
-                  {seriesList.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.title}
-                    </option>
-                  ))}
-                </select>
+              {!scoped && (
+                <TargetSelect
+                  value={formatTarget(v.series?.id ?? null, v.category?.id ?? null)}
+                  onChange={(value) => reassignTarget(v.id, value)}
+                  seriesList={seriesList}
+                  categoryList={categoryList}
+                />
               )}
               {v.status !== "READY" && (
                 <button
@@ -596,7 +601,7 @@ export function VideoManager({ seriesId }: { seriesId?: string }) {
         ))}
         {visibleVideos.length === 0 && (
           <li className="p-4 text-sm text-zinc-500">
-            {seriesId ? "No episodes in this series yet." : "No videos yet."}
+            {seriesId ? "No episodes in this series yet." : categoryId ? "No videos in this category yet." : "No videos yet."}
           </li>
         )}
       </ul>

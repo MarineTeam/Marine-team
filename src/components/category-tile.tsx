@@ -1,15 +1,21 @@
 import { MenuTile } from "@/components/menu-tile";
+import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
 
 type CategoryTileData = {
   slug: string;
   name: string;
   series: { coverImageUrl: string | null }[];
   children: { id: string }[];
+  videos: { bunnyVideoId: string }[];
+  files: { id: string }[];
 };
 
 export function CategoryTile({ category }: { category: CategoryTileData }) {
-  const thumbnailUrl = category.series.find((s) => s.coverImageUrl)?.coverImageUrl ?? null;
-  const itemCount = category.series.length + category.children.length;
+  const seriesThumbnail = category.series.find((s) => s.coverImageUrl)?.coverImageUrl ?? null;
+  const thumbnailUrl =
+    seriesThumbnail ?? (category.videos[0] ? bunnyStreamThumbnailUrl(category.videos[0].bunnyVideoId) : null);
+  const itemCount =
+    category.series.length + category.children.length + category.videos.length + category.files.length;
 
   return (
     <MenuTile
