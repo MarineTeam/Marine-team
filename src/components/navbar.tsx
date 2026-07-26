@@ -30,7 +30,7 @@ export async function Navbar() {
           />
         </form>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:gap-4 text-sm sm:ml-auto">
-          <Link href="/" className="hover:underline">
+          <Link href="/" className="hidden sm:inline hover:underline">
             Browse
           </Link>
           {user?.role === "ADMIN" && (
@@ -39,7 +39,7 @@ export async function Navbar() {
             </Link>
           )}
           {user && (
-            <Link href="/favorites" className="hover:underline">
+            <Link href="/favorites" className="hidden sm:inline hover:underline">
               Favorites
             </Link>
           )}
