@@ -9,7 +9,7 @@ import {
   getFeaturedSeries,
   getPublishedCategoriesWithSeries,
   getUncategorizedSeries,
-  getRecentlyAddedSeries,
+  getRecentlyAdded,
   getContinueWatching,
   getTrendingSeries,
 } from "@/lib/content";
@@ -21,7 +21,7 @@ export default async function Home() {
     getFeaturedSeries(),
     getPublishedCategoriesWithSeries(isLoggedIn),
     getUncategorizedSeries(),
-    getRecentlyAddedSeries(),
+    getRecentlyAdded(isLoggedIn),
     user ? getContinueWatching(user.id) : Promise.resolve([]),
     isPluginEnabled("view-counts"),
   ]);
@@ -100,9 +100,13 @@ export default async function Home() {
               Recently added
             </h2>
             <div className="space-y-3">
-              {recentlyAdded.map((series) => (
-                <SeriesTile key={series.id} series={series} />
-              ))}
+              {recentlyAdded.map((item) =>
+                item.kind === "category" ? (
+                  <CategoryTile key={`category:${item.category.id}`} category={item.category} />
+                ) : (
+                  <SeriesTile key={`series:${item.series.id}`} series={item.series} />
+                ),
+              )}
             </div>
           </section>
         )}
