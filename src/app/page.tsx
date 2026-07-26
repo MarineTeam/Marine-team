@@ -34,7 +34,11 @@ export default async function Home() {
 
   return (
     <div className="pb-12">
-      {featured && <HeroBanner series={featured} />}
+      {featured && (
+        <div className="hidden sm:block">
+          <HeroBanner series={featured} />
+        </div>
+      )}
 
       <div className="max-w-2xl mx-auto px-4 py-8 sm:py-10 space-y-8">
         {!featured && (
@@ -45,7 +49,7 @@ export default async function Home() {
         )}
 
         {continueWatching.length > 0 && (
-          <section className="space-y-3">
+          <section className="hidden sm:block space-y-3">
             <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
               Continue watching
             </h2>
@@ -92,7 +96,7 @@ export default async function Home() {
         )}
 
         {recentlyAdded.length > 0 && (
-          <section className="space-y-3">
+          <section className="hidden sm:block space-y-3">
             <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
               Recently added
             </h2>
