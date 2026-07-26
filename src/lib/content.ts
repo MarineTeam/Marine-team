@@ -103,6 +103,20 @@ export async function getContinueWatching(userId: string, limit = 10) {
   return progress;
 }
 
+/** A user's playback history (in-progress and completed), most recent first, for the "Recently Played" tab. */
+export async function getRecentlyPlayed(userId: string, limit = 30) {
+  return prisma.watchProgress.findMany({
+    where: {
+      userId,
+      positionSeconds: { gt: 0 },
+      video: publishedNow(),
+    },
+    orderBy: { updatedAt: "desc" },
+    take: limit,
+    include: { video: { include: { series: true } } },
+  });
+}
+
 export async function getCategoryBySlug(slug: string, isLoggedIn: boolean) {
   const seriesWhere = { ...publishedNow(), ...guestFilter(isLoggedIn) };
   return prisma.category.findFirst({
