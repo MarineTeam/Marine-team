@@ -89,11 +89,11 @@ export async function getFeaturedSeries() {
   });
 }
 
-/** Most recently added published series, for a homepage "Recently added" row. */
 /**
- * `publicOnly` excludes member-only series outright, for the public RSS feed:
- * on-site listings show them with a badge and gate on click, but a syndication
- * feed gets republished and cached elsewhere, so it stays strictly public.
+ * Most recently added published series. `publicOnly` excludes member-only
+ * series outright, for the public RSS feed: on-site listings show them with a
+ * badge and gate on click, but a syndication feed gets republished and cached
+ * elsewhere, so it stays strictly public.
  */
 export async function getRecentlyAddedSeries(limit = 10, publicOnly = false) {
   return prisma.series.findMany({
@@ -101,6 +101,43 @@ export async function getRecentlyAddedSeries(limit = 10, publicOnly = false) {
     orderBy: { createdAt: "desc" },
     take: limit,
   });
+}
+
+export type RecentlyAddedItem =
+  | { kind: "category"; createdAt: Date; category: RecentlyAddedCategory }
+  | { kind: "series"; createdAt: Date; series: RecentlyAddedSeries };
+
+type RecentlyAddedCategory = Awaited<ReturnType<typeof getPublishedCategoriesWithSeries>>[number];
+type RecentlyAddedSeries = Awaited<ReturnType<typeof getRecentlyAddedSeries>>[number];
+
+/**
+ * Newest published categories and series interleaved by creation date, for the
+ * "Recently added" listings. Kept as one chronological list rather than
+ * per-type sections so "recently added" actually reads as recency.
+ */
+export async function getRecentlyAdded(isLoggedIn: boolean, limit = 10): Promise<RecentlyAddedItem[]> {
+  const contentWhere = { ...publishedNow(), ...guestFilter(isLoggedIn) };
+  const [categories, series] = await Promise.all([
+    prisma.category.findMany({
+      where: publishedNow(),
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: {
+        series: { where: publishedNow(), orderBy: seriesOrder },
+        children: { where: publishedNow(), orderBy: categoryOrder },
+        videos: { where: contentWhere, orderBy: { position: "asc" } },
+        files: { where: contentWhere, orderBy: { position: "asc" } },
+      },
+    }),
+    getRecentlyAddedSeries(limit),
+  ]);
+
+  return [
+    ...categories.map((category) => ({ kind: "category" as const, createdAt: category.createdAt, category })),
+    ...series.map((s) => ({ kind: "series" as const, createdAt: s.createdAt, series: s })),
+  ]
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, limit);
 }
 
 /** In-progress videos for a logged-in user, for a "Continue watching" row. */
