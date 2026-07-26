@@ -1,46 +1,59 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
 import {
   ensureStaff,
-  ensureSeriesRelatedAccess,
+  ensureContentAccess,
   getEditableScope,
   descendantCategoryIds,
 } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { bunnyCreateStreamVideo, bunnyStreamTusSignature } from "@/lib/bunny";
 
-const createSchema = z.object({
-  title: z.string().min(1),
-  slug: z
-    .string()
-    .min(1)
-    .regex(/^[a-z0-9-]+$/, "slug must be lowercase letters, numbers, and hyphens"),
-  seriesId: z.string().optional().nullable(),
-});
+const createSchema = z
+  .object({
+    title: z.string().min(1),
+    slug: z
+      .string()
+      .min(1)
+      .regex(/^[a-z0-9-]+$/, "slug must be lowercase letters, numbers, and hyphens"),
+    seriesId: z.string().optional().nullable(),
+    categoryId: z.string().optional().nullable(),
+  })
+  .refine((body) => !(body.seriesId && body.categoryId), {
+    message: "Choose either a series or a category, not both",
+  });
 
 export async function GET() {
   try {
     const user = await ensureStaff();
     const scope = await getEditableScope(user);
-    const where = scope.isAdmin
-      ? {}
-      : {
-          seriesId: {
-            in: [
-              ...scope.seriesIds,
-              ...(await prisma.series.findMany({
-                where: { categoryId: { in: await descendantCategoryIds(scope.categoryIds) } },
-                select: { id: true },
-              })).map((s) => s.id),
-            ],
+    let where: Prisma.VideoWhereInput = {};
+    if (!scope.isAdmin) {
+      const categoryIds = await descendantCategoryIds(scope.categoryIds);
+      where = {
+        OR: [
+          {
+            seriesId: {
+              in: [
+                ...scope.seriesIds,
+                ...(await prisma.series.findMany({
+                  where: { categoryId: { in: categoryIds } },
+                  select: { id: true },
+                })).map((s) => s.id),
+              ],
+            },
           },
-        };
+          { categoryId: { in: categoryIds } },
+        ],
+      };
+    }
     const videos = await prisma.video.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      include: { series: true },
+      include: { series: true, category: true },
     });
     return NextResponse.json(videos);
   } catch (error) {
@@ -53,10 +66,10 @@ export async function POST(request: NextRequest) {
   try {
     const user = await ensureStaff();
     const body = createSchema.parse(await request.json());
-    if (user.role !== "ADMIN" && !body.seriesId) {
-      return NextResponse.json({ error: "Choose a series" }, { status: 400 });
+    if (user.role !== "ADMIN" && !body.seriesId && !body.categoryId) {
+      return NextResponse.json({ error: "Choose a series or a category" }, { status: 400 });
     }
-    await ensureSeriesRelatedAccess(user, body.seriesId ?? null);
+    await ensureContentAccess(user, { seriesId: body.seriesId ?? null, categoryId: body.categoryId ?? null });
 
     const bunnyVideoId = await bunnyCreateStreamVideo(body.title);
     const video = await prisma.video.create({
@@ -64,6 +77,7 @@ export async function POST(request: NextRequest) {
         title: body.title,
         slug: body.slug,
         seriesId: body.seriesId ?? null,
+        categoryId: body.categoryId ?? null,
         bunnyVideoId,
         bunnyLibraryId: process.env.BUNNY_STREAM_LIBRARY_ID!,
       },

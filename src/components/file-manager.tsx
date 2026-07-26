@@ -3,8 +3,14 @@
 import { useEffect, useState } from "react";
 import { DragHandle, PositionInput, useDragReorder } from "@/components/reorder-controls";
 import { reorderArray } from "@/lib/reorder";
+import {
+  TargetSelect,
+  formatTarget,
+  parseTarget,
+  type SeriesOption,
+  type CategoryOption,
+} from "@/components/content-target-picker";
 
-type Series = { id: string; title: string };
 type FileAsset = {
   id: string;
   title: string;
@@ -14,18 +20,22 @@ type FileAsset = {
   published: boolean;
   unpublishAt: string | null;
   series: { id: string; title: string } | null;
+  category: { id: string; name: string } | null;
 };
 
 /**
  * Manages downloadable files: upload, publish/visibility toggles, delete.
- * Pass `seriesId` to scope this to one series' handouts (series detail
- * page); omit it for the global "All files" view with a series picker.
+ * Pass `seriesId` to scope this to one series' handouts, or `categoryId` to
+ * scope it to files attached straight to a category (skipping the series
+ * layer); omit both for the global "All files" view with a series/category picker.
  */
-export function FileManager({ seriesId }: { seriesId?: string }) {
+export function FileManager({ seriesId, categoryId }: { seriesId?: string; categoryId?: string }) {
+  const scoped = Boolean(seriesId || categoryId);
   const [files, setFiles] = useState<FileAsset[]>([]);
-  const [seriesList, setSeriesList] = useState<Series[]>([]);
+  const [seriesList, setSeriesList] = useState<SeriesOption[]>([]);
+  const [categoryList, setCategoryList] = useState<CategoryOption[]>([]);
   const [title, setTitle] = useState("");
-  const [pickedSeriesId, setPickedSeriesId] = useState("");
+  const [pickedTarget, setPickedTarget] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,12 +43,14 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   async function load() {
-    const [filesRes, seriesRes] = await Promise.all([
+    const [filesRes, seriesRes, categoriesRes] = await Promise.all([
       fetch("/api/admin/files"),
       fetch("/api/admin/series"),
+      fetch("/api/admin/categories"),
     ]);
     if (filesRes.ok) setFiles(await filesRes.json());
     if (seriesRes.ok) setSeriesList(await seriesRes.json());
+    if (categoriesRes.ok) setCategoryList(await categoriesRes.json());
   }
 
   useEffect(() => {
@@ -52,15 +64,18 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
     setError(null);
     setUploading(true);
     try {
+      const target = scoped
+        ? { seriesId: seriesId ?? null, categoryId: categoryId ?? null }
+        : parseTarget(pickedTarget);
       const form = new FormData();
       form.append("file", file);
       form.append("title", title);
-      const targetSeriesId = seriesId ?? pickedSeriesId;
-      if (targetSeriesId) form.append("seriesId", targetSeriesId);
+      if (target.seriesId) form.append("seriesId", target.seriesId);
+      if (target.categoryId) form.append("categoryId", target.categoryId);
       const res = await fetch("/api/admin/files", { method: "POST", body: form });
       if (!res.ok) throw new Error((await res.json()).error ?? "Upload failed");
       setTitle("");
-      setPickedSeriesId("");
+      setPickedTarget("");
       setFile(null);
       await load();
     } catch (err) {
@@ -100,18 +115,23 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
     await load();
   }
 
-  async function reassignSeries(id: string, newSeriesId: string) {
+  async function reassignTarget(id: string, target: string) {
+    const parsed = parseTarget(target);
     await fetch(`/api/admin/files/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seriesId: newSeriesId || null }),
+      body: JSON.stringify({ seriesId: parsed.seriesId, categoryId: parsed.categoryId }),
     });
     await load();
   }
 
-  const scopedFiles = seriesId ? files.filter((f) => f.series?.id === seriesId) : files;
+  const scopedFiles = seriesId
+    ? files.filter((f) => f.series?.id === seriesId)
+    : categoryId
+      ? files.filter((f) => f.category?.id === categoryId)
+      : files;
   const visibleFiles =
-    !seriesId && query.trim()
+    !scoped && query.trim()
       ? scopedFiles.filter((f) => f.title.toLowerCase().includes(query.trim().toLowerCase()))
       : scopedFiles;
 
@@ -172,7 +192,9 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold">{seriesId ? "Files" : "All files"}</h2>
+      <h2 className="text-lg font-semibold">
+        {seriesId ? "Files" : categoryId ? "Files in category" : "All files"}
+      </h2>
 
       <form
         onSubmit={uploadFile}
@@ -186,19 +208,8 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
           required
         />
         <div className="flex flex-wrap items-center gap-3">
-          {!seriesId && (
-            <select
-              value={pickedSeriesId}
-              onChange={(e) => setPickedSeriesId(e.target.value)}
-              className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-            >
-              <option value="">No series</option>
-              {seriesList.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.title}
-                </option>
-              ))}
-            </select>
+          {!scoped && (
+            <TargetSelect value={pickedTarget} onChange={setPickedTarget} seriesList={seriesList} categoryList={categoryList} />
           )}
           <input
             type="file"
@@ -221,7 +232,7 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      {!seriesId && (
+      {!scoped && (
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -259,7 +270,7 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
           <li
             key={f.id}
             className={`p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 ${draggingIndex === index ? "opacity-40" : ""}`}
-            {...(seriesId ? dropZoneProps(index) : {})}
+            {...(scoped ? dropZoneProps(index) : {})}
           >
             <div className="min-w-0 flex items-center gap-2">
               <input
@@ -268,13 +279,13 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
                 onChange={() => toggleSelected(f.id)}
                 aria-label={`Select ${f.title}`}
               />
-              {seriesId && <DragHandle {...handleProps(index)} />}
+              {scoped && <DragHandle {...handleProps(index)} />}
               <div className="min-w-0">
                 <p className="font-medium">{f.title}</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              {seriesId && (
+              {scoped && (
                 <>
                   <PositionInput
                     index={index}
@@ -299,19 +310,13 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
                   </button>
                 </>
               )}
-              {!seriesId && (
-                <select
-                  value={f.series?.id ?? ""}
-                  onChange={(e) => reassignSeries(f.id, e.target.value)}
-                  className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
-                >
-                  <option value="">No series</option>
-                  {seriesList.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.title}
-                    </option>
-                  ))}
-                </select>
+              {!scoped && (
+                <TargetSelect
+                  value={formatTarget(f.series?.id ?? null, f.category?.id ?? null)}
+                  onChange={(value) => reassignTarget(f.id, value)}
+                  seriesList={seriesList}
+                  categoryList={categoryList}
+                />
               )}
               <button
                 onClick={() => toggle(f, "published")}
@@ -346,7 +351,7 @@ export function FileManager({ seriesId }: { seriesId?: string }) {
         ))}
         {visibleFiles.length === 0 && (
           <li className="p-4 text-sm text-zinc-500">
-            {seriesId ? "No files in this series yet." : "No files yet."}
+            {seriesId ? "No files in this series yet." : categoryId ? "No files in this category yet." : "No files yet."}
           </li>
         )}
       </ul>

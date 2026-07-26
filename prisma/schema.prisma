@@ -98,6 +98,8 @@ model Category {
   parent           Category?                @relation("CategoryChildren", fields: [parentId], references: [id], onDelete: SetNull)
   children         Category[]               @relation("CategoryChildren")
   series           Series[]
+  videos           Video[]
+  files            FileAsset[]
   editors          CategoryEditor[]
   pluginOverrides  PluginCategoryOverride[]
   groupAssignments GroupAssignment[]
@@ -162,6 +164,10 @@ model Video {
   position        Int               @default(0)
   series          Series?           @relation(fields: [seriesId], references: [id], onDelete: SetNull)
   seriesId        String?
+  // Set only when seriesId is null: a video attached straight to a category,
+  // skipping the series layer for categories that don't need it (see FileAsset.categoryId too).
+  category        Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId      String?
   watchProgress   WatchProgress[]
   favoritedBy     VideoFavorite[]
   comments        Comment[]
@@ -177,6 +183,7 @@ model Video {
   updatedAt       DateTime          @updatedAt
 
   @@index([seriesId])
+  @@index([categoryId])
 }
 
 // A member's bookmark of a series, for a "My Favorites" page.
@@ -254,9 +261,13 @@ model FileAsset {
   position    Int       @default(0)
   series      Series?   @relation(fields: [seriesId], references: [id], onDelete: SetNull)
   seriesId    String?
+  // Set only when seriesId is null: a file attached straight to a category (see Video.categoryId).
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId  String?
   createdAt   DateTime  @default(now())
 
   @@index([seriesId])
+  @@index([categoryId])
 }
 
 // Append-only record of admin/editor actions, kept even if the acting user

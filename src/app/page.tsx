@@ -28,7 +28,11 @@ export default async function Home() {
   const trending = viewCountsOn ? await getTrendingSeries(isLoggedIn) : [];
 
   const visibleCategories = categories.filter(
-    (category) => category.series.length > 0 || category.children.length > 0,
+    (category) =>
+      category.series.length > 0 ||
+      category.children.length > 0 ||
+      category.videos.length > 0 ||
+      category.files.length > 0,
   );
   const hasContent = visibleCategories.length > 0 || uncategorized.length > 0;
 

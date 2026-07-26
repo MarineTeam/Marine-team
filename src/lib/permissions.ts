@@ -71,6 +71,12 @@ async function userCanEditSeries(
 }
 
 /** Boolean check for use in server components (which can't throw a NextResponse like the API guards do). */
+export async function canEditCategory(user: User, categoryId: string): Promise<boolean> {
+  if (user.role === "ADMIN") return true;
+  return userCanEditCategory(user.id, categoryId);
+}
+
+/** Boolean check for use in server components (which can't throw a NextResponse like the API guards do). */
 export async function canEditSeries(
   user: User,
   series: { id: string; categoryId: string | null },
@@ -148,16 +154,30 @@ export async function getEditableScope(
   };
 }
 
-/** Videos and files aren't directly assignable — access follows whatever series they belong to. */
-export async function ensureSeriesRelatedAccess(user: User, seriesId: string | null): Promise<void> {
+/**
+ * Videos and files aren't directly assignable to a user — access follows
+ * whatever series they belong to, or, for a video/file attached straight to
+ * a category (skipping the series layer), the category itself.
+ */
+export async function ensureContentAccess(
+  user: User,
+  target: { seriesId: string | null; categoryId: string | null },
+): Promise<void> {
   if (user.role === "ADMIN") return;
-  if (!seriesId) throw NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  const series = await prisma.series.findUnique({
-    where: { id: seriesId },
-    select: { id: true, categoryId: true },
-  });
-  if (!series) throw NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  await ensureSeriesAccess(user, series);
+  if (target.seriesId) {
+    const series = await prisma.series.findUnique({
+      where: { id: target.seriesId },
+      select: { id: true, categoryId: true },
+    });
+    if (!series) throw NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    await ensureSeriesAccess(user, series);
+    return;
+  }
+  if (target.categoryId) {
+    await ensureCategoryAccess(user, target.categoryId);
+    return;
+  }
+  throw NextResponse.json({ error: "Forbidden" }, { status: 403 });
 }
 
 /**

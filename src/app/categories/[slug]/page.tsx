@@ -3,9 +3,12 @@ import { notFound } from "next/navigation";
 import { CategoryTile } from "@/components/category-tile";
 import { SeriesTile } from "@/components/series-tile";
 import { SubscribeButton } from "@/components/subscribe-button";
+import { MenuTile } from "@/components/menu-tile";
+import { FileList } from "@/components/file-list";
 import { getCategoryBySlug, isCategorySubscribed } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { isPluginEnabled } from "@/lib/plugins";
+import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
 
 export default async function CategoryPage({
   params,
@@ -25,7 +28,11 @@ export default async function CategoryPage({
 
   const backHref = category.parent ? `/categories/${category.parent.slug}` : "/";
   const backLabel = category.parent ? category.parent.name : "Browse";
-  const isEmpty = category.series.length === 0 && category.children.length === 0;
+  const isEmpty =
+    category.series.length === 0 &&
+    category.children.length === 0 &&
+    category.videos.length === 0 &&
+    category.files.length === 0;
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
@@ -52,6 +59,31 @@ export default async function CategoryPage({
             <SeriesTile key={series.id} series={series} />
           ))}
         </div>
+      )}
+
+      {category.videos.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Videos</h2>
+          <div className="space-y-3">
+            {category.videos.map((video) => (
+              <MenuTile
+                key={video.id}
+                href={`/videos/${video.slug}`}
+                title={video.title}
+                subtitle={video.description}
+                thumbnailUrl={bunnyStreamThumbnailUrl(video.bunnyVideoId)}
+                badge={video.memberOnly ? "Members" : undefined}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {category.files.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Files</h2>
+          <FileList files={category.files} isLoggedIn={Boolean(user)} />
+        </section>
       )}
     </div>
   );
