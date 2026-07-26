@@ -122,13 +122,31 @@ export function mapBunnyStreamStatus(bunnyStatus: number): "PROCESSING" | "READY
 }
 
 /**
- * When the Stream library has "Token Authentication" enabled (Library ->
- * Security), the embed player and thumbnail/direct-play URLs 404 without a
- * signed `token`/`expires` pair. Bunny's formula:
- * sha256_hex(tokenAuthKey + videoId + expires).
- * https://docs.bunny.net/docs/stream-embed-view-token-authentication
+ * BunnyCDN's general Pull Zone Token Authentication: keyed on the URL path
+ * (not a video id), base64url-encoded.
+ * base64url(sha256(tokenAuthKey + urlPath + expires)).
+ * https://docs.bunny.net/docs/cdn-token-authentication
  */
-function bunnyStreamAuthParams(videoId: string): string {
+function pullZoneAuthParams(tokenAuthKey: string, urlPath: string, ttlSeconds: number): string {
+  const expires = Math.floor(Date.now() / 1000) + ttlSeconds;
+  const token = crypto
+    .createHash("sha256")
+    .update(`${tokenAuthKey}${urlPath}${expires}`)
+    .digest("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+  return `token=${token}&expires=${expires}`;
+}
+
+/**
+ * When the Stream library has "Token Authentication" enabled (Library ->
+ * Security), the *embed player* URL 404s without a signed `token`/`expires`
+ * pair — but this is a distinct mechanism from the thumbnail/CDN one below.
+ * https://docs.bunny.net/docs/stream-embed-view-token-authentication
+ * Formula: sha256_hex(tokenAuthKey + videoId + expires).
+ */
+function bunnyStreamEmbedAuthParams(videoId: string): string {
   const tokenAuthKey = process.env.BUNNY_STREAM_TOKEN_AUTH_KEY;
   if (!tokenAuthKey) return "";
 
@@ -158,15 +176,24 @@ export async function bunnySetStreamThumbnail(videoId: string, thumbnailUrl: str
   }
 }
 
+/**
+ * The thumbnail is a plain file served off the Stream library's own CDN
+ * pull zone (BUNNY_STREAM_CDN_HOSTNAME) — a different mechanism from the
+ * embed player below, even though both live under "Token Authentication" in
+ * the Bunny dashboard. This uses the general CDN pull zone scheme (path +
+ * expires, base64), not the embed-specific one (video id + expires, hex).
+ */
 export function bunnyStreamThumbnailUrl(videoId: string): string {
   const cdnHostname = process.env.BUNNY_STREAM_CDN_HOSTNAME;
   if (!cdnHostname) return "";
-  const authParams = bunnyStreamAuthParams(videoId);
-  return `https://${cdnHostname}/${videoId}/thumbnail.jpg${authParams ? `?${authParams}` : ""}`;
+  const tokenAuthKey = process.env.BUNNY_STREAM_TOKEN_AUTH_KEY;
+  const path = `/${videoId}/thumbnail.jpg`;
+  const authParams = tokenAuthKey ? pullZoneAuthParams(tokenAuthKey, path, 6 * 60 * 60) : "";
+  return `https://${cdnHostname}${path}${authParams ? `?${authParams}` : ""}`;
 }
 
 export function bunnyStreamEmbedUrl(videoId: string, startSeconds?: number): string {
-  const authParams = bunnyStreamAuthParams(videoId);
+  const authParams = bunnyStreamEmbedAuthParams(videoId);
   const startParam = startSeconds && startSeconds > 0 ? `t=${Math.floor(startSeconds)}s` : "";
   const query = ["autoplay=false", authParams, startParam].filter(Boolean).join("&");
   return `https://iframe.mediadelivery.net/embed/${streamLibraryId()}/${videoId}?${query}`;
@@ -225,11 +252,9 @@ export function bunnyStoragePublicUrl(path: string): string {
  * store the link: handing a freshly-uploaded thumbnail image to Bunny
  * Stream's "set thumbnail" call, which fetches it immediately. If the
  * Storage pull zone has "Token Authentication" enabled (Pull Zone ->
- * Security), an unsigned URL 401s; this appends BunnyCDN's general Pull Zone
- * token — keyed on the URL path and base64url-encoded, distinct from
- * Stream's video-id-keyed scheme:
- * base64url(sha256(tokenAuthKey + urlPath + expires)).
- * https://docs.bunny.net/docs/cdn-token-authentication
+ * Security), an unsigned URL 401s; this appends the same general BunnyCDN
+ * Pull Zone token used by bunnyStreamThumbnailUrl (see pullZoneAuthParams),
+ * distinct from the embed player's video-id-keyed scheme.
  *
  * Never use this for anything stored or distributed (DB fields, RSS feeds,
  * public links) — the token expires in minutes and isn't meant to survive
@@ -241,13 +266,7 @@ export function bunnyStorageSignedUrl(path: string): string {
   const publicUrl = bunnyStoragePublicUrl(cleanPath);
   if (!tokenAuthKey) return publicUrl;
 
-  const expires = Math.floor(Date.now() / 1000) + 10 * 60; // 10 minutes — only needs to survive one immediate fetch
-  const token = crypto
-    .createHash("sha256")
-    .update(`${tokenAuthKey}/${cleanPath}${expires}`)
-    .digest("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-  return `${publicUrl}?token=${token}&expires=${expires}`;
+  // 10 minutes — only needs to survive one immediate fetch, not stored anywhere.
+  const authParams = pullZoneAuthParams(tokenAuthKey, `/${cleanPath}`, 10 * 60);
+  return `${publicUrl}?${authParams}`;
 }
