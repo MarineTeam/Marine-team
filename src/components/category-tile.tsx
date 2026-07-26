@@ -4,6 +4,8 @@ import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
 type CategoryTileData = {
   slug: string;
   name: string;
+  memberOnly: boolean;
+  coverImageUrl: string | null;
   series: { coverImageUrl: string | null }[];
   children: { id: string }[];
   videos: { bunnyVideoId: string; thumbnailFileName: string | null }[];
@@ -14,6 +16,7 @@ export function CategoryTile({ category }: { category: CategoryTileData }) {
   const seriesThumbnail = category.series.find((s) => s.coverImageUrl)?.coverImageUrl ?? null;
   const firstVideo = category.videos[0];
   const thumbnailUrl =
+    category.coverImageUrl ??
     seriesThumbnail ??
     (firstVideo ? bunnyStreamThumbnailUrl(firstVideo.bunnyVideoId, firstVideo.thumbnailFileName) : null);
   const itemCount =
@@ -25,6 +28,7 @@ export function CategoryTile({ category }: { category: CategoryTileData }) {
       title={category.name}
       subtitle={itemCount > 0 ? `${itemCount} ${itemCount === 1 ? "item" : "items"}` : undefined}
       thumbnailUrl={thumbnailUrl}
+      badge={category.memberOnly ? "Members" : undefined}
     />
   );
 }

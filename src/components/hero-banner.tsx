@@ -17,7 +17,14 @@ export function HeroBanner({ series }: { series: Series }) {
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
       <div className="relative flex h-full max-w-6xl mx-auto flex-col justify-end px-4 pb-8">
-        <p className="text-sm font-medium text-zinc-300 uppercase tracking-wide">Featured</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium text-zinc-300 uppercase tracking-wide">Featured</p>
+          {series.memberOnly && (
+            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+              Members
+            </span>
+          )}
+        </div>
         <h1 className="mt-1 text-2xl sm:text-4xl font-semibold text-white tracking-tight">
           {series.title}
         </h1>

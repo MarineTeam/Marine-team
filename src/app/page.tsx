@@ -18,23 +18,18 @@ export default async function Home() {
   const user = await getCurrentUser();
   const isLoggedIn = Boolean(user);
   const [featured, categories, uncategorized, recentlyAdded, continueWatching, viewCountsOn] = await Promise.all([
-    getFeaturedSeries(isLoggedIn),
+    getFeaturedSeries(),
     getPublishedCategoriesWithSeries(isLoggedIn),
-    getUncategorizedSeries(isLoggedIn),
-    getRecentlyAddedSeries(isLoggedIn),
+    getUncategorizedSeries(),
+    getRecentlyAddedSeries(),
     user ? getContinueWatching(user.id) : Promise.resolve([]),
     isPluginEnabled("view-counts"),
   ]);
-  const trending = viewCountsOn ? await getTrendingSeries(isLoggedIn) : [];
+  const trending = viewCountsOn ? await getTrendingSeries() : [];
 
-  const visibleCategories = categories.filter(
-    (category) =>
-      category.series.length > 0 ||
-      category.children.length > 0 ||
-      category.videos.length > 0 ||
-      category.files.length > 0,
-  );
-  const hasContent = visibleCategories.length > 0 || uncategorized.length > 0;
+  // Every published category lists, empty or not — matching how an empty
+  // series still appears, so a category isn't invisible until it has content.
+  const hasContent = categories.length > 0 || uncategorized.length > 0;
 
   return (
     <div className="pb-12">
@@ -77,7 +72,7 @@ export default async function Home() {
 
         {hasContent && (
           <div className="space-y-3">
-            {visibleCategories.map((category) => (
+            {categories.map((category) => (
               <CategoryTile key={category.id} category={category} />
             ))}
             {uncategorized.map((series) => (
