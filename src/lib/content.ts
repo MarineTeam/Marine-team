@@ -44,11 +44,11 @@ const categoryOrder: Prisma.CategoryOrderByWithRelationInput[] = [
 export async function getPublishedCategoriesWithSeries(isLoggedIn: boolean) {
   const where = { ...publishedNow(), ...guestFilter(isLoggedIn) };
   return prisma.category.findMany({
-    where: { parentId: null },
+    where: { parentId: null, ...where },
     orderBy: categoryOrder,
     include: {
       series: { where, orderBy: seriesOrder },
-      children: { orderBy: categoryOrder },
+      children: { where, orderBy: categoryOrder },
       videos: { where, orderBy: { position: "asc" } },
       files: { where, orderBy: { position: "asc" } },
     },
@@ -123,12 +123,15 @@ export async function getRecentlyPlayed(userId: string, limit = 30) {
 export async function getCategoryBySlug(slug: string, isLoggedIn: boolean) {
   const where = { ...publishedNow(), ...guestFilter(isLoggedIn) };
   return prisma.category.findFirst({
-    where: { slug },
+    // No guestFilter on the category itself (mirrors getSeriesBySlug): a memberOnly category
+    // still resolves here so the page can show a MemberGate instead of a bare 404.
+    where: { slug, ...publishedNow() },
     include: {
       series: { where, orderBy: seriesOrder },
       videos: { where, orderBy: { position: "asc" } },
       files: { where, orderBy: { position: "asc" } },
       children: {
+        where,
         orderBy: categoryOrder,
         include: {
           series: { where, orderBy: seriesOrder },
@@ -293,7 +296,7 @@ export async function searchContent(query: string, isLoggedIn: boolean) {
 
   const [categories, seriesCandidates, videoCandidates] = await Promise.all([
     prisma.category.findMany({
-      where: { name: { contains: q, mode: "insensitive" } },
+      where: { name: { contains: q, mode: "insensitive" }, ...where },
       orderBy: categoryOrder,
       include: {
         series: { where, orderBy: seriesOrder },
@@ -441,23 +444,37 @@ export async function getActiveAnnouncement() {
 // --- Sequential unlock -------------------------------------------------------
 
 /**
- * When a series has `requireSequential` on, a video is locked until the
+ * When a series (or, for a video attached straight to a category, the
+ * category itself) has `requireSequential` on, a video is locked until the
  * previous video (by position) is marked completed in the viewer's
  * WatchProgress. Anonymous viewers (no progress tracking) never get locked out.
  */
 export async function isVideoLockedBySequence(
   userId: string | null,
-  video: { id: string; position: number; seriesId: string | null },
+  video: { id: string; position: number; seriesId: string | null; categoryId: string | null },
 ): Promise<boolean> {
-  if (!userId || !video.seriesId) return false;
-  const series = await prisma.series.findUnique({
-    where: { id: video.seriesId },
-    select: { requireSequential: true },
-  });
-  if (!series?.requireSequential) return false;
+  if (!userId) return false;
+  if (!video.seriesId && !video.categoryId) return false;
+
+  const requireSequential = video.seriesId
+    ? (
+        await prisma.series.findUnique({
+          where: { id: video.seriesId },
+          select: { requireSequential: true },
+        })
+      )?.requireSequential
+    : (
+        await prisma.category.findUnique({
+          where: { id: video.categoryId! },
+          select: { requireSequential: true },
+        })
+      )?.requireSequential;
+  if (!requireSequential) return false;
 
   const previous = await prisma.video.findFirst({
-    where: { seriesId: video.seriesId, position: { lt: video.position }, ...publishedNow() },
+    where: video.seriesId
+      ? { seriesId: video.seriesId, position: { lt: video.position }, ...publishedNow() }
+      : { categoryId: video.categoryId, position: { lt: video.position }, ...publishedNow() },
     orderBy: { position: "desc" },
   });
   if (!previous) return false;

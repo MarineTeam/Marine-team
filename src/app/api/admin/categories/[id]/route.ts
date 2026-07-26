@@ -12,10 +12,35 @@ const updateSchema = z.object({
     .min(1)
     .regex(/^[a-z0-9-]+$/)
     .optional(),
+  description: z.string().optional(),
+  coverImageUrl: z.string().url().optional().or(z.literal("")),
+  tags: z.array(z.string().min(1)).optional(),
+  memberOnly: z.boolean().optional(),
+  hidden: z.boolean().optional(),
+  published: z.boolean().optional(),
+  publishAt: z.string().nullable().optional(),
+  unpublishAt: z.string().nullable().optional(),
+  featured: z.boolean().optional(),
+  requireSequential: z.boolean().optional(),
   parentId: z.string().optional().nullable(),
   position: z.number().int().optional(),
   pinned: z.boolean().optional(),
 });
+
+function normalizeData(body: z.infer<typeof updateSchema>) {
+  return {
+    ...body,
+    tags: body.tags?.map((t) => t.trim().toLowerCase()).filter(Boolean),
+    publishAt:
+      body.publishAt === undefined ? undefined : body.publishAt === null ? null : new Date(body.publishAt),
+    unpublishAt:
+      body.unpublishAt === undefined
+        ? undefined
+        : body.unpublishAt === null
+          ? null
+          : new Date(body.unpublishAt),
+  };
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -32,7 +57,7 @@ export async function PATCH(
         { status: 400 },
       );
     }
-    const category = await prisma.category.update({ where: { id }, data: body });
+    const category = await prisma.category.update({ where: { id }, data: normalizeData(body) });
     await logAudit(user.email, "update", "category", category.id, JSON.stringify(body));
     return NextResponse.json(category);
   } catch (error) {
