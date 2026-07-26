@@ -204,8 +204,50 @@ export async function bunnyStorageDelete(path: string): Promise<void> {
   }
 }
 
+/**
+ * The stable, unsigned public URL for a Storage file. This is stored
+ * long-term (FileAsset.url) and embedded in the podcast RSS feed's
+ * <guid>/<enclosure>, both of which need to stay valid indefinitely — so
+ * this deliberately never appends a token, even if one is configured.
+ * If the pull zone requires a token for direct access, use
+ * bunnyStorageSignedUrl() instead, at the point something is actually
+ * fetching the file right now.
+ */
 export function bunnyStoragePublicUrl(path: string): string {
   const pullZoneHost = process.env.BUNNY_STORAGE_PULL_ZONE_HOSTNAME;
   if (!pullZoneHost) throw new Error("Missing BUNNY_STORAGE_PULL_ZONE_HOSTNAME env var");
   return `https://${pullZoneHost}/${path.replace(/^\/+/, "")}`;
+}
+
+/**
+ * A time-limited, signed variant of bunnyStoragePublicUrl(), for the one
+ * case where something needs to fetch a Storage file *right now* rather than
+ * store the link: handing a freshly-uploaded thumbnail image to Bunny
+ * Stream's "set thumbnail" call, which fetches it immediately. If the
+ * Storage pull zone has "Token Authentication" enabled (Pull Zone ->
+ * Security), an unsigned URL 401s; this appends BunnyCDN's general Pull Zone
+ * token — keyed on the URL path and base64url-encoded, distinct from
+ * Stream's video-id-keyed scheme:
+ * base64url(sha256(tokenAuthKey + urlPath + expires)).
+ * https://docs.bunny.net/docs/cdn-token-authentication
+ *
+ * Never use this for anything stored or distributed (DB fields, RSS feeds,
+ * public links) — the token expires in minutes and isn't meant to survive
+ * past the immediate fetch it's generated for.
+ */
+export function bunnyStorageSignedUrl(path: string): string {
+  const tokenAuthKey = process.env.BUNNY_STORAGE_TOKEN_AUTH_KEY;
+  const cleanPath = path.replace(/^\/+/, "");
+  const publicUrl = bunnyStoragePublicUrl(cleanPath);
+  if (!tokenAuthKey) return publicUrl;
+
+  const expires = Math.floor(Date.now() / 1000) + 10 * 60; // 10 minutes — only needs to survive one immediate fetch
+  const token = crypto
+    .createHash("sha256")
+    .update(`${tokenAuthKey}/${cleanPath}${expires}`)
+    .digest("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+  return `${publicUrl}?token=${token}&expires=${expires}`;
 }

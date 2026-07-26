@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
-import { ensureStaff, ensureCapability } from "@/lib/permissions";
+import { ensureStaff, ensureCapability, ensureCategoryAccess } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 
 const updateSchema = z.object({
@@ -48,8 +48,12 @@ export async function PATCH(
 ) {
   try {
     const user = await ensureStaff();
-    await ensureCapability(user, "manage_categories");
     const { id } = await params;
+    // Same access model as the admin category detail page (canEditCategory):
+    // a CategoryEditor grant or scoped content-management group is enough to
+    // edit a category's own fields, not just the stricter site-wide
+    // "manage_categories" capability used for structural changes.
+    await ensureCategoryAccess(user, id);
     const body = updateSchema.parse(await request.json());
     if (body.parentId === id) {
       return NextResponse.json(

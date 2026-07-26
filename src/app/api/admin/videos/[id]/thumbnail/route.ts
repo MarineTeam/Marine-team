@@ -4,7 +4,12 @@ import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureContentAccess } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
-import { bunnySetStreamThumbnail, bunnyStorageUpload, bunnyStreamThumbnailUrl } from "@/lib/bunny";
+import {
+  bunnySetStreamThumbnail,
+  bunnyStorageUpload,
+  bunnyStorageSignedUrl,
+  bunnyStreamThumbnailUrl,
+} from "@/lib/bunny";
 
 const urlSchema = z.object({ thumbnailUrl: z.string().url() });
 
@@ -41,7 +46,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
       const buffer = Buffer.from(await file.arrayBuffer());
       const bunnyPath = `thumbnails/${video.id}-${crypto.randomUUID()}`;
-      sourceUrl = await bunnyStorageUpload(bunnyPath, buffer, file.type);
+      await bunnyStorageUpload(bunnyPath, buffer, file.type);
+      // Signed, short-lived: Bunny Stream fetches this once, immediately, to
+      // ingest the image — it's never stored or shown to anyone afterward.
+      sourceUrl = bunnyStorageSignedUrl(bunnyPath);
     } else {
       const body = urlSchema.parse(await request.json());
       sourceUrl = body.thumbnailUrl;
