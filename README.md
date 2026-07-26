@@ -18,11 +18,7 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
 ## Setup
 
 1. Copy `.env.example` to `.env` and fill in real values:
-   - A Postgres connection string for app traffic (`DATABASE_URL`, pooled/PgBouncer)
-     and a direct connection string for migrations (`DIRECT_URL`) — see the
-     comments in `.env.example`. Using a low-connection-limit "migration only"
-     role for `DATABASE_URL` at runtime causes
-     `too many connections for role ...` errors under load.
+   - A Postgres connection string (`DATABASE_URL`)
    - An Auth0 "Regular Web Application" (`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`,
      `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET` — generate with `openssl rand -hex 32`)
      - In the Auth0 app settings, set Allowed Callback URLs to
