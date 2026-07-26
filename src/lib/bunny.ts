@@ -140,6 +140,24 @@ function bunnyStreamAuthParams(videoId: string): string {
   return `token=${token}&expires=${expires}`;
 }
 
+/**
+ * Overrides Bunny Stream's auto-generated thumbnail with an image fetched
+ * from `thumbnailUrl` (which can itself be a Bunny Storage URL, letting
+ * "manually uploaded" reuse the same call as "set from URL" — the file just
+ * goes to Bunny Storage first). The result is served from the same
+ * predictable thumbnail.jpg URL as before, so nothing that reads
+ * bunnyStreamThumbnailUrl() needs to change.
+ */
+export async function bunnySetStreamThumbnail(videoId: string, thumbnailUrl: string): Promise<void> {
+  const res = await fetch(
+    `${STREAM_API_BASE}/library/${streamLibraryId()}/videos/${videoId}/thumbnail?thumbnailUrl=${encodeURIComponent(thumbnailUrl)}`,
+    { method: "POST", headers: { AccessKey: streamApiKey() } },
+  );
+  if (!res.ok) {
+    throw new Error(`Bunny Stream set thumbnail failed: ${res.status} ${await res.text()}`);
+  }
+}
+
 export function bunnyStreamThumbnailUrl(videoId: string): string {
   const cdnHostname = process.env.BUNNY_STREAM_CDN_HOSTNAME;
   if (!cdnHostname) return "";

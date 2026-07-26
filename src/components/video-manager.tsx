@@ -5,6 +5,7 @@ import { Upload } from "tus-js-client";
 import { DragHandle, PositionInput, useDragReorder } from "@/components/reorder-controls";
 import { reorderArray } from "@/lib/reorder";
 import { ViewerAccessManager } from "@/components/viewer-access-manager";
+import { ThumbnailManager } from "@/components/thumbnail-manager";
 import {
   TargetSelect,
   formatTarget,
@@ -26,6 +27,7 @@ type Video = {
   isPremiere: boolean;
   series: { id: string; title: string } | null;
   category: { id: string; name: string } | null;
+  thumbnailPreviewUrl: string;
 };
 type BunnyLibraryVideo = {
   guid: string;
@@ -71,6 +73,7 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
   const [query, setQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [managingAccessId, setManagingAccessId] = useState<string | null>(null);
+  const [managingThumbnailId, setManagingThumbnailId] = useState<string | null>(null);
 
   async function load() {
     const [videosRes, seriesRes, categoriesRes] = await Promise.all([
@@ -502,6 +505,14 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
                 aria-label={`Select ${v.title}`}
               />
               {scoped && <DragHandle {...handleProps(index)} />}
+              {v.thumbnailPreviewUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={v.thumbnailPreviewUrl}
+                  alt=""
+                  className="h-10 w-16 shrink-0 rounded object-cover bg-zinc-100 dark:bg-zinc-800"
+                />
+              )}
               <div className="min-w-0">
                 <p className="font-medium">{v.title}</p>
                 <p className="text-sm text-zinc-500">{v.status}</p>
@@ -582,6 +593,12 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
                 {v.isPremiere ? "Premiere set" : "Schedule premiere"}
               </button>
               <button
+                onClick={() => setManagingThumbnailId(managingThumbnailId === v.id ? null : v.id)}
+                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+              >
+                Thumbnail
+              </button>
+              <button
                 onClick={() => setManagingAccessId(managingAccessId === v.id ? null : v.id)}
                 className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
               >
@@ -592,6 +609,11 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
               </button>
             </div>
           </div>
+          {managingThumbnailId === v.id && (
+            <div className="px-4 pb-4">
+              <ThumbnailManager videoId={v.id} currentUrl={v.thumbnailPreviewUrl} onChange={load} />
+            </div>
+          )}
           {managingAccessId === v.id && (
             <div className="px-4 pb-4">
               <ViewerAccessManager type="video" id={v.id} />
