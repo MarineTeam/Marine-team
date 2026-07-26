@@ -1,9 +1,10 @@
 import { canAccess } from "@/lib/content";
+import { bunnyStoragePublicUrl } from "@/lib/bunny";
 
 type FileListItem = {
   id: string;
   title: string;
-  url: string;
+  bunnyPath: string;
   memberOnly: boolean;
   mimeType: string | null;
 };
@@ -14,6 +15,10 @@ export function FileList({ files, isLoggedIn }: { files: FileListItem[]; isLogge
       {files.map((file) => {
         const locked = !canAccess(file.memberOnly, isLoggedIn);
         const isAudio = file.mimeType?.startsWith("audio/") ?? false;
+        // Computed fresh rather than trusting a stored URL, so a corrected
+        // BUNNY_STORAGE_PULL_ZONE_HOSTNAME takes effect immediately for
+        // every file, not just ones re-uploaded after the fix.
+        const url = bunnyStoragePublicUrl(file.bunnyPath);
         return (
           <li key={file.id} className="p-4 flex flex-col gap-3">
             <div className="flex items-center justify-between gap-4">
@@ -23,7 +28,7 @@ export function FileList({ files, isLoggedIn }: { files: FileListItem[]; isLogge
               ) : (
                 !isAudio && (
                   <a
-                    href={file.url}
+                    href={url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
@@ -34,7 +39,7 @@ export function FileList({ files, isLoggedIn }: { files: FileListItem[]; isLogge
               )}
             </div>
             {!locked && isAudio && (
-              <audio controls src={file.url} className="w-full">
+              <audio controls src={url} className="w-full">
                 Your browser does not support the audio element.
               </audio>
             )}

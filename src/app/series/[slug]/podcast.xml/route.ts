@@ -1,4 +1,5 @@
 import { getSeriesBySlug } from "@/lib/content";
+import { bunnyStoragePublicUrl } from "@/lib/bunny";
 
 function escapeXml(value: string): string {
   return value
@@ -21,14 +22,19 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
   const episodes = series.files.filter((f) => f.mimeType?.startsWith("audio/"));
 
   const items = episodes
-    .map(
-      (f) => `
+    .map((f) => {
+      // The enclosure URL is computed fresh (never a stored value) so a
+      // corrected Bunny hostname takes effect immediately; the guid is the
+      // file's own stable id, decoupled from that URL, so podcast apps
+      // never see an episode as "new" just because a hostname changed.
+      const url = bunnyStoragePublicUrl(f.bunnyPath);
+      return `
     <item>
       <title>${escapeXml(f.title)}</title>
-      <guid>${f.url}</guid>
-      <enclosure url="${f.url}" type="${f.mimeType}" ${f.sizeBytes ? `length="${f.sizeBytes}"` : ""}/>
-    </item>`,
-    )
+      <guid isPermaLink="false">${f.id}</guid>
+      <enclosure url="${url}" type="${f.mimeType}" ${f.sizeBytes ? `length="${f.sizeBytes}"` : ""}/>
+    </item>`;
+    })
     .join("");
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
