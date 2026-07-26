@@ -54,7 +54,7 @@ export default async function FavoritesPage() {
                 href={`/videos/${f.video.slug}`}
                 title={f.video.title}
                 subtitle={f.video.series?.title}
-                thumbnailUrl={bunnyStreamThumbnailUrl(f.video.bunnyVideoId)}
+                thumbnailUrl={bunnyStreamThumbnailUrl(f.video.bunnyVideoId, f.video.thumbnailFileName)}
               />
             ))}
           </div>

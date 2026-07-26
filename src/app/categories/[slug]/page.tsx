@@ -91,7 +91,7 @@ export default async function CategoryPage({
                     href={`/videos/${video.slug}`}
                     title={video.title}
                     subtitle={video.description}
-                    thumbnailUrl={bunnyStreamThumbnailUrl(video.bunnyVideoId)}
+                    thumbnailUrl={bunnyStreamThumbnailUrl(video.bunnyVideoId, video.thumbnailFileName)}
                     badge={video.memberOnly ? "Members" : undefined}
                   />
                 ))}

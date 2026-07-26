@@ -8,7 +8,7 @@ import {
   bunnySetStreamThumbnail,
   bunnyStorageUpload,
   bunnyStorageSignedUrl,
-  bunnyStreamThumbnailUrl,
+  bunnyGetStreamVideo,
 } from "@/lib/bunny";
 
 const urlSchema = z.object({ thumbnailUrl: z.string().url() });
@@ -56,9 +56,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     await bunnySetStreamThumbnail(video.bunnyVideoId, sourceUrl);
+    // Setting a custom thumbnail changes Bunny's stored file name, so read it
+    // back rather than assuming the "thumbnail.jpg" default.
+    const bunnyVideo = await bunnyGetStreamVideo(video.bunnyVideoId);
     const updated = await prisma.video.update({
       where: { id },
-      data: { thumbnailUrl: bunnyStreamThumbnailUrl(video.bunnyVideoId) },
+      data: { thumbnailFileName: bunnyVideo.thumbnailFileName ?? null },
     });
     await logAudit(user.email, "update", "video", video.id, "set thumbnail");
     return NextResponse.json(updated);

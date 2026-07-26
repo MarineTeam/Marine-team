@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureContentAccess } from "@/lib/permissions";
-import { bunnyStreamThumbnailUrl, mapBunnyStreamStatus } from "@/lib/bunny";
+import { bunnyGetStreamVideo, mapBunnyStreamStatus } from "@/lib/bunny";
 
 /**
  * Polls Bunny Stream for encoding progress. Bunny status codes: 0 created,
@@ -19,14 +19,7 @@ export async function POST(
     const video = await prisma.video.findUniqueOrThrow({ where: { id } });
     await ensureContentAccess(user, { seriesId: video.seriesId, categoryId: video.categoryId });
 
-    const res = await fetch(
-      `https://video.bunnycdn.com/library/${video.bunnyLibraryId}/videos/${video.bunnyVideoId}`,
-      { headers: { AccessKey: process.env.BUNNY_STREAM_API_KEY! } },
-    );
-    if (!res.ok) {
-      throw new Error(`Bunny status check failed: ${res.status}`);
-    }
-    const data = (await res.json()) as { status: number; length?: number };
+    const data = await bunnyGetStreamVideo(video.bunnyVideoId);
 
     const status = mapBunnyStreamStatus(data.status);
     const updated = await prisma.video.update({
@@ -34,7 +27,7 @@ export async function POST(
       data: {
         status,
         durationSeconds: data.length ?? undefined,
-        thumbnailUrl: bunnyStreamThumbnailUrl(video.bunnyVideoId),
+        thumbnailFileName: data.thumbnailFileName ?? null,
       },
     });
     return NextResponse.json(updated);

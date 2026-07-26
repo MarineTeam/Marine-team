@@ -64,7 +64,7 @@ export default async function Home() {
                   href={`/videos/${entry.video.slug}`}
                   title={entry.video.title}
                   subtitle={entry.video.series?.title}
-                  thumbnailUrl={bunnyStreamThumbnailUrl(entry.video.bunnyVideoId)}
+                  thumbnailUrl={bunnyStreamThumbnailUrl(entry.video.bunnyVideoId, entry.video.thumbnailFileName)}
                 />
               ))}
             </div>

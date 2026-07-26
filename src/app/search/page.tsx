@@ -68,7 +68,7 @@ export default async function SearchPage({
                 href={`/videos/${video.slug}`}
                 title={video.title}
                 subtitle={video.series?.title ?? video.description}
-                thumbnailUrl={bunnyStreamThumbnailUrl(video.bunnyVideoId)}
+                thumbnailUrl={bunnyStreamThumbnailUrl(video.bunnyVideoId, video.thumbnailFileName)}
                 badge={video.memberOnly ? "Members" : undefined}
               />
             ))}

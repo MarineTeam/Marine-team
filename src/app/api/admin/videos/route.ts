@@ -59,7 +59,7 @@ export async function GET() {
     // (which uses node:crypto and can't be bundled into a client component).
     const withThumbnails = videos.map((v) => ({
       ...v,
-      thumbnailPreviewUrl: bunnyStreamThumbnailUrl(v.bunnyVideoId),
+      thumbnailPreviewUrl: bunnyStreamThumbnailUrl(v.bunnyVideoId, v.thumbnailFileName),
     }));
     return NextResponse.json(withThumbnails);
   } catch (error) {

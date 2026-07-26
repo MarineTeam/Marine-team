@@ -38,7 +38,7 @@ export default async function RecentlyPlayedPage() {
               href={`/videos/${entry.video.slug}`}
               title={entry.video.title}
               subtitle={entry.video.series?.title}
-              thumbnailUrl={bunnyStreamThumbnailUrl(entry.video.bunnyVideoId)}
+              thumbnailUrl={bunnyStreamThumbnailUrl(entry.video.bunnyVideoId, entry.video.thumbnailFileName)}
               badge={entry.completed ? "Watched" : undefined}
             />
           ))}
