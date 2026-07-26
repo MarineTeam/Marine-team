@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getCurrentUser, getSessionIdentity } from "@/lib/current-user";
 import { getPluginStates } from "@/lib/plugins";
 import { PushNotificationToggle } from "@/components/push-notification-toggle";
+import { MobileMenu } from "@/components/mobile-menu";
 
 export async function Navbar() {
   const [user, identity, plugins] = await Promise.all([
@@ -29,8 +30,8 @@ export async function Navbar() {
             className="w-full rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
           />
         </form>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:gap-4 text-sm sm:ml-auto">
-          <Link href="/" className="hidden sm:inline hover:underline">
+        <div className="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-2 sm:gap-4 text-sm sm:ml-auto">
+          <Link href="/" className="hover:underline">
             Browse
           </Link>
           {user?.role === "ADMIN" && (
@@ -39,7 +40,7 @@ export async function Navbar() {
             </Link>
           )}
           {user && (
-            <Link href="/favorites" className="hidden sm:inline hover:underline">
+            <Link href="/favorites" className="hover:underline">
               Favorites
             </Link>
           )}
@@ -89,6 +90,16 @@ export async function Navbar() {
               Log in
             </a>
           )}
+        </div>
+        <div className="sm:hidden ml-auto">
+          <MobileMenu
+            user={user ? { name: user.name, email: user.email, role: user.role } : null}
+            unauthorized={unauthorized}
+            watchLaterOn={watchLaterOn}
+            playlistsOn={playlistsOn}
+            subscriptionsOn={subscriptionsOn}
+            notificationsOn={notificationsOn}
+          />
         </div>
       </nav>
     </header>
