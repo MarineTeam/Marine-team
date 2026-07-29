@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 
 /**
  * Lets an admin override a video's Bunny Stream thumbnail — from a pasted
@@ -64,10 +65,11 @@ export function ThumbnailManager({
     <div className="space-y-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
       <div className="flex items-center gap-3">
         {currentUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={currentUrl}
             alt=""
+            width={96}
+            height={56}
             className="h-14 w-24 rounded object-cover bg-zinc-100 dark:bg-zinc-800"
           />
         )}

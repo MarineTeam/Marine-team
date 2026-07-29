@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 function PlaceholderIcon() {
@@ -39,10 +40,12 @@ export function MenuTile({
       href={href}
       className="group flex items-center gap-4 rounded-xl border border-zinc-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-900"
     >
-      <div className="h-16 w-16 sm:h-20 sm:w-20 shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
+      <div className="relative h-16 w-16 sm:h-20 sm:w-20 shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
         {thumbnailUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={thumbnailUrl} alt="" className="h-full w-full object-cover" />
+          // A video thumbnail is Bunny-hosted, but a series/category cover
+          // image is a freeform admin-pasted URL (any host) — unoptimized
+          // rather than widening remotePatterns to any host for this shared tile.
+          <Image src={thumbnailUrl} alt="" fill unoptimized className="object-cover" />
         ) : (
           <PlaceholderIcon />
         )}

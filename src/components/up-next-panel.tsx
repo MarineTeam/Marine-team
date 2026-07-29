@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 const AUTOPLAY_KEY = "up-next-autoplay";
@@ -50,8 +51,13 @@ export function UpNextPanel({
   return (
     <div className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
       {thumbnailUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={thumbnailUrl} alt="" className="h-16 w-28 shrink-0 rounded object-cover" />
+        <Image
+          src={thumbnailUrl}
+          alt=""
+          width={112}
+          height={64}
+          className="h-16 w-28 shrink-0 rounded object-cover"
+        />
       )}
       <div className="min-w-0 flex-1">
         <p className="text-xs uppercase tracking-wide text-zinc-500">

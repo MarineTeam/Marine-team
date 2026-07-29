@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { Series } from "@prisma/client";
 
@@ -8,11 +9,15 @@ export function HeroBanner({ series }: { series: Series }) {
       className="group relative block h-64 sm:h-80 w-full overflow-hidden bg-zinc-900"
     >
       {series.coverImageUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        // Cover images are a freeform admin-pasted URL (see series-edit-form),
+        // so this is unoptimized rather than widening remotePatterns to any host.
+        <Image
           src={series.coverImageUrl}
           alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-70 transition group-hover:opacity-60 group-hover:scale-105"
+          fill
+          unoptimized
+          priority
+          className="object-cover opacity-70 transition group-hover:opacity-60 group-hover:scale-105"
         />
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
