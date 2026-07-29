@@ -176,6 +176,9 @@ model Video {
   // (via our admin UI or Bunny's dashboard) changes it. Synced from the
   // Bunny API; null falls back to the "thumbnail.jpg" default.
   thumbnailFileName String?
+  // Full text transcript, admin-entered. Shown in a collapsible panel by
+  // the Transcripts plugin and matched by search when that plugin is on.
+  transcript        String?
   durationSeconds   Int?
   status            VideoStatus        @default(PROCESSING)
   memberOnly        Boolean            @default(false)

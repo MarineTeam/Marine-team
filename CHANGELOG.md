@@ -19,6 +19,8 @@ All notable changes to this project are documented here. Format follows
 - **Chapters plugin**: admins can add named timestamps to a video from the
   video manager; the video page shows a clickable chapter list underneath
   the player.
+- **Transcripts plugin**: admins can paste a full-text transcript per video,
+  shown in a collapsible panel and matched by `/search` when the plugin is on.
 
 ## [1.2.0] - 2026-07-25
 

@@ -83,6 +83,9 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   video; the video page shows a jump-to-section list underneath the player.
   Clicking a chapter reloads the embed starting at that timestamp (Bunny's
   iframe has no seek API — see the technical note below).
+- **Transcripts** — an admin-pasted full-text transcript per video, shown in
+  a collapsible panel; when this plugin is on, `/search` also matches
+  against transcript text (weighted below a title/description match).
 
 ## Auth
 

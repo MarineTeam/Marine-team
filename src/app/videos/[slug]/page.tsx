@@ -101,6 +101,7 @@ export default async function VideoPage({
     "likes-dislikes": likesOn,
     "up-next": upNextOn,
     chapters: chaptersOn,
+    transcripts: transcriptsOn,
   } = plugins;
   const resumeAt = progress && !progress.completed ? progress.positionSeconds : 0;
 
@@ -201,6 +202,13 @@ export default async function VideoPage({
       )}
 
       {video.description && <p className="text-zinc-600 dark:text-zinc-400">{video.description}</p>}
+
+      {transcriptsOn && video.transcript && (
+        <details className="rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
+          <summary className="cursor-pointer font-medium">Transcript</summary>
+          <p className="mt-2 whitespace-pre-wrap text-zinc-600 dark:text-zinc-400">{video.transcript}</p>
+        </details>
+      )}
 
       {user && video.status === "READY" && !sequenceLocked && (
         <WatchProgressTracker

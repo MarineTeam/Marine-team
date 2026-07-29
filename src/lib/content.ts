@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { unstable_cache } from "next/cache";
 import type { Prisma } from "@prisma/client";
+import { isPluginEnabled } from "@/lib/plugins";
 
 export function canAccess(memberOnly: boolean, isLoggedIn: boolean): boolean {
   return !memberOnly || isLoggedIn;
@@ -371,6 +372,7 @@ export async function searchContent(query: string, isLoggedIn: boolean) {
   if (!q) return { categories: [], series: [], videos: [] };
   const qLower = q.toLowerCase();
   const where = { ...publishedNow(), ...guestFilter(isLoggedIn) };
+  const transcriptsOn = await isPluginEnabled("transcripts");
 
   const [categories, seriesCandidates, videoCandidates] = await Promise.all([
     prisma.category.findMany({
@@ -410,6 +412,7 @@ export async function searchContent(query: string, isLoggedIn: boolean) {
             OR: [
               { title: { contains: q, mode: "insensitive" } },
               { description: { contains: q, mode: "insensitive" } },
+              ...(transcriptsOn ? [{ transcript: { contains: q, mode: "insensitive" as const } }] : []),
             ],
           },
         ],

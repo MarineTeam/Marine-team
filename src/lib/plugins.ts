@@ -17,6 +17,7 @@ export const PLUGIN_META = [
   { slug: "watch-history", name: "Watch history", description: "Shows a \"Recently Played\" page and nav tab of everything a member has watched." },
   { slug: "profiles", name: "Profiles", description: "Lets members set a display name shown instead of their Auth0 name in comments and the navbar." },
   { slug: "chapters", name: "Chapters", description: "Shows a jump-to-section chapter list under a video, admin-managed per video." },
+  { slug: "transcripts", name: "Transcripts", description: "Shows a collapsible full-text transcript under a video and includes it in search results." },
 ] as const;
 
 export type PluginSlug = (typeof PLUGIN_META)[number]["slug"];

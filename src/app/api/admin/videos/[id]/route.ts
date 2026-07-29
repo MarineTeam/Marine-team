@@ -19,6 +19,7 @@ export const updateSchema = z
       .regex(/^[a-z0-9-]+$/)
       .optional(),
     description: z.string().optional(),
+    transcript: z.string().optional().nullable(),
     seriesId: z.string().optional().nullable(),
     categoryId: z.string().optional().nullable(),
     memberOnly: z.boolean().optional(),
