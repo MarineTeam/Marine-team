@@ -199,6 +199,11 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   - **Likes / dislikes**: a thumbs up/down on a series or video, alongside
     (and independent from) the star Ratings plugin.
   - **Live streaming**: see above.
+  - **Sermon notes**: a member's own private, timestamped notes on a video
+    (`SermonNote`), added from a panel on the video page and exportable as a
+    text file. The timestamp field is prefilled once from the same
+    elapsed-time heartbeat used for Continue watching, then edited freely —
+    it isn't kept in sync with real playback (see the technical notes below).
 - **Sequential unlock**: a per-series "Require watching in order" toggle
   (`Series.requireSequential`, set on the series edit page — not a plugin,
   since it's a property of one series rather than a site feature). When on,
@@ -233,7 +238,12 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   for exact play/pause/seek events, so this is elapsed-time based, not a
   precise scrub position) — the homepage shows a "Continue watching" row
   from that, resuming playback near where you left off via Bunny's `t=`
-  embed parameter, plus a "Recently added" row of newest published series.
+  embed parameter, plus a "Recently added" row of newest published series. A
+  "Mark as watched" toggle on the video page (`MarkWatchedButton`) sets or
+  clears `WatchProgress.completed` directly — the same completion flag that
+  gates Sequential unlock and feeds the watch-through-rate analytics —
+  independent of the heartbeat, which only ever sets it to `true`, never
+  back to `false` (a stray heartbeat must not silently undo a completion).
 - **Trending / Up next / premieres**: the homepage shows a "Trending this
   week" row (from a timestamped view log, distinct from the simple
   `viewCount` counter); video pages show an "Up next" panel with an
@@ -250,6 +260,23 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   configured yet, the same fail-open pattern as `getPluginStates()`.
   Continue watching (when shown) always renders directly above the
   category/series browse list, which itself isn't a configurable row.
+- **Trash** (`/admin/trash`): deleting a category, series, video, or file
+  now sets `deletedAt` instead of removing the row (`publishedNow()` in
+  `src/lib/content.ts` excludes it everywhere public, and every admin list
+  route filters it too). Restore clears `deletedAt`; permanent delete
+  (`/api/admin/trash/[type]/[id]` `DELETE`) is the only point a video/file's
+  underlying Bunny Stream/Storage asset is actually removed — trashing alone
+  leaves it in place, unlike before. Gated on holding at least one of
+  `manage_categories`/`manage_series`/`manage_videos`/`manage_files`
+  site-wide (or `ADMIN`), since the queue spans all four types at once.
+  Trashing a category/series doesn't cascade: a child row keeps its
+  `categoryId`/`seriesId` as-is and just stops appearing in listings that
+  traverse through the trashed parent, while staying reachable directly by URL.
+- **Slug aliases**: changing a series/video's `slug` from its edit page
+  records a `SlugAlias` (old slug -> current id); the `/series/[slug]` and
+  `/videos/[slug]` pages fall back to resolving one when the direct lookup
+  finds nothing, then `permanentRedirect()` to the current slug — so a link
+  shared before a rename still works instead of 404ing.
 - **Feeds**: `/feed.xml` is a site-wide RSS feed of recently added series;
   `/series/[slug]/podcast.xml` is an iTunes-compatible podcast feed of a
   series' published audio files (skipped for `memberOnly` series, since

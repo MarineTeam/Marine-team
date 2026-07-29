@@ -289,7 +289,7 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
   }
 
   async function remove(id: string) {
-    if (!confirm("Delete this video? This also removes it from Bunny Stream.")) return;
+    if (!confirm("Move this video to Trash? It's restorable from Admin > Trash; the Bunny Stream asset isn't removed until it's permanently deleted from there.")) return;
     await fetch(`/api/admin/videos/${id}`, { method: "DELETE" });
     await load();
   }
@@ -340,7 +340,7 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
   }
 
   async function bulkDelete() {
-    if (!confirm(`Delete ${selectedIds.size} video(s)? This also removes them from Bunny Stream.`))
+    if (!confirm(`Move ${selectedIds.size} video(s) to Trash? Restorable from Admin > Trash.`))
       return;
     await fetch("/api/admin/videos/bulk", {
       method: "POST",

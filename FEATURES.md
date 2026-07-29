@@ -126,6 +126,18 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Recommendations** — a homepage "Because you watched X" row for logged-in
   members, anchored on the series of their most recently watched video and
   reusing the same same-category/shared-tag logic as related content.
+- **Sermon notes** — a member's own private, timestamped notes on a video
+  (e.g. "12:03 — great point about grace"), added while watching and
+  exportable as a plain text file. The timestamp is manually entered, the
+  same limitation as Chapters (see the technical note below).
+
+## Watch progress extras
+
+- **Mark as watched** — a manual toggle on the video page sets or clears
+  `WatchProgress.completed` directly, independent of the heartbeat
+  approximation — useful when a member watched elsewhere, or the heartbeat
+  missed the very end. Affects the same completion flag that gates
+  sequential unlock and feeds the watch-through-rate analytics.
 
 ## Auth
 
@@ -216,6 +228,20 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   with a secret as an `X-Webhook-Signature` header (hex HMAC-SHA256). Needs
   the Webhooks plugin enabled in Plugins.
 
+- **Trash** (`/admin/trash`) — deleting a category, series, video, or file
+  moves it to trash instead of removing it, so a mistake is recoverable.
+  Restore brings it back exactly as it was; permanent delete is
+  irreversible and, for a video/file, is also the point its underlying
+  Bunny Stream/Storage asset actually gets removed — trashing alone leaves
+  it in place. Requires holding at least one of the four content-management
+  capabilities (`manage_categories`/`series`/`videos`/`files`) site-wide, or
+  being `ADMIN`; see the technical note below on what trashing a category or
+  series does (and doesn't do) to what's inside it.
+
+- **Slug aliases** — renaming a series or video's slug from its edit page
+  records the old slug, so a link shared before the rename 301s to the
+  current one instead of 404ing, automatically.
+
 ## Admin analytics (`/admin/analytics`)
 
 - Needs the `view_analytics` capability. Shows total views over the last 30
@@ -241,6 +267,23 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Chapters** have the same root cause too: since the embed has no seek
   API, clicking a chapter reloads the iframe with a new `t=` start-time
   query param instead of seeking a live player.
+- **Sermon notes'** timestamp field is manually entered for the same
+  reason (no real playback position to read) — it's prefilled once from the
+  heartbeat's elapsed-time approximation as a starting point to adjust from,
+  not kept in sync afterward.
+- **The heartbeat never un-marks a video as watched**: `/api/watch-progress`
+  only ever sets `completed` to `true`, never back to `false` — a stray
+  heartbeat reporting `false` (e.g. re-opening a finished video partway
+  through) must not silently clear a completion that "Mark as watched" or an
+  earlier heartbeat already recorded. Un-marking is only ever a deliberate
+  action, via the mark-as-watched toggle or `/api/watch-progress/mark-watched`.
+- **Trashing a category or series doesn't cascade to what's inside it**: its
+  own row gets `deletedAt` set, but a child series/video/file keeps its
+  existing `categoryId`/`seriesId` untouched — it just stops appearing
+  anywhere the trashed parent would have listed it (the category/series
+  browse tree), while still being directly reachable by its own URL. This is
+  a deliberate scope trim for the first version of trash rather than full
+  recursive soft-delete/restore.
 - **View counts** are a simple per-page-load counter, not deduplicated or
   spam-resistant — a basic "how many hits" number, not analytics. Trending
   and the admin analytics dashboard use a separate timestamped view log for

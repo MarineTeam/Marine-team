@@ -6,6 +6,7 @@ import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureSeriesAccess, ensureCategoryAccess } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { fireWebhooks } from "@/lib/webhooks";
+import { recordSlugAlias } from "@/lib/content";
 
 export const updateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -82,6 +83,7 @@ export async function PATCH(
     const series = await prisma.series.update({ where: { id }, data: normalizeSeriesData(body) });
     await logAudit(user.email, "update", "series", series.id, JSON.stringify(body));
     revalidateTag("series", { expire: 0 });
+    if (body.slug) await recordSlugAlias("SERIES", existing.slug, body.slug, series.id);
 
     if (existing.published === false && series.published === true) {
       await fireWebhooks("series.published", {
@@ -98,6 +100,7 @@ export async function PATCH(
   }
 }
 
+/** Soft delete — moves the series to /admin/trash instead of removing it, so it can be restored. */
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -107,8 +110,8 @@ export async function DELETE(
     const { id } = await params;
     const existing = await prisma.series.findUniqueOrThrow({ where: { id } });
     await ensureSeriesAccess(user, existing);
-    await prisma.series.delete({ where: { id } });
-    await logAudit(user.email, "delete", "series", id, existing.title);
+    await prisma.series.update({ where: { id }, data: { deletedAt: new Date() } });
+    await logAudit(user.email, "trash", "series", id, existing.title);
     revalidateTag("series", { expire: 0 });
     return NextResponse.json({ ok: true });
   } catch (error) {

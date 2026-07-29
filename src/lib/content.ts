@@ -17,6 +17,7 @@ function publishedNow() {
   return {
     published: true,
     hidden: false,
+    deletedAt: null,
     AND: [
       { OR: [{ publishAt: null }, { publishAt: { lte: now } }] },
       { OR: [{ unpublishAt: null }, { unpublishAt: { gt: now } }] },
@@ -1170,6 +1171,75 @@ export async function getSitemapData() {
     speakers,
     scriptureBooks: Array.from(bookSet),
   };
+}
+
+// --- Trash (soft-deleted content) -------------------------------------------
+
+/** Every soft-deleted category/series/video/file, newest-deleted first, for /admin/trash. */
+export async function getTrashedItems() {
+  const [categories, series, videos, files] = await Promise.all([
+    prisma.category.findMany({ where: { deletedAt: { not: null } }, orderBy: { deletedAt: "desc" } }),
+    prisma.series.findMany({
+      where: { deletedAt: { not: null } },
+      orderBy: { deletedAt: "desc" },
+      include: { category: { select: { name: true } } },
+    }),
+    prisma.video.findMany({
+      where: { deletedAt: { not: null } },
+      orderBy: { deletedAt: "desc" },
+      include: { series: { select: { title: true } }, category: { select: { name: true } } },
+    }),
+    prisma.fileAsset.findMany({
+      where: { deletedAt: { not: null } },
+      orderBy: { deletedAt: "desc" },
+      include: { series: { select: { title: true } }, category: { select: { name: true } } },
+    }),
+  ]);
+  return { categories, series, videos, files };
+}
+
+// --- Slug aliases ------------------------------------------------------------
+
+/** Records a series/video's previous slug so an old link can redirect to its current one — a no-op if oldSlug === newSlug. */
+export async function recordSlugAlias(type: "SERIES" | "VIDEO", oldSlug: string, newSlug: string, targetId: string) {
+  if (oldSlug === newSlug) return;
+  await prisma.slugAlias.upsert({
+    where: { type_oldSlug: { type, oldSlug } },
+    create: { type, oldSlug, targetId },
+    update: { targetId, createdAt: new Date() },
+  });
+}
+
+/** The current slug of the (still-existing, non-deleted) series a stale slug used to point at, or null. */
+export async function resolveSeriesSlugAlias(oldSlug: string): Promise<string | null> {
+  const alias = await prisma.slugAlias.findUnique({ where: { type_oldSlug: { type: "SERIES", oldSlug } } });
+  if (!alias) return null;
+  const series = await prisma.series.findFirst({
+    where: { id: alias.targetId, deletedAt: null },
+    select: { slug: true },
+  });
+  return series?.slug ?? null;
+}
+
+/** Same as resolveSeriesSlugAlias, for videos. */
+export async function resolveVideoSlugAlias(oldSlug: string): Promise<string | null> {
+  const alias = await prisma.slugAlias.findUnique({ where: { type_oldSlug: { type: "VIDEO", oldSlug } } });
+  if (!alias) return null;
+  const video = await prisma.video.findFirst({
+    where: { id: alias.targetId, deletedAt: null },
+    select: { slug: true },
+  });
+  return video?.slug ?? null;
+}
+
+// --- Sermon notes ------------------------------------------------------------
+
+/** A member's own notes on a video, oldest timestamp first — private, never shown to anyone else. */
+export async function getSermonNotes(userId: string, videoId: string) {
+  return prisma.sermonNote.findMany({
+    where: { userId, videoId },
+    orderBy: { timestampSeconds: "asc" },
+  });
 }
 
 // --- Chapters ----------------------------------------------------------------

@@ -40,6 +40,27 @@ All notable changes to this project are documented here. Format follows
   their notifications on `/profile`, sent via the Resend API alongside Web
   Push. Always instant, independent of the existing instant/daily-digest
   choice (which only governs push timing).
+- **Sermon notes**: a member's own private, timestamped notes on a video,
+  added from a panel on the video page and exportable as a text file.
+- **Trash + restore** (`/admin/trash`): deleting a category, series, video,
+  or file now moves it to trash instead of removing it immediately.
+  Restore brings it back exactly as it was; permanent delete is
+  irreversible and, for a video/file, is the point its Bunny Stream/Storage
+  asset is actually removed.
+- **Slug aliases**: renaming a series or video's slug now records the old
+  one, so a link shared before the rename redirects to the current slug
+  instead of 404ing.
+- **Manual "Mark as watched"**: a toggle on the video page sets/clears
+  watch completion directly, independent of the heartbeat approximation.
+
+### Fixed
+
+- **Watch progress no longer silently un-marks a video as watched**: a
+  heartbeat reporting incomplete (e.g. re-opening a finished video partway
+  through) used to overwrite an existing `completed: true`, which could
+  re-lock a sequential-unlock series and drop the video from the
+  watch-through-rate analytics. The heartbeat now only ever sets `completed`
+  forward to `true`, never back to `false`.
 
 ## [1.3.0] - 2026-07-29
 

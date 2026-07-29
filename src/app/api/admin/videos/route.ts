@@ -30,10 +30,11 @@ export async function GET() {
   try {
     const user = await ensureStaff();
     const scope = await getEditableScope(user);
-    let where: Prisma.VideoWhereInput = {};
+    let where: Prisma.VideoWhereInput = { deletedAt: null };
     if (!scope.isAdmin) {
       const categoryIds = await descendantCategoryIds(scope.categoryIds);
       where = {
+        deletedAt: null,
         OR: [
           {
             seriesId: {

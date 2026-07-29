@@ -4,11 +4,10 @@ import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureContentAccess } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
-import { bunnyDeleteStreamVideo } from "@/lib/bunny";
 import { isPluginEnabled } from "@/lib/plugins";
 import { notifySubscribers } from "@/lib/push";
 import { fireWebhooks } from "@/lib/webhooks";
-import { getSubscriberUserIdsForSeries, getSubscriberUserIdsForCategory } from "@/lib/content";
+import { getSubscriberUserIdsForSeries, getSubscriberUserIdsForCategory, recordSlugAlias } from "@/lib/content";
 import type { User } from "@prisma/client";
 
 export const updateSchema = z
@@ -71,6 +70,7 @@ export async function applyVideoUpdate(user: User, id: string, body: z.infer<typ
     include: { series: true },
   });
   await logAudit(user.email, "update", "video", video.id, JSON.stringify(body));
+  if (body.slug) await recordSlugAlias("VIDEO", existing.slug, body.slug, video.id);
 
   const justPublished = existing.published === false && body.published === true;
   if (justPublished && video.status === "READY") {
@@ -108,13 +108,17 @@ export async function applyVideoUpdate(user: User, id: string, body: z.infer<typ
   return video;
 }
 
-/** Shared by the single-item DELETE below and the bulk route. */
+/**
+ * Shared by the single-item DELETE below and the bulk route. Soft delete
+ * only — the Bunny Stream asset itself isn't removed until the trash entry
+ * is permanently purged from /admin/trash, so a mistaken delete is
+ * recoverable rather than an immediate, irreversible loss of the video file.
+ */
 export async function removeVideo(user: User, id: string) {
   const video = await prisma.video.findUniqueOrThrow({ where: { id } });
   await ensureContentAccess(user, { seriesId: video.seriesId, categoryId: video.categoryId });
-  await bunnyDeleteStreamVideo(video.bunnyVideoId);
-  await prisma.video.delete({ where: { id } });
-  await logAudit(user.email, "delete", "video", id, video.title);
+  await prisma.video.update({ where: { id }, data: { deletedAt: new Date() } });
+  await logAudit(user.email, "trash", "video", id, video.title);
 }
 
 export async function PATCH(

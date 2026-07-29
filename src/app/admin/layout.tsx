@@ -12,6 +12,7 @@ const adminLinks = [
   { href: "/admin/live", label: "Live streaming" },
   { href: "/admin/files", label: "Files" },
   { href: "/admin/comments", label: "Comment moderation" },
+  { href: "/admin/trash", label: "Trash" },
   { href: "/admin/users", label: "Access" },
   { href: "/admin/permissions", label: "Permissions" },
   { href: "/admin/plugins", label: "Plugins" },
@@ -52,6 +53,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       canViewAuditLog,
       canViewAnalytics,
       canManageVideosSiteWide,
+      canManageCategories,
+      canManageSeries,
+      canManageFiles,
       moderateScope,
     ] = await Promise.all([
       hasCapability(user, "manage_users"),
@@ -60,10 +64,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       hasCapability(user, "view_audit_log"),
       hasCapability(user, "view_analytics"),
       hasCapability(user, "manage_videos"),
+      hasCapability(user, "manage_categories"),
+      hasCapability(user, "manage_series"),
+      hasCapability(user, "manage_files"),
       getCapabilityScope(user, "moderate_comments"),
     ]);
     const canModerateComments =
       moderateScope.isAdmin || moderateScope.categoryIds.length > 0 || moderateScope.seriesIds.length > 0;
+    const canSeeTrash = canManageCategories || canManageSeries || canManageVideosSiteWide || canManageFiles;
     links = [
       { href: "/admin/series", label: "Series" },
       { href: "/admin/videos", label: "Videos" },
@@ -75,6 +83,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         : []),
       { href: "/admin/files", label: "Files" },
       ...(canModerateComments ? [{ href: "/admin/comments", label: "Comment moderation" }] : []),
+      ...(canSeeTrash ? [{ href: "/admin/trash", label: "Trash" }] : []),
       ...(canManageUsers ? [{ href: "/admin/users", label: "Access" }] : []),
       ...(canManagePermissions ? [{ href: "/admin/permissions", label: "Permissions" }] : []),
       ...(canManagePlugins

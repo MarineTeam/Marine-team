@@ -67,6 +67,7 @@ model User {
   videoFavorites        VideoFavorite[]
   comments              Comment[]
   commentReports        CommentReport[]
+  sermonNotes           SermonNote[]
   groupAssignments      GroupAssignment[]
   ratings               Rating[]
   seriesWatchLater      SeriesWatchLater[]
@@ -120,6 +121,11 @@ model Category {
   published         Boolean                  @default(true)
   publishAt         DateTime?
   unpublishAt       DateTime?
+  // Soft delete: set from "Delete" in the admin UI instead of removing the
+  // row, so it can be restored from /admin/trash. Excluded from every
+  // public query (via publishedNow()) and from the normal admin list;
+  // permanently removed only when purged from the trash.
+  deletedAt         DateTime?
   featured          Boolean                  @default(false)
   // Applies only to this category's own direct videos (see Video.categoryId), not to child
   // categories/series — mirrors Series.requireSequential one level down.
@@ -155,6 +161,8 @@ model Series {
   published         Boolean             @default(true)
   publishAt         DateTime?
   unpublishAt       DateTime?
+  // Soft delete — see Category.deletedAt.
+  deletedAt         DateTime?
   featured          Boolean             @default(false)
   pinned            Boolean             @default(false)
   tags              String[]            @default([])
@@ -207,6 +215,9 @@ model Video {
   published         Boolean            @default(false)
   publishAt         DateTime?
   unpublishAt       DateTime?
+  // Soft delete — see Category.deletedAt. The Bunny Stream asset itself
+  // isn't removed until the trash entry is permanently purged.
+  deletedAt         DateTime?
   isPremiere        Boolean            @default(false)
   position          Int                @default(0)
   series            Series?            @relation(fields: [seriesId], references: [id], onDelete: SetNull)
@@ -230,6 +241,7 @@ model Video {
   viewerGroups      VideoViewerGroup[]
   viewers           VideoViewer[]
   chapters          Chapter[]
+  sermonNotes       SermonNote[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
@@ -366,6 +378,9 @@ model FileAsset {
   published   Boolean   @default(true)
   publishAt   DateTime?
   unpublishAt DateTime?
+  // Soft delete — see Category.deletedAt. The Bunny Storage object itself
+  // isn't removed until the trash entry is permanently purged.
+  deletedAt   DateTime?
   position    Int       @default(0)
   series      Series?   @relation(fields: [seriesId], references: [id], onDelete: SetNull)
   seriesId    String?
@@ -760,4 +775,42 @@ model VideoViewer {
 
   @@unique([videoId, userId])
   @@index([userId])
+}
+
+// A member's private, timestamped note on a video (e.g. sermon notes taken
+// while watching). The timestamp is manually entered, not synced to actual
+// playback — the same limitation as Chapters, since Bunny's embed has no
+// postMessage API to read real playback position from.
+model SermonNote {
+  id               String   @id @default(cuid())
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String
+  video            Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId          String
+  timestampSeconds Int      @default(0)
+  body             String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId, videoId])
+}
+
+enum SlugAliasType {
+  SERIES
+  VIDEO
+}
+
+// Remembers a series/video's previous slug after an admin renames it, so an
+// old shared link 301s to the new one instead of 404ing. No FK to the
+// target row (loose reference by id, like AuditLog) — if the row is later
+// hard-deleted (trash purge), the alias just stops resolving to anything.
+model SlugAlias {
+  id        String        @id @default(cuid())
+  type      SlugAliasType
+  oldSlug   String
+  targetId  String
+  createdAt DateTime      @default(now())
+
+  @@unique([type, oldSlug])
+  @@index([targetId])
 }
