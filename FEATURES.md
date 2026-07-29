@@ -132,6 +132,13 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   soon as any such grant exists for an item, "Members only" no longer gates
   it — only the granted roles/people (and admins) can view it. Files aren't
   covered — they stay governed by their own "Members only" flag.
+- **Draft mode for series edits**: a series' edit page has a "Save as draft"
+  action alongside "Publish now" — it stages the form's field values in a
+  single pending `DraftRevision` row (upserted, not versioned) without
+  touching the live series. A banner shows the pending draft with "Load
+  into form" and "Discard" actions; publishing clears any staged draft.
+  Scoped to series only — videos are edited inline in the video list rather
+  than through a comparable multi-field form.
 - **Hide content**: a series, video, or file can be marked `hidden` from its
   admin edit page, independent of `published`/`memberOnly`. Hidden content is
   excluded from every guest- and member-facing listing, search, RSS/podcast

@@ -7,7 +7,7 @@ import { ensureStaff, ensureSeriesAccess, ensureCategoryAccess } from "@/lib/per
 import { logAudit } from "@/lib/audit";
 import { fireWebhooks } from "@/lib/webhooks";
 
-const updateSchema = z.object({
+export const updateSchema = z.object({
   title: z.string().min(1).optional(),
   slug: z
     .string()

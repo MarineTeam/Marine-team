@@ -459,6 +459,21 @@ model PushSubscription {
   @@index([userId])
 }
 
+// A single pending set of field edits for a series, staged separately from
+// the live row so they can be reviewed/loaded or discarded before going
+// live, without keeping full revision history. One row per series
+// (upserted), not a version log.
+model DraftRevision {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  data       Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([entityType, entityId])
+}
+
 // An outgoing webhook URL notified when the Webhooks plugin is on and a
 // series/video is published (see src/lib/webhooks.ts). `secret`, if set,
 // signs the payload as an X-Webhook-Signature header (hex HMAC-SHA256).
