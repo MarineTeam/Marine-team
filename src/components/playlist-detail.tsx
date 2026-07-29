@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
@@ -126,12 +127,20 @@ export function PlaylistDetail({ playlist: initial }: { playlist: Playlist }) {
                 ↓
               </button>
             </div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={bunnyStreamThumbnailUrl(item.video.bunnyVideoId, item.video.thumbnailFileName)}
-              alt=""
-              className="h-14 w-24 shrink-0 rounded object-cover bg-zinc-100 dark:bg-zinc-800"
-            />
+            {(() => {
+              const thumbnailUrl = bunnyStreamThumbnailUrl(item.video.bunnyVideoId, item.video.thumbnailFileName);
+              return thumbnailUrl ? (
+                <Image
+                  src={thumbnailUrl}
+                  alt=""
+                  width={96}
+                  height={56}
+                  className="h-14 w-24 shrink-0 rounded object-cover bg-zinc-100 dark:bg-zinc-800"
+                />
+              ) : (
+                <div className="h-14 w-24 shrink-0 rounded bg-zinc-100 dark:bg-zinc-800" />
+              );
+            })()}
             <Link href={`/videos/${item.video.slug}`} className="min-w-0 flex-1">
               <p className="font-medium truncate hover:underline">{item.video.title}</p>
               {item.video.series && <p className="text-sm text-zinc-500 truncate">{item.video.series.title}</p>}

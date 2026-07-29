@@ -1,22 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
+import { categoryChainIds } from "@/lib/content";
 import type { User } from "@prisma/client";
 import type { CapabilityKey } from "@/lib/capabilities";
-
-async function categoryChainIds(categoryId: string): Promise<string[]> {
-  const ids: string[] = [];
-  let currentId: string | null = categoryId;
-  while (currentId) {
-    ids.push(currentId);
-    const category: { parentId: string | null } | null = await prisma.category.findUnique({
-      where: { id: currentId },
-      select: { parentId: true },
-    });
-    currentId = category?.parentId ?? null;
-  }
-  return ids;
-}
 
 /** Capabilities that, granted via a permission group, are equivalent to a legacy category/series editor grant. */
 const CONTENT_CAPABILITIES: CapabilityKey[] = [

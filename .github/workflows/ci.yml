@@ -32,6 +32,9 @@ jobs:
       - name: Lint
         run: npx eslint .
 
+      - name: Unit tests
+        run: npm test
+
       - name: Schema is valid and formatted
         run: |
           npx prisma validate

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
@@ -63,6 +64,7 @@ export async function PATCH(
     }
     const category = await prisma.category.update({ where: { id }, data: normalizeData(body) });
     await logAudit(user.email, "update", "category", category.id, JSON.stringify(body));
+    revalidateTag("categories", { expire: 0 });
     return NextResponse.json(category);
   } catch (error) {
     return errorResponse(error);
@@ -79,6 +81,7 @@ export async function DELETE(
     const { id } = await params;
     const category = await prisma.category.delete({ where: { id } });
     await logAudit(user.email, "delete", "category", id, category.name);
+    revalidateTag("categories", { expire: 0 });
     return NextResponse.json({ ok: true });
   } catch (error) {
     return errorResponse(error);

@@ -167,7 +167,6 @@ model Video {
   description       String?
   bunnyVideoId      String
   bunnyLibraryId    String
-  thumbnailUrl      String?
   // Bunny stores the thumbnail under a per-video file name, which is only
   // "thumbnail.jpg" for auto-generated ones — setting a custom thumbnail
   // (via our admin UI or Bunny's dashboard) changes it. Synced from the

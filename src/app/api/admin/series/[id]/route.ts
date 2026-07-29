@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
@@ -79,6 +80,7 @@ export async function PATCH(
     }
     const series = await prisma.series.update({ where: { id }, data: normalizeSeriesData(body) });
     await logAudit(user.email, "update", "series", series.id, JSON.stringify(body));
+    revalidateTag("series", { expire: 0 });
     return NextResponse.json(series);
   } catch (error) {
     return errorResponse(error);
@@ -96,6 +98,7 @@ export async function DELETE(
     await ensureSeriesAccess(user, existing);
     await prisma.series.delete({ where: { id } });
     await logAudit(user.email, "delete", "series", id, existing.title);
+    revalidateTag("series", { expire: 0 });
     return NextResponse.json({ ok: true });
   } catch (error) {
     return errorResponse(error);

@@ -5,8 +5,9 @@ import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureContentAccess } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { bunnyStorageDelete } from "@/lib/bunny";
+import type { User } from "@prisma/client";
 
-const updateSchema = z
+export const updateSchema = z
   .object({
     title: z.string().min(1).optional(),
     seriesId: z.string().optional().nullable(),
@@ -39,6 +40,27 @@ function normalizeData(body: z.infer<typeof updateSchema>) {
   };
 }
 
+/** Shared by the single-item PATCH below and the bulk route. */
+export async function applyFileUpdate(user: User, id: string, body: z.infer<typeof updateSchema>) {
+  const existing = await prisma.fileAsset.findUniqueOrThrow({ where: { id } });
+  await ensureContentAccess(user, { seriesId: existing.seriesId, categoryId: existing.categoryId });
+  if (body.seriesId !== undefined || body.categoryId !== undefined) {
+    await ensureContentAccess(user, { seriesId: body.seriesId ?? null, categoryId: body.categoryId ?? null });
+  }
+  const file = await prisma.fileAsset.update({ where: { id }, data: normalizeData(body) });
+  await logAudit(user.email, "update", "file", file.id, JSON.stringify(body));
+  return file;
+}
+
+/** Shared by the single-item DELETE below and the bulk route. */
+export async function removeFile(user: User, id: string) {
+  const file = await prisma.fileAsset.findUniqueOrThrow({ where: { id } });
+  await ensureContentAccess(user, { seriesId: file.seriesId, categoryId: file.categoryId });
+  await bunnyStorageDelete(file.bunnyPath);
+  await prisma.fileAsset.delete({ where: { id } });
+  await logAudit(user.email, "delete", "file", id, file.title);
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -46,14 +68,8 @@ export async function PATCH(
   try {
     const user = await ensureStaff();
     const { id } = await params;
-    const existing = await prisma.fileAsset.findUniqueOrThrow({ where: { id } });
-    await ensureContentAccess(user, { seriesId: existing.seriesId, categoryId: existing.categoryId });
     const body = updateSchema.parse(await request.json());
-    if (body.seriesId !== undefined || body.categoryId !== undefined) {
-      await ensureContentAccess(user, { seriesId: body.seriesId ?? null, categoryId: body.categoryId ?? null });
-    }
-    const file = await prisma.fileAsset.update({ where: { id }, data: normalizeData(body) });
-    await logAudit(user.email, "update", "file", file.id, JSON.stringify(body));
+    const file = await applyFileUpdate(user, id, body);
     return NextResponse.json(file);
   } catch (error) {
     return errorResponse(error);
@@ -67,11 +83,7 @@ export async function DELETE(
   try {
     const user = await ensureStaff();
     const { id } = await params;
-    const file = await prisma.fileAsset.findUniqueOrThrow({ where: { id } });
-    await ensureContentAccess(user, { seriesId: file.seriesId, categoryId: file.categoryId });
-    await bunnyStorageDelete(file.bunnyPath);
-    await prisma.fileAsset.delete({ where: { id } });
-    await logAudit(user.email, "delete", "file", id, file.title);
+    await removeFile(user, id);
     return NextResponse.json({ ok: true });
   } catch (error) {
     return errorResponse(error);

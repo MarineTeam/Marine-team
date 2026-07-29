@@ -8,8 +8,9 @@ import { bunnyDeleteStreamVideo } from "@/lib/bunny";
 import { isPluginEnabled } from "@/lib/plugins";
 import { notifySubscribers } from "@/lib/push";
 import { getSubscriberUserIdsForSeries, getSubscriberUserIdsForCategory } from "@/lib/content";
+import type { User } from "@prisma/client";
 
-const updateSchema = z
+export const updateSchema = z
   .object({
     title: z.string().min(1).optional(),
     slug: z
@@ -49,6 +50,61 @@ function normalizeData(body: z.infer<typeof updateSchema>) {
   };
 }
 
+/**
+ * Shared by the single-item PATCH below and the bulk route, so a bulk publish
+ * toggle runs this same permission-checked, notification-triggering logic in
+ * one request instead of the client firing one PATCH per selected video.
+ */
+export async function applyVideoUpdate(user: User, id: string, body: z.infer<typeof updateSchema>) {
+  const existing = await prisma.video.findUniqueOrThrow({ where: { id } });
+  await ensureContentAccess(user, { seriesId: existing.seriesId, categoryId: existing.categoryId });
+  if (body.seriesId !== undefined || body.categoryId !== undefined) {
+    await ensureContentAccess(user, { seriesId: body.seriesId ?? null, categoryId: body.categoryId ?? null });
+  }
+  const video = await prisma.video.update({
+    where: { id },
+    data: normalizeData(body),
+    include: { series: true },
+  });
+  await logAudit(user.email, "update", "video", video.id, JSON.stringify(body));
+
+  const justPublished = existing.published === false && body.published === true;
+  if (justPublished && video.status === "READY") {
+    const categoryId = video.series?.categoryId ?? video.categoryId ?? null;
+    if (await isPluginEnabled("notifications", categoryId)) {
+      await notifySubscribers({
+        title: "New video published",
+        body: video.title,
+        url: `/videos/${video.slug}`,
+      });
+    }
+    if (await isPluginEnabled("subscriptions", categoryId)) {
+      const subscriberIds = video.seriesId
+        ? await getSubscriberUserIdsForSeries(video.seriesId, categoryId)
+        : video.categoryId
+          ? await getSubscriberUserIdsForCategory(video.categoryId)
+          : [];
+      if (subscriberIds.length > 0) {
+        await notifySubscribers(
+          { title: `New video in ${video.series?.title ?? "a category you follow"}`, body: video.title, url: `/videos/${video.slug}` },
+          subscriberIds,
+        );
+      }
+    }
+  }
+
+  return video;
+}
+
+/** Shared by the single-item DELETE below and the bulk route. */
+export async function removeVideo(user: User, id: string) {
+  const video = await prisma.video.findUniqueOrThrow({ where: { id } });
+  await ensureContentAccess(user, { seriesId: video.seriesId, categoryId: video.categoryId });
+  await bunnyDeleteStreamVideo(video.bunnyVideoId);
+  await prisma.video.delete({ where: { id } });
+  await logAudit(user.email, "delete", "video", id, video.title);
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -56,44 +112,8 @@ export async function PATCH(
   try {
     const user = await ensureStaff();
     const { id } = await params;
-    const existing = await prisma.video.findUniqueOrThrow({ where: { id } });
-    await ensureContentAccess(user, { seriesId: existing.seriesId, categoryId: existing.categoryId });
     const body = updateSchema.parse(await request.json());
-    if (body.seriesId !== undefined || body.categoryId !== undefined) {
-      await ensureContentAccess(user, { seriesId: body.seriesId ?? null, categoryId: body.categoryId ?? null });
-    }
-    const video = await prisma.video.update({
-      where: { id },
-      data: normalizeData(body),
-      include: { series: true },
-    });
-    await logAudit(user.email, "update", "video", video.id, JSON.stringify(body));
-
-    const justPublished = existing.published === false && body.published === true;
-    if (justPublished && video.status === "READY") {
-      const categoryId = video.series?.categoryId ?? video.categoryId ?? null;
-      if (await isPluginEnabled("notifications", categoryId)) {
-        await notifySubscribers({
-          title: "New video published",
-          body: video.title,
-          url: `/videos/${video.slug}`,
-        });
-      }
-      if (await isPluginEnabled("subscriptions", categoryId)) {
-        const subscriberIds = video.seriesId
-          ? await getSubscriberUserIdsForSeries(video.seriesId, categoryId)
-          : video.categoryId
-            ? await getSubscriberUserIdsForCategory(video.categoryId)
-            : [];
-        if (subscriberIds.length > 0) {
-          await notifySubscribers(
-            { title: `New video in ${video.series?.title ?? "a category you follow"}`, body: video.title, url: `/videos/${video.slug}` },
-            subscriberIds,
-          );
-        }
-      }
-    }
-
+    const video = await applyVideoUpdate(user, id, body);
     return NextResponse.json(video);
   } catch (error) {
     return errorResponse(error);
@@ -107,11 +127,7 @@ export async function DELETE(
   try {
     const user = await ensureStaff();
     const { id } = await params;
-    const video = await prisma.video.findUniqueOrThrow({ where: { id } });
-    await ensureContentAccess(user, { seriesId: video.seriesId, categoryId: video.categoryId });
-    await bunnyDeleteStreamVideo(video.bunnyVideoId);
-    await prisma.video.delete({ where: { id } });
-    await logAudit(user.email, "delete", "video", id, video.title);
+    await removeVideo(user, id);
     return NextResponse.json({ ok: true });
   } catch (error) {
     return errorResponse(error);

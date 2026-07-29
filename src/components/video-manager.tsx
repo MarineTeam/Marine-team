@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { Upload } from "tus-js-client";
 import { DragHandle, PositionInput, useDragReorder } from "@/components/reorder-controls";
 import { reorderArray } from "@/lib/reorder";
@@ -288,15 +289,11 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
   }
 
   async function bulkSetPublished(published: boolean) {
-    await Promise.all(
-      Array.from(selectedIds).map((id) =>
-        fetch(`/api/admin/videos/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ published }),
-        }),
-      ),
-    );
+    await fetch("/api/admin/videos/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: Array.from(selectedIds), action: published ? "publish" : "unpublish" }),
+    });
     setSelectedIds(new Set());
     await load();
   }
@@ -304,9 +301,11 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
   async function bulkDelete() {
     if (!confirm(`Delete ${selectedIds.size} video(s)? This also removes them from Bunny Stream.`))
       return;
-    await Promise.all(
-      Array.from(selectedIds).map((id) => fetch(`/api/admin/videos/${id}`, { method: "DELETE" })),
-    );
+    await fetch("/api/admin/videos/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: Array.from(selectedIds), action: "delete" }),
+    });
     setSelectedIds(new Set());
     await load();
   }
@@ -506,10 +505,11 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
               />
               {scoped && <DragHandle {...handleProps(index)} />}
               {v.thumbnailPreviewUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <Image
                   src={v.thumbnailPreviewUrl}
                   alt=""
+                  width={64}
+                  height={40}
                   className="h-10 w-16 shrink-0 rounded object-cover bg-zinc-100 dark:bg-zinc-800"
                 />
               )}

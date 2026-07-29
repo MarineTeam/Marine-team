@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
     const body = categorySchema.parse(await request.json());
     const category = await prisma.category.create({ data: body });
     await logAudit(user.email, "create", "category", category.id, category.name);
+    revalidateTag("categories", { expire: 0 });
     return NextResponse.json(category, { status: 201 });
   } catch (error) {
     return errorResponse(error);

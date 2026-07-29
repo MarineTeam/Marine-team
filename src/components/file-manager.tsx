@@ -145,15 +145,11 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
   }
 
   async function bulkSetPublished(published: boolean) {
-    await Promise.all(
-      Array.from(selectedIds).map((id) =>
-        fetch(`/api/admin/files/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ published }),
-        }),
-      ),
-    );
+    await fetch("/api/admin/files/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: Array.from(selectedIds), action: published ? "publish" : "unpublish" }),
+    });
     setSelectedIds(new Set());
     await load();
   }
@@ -161,9 +157,11 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
   async function bulkDelete() {
     if (!confirm(`Delete ${selectedIds.size} file(s)? This also removes them from Bunny Storage.`))
       return;
-    await Promise.all(
-      Array.from(selectedIds).map((id) => fetch(`/api/admin/files/${id}`, { method: "DELETE" })),
-    );
+    await fetch("/api/admin/files/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: Array.from(selectedIds), action: "delete" }),
+    });
     setSelectedIds(new Set());
     await load();
   }
