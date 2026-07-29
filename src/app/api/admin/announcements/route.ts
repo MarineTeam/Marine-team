@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
@@ -27,6 +28,7 @@ export async function POST(request: NextRequest) {
       data: { message: body.message, active: body.active ?? true },
     });
     await logAudit(user.email, "create", "announcement", announcement.id, announcement.message);
+    revalidateTag("announcements", { expire: 0 });
     return NextResponse.json(announcement, { status: 201 });
   } catch (error) {
     return errorResponse(error);
