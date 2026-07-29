@@ -827,12 +827,29 @@ export async function getAnalyticsSummary(days = 30) {
     }),
   ]);
 
-  const [seriesById, videosById] = await Promise.all([
+  const topVideoIds = topVideosGrouped.map((g) => g.videoId as string);
+  const [seriesById, videosById, progressTotal, progressCompleted] = await Promise.all([
     prisma.series.findMany({ where: { id: { in: topSeriesGrouped.map((g) => g.seriesId as string) } } }),
-    prisma.video.findMany({ where: { id: { in: topVideosGrouped.map((g) => g.videoId as string) } } }),
+    prisma.video.findMany({ where: { id: { in: topVideoIds } } }),
+    prisma.watchProgress.groupBy({
+      by: ["videoId"],
+      where: { videoId: { in: topVideoIds }, updatedAt: { gte: since } },
+      _count: { _all: true },
+    }),
+    prisma.watchProgress.groupBy({
+      by: ["videoId"],
+      where: { videoId: { in: topVideoIds }, updatedAt: { gte: since }, completed: true },
+      _count: { _all: true },
+    }),
   ]);
   const seriesMap = new Map(seriesById.map((s) => [s.id, s]));
   const videoMap = new Map(videosById.map((v) => [v.id, v]));
+  // Fraction of this window's watchers who reached the end, per video —
+  // reuses the same heartbeat data that already powers "Continue watching"
+  // and resume-on-return, so this costs one extra groupBy pair, not a new
+  // tracking mechanism.
+  const totalByVideo = new Map(progressTotal.map((g) => [g.videoId, g._count._all]));
+  const completedByVideo = new Map(progressCompleted.map((g) => [g.videoId, g._count._all]));
 
   return {
     totalViews,
@@ -840,8 +857,20 @@ export async function getAnalyticsSummary(days = 30) {
       .map((g) => ({ series: seriesMap.get(g.seriesId as string), views: g._count.seriesId }))
       .filter((r): r is { series: NonNullable<typeof r.series>; views: number } => Boolean(r.series)),
     topVideos: topVideosGrouped
-      .map((g) => ({ video: videoMap.get(g.videoId as string), views: g._count.videoId }))
-      .filter((r): r is { video: NonNullable<typeof r.video>; views: number } => Boolean(r.video)),
+      .map((g) => {
+        const video = videoMap.get(g.videoId as string);
+        const total = totalByVideo.get(g.videoId as string) ?? 0;
+        const completed = completedByVideo.get(g.videoId as string) ?? 0;
+        return {
+          video,
+          views: g._count.videoId,
+          completionRate: total > 0 ? completed / total : null,
+        };
+      })
+      .filter(
+        (r): r is { video: NonNullable<typeof r.video>; views: number; completionRate: number | null } =>
+          Boolean(r.video),
+      ),
   };
 }
 
