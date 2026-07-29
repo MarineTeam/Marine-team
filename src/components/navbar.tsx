@@ -16,6 +16,7 @@ export async function Navbar() {
   const subscriptionsOn = plugins.subscriptions;
   const playlistsOn = plugins.playlists;
   const profilesOn = plugins.profiles;
+  const liveStreamingOn = plugins["live-streaming"];
   const unauthorized = !user && identity !== null;
 
   return (
@@ -36,6 +37,11 @@ export async function Navbar() {
           <Link href="/" className="hover:underline">
             Browse
           </Link>
+          {liveStreamingOn && (
+            <Link href="/live" className="hover:underline">
+              Live
+            </Link>
+          )}
           {user?.role === "ADMIN" && (
             <Link href="/admin" className="hover:underline">
               Admin
@@ -107,6 +113,7 @@ export async function Navbar() {
             subscriptionsOn={subscriptionsOn}
             notificationsOn={notificationsOn}
             profilesOn={profilesOn}
+            liveStreamingOn={liveStreamingOn}
           />
         </div>
       </nav>

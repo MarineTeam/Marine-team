@@ -30,10 +30,11 @@ export async function GET() {
   try {
     const user = await ensureStaff();
     const scope = await getEditableScope(user);
-    let where: Prisma.VideoWhereInput = {};
+    let where: Prisma.VideoWhereInput = { deletedAt: null };
     if (!scope.isAdmin) {
       const categoryIds = await descendantCategoryIds(scope.categoryIds);
       where = {
+        deletedAt: null,
         OR: [
           {
             seriesId: {
@@ -53,7 +54,7 @@ export async function GET() {
     const videos = await prisma.video.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      include: { series: true, category: true },
+      include: { series: true, category: true, speaker: true },
     });
     // Computed server-side so the admin UI never needs to import bunny.ts
     // (which uses node:crypto and can't be bundled into a client component).

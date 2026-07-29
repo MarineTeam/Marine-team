@@ -15,10 +15,11 @@ export async function GET() {
   try {
     const user = await ensureStaff();
     const scope = await getEditableScope(user);
-    let where: Prisma.FileAssetWhereInput = {};
+    let where: Prisma.FileAssetWhereInput = { deletedAt: null };
     if (!scope.isAdmin) {
       const categoryIds = await descendantCategoryIds(scope.categoryIds);
       where = {
+        deletedAt: null,
         OR: [
           {
             seriesId: {

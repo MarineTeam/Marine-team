@@ -26,6 +26,7 @@ export default async function ProfilePage() {
         currentDisplayName={user.displayName}
         notificationsOn={notificationsOn}
         currentNotificationFrequency={user.notificationFrequency}
+        currentEmailNotifications={user.emailNotifications}
       />
     </div>
   );

@@ -10,6 +10,7 @@ import { ThumbnailManager } from "@/components/thumbnail-manager";
 import { CaptionsManager } from "@/components/captions-manager";
 import { ChapterManager } from "@/components/chapter-manager";
 import { TranscriptManager } from "@/components/transcript-manager";
+import { ScriptureManager } from "@/components/scripture-manager";
 import {
   TargetSelect,
   formatTarget,
@@ -17,6 +18,8 @@ import {
   type SeriesOption,
   type CategoryOption,
 } from "@/components/content-target-picker";
+
+type Speaker = { id: string; name: string };
 
 type Video = {
   id: string;
@@ -31,6 +34,8 @@ type Video = {
   isPremiere: boolean;
   series: { id: string; title: string } | null;
   category: { id: string; name: string } | null;
+  speaker: Speaker | null;
+  scriptureRefs: string[];
   thumbnailPreviewUrl: string;
   transcript: string | null;
 };
@@ -62,6 +67,7 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
   const [videos, setVideos] = useState<Video[]>([]);
   const [seriesList, setSeriesList] = useState<SeriesOption[]>([]);
   const [categoryList, setCategoryList] = useState<CategoryOption[]>([]);
+  const [speakerList, setSpeakerList] = useState<Speaker[]>([]);
   const [title, setTitle] = useState("");
   const [pickedTarget, setPickedTarget] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -82,16 +88,19 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
   const [managingChaptersId, setManagingChaptersId] = useState<string | null>(null);
   const [managingTranscriptId, setManagingTranscriptId] = useState<string | null>(null);
   const [managingCaptionsId, setManagingCaptionsId] = useState<string | null>(null);
+  const [managingScriptureId, setManagingScriptureId] = useState<string | null>(null);
 
   async function load() {
-    const [videosRes, seriesRes, categoriesRes] = await Promise.all([
+    const [videosRes, seriesRes, categoriesRes, speakersRes] = await Promise.all([
       fetch("/api/admin/videos"),
       fetch("/api/admin/series"),
       fetch("/api/admin/categories"),
+      fetch("/api/admin/speakers"),
     ]);
     if (videosRes.ok) setVideos(await videosRes.json());
     if (seriesRes.ok) setSeriesList(await seriesRes.json());
     if (categoriesRes.ok) setCategoryList(await categoriesRes.json());
+    if (speakersRes.ok) setSpeakerList(await speakersRes.json());
   }
 
   useEffect(() => {
@@ -270,8 +279,17 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
     await load();
   }
 
+  async function reassignSpeaker(id: string, speakerId: string) {
+    await fetch(`/api/admin/videos/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ speakerId: speakerId || null }),
+    });
+    await load();
+  }
+
   async function remove(id: string) {
-    if (!confirm("Delete this video? This also removes it from Bunny Stream.")) return;
+    if (!confirm("Move this video to Trash? It's restorable from Admin > Trash; the Bunny Stream asset isn't removed until it's permanently deleted from there.")) return;
     await fetch(`/api/admin/videos/${id}`, { method: "DELETE" });
     await load();
   }
@@ -322,7 +340,7 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
   }
 
   async function bulkDelete() {
-    if (!confirm(`Delete ${selectedIds.size} video(s)? This also removes them from Bunny Stream.`))
+    if (!confirm(`Move ${selectedIds.size} video(s) to Trash? Restorable from Admin > Trash.`))
       return;
     await fetch("/api/admin/videos/bulk", {
       method: "POST",
@@ -581,6 +599,19 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
                   categoryList={categoryList}
                 />
               )}
+              <select
+                value={v.speaker?.id ?? ""}
+                onChange={(e) => reassignSpeaker(v.id, e.target.value)}
+                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+                aria-label="Speaker"
+              >
+                <option value="">No speaker</option>
+                {speakerList.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
               {/* Always available, not just while encoding: this also re-syncs
                   the thumbnail file name, which changes whenever a thumbnail is
                   set outside this app (e.g. in Bunny's own dashboard). */}
@@ -642,6 +673,12 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
                 Transcript
               </button>
               <button
+                onClick={() => setManagingScriptureId(managingScriptureId === v.id ? null : v.id)}
+                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+              >
+                Scripture
+              </button>
+              <button
                 onClick={() => setManagingAccessId(managingAccessId === v.id ? null : v.id)}
                 className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
               >
@@ -671,6 +708,11 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
           {managingTranscriptId === v.id && (
             <div className="px-4 pb-4">
               <TranscriptManager videoId={v.id} currentTranscript={v.transcript} onChange={load} />
+            </div>
+          )}
+          {managingScriptureId === v.id && (
+            <div className="px-4 pb-4">
+              <ScriptureManager videoId={v.id} currentRefs={v.scriptureRefs} onChange={load} />
             </div>
           )}
           {managingAccessId === v.id && (

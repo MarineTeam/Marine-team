@@ -21,6 +21,7 @@ export async function GET() {
   try {
     await ensureStaff();
     const categories = await prisma.category.findMany({
+      where: { deletedAt: null },
       orderBy: { position: "asc" },
       include: { parent: true },
     });

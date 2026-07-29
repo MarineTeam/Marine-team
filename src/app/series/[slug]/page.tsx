@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import {
   getSeriesBySlug,
+  resolveSeriesSlugAlias,
   getRelatedSeries,
   isSeriesFavorited,
   isSeriesInWatchLater,
@@ -40,7 +41,11 @@ export default async function SeriesPage({
   const { slug } = await params;
   const [series, user] = await Promise.all([getSeriesBySlug(slug), getCurrentUser()]);
 
-  if (!series) notFound();
+  if (!series) {
+    const currentSlug = await resolveSeriesSlugAlias(slug);
+    if (currentSlug) permanentRedirect(`/series/${currentSlug}`);
+    notFound();
+  }
 
   const isLoggedIn = Boolean(user);
   const hasAudio = series.files.some((f) => f.mimeType?.startsWith("audio/"));

@@ -104,7 +104,11 @@ export default function SeriesAdminPage() {
   }
 
   async function remove(id: string) {
-    if (!confirm("Delete this series? Its videos and files will be detached, not deleted."))
+    if (
+      !confirm(
+        "Move this series to Trash? Its videos/files aren't deleted, but disappear from the site until you restore it from Admin > Trash.",
+      )
+    )
       return;
     await fetch(`/api/admin/series/${id}`, { method: "DELETE" });
     await load();
@@ -194,7 +198,7 @@ export default function SeriesAdminPage() {
   }
 
   async function bulkDelete() {
-    if (!confirm(`Delete ${selectedIds.size} series? Videos and files will be detached, not deleted.`))
+    if (!confirm(`Move ${selectedIds.size} series to Trash? Restorable from Admin > Trash.`))
       return;
     await Promise.all(
       Array.from(selectedIds).map((id) => fetch(`/api/admin/series/${id}`, { method: "DELETE" })),

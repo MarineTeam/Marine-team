@@ -16,8 +16,12 @@ function format(ms: number): string {
   return parts.join(" ");
 }
 
-/** Countdown to a scheduled premiere; reloads the page once it hits zero so the real player takes over. */
-export function PremiereCountdown({ premiereAt }: { premiereAt: string }) {
+/**
+ * Countdown to a scheduled premiere (or, via `label`, any other timestamped
+ * event like a live stream); reloads the page once it hits zero so the real
+ * player takes over.
+ */
+export function PremiereCountdown({ premiereAt, label = "Premieres in" }: { premiereAt: string; label?: string }) {
   const target = new Date(premiereAt).getTime();
   const [remaining, setRemaining] = useState(() => target - Date.now());
 
@@ -35,7 +39,7 @@ export function PremiereCountdown({ premiereAt }: { premiereAt: string }) {
 
   return (
     <div className="aspect-video flex flex-col items-center justify-center gap-2 rounded-lg bg-zinc-900 text-white">
-      <p className="text-sm uppercase tracking-wide text-zinc-400">Premieres in</p>
+      <p className="text-sm uppercase tracking-wide text-zinc-400">{label}</p>
       <p className="font-mono text-2xl">{format(remaining)}</p>
       <p className="text-sm text-zinc-400">{new Date(premiereAt).toLocaleString()}</p>
     </div>

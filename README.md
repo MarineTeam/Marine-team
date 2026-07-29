@@ -37,6 +37,9 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
        there (a different secret from `BUNNY_STREAM_API_KEY`) — otherwise
        the video player and thumbnails will 404. Leave it unset if token
        auth is off.
+   - `RESEND_API_KEY`/`EMAIL_FROM` (optional): enables the Notifications
+     plugin's opt-in email channel. Leave both unset locally — email sends
+     become a no-op, same as leaving the Web Push `VAPID_*` keys unset.
 2. Install dependencies and generate the Prisma client:
    ```bash
    npm install
@@ -114,21 +117,43 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   `favorites` plugin (see Plugins below).
 - **Comments**: logged-in users can leave comments on a series or video
   page; authors can delete their own, admins or `moderate_comments`
-  capability holders can delete any. Gated by the `comments` plugin.
+  capability holders can delete any. Gated by the `comments` plugin. Any
+  other logged-in member can **report** a comment (`CommentReport`, one per
+  member per comment); reported or already-hidden comments surface in
+  `/admin/comments` (`getReportedComments()` in `src/lib/content.ts`,
+  scoped to a moderator's own categories/series via `getCapabilityScope()`
+  unless they hold a site-wide grant), where a moderator can hide
+  (`Comment.hidden`, excluded from public reads) or permanently delete.
 - **Related content**: series pages show a "More like this" row (same
   category, then shared tags); video pages show "More from this series" or
   "You might also like" for standalone videos. Gated by the
   `related-content` plugin.
 - **Relevance-ranked search**: `/search` and the navbar search box rank
   results by how well they match — an exact or prefix title match outranks
-  a description-only hit — rather than raw database order. When the exact
-  pass returns no series (or no videos), a fuzzy fallback re-ranks up to 500
-  published rows by word-level Levenshtein distance (`src/lib/fuzzy.ts`) so
-  a typo like "chruch" still finds "Church". It only runs on an empty
-  result, so the common case pays no extra query.
+  a description-only hit — across categories, series, videos, and speaker
+  names, with optional category/speaker filters and a relevance-vs-newest
+  sort. When the exact pass returns no series (or no videos), a fuzzy
+  fallback re-ranks candidates by Postgres trigram similarity (`pg_trgm`,
+  via the GIN indexes added in the `search_trigram_indexes` migration) so a
+  typo like "chruch" still finds "Church". It only runs on an empty result,
+  so the common case pays no extra query.
+- **Speakers**: an admin-managed directory (`src/app/admin/speakers`) of
+  preachers/presenters, attachable to a video from the video manager.
+  `/speakers` and `/speakers/[slug]` list them and their published videos.
+- **Scripture references**: free-form Bible references on a video (e.g.
+  "John 3:16-18"), edited from the video manager's "Scripture" panel and
+  browsable at `/scripture` and `/scripture/[book]` (`scriptureBook()` in
+  `src/lib/content.ts` derives the book from the leading text of a reference).
+- **Live streaming** (plugin): `LiveStream` rows point at a stream already
+  hosted elsewhere (YouTube, Boxcast, etc. — Bunny Stream has no live
+  ingest). `/live` shows the current stream when live, a countdown to the
+  next scheduled one otherwise, and a "Live now" banner appears on the
+  homepage and nav while one is live. Publishing a stream pushes a
+  notification the same way publishing a video does.
 - **Sitemap**: `/sitemap.xml` (`src/app/sitemap.ts`, backed by
   `getSitemapData()`) lists published categories and series, guest-visible
-  videos, and every distinct series tag. It's `force-dynamic` because the
+  videos, every distinct series tag, every speaker, every distinct
+  scripture book, and `/live`. It's `force-dynamic` because the
   database isn't reachable at build time here, same as the root layout, and
   it uses `APP_BASE_URL` for absolute URLs.
 - **Closed captions**: each row of the admin video list has a **Captions**
@@ -154,21 +179,41 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     dedup/anti-spam, it's a basic "how many hits" number, not analytics.
   - **Social share**: copy-link plus share-to-X/Facebook buttons.
   - **Announcements** (`/admin/announcements`): a dismissible (per-browser-
-    session) site-wide banner; only the newest `active` one shows, checked
-    site-wide only (no per-category override — it's a global message).
+    session) site-wide banner; only the newest `active` one matching the
+    viewer's login state shows, checked site-wide only (no per-category
+    override — it's a global message). Two optional refinements on top of
+    `active`: a `publishAt`/`expiresAt` scheduling window, and an
+    `audience` (`ALL`/`GUESTS`/`MEMBERS`) targeting the banner to logged-out
+    visitors, logged-in members, or everyone — `getActiveAnnouncement()`
+    takes the viewer's login state and is cached per state (guest vs.
+    member), not globally, since the result now differs by audience.
   - **Notifications**: Web Push to subscribed members when an admin flips a
     video from unpublished to published (see PWA below) — a no-op if VAPID
     keys aren't configured. Members choose a frequency on `/profile`:
     `INSTANT` (default, unchanged behavior) pushes immediately, while
     `DAILY` queues a `PendingNotification` row per event that the digest
-    cron batches into one push a day (see Deployment below).
+    cron batches into one push a day (see Deployment below). A member can
+    also opt into `User.emailNotifications` — a separate, always-instant
+    email channel (`src/lib/email.ts`, via the Resend API, a no-op without
+    `RESEND_API_KEY`/`EMAIL_FROM`) sent alongside push regardless of the
+    `INSTANT`/`DAILY` choice, which only governs push timing.
   - **Subscriptions** (`/subscriptions`): follow a series or category; its
     subscribers get a targeted push notification when it publishes a new
     video, on top of the general Notifications above.
   - **Playlists** (`/playlists`): member-created, reorderable video
-    playlists, separate from the single Watch Later queue.
+    playlists, separate from the single Watch Later queue. `Playlist.public`
+    (toggled from the playlist page) lets anyone with the link view it
+    read-only at `/playlists/[id]` without an account — `getPublicPlaylist()`
+    in `src/lib/content.ts` only resolves when that flag is set; otherwise
+    the route falls through to the existing owner-only `getPlaylist()`.
   - **Likes / dislikes**: a thumbs up/down on a series or video, alongside
     (and independent from) the star Ratings plugin.
+  - **Live streaming**: see above.
+  - **Sermon notes**: a member's own private, timestamped notes on a video
+    (`SermonNote`), added from a panel on the video page and exportable as a
+    text file. The timestamp field is prefilled once from the same
+    elapsed-time heartbeat used for Continue watching, then edited freely —
+    it isn't kept in sync with real playback (see the technical notes below).
 - **Sequential unlock**: a per-series "Require watching in order" toggle
   (`Series.requireSequential`, set on the series edit page — not a plugin,
   since it's a property of one series rather than a site feature). When on,
@@ -203,7 +248,12 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   for exact play/pause/seek events, so this is elapsed-time based, not a
   precise scrub position) — the homepage shows a "Continue watching" row
   from that, resuming playback near where you left off via Bunny's `t=`
-  embed parameter, plus a "Recently added" row of newest published series.
+  embed parameter, plus a "Recently added" row of newest published series. A
+  "Mark as watched" toggle on the video page (`MarkWatchedButton`) sets or
+  clears `WatchProgress.completed` directly — the same completion flag that
+  gates Sequential unlock and feeds the watch-through-rate analytics —
+  independent of the heartbeat, which only ever sets it to `true`, never
+  back to `false` (a stray heartbeat must not silently undo a completion).
 - **Trending / Up next / premieres**: the homepage shows a "Trending this
   week" row (from a timestamped view log, distinct from the simple
   `viewCount` counter); video pages show an "Up next" panel with an
@@ -211,7 +261,34 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   a premiere with a future publish time to show a live countdown instead of
   staying fully hidden until then.
 - **Admin analytics** (`/admin/analytics`, `view_analytics` capability):
-  30-day view totals and top series/videos, from the same view log.
+  view totals and top series/videos for a selectable window (`?days=7|30|90`),
+  from the same view log, plus a CSV/JSON export of the same data
+  (`/api/admin/analytics/export`) for pulling into a spreadsheet.
+- **Homepage rows** (`/admin/home-rows`, `manage_plugins` capability): a
+  `HomeRow` per built-in section (seeded once via `ensureHomeRowsSeeded()`)
+  lets an admin toggle, rename, and reorder Continue watching/Because you
+  watched/Trending/Recently added, plus add curated `CATEGORY`/`TAG` rows.
+  `getHomeRows()` falls back to the default built-in order when nothing's
+  configured yet, the same fail-open pattern as `getPluginStates()`.
+  Continue watching (when shown) always renders directly above the
+  category/series browse list, which itself isn't a configurable row.
+- **Trash** (`/admin/trash`): deleting a category, series, video, or file
+  now sets `deletedAt` instead of removing the row (`publishedNow()` in
+  `src/lib/content.ts` excludes it everywhere public, and every admin list
+  route filters it too). Restore clears `deletedAt`; permanent delete
+  (`/api/admin/trash/[type]/[id]` `DELETE`) is the only point a video/file's
+  underlying Bunny Stream/Storage asset is actually removed — trashing alone
+  leaves it in place, unlike before. Gated on holding at least one of
+  `manage_categories`/`manage_series`/`manage_videos`/`manage_files`
+  site-wide (or `ADMIN`), since the queue spans all four types at once.
+  Trashing a category/series doesn't cascade: a child row keeps its
+  `categoryId`/`seriesId` as-is and just stops appearing in listings that
+  traverse through the trashed parent, while staying reachable directly by URL.
+- **Slug aliases**: changing a series/video's `slug` from its edit page
+  records a `SlugAlias` (old slug -> current id); the `/series/[slug]` and
+  `/videos/[slug]` pages fall back to resolving one when the direct lookup
+  finds nothing, then `permanentRedirect()` to the current slug — so a link
+  shared before a rename still works instead of 404ing.
 - **Feeds**: `/feed.xml` is a site-wide RSS feed of recently added series;
   `/series/[slug]/podcast.xml` is an iTunes-compatible podcast feed of a
   series' published audio files (skipped for `memberOnly` series, since
@@ -262,9 +339,9 @@ Written for a Postgres free tier, where every query counts:
 `npm test` runs the vitest suite in `src/lib/*.test.ts`. It covers the pure
 and query-shaping logic that tends to break silently — `canAccess`,
 `categoryChainIds`, sequential-unlock derivation, `hasCapability` and
-category-scope resolution, plugin override precedence, `reorderArray`, and
-the fuzzy matcher. `@/lib/db` is mocked throughout, so the suite needs no
-database and no environment variables.
+category-scope resolution, plugin override precedence, and `reorderArray`.
+`@/lib/db` is mocked throughout, so the suite needs no database and no
+environment variables.
 
 `.github/workflows/ci.yml` runs on every pull request and every push to
 `main`: type check (`tsc --noEmit`), lint (`eslint .`), `npm test`, then
@@ -281,6 +358,18 @@ Schema changes are tracked as migration files under `prisma/migrations/` —
 `prisma db push` is no longer used anywhere, because it has no history, no
 rollback, and refuses (or destroys data) on changes it can't make in place.
 
+The `search_trigram_indexes` migration runs `CREATE EXTENSION IF NOT EXISTS
+pg_trgm`, which needs the database user to have (or be granted) that
+privilege — already the case on Prisma Postgres, Neon, Supabase, and RDS
+with `rds_superuser`, but worth checking on a locked-down managed instance.
+
+**The trigram GIN indexes have no representation in `schema.prisma`** (raw
+SQL, not the Prisma DSL), so the next time `prisma migrate dev` diffs the
+schema it will propose `DROP INDEX` for all of them as apparent drift —
+seen firsthand while adding the `home_rows_comment_moderation_email`
+migration. Strip any such `DROP INDEX ..._trgm_idx` lines from a
+freshly-generated migration before applying it, the same way that one had them removed.
+
 To change the schema:
 
 1. Edit `prisma/schema.prisma`.
@@ -290,13 +379,20 @@ To change the schema:
 
 ### Scheduled jobs
 
-`vercel.json` also declares one cron: `/api/cron/notification-digest`, daily
-at 13:00 UTC. It batches every queued `PendingNotification` per user into a
-single push and clears the queue, which is the only delivery path for members
-who chose the "Daily digest" frequency — if this cron isn't running, their
-notifications pile up and never arrive. Set `CRON_SECRET` in Vercel and the
-route will reject anything without a matching bearer token; Vercel Cron
-attaches it automatically.
+`vercel.json` declares two crons, both guarded by the same `CRON_SECRET`
+bearer-token check (Vercel Cron attaches it automatically):
+
+- `/api/cron/notification-digest`, daily at 13:00 UTC. Batches every queued
+  `PendingNotification` per user into a single push and clears the queue —
+  the only delivery path for members who chose the "Daily digest" frequency;
+  if this cron isn't running, their notifications pile up and never arrive.
+- `/api/cron/sync-video-status`, daily at 06:00 UTC. Polls Bunny for every
+  video still stuck in `PROCESSING` and reconciles its status/duration/
+  thumbnail, the same as the admin's manual "Sync from Bunny" button — so a
+  finished encode doesn't sit unprocessed until someone happens to click
+  refresh. Daily is the Hobby-plan-safe cadence (Vercel's free tier only
+  allows once-a-day cron schedules); a Pro plan can tighten this to run
+  every few minutes if stuck videos need to resolve faster.
 
 ### Preview deployments need their own database
 

@@ -45,14 +45,17 @@ export async function GET() {
   try {
     const user = await ensureStaff();
     const scope = await getEditableScope(user);
-    const where = scope.isAdmin
-      ? {}
-      : {
-          OR: [
-            { id: { in: scope.seriesIds } },
-            { categoryId: { in: await descendantCategoryIds(scope.categoryIds) } },
-          ],
-        };
+    const where = {
+      deletedAt: null,
+      ...(scope.isAdmin
+        ? {}
+        : {
+            OR: [
+              { id: { in: scope.seriesIds } },
+              { categoryId: { in: await descendantCategoryIds(scope.categoryIds) } },
+            ],
+          }),
+    };
     const series = await prisma.series.findMany({
       where,
       orderBy: [{ pinned: "desc" }, { position: "asc" }],

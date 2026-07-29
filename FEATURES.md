@@ -22,10 +22,24 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   so content can go live or expire automatically without a manual step.
 - **Search** — `/search` and the navbar search box rank results by
   relevance (exact/prefix title match outranks a description-only hit)
-  across category names, series titles/descriptions/tags, and video
-  titles/descriptions. If that exact pass finds no series or no videos, a
-  typo-tolerant fuzzy pass runs as a fallback, matching titles by edit
-  distance so "chruch" still finds "Church" — see the technical note below.
+  across category names, series titles/descriptions/tags, video
+  titles/descriptions, and speaker names. Filters narrow results to one
+  category and/or speaker, and a sort toggle switches between relevance and
+  newest-first. If the exact pass finds no series or no videos, a
+  typo-tolerant fuzzy pass runs as a fallback, ranking by Postgres trigram
+  similarity so "chruch" still finds "Church" — see the technical note below.
+- **Speakers** — an admin-managed directory of preachers/presenters
+  (`/speakers`, `/speakers/[slug]`), attachable to a video from the video
+  manager; a speaker's page lists their published, viewable videos.
+- **Scripture references** — free-form Bible references on a video (e.g.
+  "John 3:16-18"), shown as chips and browsable at `/scripture` (an index of
+  referenced books) and `/scripture/[book]`.
+- **Live streaming** (plugin) — an admin-scheduled `LiveStream` pointing at
+  an already-hosted embed (YouTube, Boxcast, etc. — Bunny Stream has no live
+  ingest). `/live` shows the current stream when one is live, a countdown to
+  the next scheduled one otherwise, and a site-wide "Live now" banner appears
+  on the homepage and in the nav while a stream is live. Publishing a stream
+  sends a push notification, same as a new video.
 - **Continue watching / recently added** — a periodic heartbeat approximates
   watch position (see note below) and powers a homepage "Continue watching"
   row with resume-from-where-you-left-off; a "Recently added" row shows the
@@ -33,6 +47,9 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Trending** — a homepage "Trending this week" row of the series with the
   most logged views in the last 7 days (gated by the View counts plugin,
   which now also logs timestamped view events, not just the all-time counter).
+- **Admin-configurable homepage rows** — an admin can turn any homepage row
+  on/off, rename it, and reorder it, plus add curated rows pointing at a
+  specific category or tag. See Admin CMS below.
 - **Up next** — a panel under a video showing the next episode in its series,
   with an autoplay toggle (persisted per-browser) that best-effort advances
   once the current video's known duration elapses — see the technical note
@@ -67,24 +84,35 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Watch later** (`/watch-later`) — a separate queue from Favorites.
 - **Comments** — discuss a series or video, one level of replies deep;
   authors can delete their own comments and replies, moderators can delete
-  any (see Permissions).
+  any (see Permissions). Any other logged-in member can **report** a
+  comment; reported (and moderator-hidden) comments surface in the
+  `/admin/comments` moderation queue, where a moderator can hide (without
+  deleting) or delete them — see Admin CMS below.
 - **Ratings** — a 1-5 star rating on a series or video; average and count
   shown to everyone, the stars are only clickable when logged in.
 - **View counts** — a simple counter shown on series/video pages.
 - **Social share** — copy-link and share-to-X/Facebook buttons.
-- **Announcements** — a dismissible (per browser session) site-wide banner.
+- **Announcements** — a dismissible (per browser session) site-wide banner,
+  optionally scheduled (start/expiry time) and targeted to guests, members,
+  or everyone.
 - **Notifications** — opt-in Web Push, sent when an admin publishes a video.
   Each member picks a frequency on `/profile`: **Instant** (the default)
   pushes the moment content publishes, **Daily digest** queues notifications
   and delivers one batched push a day via a scheduled job. The selector only
-  appears while this plugin is on.
+  appears while this plugin is on. A member can also opt into an **email**
+  copy of the same notifications — a separate, always-instant channel
+  (independent of the push frequency choice) that reaches members without a
+  push subscription at all; see the technical note below.
 - **Subscriptions** (`/subscriptions`) — follow a series or category; when a
   followed series publishes a new video, its subscribers get a push
   notification (in addition to, and independent from, the general
   Notifications plugin above). Each subscription has a mute toggle that
   keeps the follow but skips push notifications for it.
 - **Playlists** (`/playlists`) — member-created, ordered, reorderable video
-  collections, separate from the single site-wide Watch Later queue.
+  collections, separate from the single site-wide Watch Later queue. A
+  playlist can be made shareable ("Make shareable"), which lets anyone with
+  the link view it read-only at `/playlists/[id]` without logging in —
+  otherwise it's only visible to its owner.
 - **Likes / dislikes** — a thumbs up/down on a series or video, shown
   alongside (and independent from) the 1-5 star Ratings plugin.
 - **Watch history** — gates the `/recently-played` page and its bottom-nav
@@ -103,6 +131,18 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Recommendations** — a homepage "Because you watched X" row for logged-in
   members, anchored on the series of their most recently watched video and
   reusing the same same-category/shared-tag logic as related content.
+- **Sermon notes** — a member's own private, timestamped notes on a video
+  (e.g. "12:03 — great point about grace"), added while watching and
+  exportable as a plain text file. The timestamp is manually entered, the
+  same limitation as Chapters (see the technical note below).
+
+## Watch progress extras
+
+- **Mark as watched** — a manual toggle on the video page sets or clears
+  `WatchProgress.completed` directly, independent of the heartbeat
+  approximation — useful when a member watched elsewhere, or the heartbeat
+  missed the very end. Affects the same completion flag that gates
+  sequential unlock and feeds the watch-through-rate analytics.
 
 ## Auth
 
@@ -173,23 +213,66 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   Transcripts plugin, which is a searchable text panel beside the video
   rather than subtitles on it.
 
+- **Comment moderation** (`/admin/comments`, needs `moderate_comments`) — a
+  queue of every reported and/or hidden comment, scoped to a moderator's own
+  categories/series unless they hold a site-wide `moderate_comments` grant
+  (or are `ADMIN`). "Hide" removes a comment from public view without
+  deleting it; "Delete" is permanent, same as the existing per-comment
+  delete action.
+
+- **Homepage rows** (`/admin/home-rows`, needs `manage_plugins`) — turn any
+  of the homepage's built-in rows (Continue watching, Because you watched,
+  Trending, Recently added) on/off and rename them, plus add curated rows
+  pointing at a specific category or tag. Continue watching (when shown)
+  always renders directly above the category/series browse list, which
+  itself isn't reorderable; every other row reorders and appears below it,
+  in the order configured here.
+
 - **Webhooks** (`/admin/webhooks`) — admin-configured outgoing URLs that get
   a JSON POST whenever a series or video is published; optionally signed
   with a secret as an `X-Webhook-Signature` header (hex HMAC-SHA256). Needs
   the Webhooks plugin enabled in Plugins.
 
+- **Trash** (`/admin/trash`) — deleting a category, series, video, or file
+  moves it to trash instead of removing it, so a mistake is recoverable.
+  Restore brings it back exactly as it was; permanent delete is
+  irreversible and, for a video/file, is also the point its underlying
+  Bunny Stream/Storage asset actually gets removed — trashing alone leaves
+  it in place. Requires holding at least one of the four content-management
+  capabilities (`manage_categories`/`series`/`videos`/`files`) site-wide, or
+  being `ADMIN`; see the technical note below on what trashing a category or
+  series does (and doesn't do) to what's inside it.
+
+- **Slug aliases** — renaming a series or video's slug from its edit page
+  records the old slug, so a link shared before the rename 301s to the
+  current one instead of 404ing, automatically.
+
 ## Admin analytics (`/admin/analytics`)
 
-- Needs the `view_analytics` capability. Shows total views over the last 30
-  days plus the top 10 series and top 10 videos by view count in that
-  window, built from the same timestamped view log that powers the
-  homepage Trending row.
+- Needs the `view_analytics` capability. Shows total views over a selectable
+  window (7/30/90 days, `?days=`) plus the top 10 series and top 10 videos
+  by view count in that window, built from the same timestamped view log
+  that powers the homepage Trending row.
 - Each top video also shows a **watch-through rate**: the share of that
   window's watch-progress rows for the video that are marked completed.
   It reuses the existing heartbeat data rather than adding tracking, and is
   omitted entirely (not shown as 0%) for a video with no progress recorded
   in the window, so a stale view count can't be paired with a misleadingly
   precise 0%.
+- **Export CSV** downloads the same top-series/top-videos data for the
+  selected window as a CSV (or JSON) file, for pulling into a spreadsheet or
+  a board report.
+
+## Scheduled jobs
+
+- `/api/cron/notification-digest` (daily): batches queued daily-digest push
+  notifications — see Notifications above.
+- `/api/cron/sync-video-status` (daily): polls Bunny for every video still
+  stuck in `PROCESSING` and applies the same status/duration/thumbnail
+  update the admin's manual "Sync from Bunny" button does, so a video that
+  finished encoding doesn't sit unprocessed until someone happens to click
+  refresh. Never touches `published` — an admin still decides when to
+  publish. Both crons share the same `CRON_SECRET` bearer-token guard.
 
 ## Technical notes
 
@@ -203,6 +286,23 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Chapters** have the same root cause too: since the embed has no seek
   API, clicking a chapter reloads the iframe with a new `t=` start-time
   query param instead of seeking a live player.
+- **Sermon notes'** timestamp field is manually entered for the same
+  reason (no real playback position to read) — it's prefilled once from the
+  heartbeat's elapsed-time approximation as a starting point to adjust from,
+  not kept in sync afterward.
+- **The heartbeat never un-marks a video as watched**: `/api/watch-progress`
+  only ever sets `completed` to `true`, never back to `false` — a stray
+  heartbeat reporting `false` (e.g. re-opening a finished video partway
+  through) must not silently clear a completion that "Mark as watched" or an
+  earlier heartbeat already recorded. Un-marking is only ever a deliberate
+  action, via the mark-as-watched toggle or `/api/watch-progress/mark-watched`.
+- **Trashing a category or series doesn't cascade to what's inside it**: its
+  own row gets `deletedAt` set, but a child series/video/file keeps its
+  existing `categoryId`/`seriesId` untouched — it just stops appearing
+  anywhere the trashed parent would have listed it (the category/series
+  browse tree), while still being directly reachable by its own URL. This is
+  a deliberate scope trim for the first version of trash rather than full
+  recursive soft-delete/restore.
 - **View counts** are a simple per-page-load counter, not deduplicated or
   spam-resistant — a basic "how many hits" number, not analytics. Trending
   and the admin analytics dashboard use a separate timestamped view log for
@@ -214,11 +314,10 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Fuzzy search is a fallback, not the default path**: the exact/substring
   query runs first and, when it matches anything, nothing else happens — so
   the common case pays no extra query. Only when a pass comes back empty
-  does the fuzzy path load up to 500 published rows and rank them in memory
-  by word-level Levenshtein distance (`src/lib/fuzzy.ts`, unit tested
-  directly), keeping the added cost off the hot path. The 500-row cap
-  comfortably covers a single church's catalog rather than scanning an
-  unbounded table.
+  does the fuzzy path run, ranking candidates by Postgres trigram similarity
+  (`similarity()`, via the `pg_trgm` extension and GIN indexes added in the
+  `search_trigram_indexes` migration) rather than pulling rows into memory —
+  this scales with the database, not with an in-memory row cap.
 - **Closed captions live in Bunny, not here**: there's no local copy and no
   new `Video` column — the admin route reads and writes Bunny's captions
   API directly, so every render path picks up a new track for free, the
@@ -250,6 +349,18 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   aggressive offline cache would risk showing stale or wrong-audience
   content; it only caches its own static shell (manifest + icons) and
   handles push notifications.
+- **Email notifications are a fetch to the Resend API** (`src/lib/email.ts`),
+  the same pattern as `bunny.ts`/`webhooks.ts` talking to their own REST
+  APIs — no SDK dependency. It's a no-op if `RESEND_API_KEY`/`EMAIL_FROM`
+  aren't set, same as push's VAPID-keys-optional behavior. Unlike push,
+  email always sends immediately: it isn't queued into `PendingNotification`
+  for `DAILY` users, since that preference only governs push's timing.
+- **The trigram GIN indexes have no `schema.prisma` representation** (raw
+  SQL migration, not the Prisma DSL) — the next `prisma migrate dev` will
+  read them as drift and propose dropping them. Strip any such
+  `DROP INDEX ..._trgm_idx` statements from a freshly generated migration
+  before applying it (see the `home_rows_comment_moderation_email`
+  migration for an example of this already happening once).
 
 ## Tests & CI
 

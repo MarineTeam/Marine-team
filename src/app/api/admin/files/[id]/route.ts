@@ -4,7 +4,6 @@ import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureContentAccess } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
-import { bunnyStorageDelete } from "@/lib/bunny";
 import type { User } from "@prisma/client";
 
 export const updateSchema = z
@@ -52,13 +51,16 @@ export async function applyFileUpdate(user: User, id: string, body: z.infer<type
   return file;
 }
 
-/** Shared by the single-item DELETE below and the bulk route. */
+/**
+ * Shared by the single-item DELETE below and the bulk route. Soft delete
+ * only — the Bunny Storage object isn't removed until the trash entry is
+ * permanently purged from /admin/trash.
+ */
 export async function removeFile(user: User, id: string) {
   const file = await prisma.fileAsset.findUniqueOrThrow({ where: { id } });
   await ensureContentAccess(user, { seriesId: file.seriesId, categoryId: file.categoryId });
-  await bunnyStorageDelete(file.bunnyPath);
-  await prisma.fileAsset.delete({ where: { id } });
-  await logAudit(user.email, "delete", "file", id, file.title);
+  await prisma.fileAsset.update({ where: { id }, data: { deletedAt: new Date() } });
+  await logAudit(user.email, "trash", "file", id, file.title);
 }
 
 export async function PATCH(

@@ -6,6 +6,77 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-29
+
+### Added
+
+- **Speakers**: an admin-managed directory of preachers/presenters
+  (`/admin/speakers`), attachable to a video from the video manager.
+  `/speakers` and `/speakers/[slug]` list them alongside their published,
+  viewable videos.
+- **Scripture references**: free-form Bible references on a video (e.g.
+  "John 3:16-18"), edited from a new "Scripture" panel in the video manager
+  and browsable at `/scripture` (an index of referenced books) and
+  `/scripture/[book]`.
+- **Live streaming plugin** (`/admin/live`): schedule a live stream that
+  points at an existing embed (YouTube, Boxcast, etc.). `/live` shows the
+  current stream while it's live, a countdown to the next scheduled one
+  otherwise, and a "Live now" banner appears on the homepage and in the nav.
+  Publishing a stream sends a push notification like publishing a video does.
+- **Search filters + sort**: `/search` gained category and speaker filters
+  plus a relevance/newest sort toggle, and now also matches on speaker name.
+- **Trigram-backed search**: the fuzzy fallback in `/search` (and the typo
+  tolerance it provides) now ranks candidates by Postgres trigram similarity
+  (`pg_trgm`, new GIN indexes) instead of scanning up to 500 rows into
+  memory with a JS Levenshtein matcher, which is retired along with it.
+- **Admin-configurable homepage rows** (`/admin/home-rows`): toggle, rename,
+  and reorder the homepage's built-in rows (Continue watching, Because you
+  watched, Trending, Recently added), and add curated rows pointing at a
+  specific category or tag.
+- **Comment reporting + moderation queue**: any logged-in member can report
+  a comment; reported (and moderator-hidden) comments surface in a new
+  `/admin/comments` queue, scoped to a moderator's own categories/series
+  unless they hold a site-wide `moderate_comments` grant. A moderator can
+  hide a comment (removed from public view, not deleted) or delete it as before.
+- **Email notification channel**: members can opt into an email copy of
+  their notifications on `/profile`, sent via the Resend API alongside Web
+  Push. Always instant, independent of the existing instant/daily-digest
+  choice (which only governs push timing).
+- **Sermon notes**: a member's own private, timestamped notes on a video,
+  added from a panel on the video page and exportable as a text file.
+- **Trash + restore** (`/admin/trash`): deleting a category, series, video,
+  or file now moves it to trash instead of removing it immediately.
+  Restore brings it back exactly as it was; permanent delete is
+  irreversible and, for a video/file, is the point its Bunny Stream/Storage
+  asset is actually removed.
+- **Slug aliases**: renaming a series or video's slug now records the old
+  one, so a link shared before the rename redirects to the current slug
+  instead of 404ing.
+- **Manual "Mark as watched"**: a toggle on the video page sets/clears
+  watch completion directly, independent of the heartbeat approximation.
+- **Scheduled + targeted announcements**: an announcement can now have a
+  `publishAt`/`expiresAt` window and an audience (guests/members/everyone),
+  on top of the existing `active` toggle.
+- **Shareable playlists**: a playlist can be made "shareable", letting
+  anyone with the link view it read-only at `/playlists/[id]` without
+  logging in.
+- **Analytics date range + CSV export**: `/admin/analytics` gained a
+  7/30/90-day range picker and a CSV/JSON export of the same top-series/
+  top-videos data.
+- **Cron to reconcile stuck video processing**: a new daily
+  `/api/cron/sync-video-status` job polls Bunny for any video still stuck
+  in `PROCESSING` and applies the same status/duration/thumbnail sync the
+  admin's manual "Sync from Bunny" button does.
+
+### Fixed
+
+- **Watch progress no longer silently un-marks a video as watched**: a
+  heartbeat reporting incomplete (e.g. re-opening a finished video partway
+  through) used to overwrite an existing `completed: true`, which could
+  re-lock a sequential-unlock series and drop the video from the
+  watch-through-rate analytics. The heartbeat now only ever sets `completed`
+  forward to `true`, never back to `false`.
+
 ## [1.3.0] - 2026-07-29
 
 ### Added

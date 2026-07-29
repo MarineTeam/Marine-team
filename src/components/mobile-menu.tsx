@@ -14,6 +14,7 @@ type MobileMenuProps = {
   subscriptionsOn: boolean;
   notificationsOn: boolean;
   profilesOn: boolean;
+  liveStreamingOn: boolean;
 };
 
 export function MobileMenu({
@@ -24,6 +25,7 @@ export function MobileMenu({
   subscriptionsOn,
   notificationsOn,
   profilesOn,
+  liveStreamingOn,
 }: MobileMenuProps) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -136,6 +138,11 @@ export function MobileMenu({
               <Link href="/" onClick={() => setOpen(false)} className="py-3">
                 Browse
               </Link>
+              {liveStreamingOn && (
+                <Link href="/live" onClick={() => setOpen(false)} className="py-3">
+                  Live
+                </Link>
+              )}
               {user && (
                 <Link href="/favorites" onClick={() => setOpen(false)} className="py-3">
                   Favorites

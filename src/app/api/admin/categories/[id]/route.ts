@@ -71,6 +71,7 @@ export async function PATCH(
   }
 }
 
+/** Soft delete — moves the category to /admin/trash instead of removing it, so it can be restored. */
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -79,8 +80,8 @@ export async function DELETE(
     const user = await ensureStaff();
     await ensureCapability(user, "manage_categories");
     const { id } = await params;
-    const category = await prisma.category.delete({ where: { id } });
-    await logAudit(user.email, "delete", "category", id, category.name);
+    const category = await prisma.category.update({ where: { id }, data: { deletedAt: new Date() } });
+    await logAudit(user.email, "trash", "category", id, category.name);
     revalidateTag("categories", { expire: 0 });
     return NextResponse.json({ ok: true });
   } catch (error) {

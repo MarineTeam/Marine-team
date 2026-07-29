@@ -1,17 +1,22 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser, getSessionIdentity } from "@/lib/current-user";
-import { isStaff, hasCapability } from "@/lib/permissions";
+import { isStaff, hasCapability, getCapabilityScope } from "@/lib/permissions";
 
 const adminLinks = [
   { href: "/admin", label: "Overview" },
   { href: "/admin/categories", label: "Categories" },
   { href: "/admin/series", label: "Series" },
   { href: "/admin/videos", label: "Videos" },
+  { href: "/admin/speakers", label: "Speakers" },
+  { href: "/admin/live", label: "Live streaming" },
   { href: "/admin/files", label: "Files" },
+  { href: "/admin/comments", label: "Comment moderation" },
+  { href: "/admin/trash", label: "Trash" },
   { href: "/admin/users", label: "Access" },
   { href: "/admin/permissions", label: "Permissions" },
   { href: "/admin/plugins", label: "Plugins" },
+  { href: "/admin/home-rows", label: "Homepage" },
   { href: "/admin/announcements", label: "Announcements" },
   { href: "/admin/webhooks", label: "Webhooks" },
   { href: "/admin/audit", label: "Audit log" },
@@ -41,23 +46,50 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   let links = adminLinks;
   if (user.role !== "ADMIN") {
-    const [canManageUsers, canManagePermissions, canManagePlugins, canViewAuditLog, canViewAnalytics] =
-      await Promise.all([
-        hasCapability(user, "manage_users"),
-        hasCapability(user, "manage_permissions"),
-        hasCapability(user, "manage_plugins"),
-        hasCapability(user, "view_audit_log"),
-        hasCapability(user, "view_analytics"),
-      ]);
+    const [
+      canManageUsers,
+      canManagePermissions,
+      canManagePlugins,
+      canViewAuditLog,
+      canViewAnalytics,
+      canManageVideosSiteWide,
+      canManageCategories,
+      canManageSeries,
+      canManageFiles,
+      moderateScope,
+    ] = await Promise.all([
+      hasCapability(user, "manage_users"),
+      hasCapability(user, "manage_permissions"),
+      hasCapability(user, "manage_plugins"),
+      hasCapability(user, "view_audit_log"),
+      hasCapability(user, "view_analytics"),
+      hasCapability(user, "manage_videos"),
+      hasCapability(user, "manage_categories"),
+      hasCapability(user, "manage_series"),
+      hasCapability(user, "manage_files"),
+      getCapabilityScope(user, "moderate_comments"),
+    ]);
+    const canModerateComments =
+      moderateScope.isAdmin || moderateScope.categoryIds.length > 0 || moderateScope.seriesIds.length > 0;
+    const canSeeTrash = canManageCategories || canManageSeries || canManageVideosSiteWide || canManageFiles;
     links = [
       { href: "/admin/series", label: "Series" },
       { href: "/admin/videos", label: "Videos" },
+      ...(canManageVideosSiteWide
+        ? [
+            { href: "/admin/speakers", label: "Speakers" },
+            { href: "/admin/live", label: "Live streaming" },
+          ]
+        : []),
       { href: "/admin/files", label: "Files" },
+      ...(canModerateComments ? [{ href: "/admin/comments", label: "Comment moderation" }] : []),
+      ...(canSeeTrash ? [{ href: "/admin/trash", label: "Trash" }] : []),
       ...(canManageUsers ? [{ href: "/admin/users", label: "Access" }] : []),
       ...(canManagePermissions ? [{ href: "/admin/permissions", label: "Permissions" }] : []),
       ...(canManagePlugins
         ? [
             { href: "/admin/plugins", label: "Plugins" },
+            { href: "/admin/home-rows", label: "Homepage" },
             { href: "/admin/announcements", label: "Announcements" },
             { href: "/admin/webhooks", label: "Webhooks" },
           ]

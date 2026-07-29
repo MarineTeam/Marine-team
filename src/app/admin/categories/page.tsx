@@ -153,7 +153,7 @@ export default function CategoriesPage() {
   async function remove(id: string) {
     if (
       !confirm(
-        "Delete this category? Series in it will become uncategorized, and any sub-categories will become top-level.",
+        "Move this category to Trash? Series/sub-categories inside it aren't deleted, but disappear from the site until you restore it from Admin > Trash.",
       )
     )
       return;

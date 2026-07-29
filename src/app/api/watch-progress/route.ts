@@ -31,7 +31,12 @@ export async function POST(request: NextRequest) {
     },
     update: {
       positionSeconds: body.positionSeconds,
-      completed: body.completed ?? false,
+      // Only ever sets completed to true here — a heartbeat reporting
+      // false (e.g. re-opening a finished video partway through) must not
+      // clear a completion that manual "Mark as watched" (or an earlier
+      // heartbeat) already recorded. Un-marking is a deliberate action via
+      // /api/watch-progress/mark-watched, not an incidental heartbeat.
+      completed: body.completed ? true : undefined,
     },
   });
   return NextResponse.json({ ok: true });

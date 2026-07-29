@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import {
   getVideoBySlugIncludingPremiere,
+  resolveVideoSlugAlias,
   getWatchProgressForVideo,
   getRelatedVideos,
   getUpNextVideo,
@@ -17,6 +18,7 @@ import {
   getUserVideoReaction,
   getComments,
   getVideoChapters,
+  getSermonNotes,
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
@@ -25,6 +27,7 @@ import { bunnyStreamEmbedUrl, bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { WatchProgressTracker } from "@/components/watch-progress-tracker";
 import { VideoPlayer } from "@/components/video-player";
 import { FavoriteButton } from "@/components/favorite-button";
+import { MarkWatchedButton } from "@/components/mark-watched-button";
 import { WatchLaterButton } from "@/components/watch-later-button";
 import { SubscribeButton } from "@/components/subscribe-button";
 import { AddToPlaylistButton } from "@/components/add-to-playlist-button";
@@ -33,6 +36,7 @@ import { ReactionButtons } from "@/components/reaction-buttons";
 import { ShareButtons } from "@/components/share-buttons";
 import { MenuTile } from "@/components/menu-tile";
 import { CommentSection } from "@/components/comment-section";
+import { SermonNotesPanel } from "@/components/sermon-notes-panel";
 import { UpNextPanel } from "@/components/up-next-panel";
 import { PremiereCountdown } from "@/components/premiere-countdown";
 import { ViewEventBeacon } from "@/components/view-event-beacon";
@@ -45,7 +49,11 @@ export default async function VideoPage({
   const { slug } = await params;
   const [video, user] = await Promise.all([getVideoBySlugIncludingPremiere(slug), getCurrentUser()]);
 
-  if (!video) notFound();
+  if (!video) {
+    const currentSlug = await resolveVideoSlugAlias(slug);
+    if (currentSlug) permanentRedirect(`/videos/${currentSlug}`);
+    notFound();
+  }
 
   const isPendingPremiere = Boolean(video.isPremiere && video.publishAt && video.publishAt > new Date());
 
@@ -102,10 +110,11 @@ export default async function VideoPage({
     "up-next": upNextOn,
     chapters: chaptersOn,
     transcripts: transcriptsOn,
+    "sermon-notes": sermonNotesOn,
   } = plugins;
   const resumeAt = progress && !progress.completed ? progress.positionSeconds : 0;
 
-  const [ratingSummary, myRating, reactionSummary, myReaction, related, comments, upNext, chapters] =
+  const [ratingSummary, myRating, reactionSummary, myReaction, related, comments, upNext, chapters, sermonNotes] =
     await Promise.all([
       ratingsOn ? getVideoRatingSummary(video.id) : Promise.resolve({ average: 0, count: 0 }),
       ratingsOn && user ? getUserVideoRating(user.id, video.id) : Promise.resolve(null),
@@ -115,6 +124,7 @@ export default async function VideoPage({
       commentsOn ? getComments("video", video.id) : Promise.resolve([]),
       upNextOn ? getUpNextVideo(video, isLoggedIn) : Promise.resolve(null),
       chaptersOn ? getVideoChapters(video.id) : Promise.resolve([]),
+      sermonNotesOn && user ? getSermonNotes(user.id, video.id) : Promise.resolve([]),
     ]);
   const initialComments = comments.map((c) => ({
     ...c,
@@ -140,6 +150,9 @@ export default async function VideoPage({
         <div className="flex flex-wrap items-center gap-2">
           {user && favoritesOn && <FavoriteButton type="video" id={video.id} initialFavorited={favorited} />}
           {user && watchLaterOn && <WatchLaterButton type="video" id={video.id} initialQueued={queued} />}
+          {user && video.status === "READY" && !sequenceLocked && (
+            <MarkWatchedButton videoId={video.id} initialCompleted={progress?.completed ?? false} />
+          )}
           {user && playlistsOn && <AddToPlaylistButton videoId={video.id} />}
           {user && video.seriesId && subscriptionsOn && (
             <SubscribeButton type="series" id={video.seriesId} initialSubscribed={subscribed} />
@@ -245,6 +258,15 @@ export default async function VideoPage({
             ))}
           </div>
         </section>
+      )}
+
+      {sermonNotesOn && user && (
+        <SermonNotesPanel
+          videoId={video.id}
+          videoTitle={video.title}
+          initialNotes={sermonNotes}
+          startPositionSeconds={resumeAt}
+        />
       )}
 
       {commentsOn && (

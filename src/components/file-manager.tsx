@@ -110,7 +110,7 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
   }
 
   async function remove(id: string) {
-    if (!confirm("Delete this file? This also removes it from Bunny Storage.")) return;
+    if (!confirm("Move this file to Trash? It's restorable from Admin > Trash; the Bunny Storage object isn't removed until it's permanently deleted from there.")) return;
     await fetch(`/api/admin/files/${id}`, { method: "DELETE" });
     await load();
   }
@@ -171,7 +171,7 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
   }
 
   async function bulkDelete() {
-    if (!confirm(`Delete ${selectedIds.size} file(s)? This also removes them from Bunny Storage.`))
+    if (!confirm(`Move ${selectedIds.size} file(s) to Trash? Restorable from Admin > Trash.`))
       return;
     await fetch("/api/admin/files/bulk", {
       method: "POST",
