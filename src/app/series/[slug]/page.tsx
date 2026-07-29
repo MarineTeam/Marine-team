@@ -87,7 +87,10 @@ export default async function SeriesPage({
   ]);
   const initialComments = comments.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }));
 
-  if (viewCountsOn) await incrementSeriesViewCount(series.id);
+  // Gated by seriesLocked to match the ViewEventBeacon below and the video
+  // page, where the access check returns early: someone who only ever sees
+  // the members-only gate hasn't viewed the series.
+  if (viewCountsOn && !seriesLocked) await incrementSeriesViewCount(series.id);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-8">

@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      # prisma generate (via postinstall) reads the datasource block but never
+      # connects, so a syntactically valid placeholder is enough — CI must not
+      # need real database credentials.
+      DATABASE_URL: postgresql://user:password@localhost:5432/placeholder
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # postinstall runs `prisma generate`, which the type check depends on:
+      # without the generated client, tsc fails on every @prisma/client import.
+      - run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint .
+
+      - name: Schema is valid and formatted
+        run: |
+          npx prisma validate
+          npx prisma format --check

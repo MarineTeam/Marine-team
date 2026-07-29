@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { PushNotificationToggle } from "@/components/push-notification-toggle";
@@ -23,20 +23,80 @@ export function MobileMenu({
   notificationsOn,
 }: MobileMenuProps) {
   const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<HTMLButtonElement>(null);
+
+  // A full-screen overlay that the keyboard can't escape or dismiss is a trap,
+  // and leaving the page scrollable behind it means the background moves under
+  // the menu on touch. Handles Escape, scroll lock, and keeping Tab inside the
+  // panel, restoring focus to the opener on close.
+  useEffect(() => {
+    if (!open) return;
+
+    const opener = openerRef.current;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = panelRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable?.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    // Focus the panel itself rather than the close button, so a screen reader
+    // announces the dialog before its first control.
+    panelRef.current?.focus();
+
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      (opener ?? previouslyFocused)?.focus();
+    };
+  }, [open]);
 
   return (
     <>
       <button
         type="button"
+        ref={openerRef}
         onClick={() => setOpen(true)}
         aria-label="Open menu"
+        aria-expanded={open}
+        aria-haspopup="dialog"
         className="-m-2 rounded-md p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800"
       >
         <MenuIcon className="h-6 w-6" />
       </button>
 
       {open && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-zinc-950">
+        <div
+          ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu"
+          tabIndex={-1}
+          className="fixed inset-0 z-50 flex flex-col bg-white outline-none dark:bg-zinc-950"
+        >
           <div className="flex items-center gap-4 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
             <button
               type="button"
