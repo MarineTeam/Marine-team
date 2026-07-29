@@ -37,6 +37,9 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
        there (a different secret from `BUNNY_STREAM_API_KEY`) — otherwise
        the video player and thumbnails will 404. Leave it unset if token
        auth is off.
+   - `RESEND_API_KEY`/`EMAIL_FROM` (optional): enables the Notifications
+     plugin's opt-in email channel. Leave both unset locally — email sends
+     become a no-op, same as leaving the Web Push `VAPID_*` keys unset.
 2. Install dependencies and generate the Prisma client:
    ```bash
    npm install
@@ -114,7 +117,13 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   `favorites` plugin (see Plugins below).
 - **Comments**: logged-in users can leave comments on a series or video
   page; authors can delete their own, admins or `moderate_comments`
-  capability holders can delete any. Gated by the `comments` plugin.
+  capability holders can delete any. Gated by the `comments` plugin. Any
+  other logged-in member can **report** a comment (`CommentReport`, one per
+  member per comment); reported or already-hidden comments surface in
+  `/admin/comments` (`getReportedComments()` in `src/lib/content.ts`,
+  scoped to a moderator's own categories/series via `getCapabilityScope()`
+  unless they hold a site-wide grant), where a moderator can hide
+  (`Comment.hidden`, excluded from public reads) or permanently delete.
 - **Related content**: series pages show a "More like this" row (same
   category, then shared tags); video pages show "More from this series" or
   "You might also like" for standalone videos. Gated by the
@@ -177,7 +186,11 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     keys aren't configured. Members choose a frequency on `/profile`:
     `INSTANT` (default, unchanged behavior) pushes immediately, while
     `DAILY` queues a `PendingNotification` row per event that the digest
-    cron batches into one push a day (see Deployment below).
+    cron batches into one push a day (see Deployment below). A member can
+    also opt into `User.emailNotifications` — a separate, always-instant
+    email channel (`src/lib/email.ts`, via the Resend API, a no-op without
+    `RESEND_API_KEY`/`EMAIL_FROM`) sent alongside push regardless of the
+    `INSTANT`/`DAILY` choice, which only governs push timing.
   - **Subscriptions** (`/subscriptions`): follow a series or category; its
     subscribers get a targeted push notification when it publishes a new
     video, on top of the general Notifications above.
@@ -229,6 +242,14 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   staying fully hidden until then.
 - **Admin analytics** (`/admin/analytics`, `view_analytics` capability):
   30-day view totals and top series/videos, from the same view log.
+- **Homepage rows** (`/admin/home-rows`, `manage_plugins` capability): a
+  `HomeRow` per built-in section (seeded once via `ensureHomeRowsSeeded()`)
+  lets an admin toggle, rename, and reorder Continue watching/Because you
+  watched/Trending/Recently added, plus add curated `CATEGORY`/`TAG` rows.
+  `getHomeRows()` falls back to the default built-in order when nothing's
+  configured yet, the same fail-open pattern as `getPluginStates()`.
+  Continue watching (when shown) always renders directly above the
+  category/series browse list, which itself isn't a configurable row.
 - **Feeds**: `/feed.xml` is a site-wide RSS feed of recently added series;
   `/series/[slug]/podcast.xml` is an iTunes-compatible podcast feed of a
   series' published audio files (skipped for `memberOnly` series, since
@@ -302,6 +323,13 @@ The `search_trigram_indexes` migration runs `CREATE EXTENSION IF NOT EXISTS
 pg_trgm`, which needs the database user to have (or be granted) that
 privilege — already the case on Prisma Postgres, Neon, Supabase, and RDS
 with `rds_superuser`, but worth checking on a locked-down managed instance.
+
+**The trigram GIN indexes have no representation in `schema.prisma`** (raw
+SQL, not the Prisma DSL), so the next time `prisma migrate dev` diffs the
+schema it will propose `DROP INDEX` for all of them as apparent drift —
+seen firsthand while adding the `home_rows_comment_moderation_email`
+migration. Strip any such `DROP INDEX ..._trgm_idx` lines from a
+freshly-generated migration before applying it, the same way that one had them removed.
 
 To change the schema:
 

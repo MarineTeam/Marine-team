@@ -555,9 +555,10 @@ export async function searchContent(query: string, isLoggedIn: boolean, filters:
  * (oldest first, reading like a conversation) — threading is one level deep,
  * so a reply's own `replies` array is always empty.
  */
+/** Public reads exclude hidden comments (moderator-hidden via /admin/comments); a moderator reviews those from the queue instead. */
 export async function getComments(type: "series" | "video", id: string) {
   const all = await prisma.comment.findMany({
-    where: type === "series" ? { seriesId: id } : { videoId: id },
+    where: { ...(type === "series" ? { seriesId: id } : { videoId: id }), hidden: false },
     include: { user: { select: { id: true, name: true, displayName: true, email: true, picture: true } } },
     orderBy: { createdAt: "asc" },
   });
@@ -574,6 +575,52 @@ export async function getComments(type: "series" | "video", id: string) {
     .filter((c) => !c.parentId)
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .map((c) => ({ ...c, replies: repliesByParent.get(c.id) ?? [] }));
+}
+
+/** Records a member's report of a comment; a repeat report from the same member is a no-op (unique per commentId+userId). */
+export async function reportComment(commentId: string, userId: string): Promise<void> {
+  await prisma.commentReport.upsert({
+    where: { commentId_userId: { commentId, userId } },
+    create: { commentId, userId },
+    update: {},
+  });
+}
+
+/**
+ * Comments with at least one report or already hidden, for the
+ * /admin/comments moderation queue — newest report/comment first.
+ * `categoryIds`/`seriesIds` scope the query to a non-site-wide moderator
+ * (undefined means no scoping, i.e. site-wide access).
+ */
+export async function getReportedComments(scope?: { categoryIds: string[]; seriesIds: string[] }) {
+  const comments = await prisma.comment.findMany({
+    where: { OR: [{ reports: { some: {} } }, { hidden: true }] },
+    include: {
+      user: { select: { id: true, name: true, displayName: true, email: true } },
+      series: { select: { id: true, title: true, slug: true, categoryId: true } },
+      video: {
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          seriesId: true,
+          categoryId: true,
+          series: { select: { categoryId: true } },
+        },
+      },
+      _count: { select: { reports: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!scope) return comments;
+  const categorySet = new Set(scope.categoryIds);
+  const seriesSet = new Set(scope.seriesIds);
+  return comments.filter((c) => {
+    const categoryId = c.series?.categoryId ?? c.video?.categoryId ?? c.video?.series?.categoryId ?? null;
+    const seriesId = c.seriesId ?? c.video?.seriesId ?? null;
+    return (categoryId != null && categorySet.has(categoryId)) || (seriesId != null && seriesSet.has(seriesId));
+  });
 }
 
 // --- Ratings ---------------------------------------------------------------
@@ -1006,6 +1053,64 @@ export async function getRecommendedSeries(userId: string, limit = 8) {
   const series = await getRelatedSeries(anchor, limit);
   if (series.length === 0) return null;
   return { anchorTitle: anchor.title, series };
+}
+
+// --- Homepage rows -----------------------------------------------------------
+
+/** Built-in row types, in their out-of-the-box order — used both to seed HomeRow and as the fallback when nothing's been configured yet. */
+const DEFAULT_HOME_ROW_TYPES: Array<"CONTINUE_WATCHING" | "RECOMMENDATIONS" | "TRENDING" | "RECENTLY_ADDED"> = [
+  "CONTINUE_WATCHING",
+  "RECOMMENDATIONS",
+  "TRENDING",
+  "RECENTLY_ADDED",
+];
+
+/** Creates the four built-in row types (enabled, in their default order) the first time /admin/home-rows is opened. A no-op once any HomeRow exists. */
+export async function ensureHomeRowsSeeded(): Promise<void> {
+  const count = await prisma.homeRow.count();
+  if (count > 0) return;
+  await prisma.homeRow.createMany({
+    data: DEFAULT_HOME_ROW_TYPES.map((type, position) => ({ type, position })),
+  });
+}
+
+/**
+ * Enabled homepage rows in admin-configured order, each carrying its
+ * category (for a CATEGORY row). Falls back to the default built-in order
+ * (nothing customized yet) rather than an empty homepage when no HomeRow
+ * has been created, matching how getPluginStates() fails open.
+ */
+async function getHomeRowsUncached() {
+  const rows = await prisma.homeRow.findMany({
+    where: { enabled: true },
+    orderBy: { position: "asc" },
+    include: { category: { select: { id: true, name: true, slug: true } } },
+  });
+  if (rows.length > 0) return rows;
+  const now = new Date();
+  return DEFAULT_HOME_ROW_TYPES.map((type, position) => ({
+    id: `default-${type}`,
+    type,
+    title: null,
+    enabled: true,
+    position,
+    categoryId: null,
+    category: null,
+    tag: null,
+    createdAt: now,
+    updatedAt: now,
+  }));
+}
+
+/** Cached: the homepage row config is the same for every visitor and rarely changes. */
+export const getHomeRows = unstable_cache(getHomeRowsUncached, ["home-rows"], {
+  revalidate: 60,
+  tags: ["home-rows"],
+});
+
+/** Published series directly in a category, for a custom CATEGORY homepage row. */
+export async function getCategoryRowSeries(categoryId: string) {
+  return prisma.series.findMany({ where: { categoryId, ...publishedNow() }, orderBy: seriesOrder });
 }
 
 // --- Up next -----------------------------------------------------------------

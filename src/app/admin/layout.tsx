@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser, getSessionIdentity } from "@/lib/current-user";
-import { isStaff, hasCapability } from "@/lib/permissions";
+import { isStaff, hasCapability, getCapabilityScope } from "@/lib/permissions";
 
 const adminLinks = [
   { href: "/admin", label: "Overview" },
@@ -11,9 +11,11 @@ const adminLinks = [
   { href: "/admin/speakers", label: "Speakers" },
   { href: "/admin/live", label: "Live streaming" },
   { href: "/admin/files", label: "Files" },
+  { href: "/admin/comments", label: "Comment moderation" },
   { href: "/admin/users", label: "Access" },
   { href: "/admin/permissions", label: "Permissions" },
   { href: "/admin/plugins", label: "Plugins" },
+  { href: "/admin/home-rows", label: "Homepage" },
   { href: "/admin/announcements", label: "Announcements" },
   { href: "/admin/webhooks", label: "Webhooks" },
   { href: "/admin/audit", label: "Audit log" },
@@ -50,6 +52,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       canViewAuditLog,
       canViewAnalytics,
       canManageVideosSiteWide,
+      moderateScope,
     ] = await Promise.all([
       hasCapability(user, "manage_users"),
       hasCapability(user, "manage_permissions"),
@@ -57,7 +60,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       hasCapability(user, "view_audit_log"),
       hasCapability(user, "view_analytics"),
       hasCapability(user, "manage_videos"),
+      getCapabilityScope(user, "moderate_comments"),
     ]);
+    const canModerateComments =
+      moderateScope.isAdmin || moderateScope.categoryIds.length > 0 || moderateScope.seriesIds.length > 0;
     links = [
       { href: "/admin/series", label: "Series" },
       { href: "/admin/videos", label: "Videos" },
@@ -68,11 +74,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           ]
         : []),
       { href: "/admin/files", label: "Files" },
+      ...(canModerateComments ? [{ href: "/admin/comments", label: "Comment moderation" }] : []),
       ...(canManageUsers ? [{ href: "/admin/users", label: "Access" }] : []),
       ...(canManagePermissions ? [{ href: "/admin/permissions", label: "Permissions" }] : []),
       ...(canManagePlugins
         ? [
             { href: "/admin/plugins", label: "Plugins" },
+            { href: "/admin/home-rows", label: "Homepage" },
             { href: "/admin/announcements", label: "Announcements" },
             { href: "/admin/webhooks", label: "Webhooks" },
           ]

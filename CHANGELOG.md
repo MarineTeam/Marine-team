@@ -27,6 +27,19 @@ All notable changes to this project are documented here. Format follows
   tolerance it provides) now ranks candidates by Postgres trigram similarity
   (`pg_trgm`, new GIN indexes) instead of scanning up to 500 rows into
   memory with a JS Levenshtein matcher, which is retired along with it.
+- **Admin-configurable homepage rows** (`/admin/home-rows`): toggle, rename,
+  and reorder the homepage's built-in rows (Continue watching, Because you
+  watched, Trending, Recently added), and add curated rows pointing at a
+  specific category or tag.
+- **Comment reporting + moderation queue**: any logged-in member can report
+  a comment; reported (and moderator-hidden) comments surface in a new
+  `/admin/comments` queue, scoped to a moderator's own categories/series
+  unless they hold a site-wide `moderate_comments` grant. A moderator can
+  hide a comment (removed from public view, not deleted) or delete it as before.
+- **Email notification channel**: members can opt into an email copy of
+  their notifications on `/profile`, sent via the Resend API alongside Web
+  Push. Always instant, independent of the existing instant/daily-digest
+  choice (which only governs push timing).
 
 ## [1.3.0] - 2026-07-29
 

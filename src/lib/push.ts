@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import { prisma } from "@/lib/db";
+import { sendEmail } from "@/lib/email";
 
 let configured = false;
 
@@ -55,13 +56,9 @@ async function sendToSubscriptions(
  * and sent once a day by the cron at /api/cron/notification-digest. Everyone
  * else (the INSTANT default) is unaffected: same immediate send as before.
  */
-export async function notifySubscribers(
-  payload: { title: string; body: string; url?: string },
-  userIds?: string[],
-) {
+async function notifyPushSubscribers(payload: { title: string; body: string; url?: string }, userIds?: string[]) {
   ensureConfigured();
   if (!configured) return;
-  if (userIds && userIds.length === 0) return;
 
   const subscriptions = await prisma.pushSubscription.findMany(
     userIds ? { where: { userId: { in: userIds } } } : undefined,
@@ -88,6 +85,30 @@ export async function notifySubscribers(
       })),
     });
   }
+}
+
+/**
+ * Emails every user with emailNotifications on (optionally scoped to
+ * `userIds`, same as the push side) — a separate, always-instant channel
+ * independent of notificationFrequency, which only governs push's
+ * instant-vs-digest timing. Silently does nothing per-user if RESEND_API_KEY
+ * isn't configured (see sendEmail), and reaches members with no push
+ * subscription at all, unlike the push side above.
+ */
+async function notifyEmailSubscribers(payload: { title: string; body: string; url?: string }, userIds?: string[]) {
+  const users = await prisma.user.findMany({
+    where: { emailNotifications: true, ...(userIds ? { id: { in: userIds } } : {}) },
+    select: { email: true },
+  });
+  await Promise.all(users.map((u) => sendEmail(u.email, payload.title, payload.body, payload.url)));
+}
+
+export async function notifySubscribers(
+  payload: { title: string; body: string; url?: string },
+  userIds?: string[],
+) {
+  if (userIds && userIds.length === 0) return;
+  await Promise.all([notifyPushSubscribers(payload, userIds), notifyEmailSubscribers(payload, userIds)]);
 }
 
 /** Used only by the daily digest cron: sends one already-batched message straight to a user's own subscriptions. */

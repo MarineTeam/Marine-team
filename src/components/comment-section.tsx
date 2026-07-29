@@ -27,6 +27,7 @@ export function CommentSection({
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState("");
   const [replyPosting, setReplyPosting] = useState(false);
+  const [reportedIds, setReportedIds] = useState<Set<string>>(new Set());
 
   async function load() {
     const res = await fetch(`/api/comments?type=${type}&id=${id}`);
@@ -82,6 +83,11 @@ export function CommentSection({
     await load();
   }
 
+  async function report(commentId: string) {
+    setReportedIds((prev) => new Set(prev).add(commentId));
+    await fetch(`/api/comments/${commentId}/report`, { method: "POST" });
+  }
+
   const replyCount = comments.reduce((sum, c) => sum + c.replies.length, 0);
 
   return (
@@ -126,6 +132,15 @@ export function CommentSection({
                 <span className="text-xs text-zinc-400">
                   {new Date(c.createdAt).toLocaleString()}
                 </span>
+                {currentUserId && c.userId !== currentUserId && (
+                  <button
+                    onClick={() => report(c.id)}
+                    disabled={reportedIds.has(c.id)}
+                    className="text-xs text-zinc-400 hover:underline disabled:no-underline"
+                  >
+                    {reportedIds.has(c.id) ? "Reported" : "Report"}
+                  </button>
+                )}
                 {(c.userId === currentUserId || canModerate) && (
                   <button
                     onClick={() => remove(c.id)}
@@ -162,6 +177,15 @@ export function CommentSection({
                         <span className="text-xs text-zinc-400">
                           {new Date(r.createdAt).toLocaleString()}
                         </span>
+                        {currentUserId && r.userId !== currentUserId && (
+                          <button
+                            onClick={() => report(r.id)}
+                            disabled={reportedIds.has(r.id)}
+                            className="text-xs text-zinc-400 hover:underline disabled:no-underline"
+                          >
+                            {reportedIds.has(r.id) ? "Reported" : "Report"}
+                          </button>
+                        )}
                         {(r.userId === currentUserId || canModerate) && (
                           <button
                             onClick={() => remove(r.id)}

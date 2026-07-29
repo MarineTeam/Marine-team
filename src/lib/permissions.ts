@@ -215,6 +215,32 @@ export async function ensureCapability(
   }
 }
 
+/**
+ * Same shape as getEditableScope, but for an arbitrary capability rather
+ * than the fixed content-management set — used by the /admin/comments
+ * queue so a moderator scoped to one category/series only sees reports
+ * under it, while a site-wide moderate_comments grant (or ADMIN) sees
+ * everything, mirroring how getEditableScope resolves content access.
+ */
+export async function getCapabilityScope(
+  user: User,
+  capability: CapabilityKey,
+): Promise<{ isAdmin: true } | { isAdmin: false; categoryIds: string[]; seriesIds: string[] }> {
+  if (user.role === "ADMIN") return { isAdmin: true };
+
+  const assignments = await prisma.groupAssignment.findMany({
+    where: { userId: user.id, group: { capabilities: { has: capability } } },
+    select: { categoryId: true, seriesId: true },
+  });
+  if (assignments.some((a) => !a.categoryId && !a.seriesId)) return { isAdmin: true };
+
+  return {
+    isAdmin: false,
+    categoryIds: assignments.flatMap((a) => (a.categoryId ? [a.categoryId] : [])),
+    seriesIds: assignments.flatMap((a) => (a.seriesId ? [a.seriesId] : [])),
+  };
+}
+
 /** Every category id reachable under the given root category ids (roots included). */
 export async function descendantCategoryIds(rootIds: string[]): Promise<string[]> {
   if (rootIds.length === 0) return [];

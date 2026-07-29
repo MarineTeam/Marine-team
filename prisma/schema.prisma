@@ -51,8 +51,12 @@ model User {
   authorized            Boolean               @default(false)
   // Instant (default) sends a push the moment content publishes, matching
   // every plugin's existing behavior. Daily batches the same events into
-  // one push, sent by a scheduled job — see PendingNotification.
+  // one push, sent by a scheduled job — see PendingNotification. Governs
+  // push only; emailNotifications below is a separate, always-instant channel.
   notificationFrequency NotificationFrequency @default(INSTANT)
+  // Opt-in email channel, independent of notificationFrequency (which only
+  // governs push timing) — always sent immediately when a notification fires.
+  emailNotifications    Boolean               @default(false)
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
   pendingNotifications  PendingNotification[]
@@ -62,6 +66,7 @@ model User {
   seriesFavorites       SeriesFavorite[]
   videoFavorites        VideoFavorite[]
   comments              Comment[]
+  commentReports        CommentReport[]
   groupAssignments      GroupAssignment[]
   ratings               Rating[]
   seriesWatchLater      SeriesWatchLater[]
@@ -132,6 +137,7 @@ model Category {
   groupAssignments  GroupAssignment[]
   subscriptions     Subscription[]
   watchLaterBy      CategoryWatchLater[]
+  homeRows          HomeRow[]
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @default(now()) @updatedAt
 
@@ -292,22 +298,42 @@ model VideoFavorite {
 // top-level comment (see the flattening logic in the comments API), so
 // `replies` below never itself has replies.
 model Comment {
-  id        String    @id @default(cuid())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String          @id @default(cuid())
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-  series    Series?   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  series    Series?         @relation(fields: [seriesId], references: [id], onDelete: Cascade)
   seriesId  String?
-  video     Video?    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  video     Video?          @relation(fields: [videoId], references: [id], onDelete: Cascade)
   videoId   String?
   body      String
-  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  parent    Comment?        @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   parentId  String?
-  replies   Comment[] @relation("CommentReplies")
-  createdAt DateTime  @default(now())
+  replies   Comment[]       @relation("CommentReplies")
+  // Set by a moderator from the /admin/comments queue; hidden comments are
+  // excluded from getComments() (public reads) but still visible there for review.
+  hidden    Boolean         @default(false)
+  reports   CommentReport[]
+  createdAt DateTime        @default(now())
 
   @@index([seriesId])
   @@index([videoId])
   @@index([parentId])
+}
+
+// A member flagging a comment for moderator attention. One report per
+// member per comment (repeat clicks don't inflate the count); the count
+// itself just prioritizes the /admin/comments queue — reporting doesn't
+// hide anything by itself.
+model CommentReport {
+  id        String   @id @default(cuid())
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  commentId String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([commentId, userId])
+  @@index([commentId])
 }
 
 // Per-user resume position for a video, approximated from periodic
@@ -546,6 +572,34 @@ model LiveStream {
   updatedAt     DateTime  @updatedAt
 
   @@index([startAt])
+}
+
+enum HomeRowType {
+  CONTINUE_WATCHING
+  RECOMMENDATIONS
+  TRENDING
+  RECENTLY_ADDED
+  CATEGORY
+  TAG
+}
+
+// Admin-configurable ordering/visibility of the homepage's rows. The four
+// built-in types (seeded once, like Plugin rows) toggle/reorder the
+// existing hardcoded sections; CATEGORY/TAG rows are curated additions
+// pointing at a category or tag. `title` overrides each row's default label.
+model HomeRow {
+  id         String      @id @default(cuid())
+  type       HomeRowType
+  title      String?
+  enabled    Boolean     @default(true)
+  position   Int         @default(0)
+  category   Category?   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId String?
+  tag        String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([categoryId])
 }
 
 // A member following a series or category (exactly one of seriesId/categoryId

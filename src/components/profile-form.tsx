@@ -7,14 +7,17 @@ export function ProfileForm({
   currentDisplayName,
   notificationsOn,
   currentNotificationFrequency,
+  currentEmailNotifications,
 }: {
   currentDisplayName: string | null;
   notificationsOn: boolean;
   currentNotificationFrequency: "INSTANT" | "DAILY";
+  currentEmailNotifications: boolean;
 }) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(currentDisplayName ?? "");
   const [notificationFrequency, setNotificationFrequency] = useState(currentNotificationFrequency);
+  const [emailNotifications, setEmailNotifications] = useState(currentEmailNotifications);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -28,7 +31,11 @@ export function ProfileForm({
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName: displayName.trim() || null, notificationFrequency }),
+        body: JSON.stringify({
+          displayName: displayName.trim() || null,
+          notificationFrequency,
+          emailNotifications,
+        }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed to save");
       setSaved(true);
@@ -71,6 +78,17 @@ export function ProfileForm({
             <option value="INSTANT">Instant — right when it&apos;s published</option>
             <option value="DAILY">Daily digest — one summary a day</option>
           </select>
+          <label className="mt-2 flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={emailNotifications}
+              onChange={(e) => setEmailNotifications(e.target.checked)}
+            />
+            Also email me when new content publishes
+          </label>
+          <p className="mt-1 text-xs text-zinc-500">
+            Email always sends immediately, regardless of your push frequency above.
+          </p>
         </div>
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}

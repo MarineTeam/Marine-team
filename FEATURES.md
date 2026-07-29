@@ -47,6 +47,9 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Trending** — a homepage "Trending this week" row of the series with the
   most logged views in the last 7 days (gated by the View counts plugin,
   which now also logs timestamped view events, not just the all-time counter).
+- **Admin-configurable homepage rows** — an admin can turn any homepage row
+  on/off, rename it, and reorder it, plus add curated rows pointing at a
+  specific category or tag. See Admin CMS below.
 - **Up next** — a panel under a video showing the next episode in its series,
   with an autoplay toggle (persisted per-browser) that best-effort advances
   once the current video's known duration elapses — see the technical note
@@ -81,7 +84,10 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Watch later** (`/watch-later`) — a separate queue from Favorites.
 - **Comments** — discuss a series or video, one level of replies deep;
   authors can delete their own comments and replies, moderators can delete
-  any (see Permissions).
+  any (see Permissions). Any other logged-in member can **report** a
+  comment; reported (and moderator-hidden) comments surface in the
+  `/admin/comments` moderation queue, where a moderator can hide (without
+  deleting) or delete them — see Admin CMS below.
 - **Ratings** — a 1-5 star rating on a series or video; average and count
   shown to everyone, the stars are only clickable when logged in.
 - **View counts** — a simple counter shown on series/video pages.
@@ -91,7 +97,10 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   Each member picks a frequency on `/profile`: **Instant** (the default)
   pushes the moment content publishes, **Daily digest** queues notifications
   and delivers one batched push a day via a scheduled job. The selector only
-  appears while this plugin is on.
+  appears while this plugin is on. A member can also opt into an **email**
+  copy of the same notifications — a separate, always-instant channel
+  (independent of the push frequency choice) that reaches members without a
+  push subscription at all; see the technical note below.
 - **Subscriptions** (`/subscriptions`) — follow a series or category; when a
   followed series publishes a new video, its subscribers get a push
   notification (in addition to, and independent from, the general
@@ -187,6 +196,21 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   Transcripts plugin, which is a searchable text panel beside the video
   rather than subtitles on it.
 
+- **Comment moderation** (`/admin/comments`, needs `moderate_comments`) — a
+  queue of every reported and/or hidden comment, scoped to a moderator's own
+  categories/series unless they hold a site-wide `moderate_comments` grant
+  (or are `ADMIN`). "Hide" removes a comment from public view without
+  deleting it; "Delete" is permanent, same as the existing per-comment
+  delete action.
+
+- **Homepage rows** (`/admin/home-rows`, needs `manage_plugins`) — turn any
+  of the homepage's built-in rows (Continue watching, Because you watched,
+  Trending, Recently added) on/off and rename them, plus add curated rows
+  pointing at a specific category or tag. Continue watching (when shown)
+  always renders directly above the category/series browse list, which
+  itself isn't reorderable; every other row reorders and appears below it,
+  in the order configured here.
+
 - **Webhooks** (`/admin/webhooks`) — admin-configured outgoing URLs that get
   a JSON POST whenever a series or video is published; optionally signed
   with a secret as an `X-Webhook-Signature` header (hex HMAC-SHA256). Needs
@@ -263,6 +287,18 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   aggressive offline cache would risk showing stale or wrong-audience
   content; it only caches its own static shell (manifest + icons) and
   handles push notifications.
+- **Email notifications are a fetch to the Resend API** (`src/lib/email.ts`),
+  the same pattern as `bunny.ts`/`webhooks.ts` talking to their own REST
+  APIs — no SDK dependency. It's a no-op if `RESEND_API_KEY`/`EMAIL_FROM`
+  aren't set, same as push's VAPID-keys-optional behavior. Unlike push,
+  email always sends immediately: it isn't queued into `PendingNotification`
+  for `DAILY` users, since that preference only governs push's timing.
+- **The trigram GIN indexes have no `schema.prisma` representation** (raw
+  SQL migration, not the Prisma DSL) — the next `prisma migrate dev` will
+  read them as drift and propose dropping them. Strip any such
+  `DROP INDEX ..._trgm_idx` statements from a freshly generated migration
+  before applying it (see the `home_rows_comment_moderation_email`
+  migration for an example of this already happening once).
 
 ## Tests & CI
 
