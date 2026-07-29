@@ -333,6 +333,19 @@ Written for a Postgres free tier, where every query counts:
   (`/api/view-events`, `src/components/view-event-beacon.tsx`) throttled by
   a 30-minute cookie rather than a DB check — a cookie read is free, so a
   throttled repeat view costs zero database operations.
+- **Query Monitor**: set `QUERY_MONITOR_ENABLED=true` to get a
+  WordPress-Query-Monitor-style debug bar at the bottom of every page —
+  query count/time, a per-query breakdown, page render time, and process
+  memory — so the query counts above are something you can actually watch
+  rather than take on faith. Env-controlled rather than a database-toggled
+  `Plugin` like every other optional feature (see `/admin/query-monitor`,
+  which shows the current on/off state but can't flip it), and only renders
+  for logged-in `ADMIN` users even when on. `src/lib/db.ts` wraps every
+  Prisma model call in a client extension that's a no-op unless the flag is
+  set; `src/lib/query-monitor.ts` tallies per request via React's `cache()`
+  (the same primitive `getCurrentUser()` uses), so concurrent requests never
+  mix each other's counts — verified by firing concurrent requests with
+  known, distinct query counts and confirming none leaked into another's tally.
 
 ## Testing & CI
 
