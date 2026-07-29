@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { getDisplayName } from "@/lib/profile";
 
-type CommentUser = { id: string; name: string | null; email: string; picture: string | null };
+type CommentUser = { id: string; name: string | null; displayName: string | null; email: string; picture: string | null };
 type Reply = { id: string; body: string; createdAt: string; userId: string; user: CommentUser };
 type Comment = Reply & { replies: Reply[] };
 
@@ -120,7 +121,7 @@ export function CommentSection({
         {comments.map((c) => (
           <li key={c.id} className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium">{c.user.name ?? c.user.email}</p>
+              <p className="text-sm font-medium">{getDisplayName(c.user)}</p>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-zinc-400">
                   {new Date(c.createdAt).toLocaleString()}
@@ -156,7 +157,7 @@ export function CommentSection({
                 {c.replies.map((r) => (
                   <li key={r.id}>
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium">{r.user.name ?? r.user.email}</p>
+                      <p className="text-sm font-medium">{getDisplayName(r.user)}</p>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-zinc-400">
                           {new Date(r.createdAt).toLocaleString()}
@@ -184,7 +185,7 @@ export function CommentSection({
                 <textarea
                   value={replyBody}
                   onChange={(e) => setReplyBody(e.target.value)}
-                  placeholder={`Reply to ${c.user.name ?? c.user.email}…`}
+                  placeholder={`Reply to ${getDisplayName(c.user)}…`}
                   rows={2}
                   autoFocus
                   className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"

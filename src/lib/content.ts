@@ -444,7 +444,7 @@ export async function searchContent(query: string, isLoggedIn: boolean) {
 export async function getComments(type: "series" | "video", id: string) {
   const all = await prisma.comment.findMany({
     where: type === "series" ? { seriesId: id } : { videoId: id },
-    include: { user: { select: { id: true, name: true, email: true, picture: true } } },
+    include: { user: { select: { id: true, name: true, displayName: true, email: true, picture: true } } },
     orderBy: { createdAt: "asc" },
   });
 

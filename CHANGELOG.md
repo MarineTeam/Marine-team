@@ -14,6 +14,8 @@ All notable changes to this project are documented here. Format follows
 - **Comment replies**: comments now support one level of threaded replies.
   A reply to a reply attaches to that reply's top-level parent instead of
   nesting further.
+- **Profiles plugin** (`/profile`): members can set a display name shown
+  instead of their Auth0 account name in comments and the navbar.
 
 ## [1.2.0] - 2026-07-25
 

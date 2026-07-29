@@ -76,6 +76,9 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   alongside (and independent from) the 1-5 star Ratings plugin.
 - **Watch history** — gates the `/recently-played` page and its bottom-nav
   tab, matching the toggle pattern of the other member features.
+- **Profiles** (`/profile`) — lets a member set a display name, shown
+  instead of their Auth0 account name in comments and the navbar. Blank
+  falls back to the Auth0 name, then the email.
 
 ## Auth
 

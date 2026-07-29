@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       videoId: type === "video" ? id : undefined,
       parentId: resolvedParentId,
     },
-    include: { user: { select: { id: true, name: true, email: true, picture: true } } },
+    include: { user: { select: { id: true, name: true, displayName: true, email: true, picture: true } } },
   });
   return NextResponse.json(comment, { status: 201 });
 }

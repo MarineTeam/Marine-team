@@ -15,6 +15,7 @@ export const PLUGIN_META = [
   { slug: "likes-dislikes", name: "Likes / dislikes", description: "Lets members like or dislike a series or video." },
   { slug: "up-next", name: "Up next", description: "Shows an \"Up next\" panel with the next video in a series, with an autoplay option." },
   { slug: "watch-history", name: "Watch history", description: "Shows a \"Recently Played\" page and nav tab of everything a member has watched." },
+  { slug: "profiles", name: "Profiles", description: "Lets members set a display name shown instead of their Auth0 name in comments and the navbar." },
 ] as const;
 
 export type PluginSlug = (typeof PLUGIN_META)[number]["slug"];
