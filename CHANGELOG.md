@@ -6,6 +6,12 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Watch history plugin**: the `/recently-played` page and its bottom-nav
+  tab are now gated by a new "Watch history" plugin toggle, matching every
+  other optional member feature.
+
 ## [1.2.0] - 2026-07-25
 
 ### Added

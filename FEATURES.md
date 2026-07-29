@@ -73,6 +73,8 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   collections, separate from the single site-wide Watch Later queue.
 - **Likes / dislikes** — a thumbs up/down on a series or video, shown
   alongside (and independent from) the 1-5 star Ratings plugin.
+- **Watch history** — gates the `/recently-played` page and its bottom-nav
+  tab, matching the toggle pattern of the other member features.
 
 ## Auth
 
