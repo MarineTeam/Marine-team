@@ -4,7 +4,7 @@ import { SeriesTile } from "@/components/series-tile";
 import { MenuTile } from "@/components/menu-tile";
 import { getCurrentUser } from "@/lib/current-user";
 import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
-import { isPluginEnabled } from "@/lib/plugins";
+import { getPluginStates } from "@/lib/plugins";
 import {
   getFeaturedSeries,
   getPublishedCategoriesWithSeries,
@@ -12,20 +12,24 @@ import {
   getRecentlyAdded,
   getContinueWatching,
   getTrendingSeries,
+  getRecommendedSeries,
 } from "@/lib/content";
 
 export default async function Home() {
   const user = await getCurrentUser();
   const isLoggedIn = Boolean(user);
-  const [featured, categories, uncategorized, recentlyAdded, continueWatching, viewCountsOn] = await Promise.all([
+  const [featured, categories, uncategorized, recentlyAdded, continueWatching, plugins] = await Promise.all([
     getFeaturedSeries(),
     getPublishedCategoriesWithSeries(isLoggedIn),
     getUncategorizedSeries(),
     getRecentlyAdded(isLoggedIn),
     user ? getContinueWatching(user.id) : Promise.resolve([]),
-    isPluginEnabled("view-counts"),
+    getPluginStates(),
   ]);
+  const viewCountsOn = plugins["view-counts"];
+  const recommendationsOn = plugins.recommendations;
   const trending = viewCountsOn ? await getTrendingSeries() : [];
+  const recommended = user && recommendationsOn ? await getRecommendedSeries(user.id) : null;
 
   // Every published category lists, empty or not — matching how an empty
   // series still appears, so a category isn't invisible until it has content.
@@ -79,6 +83,19 @@ export default async function Home() {
               <SeriesTile key={series.id} series={series} />
             ))}
           </div>
+        )}
+
+        {recommended && (
+          <section className="space-y-3">
+            <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+              Because you watched {recommended.anchorTitle}
+            </h2>
+            <div className="space-y-3">
+              {recommended.series.map((series) => (
+                <SeriesTile key={series.id} series={series} />
+              ))}
+            </div>
+          </section>
         )}
 
         {trending.length > 0 && (

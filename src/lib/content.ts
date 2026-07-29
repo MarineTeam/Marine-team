@@ -844,6 +844,29 @@ export async function getAnalyticsSummary(days = 30) {
   };
 }
 
+// --- Recommendations -----------------------------------------------------
+
+/**
+ * A "Because you watched X" row for the homepage: anchored on the series of
+ * the user's most recently watched video (any progress, not just
+ * in-progress ones), then reusing getRelatedSeries' same-category/shared-tag
+ * logic. Returns null if the user has no watch history yet, or their most
+ * recent watch was a standalone video with no series to anchor on.
+ */
+export async function getRecommendedSeries(userId: string, limit = 8) {
+  const recent = await prisma.watchProgress.findFirst({
+    where: { userId, positionSeconds: { gt: 0 }, video: { seriesId: { not: null } } },
+    orderBy: { updatedAt: "desc" },
+    include: { video: { include: { series: true } } },
+  });
+  const anchor = recent?.video.series;
+  if (!anchor) return null;
+
+  const series = await getRelatedSeries(anchor, limit);
+  if (series.length === 0) return null;
+  return { anchorTitle: anchor.title, series };
+}
+
 // --- Up next -----------------------------------------------------------------
 
 /** The next published, ready video in the same series (by position), for an "Up next" panel. */

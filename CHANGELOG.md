@@ -21,6 +21,8 @@ All notable changes to this project are documented here. Format follows
   the player.
 - **Transcripts plugin**: admins can paste a full-text transcript per video,
   shown in a collapsible panel and matched by `/search` when the plugin is on.
+- **Recommendations plugin**: a personalized "Because you watched X"
+  homepage row for logged-in members.
 
 ## [1.2.0] - 2026-07-25
 

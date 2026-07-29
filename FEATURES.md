@@ -86,6 +86,9 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Transcripts** — an admin-pasted full-text transcript per video, shown in
   a collapsible panel; when this plugin is on, `/search` also matches
   against transcript text (weighted below a title/description match).
+- **Recommendations** — a homepage "Because you watched X" row for logged-in
+  members, anchored on the series of their most recently watched video and
+  reusing the same same-category/shared-tag logic as related content.
 
 ## Auth
 
