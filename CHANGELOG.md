@@ -37,6 +37,32 @@ All notable changes to this project are documented here. Format follows
   once a logged-in user exceeds a per-minute cap, via a DB-backed rolling
   count rather than an in-memory limiter (this app runs on serverless
   functions with no shared process state).
+- **Sitemap** (`/sitemap.xml`): published categories and series, guest-visible
+  videos, and every distinct series tag, so search engines don't have to
+  discover pages by crawling links alone.
+- **Notification frequency**: `/profile` gained an instant-vs-daily-digest
+  choice for push notifications. "Instant" (the default, unchanged for
+  everyone) sends on publish; "Daily digest" queues each notification and a
+  scheduled job batches them into one push a day.
+- **Closed captions**: the video manager gained a "Captions" panel for
+  uploading a `.vtt`/`.srt` track per language and removing it later. Tracks
+  live in Bunny Stream, whose player then shows a CC toggle automatically.
+- **Watch-through rate**: `/admin/analytics` now shows, per top video, the
+  share of the window's viewers who reached the end — derived from the
+  existing watch-progress heartbeats, with no new tracking.
+- **Typo-tolerant search**: `/search` now falls back to a fuzzy (edit
+  distance) title match when the exact/substring pass returns nothing, so a
+  single typo no longer yields an empty page.
+
+### Development
+
+- **Unit tests** (`npm test`): a vitest suite covering the pure and
+  query-shaping logic most likely to break silently — access checks,
+  capability resolution, plugin override precedence, sequential unlock,
+  list reordering, and fuzzy matching.
+- **CI**: a GitHub Actions workflow running the type check, lint, unit
+  tests, and `prisma validate` / `prisma format --check` on every pull
+  request and every push to `main`.
 
 ## [1.2.0] - 2026-07-25
 

@@ -23,7 +23,9 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Search** — `/search` and the navbar search box rank results by
   relevance (exact/prefix title match outranks a description-only hit)
   across category names, series titles/descriptions/tags, and video
-  titles/descriptions.
+  titles/descriptions. If that exact pass finds no series or no videos, a
+  typo-tolerant fuzzy pass runs as a fallback, matching titles by edit
+  distance so "chruch" still finds "Church" — see the technical note below.
 - **Continue watching / recently added** — a periodic heartbeat approximates
   watch position (see note below) and powers a homepage "Continue watching"
   row with resume-from-where-you-left-off; a "Recently added" row shows the
@@ -50,6 +52,12 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   `/series/[slug]/podcast.xml` (iTunes-compatible podcast feed of a series'
   audio files, skipped for member-only series since podcast apps can't
   authenticate).
+- **Sitemap** — `/sitemap.xml` lists published categories and series,
+  guest-visible videos, and every distinct series tag, so search engines
+  don't have to discover pages by crawling links alone. Member-only videos
+  are left out (as in every public video listing); member-only categories
+  and series are included, matching how they already list publicly behind a
+  "Members" badge.
 - **PWA** — installable (Add to Home Screen / desktop install prompt) with
   a minimal service worker; see the PWA section below.
 
@@ -66,6 +74,10 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Social share** — copy-link and share-to-X/Facebook buttons.
 - **Announcements** — a dismissible (per browser session) site-wide banner.
 - **Notifications** — opt-in Web Push, sent when an admin publishes a video.
+  Each member picks a frequency on `/profile`: **Instant** (the default)
+  pushes the moment content publishes, **Daily digest** queues notifications
+  and delivers one batched push a day via a scheduled job. The selector only
+  appears while this plugin is on.
 - **Subscriptions** (`/subscriptions`) — follow a series or category; when a
   followed series publishes a new video, its subscribers get a push
   notification (in addition to, and independent from, the general
@@ -79,7 +91,8 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   tab, matching the toggle pattern of the other member features.
 - **Profiles** (`/profile`) — lets a member set a display name, shown
   instead of their Auth0 account name in comments and the navbar. Blank
-  falls back to the Auth0 name, then the email.
+  falls back to the Auth0 name, then the email. The page also hosts the
+  notification frequency selector described above.
 - **Chapters** — an admin-managed, ordered list of named timestamps on a
   video; the video page shows a jump-to-section list underneath the player.
   Clicking a chapter reloads the embed starting at that timestamp (Bunny's
@@ -152,6 +165,14 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   shows a "log in to view" gate rather than a 404, so a shared link still
   invites sign-up.
 
+- **Closed captions** — a "Captions" button on each row of the video list
+  opens a panel for uploading a `.vtt`/`.srt` track (1MB cap), labelled by
+  language code, and removing tracks later. Not a plugin and not stored
+  locally: tracks live in Bunny Stream, keyed by `srclang`, and its embed
+  player shows a CC toggle automatically once one exists. Distinct from the
+  Transcripts plugin, which is a searchable text panel beside the video
+  rather than subtitles on it.
+
 - **Webhooks** (`/admin/webhooks`) — admin-configured outgoing URLs that get
   a JSON POST whenever a series or video is published; optionally signed
   with a secret as an `X-Webhook-Signature` header (hex HMAC-SHA256). Needs
@@ -163,6 +184,12 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   days plus the top 10 series and top 10 videos by view count in that
   window, built from the same timestamped view log that powers the
   homepage Trending row.
+- Each top video also shows a **watch-through rate**: the share of that
+  window's watch-progress rows for the video that are marked completed.
+  It reuses the existing heartbeat data rather than adding tracking, and is
+  omitted entirely (not shown as 0%) for a video with no progress recorded
+  in the window, so a stale view count can't be paired with a misleadingly
+  precise 0%.
 
 ## Technical notes
 
@@ -184,6 +211,27 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Playback speed** is handled by Bunny Stream's own player UI (the ⚙️
   settings icon) — there's nothing to build server-side since the iframe
   embed already exposes it.
+- **Fuzzy search is a fallback, not the default path**: the exact/substring
+  query runs first and, when it matches anything, nothing else happens — so
+  the common case pays no extra query. Only when a pass comes back empty
+  does the fuzzy path load up to 500 published rows and rank them in memory
+  by word-level Levenshtein distance (`src/lib/fuzzy.ts`, unit tested
+  directly), keeping the added cost off the hot path. The 500-row cap
+  comfortably covers a single church's catalog rather than scanning an
+  unbounded table.
+- **Closed captions live in Bunny, not here**: there's no local copy and no
+  new `Video` column — the admin route reads and writes Bunny's captions
+  API directly, so every render path picks up a new track for free, the
+  same pattern the custom-thumbnail work uses. Bunny is the source of truth,
+  which also means the captions panel reflects whatever is set there even if
+  it was uploaded from the Bunny dashboard.
+- **Daily digests need a scheduled job**: a member set to "Daily digest"
+  never gets an inline push — each notification is queued as a
+  `PendingNotification` row and only leaves the system when
+  `/api/cron/notification-digest` runs (scheduled in `vercel.json`, daily).
+  Without that cron running, digest users' notifications accumulate and are
+  never delivered. The route is guarded by `CRON_SECRET` when that env var
+  is set, so it can't be hit externally to mass-send pushes.
 - **Rate limiting**: comments (5/minute), ratings, and likes/dislikes
   (20/minute each) are capped per logged-in user via a DB-backed count over
   a rolling window (`src/lib/rate-limit.ts`), returning 429 once exceeded.
@@ -202,3 +250,16 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   aggressive offline cache would risk showing stale or wrong-audience
   content; it only caches its own static shell (manifest + icons) and
   handles push notifications.
+
+## Tests & CI
+
+`npm test` runs a vitest suite (`src/lib/*.test.ts`) over the logic that
+would fail quietly rather than loudly — access and capability checks,
+plugin override precedence, sequential unlock, list reordering, and fuzzy
+matching. Prisma is mocked, so the suite needs no database.
+
+GitHub Actions runs the type check, lint, that suite, and
+`prisma validate` / `prisma format --check` on every pull request and every
+push to `main` (`.github/workflows/ci.yml`). The schema check is why an
+unformatted `schema.prisma` fails CI — run `npx prisma format` before
+committing schema edits.

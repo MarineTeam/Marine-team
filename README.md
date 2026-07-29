@@ -25,6 +25,10 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
        `http://localhost:3000/auth/callback` and Allowed Logout URLs to
        `http://localhost:3000`
    - `ADMIN_EMAILS`: comma-separated emails granted the `ADMIN` role on login
+   - `CRON_SECRET` (optional): when set, the daily notification-digest cron
+     route only accepts requests carrying it as a bearer token. Vercel Cron
+     sends this automatically. Leave unset locally; set it in production so
+     the route can't be triggered from outside to mass-send pushes.
    - A Bunny Stream video library (`BUNNY_STREAM_*`) and a Bunny Storage zone
      with a public pull zone (`BUNNY_STORAGE_*`)
      - If the Stream library has **Token Authentication** enabled (Library ->
@@ -58,7 +62,8 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   `/categories/[slug]` page that shows that category's own series plus a tile
   for each child category, recursively. The search box in the navbar (and the
   `/search` page) does a case-insensitive substring search across category
-  names, series titles/descriptions, and video titles/descriptions.
+  names, series titles/descriptions, and video titles/descriptions, falling
+  back to a typo-tolerant fuzzy title match when that finds nothing.
 - **Ordering**: every list (categories, series, videos, files) has a
   `position` field. The admin CMS shows ↑/↓ buttons next to each item to
   reorder it among its siblings — categories among the same parent, series
@@ -116,7 +121,23 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   `related-content` plugin.
 - **Relevance-ranked search**: `/search` and the navbar search box rank
   results by how well they match — an exact or prefix title match outranks
-  a description-only hit — rather than raw database order.
+  a description-only hit — rather than raw database order. When the exact
+  pass returns no series (or no videos), a fuzzy fallback re-ranks up to 500
+  published rows by word-level Levenshtein distance (`src/lib/fuzzy.ts`) so
+  a typo like "chruch" still finds "Church". It only runs on an empty
+  result, so the common case pays no extra query.
+- **Sitemap**: `/sitemap.xml` (`src/app/sitemap.ts`, backed by
+  `getSitemapData()`) lists published categories and series, guest-visible
+  videos, and every distinct series tag. It's `force-dynamic` because the
+  database isn't reachable at build time here, same as the root layout, and
+  it uses `APP_BASE_URL` for absolute URLs.
+- **Closed captions**: each row of the admin video list has a **Captions**
+  button for uploading a `.vtt`/`.srt` track per language code and removing
+  it later. Captions are stored in Bunny Stream rather than locally (no new
+  `Video` column, no local copy) via `bunnyAddCaption`/`bunnyDeleteCaption`
+  in `src/lib/bunny.ts`, and Bunny's embed player adds a CC toggle by itself
+  once a track exists. This is separate from the Transcripts plugin, which
+  renders a searchable text panel beside the video instead of subtitles.
 - **Plugins** (`/admin/plugins`, needs `manage_plugins`): a WordPress-style
   list of optional features with a site-wide Active/Inactive toggle, plus
   per-category overrides — e.g. disable Comments just under "Kids" while
@@ -137,7 +158,10 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     site-wide only (no per-category override — it's a global message).
   - **Notifications**: Web Push to subscribed members when an admin flips a
     video from unpublished to published (see PWA below) — a no-op if VAPID
-    keys aren't configured.
+    keys aren't configured. Members choose a frequency on `/profile`:
+    `INSTANT` (default, unchanged behavior) pushes immediately, while
+    `DAILY` queues a `PendingNotification` row per event that the digest
+    cron batches into one push a day (see Deployment below).
   - **Subscriptions** (`/subscriptions`): follow a series or category; its
     subscribers get a targeted push notification when it publishes a new
     video, on top of the general Notifications above.
@@ -233,6 +257,23 @@ Written for a Postgres free tier, where every query counts:
   a 30-minute cookie rather than a DB check — a cookie read is free, so a
   throttled repeat view costs zero database operations.
 
+## Testing & CI
+
+`npm test` runs the vitest suite in `src/lib/*.test.ts`. It covers the pure
+and query-shaping logic that tends to break silently — `canAccess`,
+`categoryChainIds`, sequential-unlock derivation, `hasCapability` and
+category-scope resolution, plugin override precedence, `reorderArray`, and
+the fuzzy matcher. `@/lib/db` is mocked throughout, so the suite needs no
+database and no environment variables.
+
+`.github/workflows/ci.yml` runs on every pull request and every push to
+`main`: type check (`tsc --noEmit`), lint (`eslint .`), `npm test`, then
+`prisma validate` and `prisma format --check`. That last check is why an
+unformatted schema fails CI — run `npx prisma format` after editing
+`prisma/schema.prisma`. CI installs with a placeholder `DATABASE_URL`
+because `postinstall` runs `prisma generate`, which reads the datasource
+block but never connects; CI never needs real credentials.
+
 ## Deployment
 
 Vercel builds run `prisma migrate deploy && next build` (see `vercel.json`).
@@ -246,6 +287,16 @@ To change the schema:
 2. Run `npm run db:migrate` locally to generate and apply a migration.
 3. Commit the generated `prisma/migrations/<timestamp>_<name>/` directory
    **with** the schema change. Without it the deploy has nothing to apply.
+
+### Scheduled jobs
+
+`vercel.json` also declares one cron: `/api/cron/notification-digest`, daily
+at 13:00 UTC. It batches every queued `PendingNotification` per user into a
+single push and clears the queue, which is the only delivery path for members
+who chose the "Daily digest" frequency — if this cron isn't running, their
+notifications pile up and never arrive. Set `CRON_SECRET` in Vercel and the
+route will reject anything without a matching bearer token; Vercel Cron
+attaches it automatically.
 
 ### Preview deployments need their own database
 
@@ -285,4 +336,6 @@ from the old `db push` era — that's already done.)
 - `npm run db:baseline` — mark `0_init` as already applied, for adopting
   migrations on a database whose tables already exist
 - `npm run db:studio` — browse the database with Prisma Studio
+- `npm test` — run the vitest unit suite (no database needed)
+- `npm run lint` — ESLint over the project
 - `npm run build` — production build
