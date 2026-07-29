@@ -4,7 +4,6 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { reorderArray } from "@/lib/reorder";
 import { ShareButtons } from "@/components/share-buttons";
 
@@ -14,8 +13,10 @@ type Item = {
     id: string;
     slug: string;
     title: string;
-    bunnyVideoId: string;
-    thumbnailFileName: string | null;
+    // Signed by the server (bunnyStreamThumbnailUrl needs a server-only key
+    // and Node's crypto) and passed down already-built — this is a client
+    // component, so it must never compute the signed URL itself.
+    thumbnailUrl: string;
     series: { title: string } | null;
   };
 };
@@ -146,20 +147,18 @@ export function PlaylistDetail({ playlist: initial }: { playlist: Playlist }) {
                 ↓
               </button>
             </div>
-            {(() => {
-              const thumbnailUrl = bunnyStreamThumbnailUrl(item.video.bunnyVideoId, item.video.thumbnailFileName);
-              return thumbnailUrl ? (
-                <Image
-                  src={thumbnailUrl}
-                  alt=""
-                  width={96}
-                  height={56}
-                  className="h-14 w-24 shrink-0 rounded object-cover bg-zinc-100 dark:bg-zinc-800"
-                />
-              ) : (
-                <div className="h-14 w-24 shrink-0 rounded bg-zinc-100 dark:bg-zinc-800" />
-              );
-            })()}
+            {item.video.thumbnailUrl ? (
+              <Image
+                src={item.video.thumbnailUrl}
+                alt=""
+                width={96}
+                height={56}
+                unoptimized
+                className="h-14 w-24 shrink-0 rounded object-cover bg-zinc-100 dark:bg-zinc-800"
+              />
+            ) : (
+              <div className="h-14 w-24 shrink-0 rounded bg-zinc-100 dark:bg-zinc-800" />
+            )}
             <Link href={`/videos/${item.video.slug}`} className="min-w-0 flex-1">
               <p className="font-medium truncate hover:underline">{item.video.title}</p>
               {item.video.series && <p className="text-sm text-zinc-500 truncate">{item.video.series.title}</p>}

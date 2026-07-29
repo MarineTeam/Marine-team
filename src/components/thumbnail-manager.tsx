@@ -70,6 +70,7 @@ export function ThumbnailManager({
             alt=""
             width={96}
             height={56}
+            unoptimized
             className="h-14 w-24 rounded object-cover bg-zinc-100 dark:bg-zinc-800"
           />
         )}

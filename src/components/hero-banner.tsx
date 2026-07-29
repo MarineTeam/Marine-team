@@ -9,8 +9,8 @@ export function HeroBanner({ series }: { series: Series }) {
       className="group relative block h-64 sm:h-80 w-full overflow-hidden bg-zinc-900"
     >
       {series.coverImageUrl && (
-        // Cover images are a freeform admin-pasted URL (see series-edit-form),
-        // so this is unoptimized rather than widening remotePatterns to any host.
+        // Cover images are a freeform admin-pasted URL (see series-edit-form) —
+        // unoptimized, see next.config.ts.
         <Image
           src={series.coverImageUrl}
           alt=""
