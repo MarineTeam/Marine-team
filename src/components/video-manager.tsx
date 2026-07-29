@@ -303,6 +303,22 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
     await load();
   }
 
+  async function bulkSchedule() {
+    const input = prompt(`Publish ${selectedIds.size} video(s) at (YYYY-MM-DDTHH:MM, local time)?`, "");
+    if (!input?.trim()) return;
+    await fetch("/api/admin/videos/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ids: Array.from(selectedIds),
+        action: "schedule",
+        publishAt: new Date(input.trim()).toISOString(),
+      }),
+    });
+    setSelectedIds(new Set());
+    await load();
+  }
+
   async function bulkDelete() {
     if (!confirm(`Delete ${selectedIds.size} video(s)? This also removes them from Bunny Stream.`))
       return;
@@ -483,6 +499,12 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
             className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
           >
             Unpublish
+          </button>
+          <button
+            onClick={bulkSchedule}
+            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+          >
+            Schedule publish…
           </button>
           <button onClick={bulkDelete} className="rounded-md border border-red-300 px-2 py-1 text-red-600 dark:border-red-900">
             Delete

@@ -27,6 +27,9 @@ All notable changes to this project are documented here. Format follows
   that get a signed JSON POST when a series or video is published.
 - **Subscription mute**: each entry on `/subscriptions` has a mute toggle
   that keeps the follow but skips push notifications for it.
+- **Bulk schedule publish**: the series/video/file admin lists gained a
+  "Schedule publish…" bulk action, setting a future `publishAt` across the
+  whole selection in one prompt instead of one item at a time.
 
 ## [1.2.0] - 2026-07-25
 

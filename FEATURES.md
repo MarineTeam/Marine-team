@@ -109,7 +109,8 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   files hosted directly in Bunny).
 - **Bulk actions & filtering** — multi-select Publish/Unpublish/Delete and
   a title filter box on the series/video/file lists; series can be
-  recategorized individually or in bulk.
+  recategorized individually or in bulk. "Schedule publish…" sets a
+  future `publishAt` across the whole selection in one prompt.
 - **Audit log** (`/admin/audit`) — an append-only record of admin/editor
   actions, exportable as CSV or JSON.
 - **Plugins** (`/admin/plugins`) — a WordPress-style list of the optional
