@@ -33,6 +33,10 @@ All notable changes to this project are documented here. Format follows
 - **Draft mode for series edits**: "Save as draft" stages a series edit
   form's values without publishing; a banner offers "Load into form" /
   "Discard" for the pending draft.
+- **Rate limiting**: comments, ratings, and likes/dislikes now return 429
+  once a logged-in user exceeds a per-minute cap, via a DB-backed rolling
+  count rather than an in-memory limiter (this app runs on serverless
+  functions with no shared process state).
 
 ## [1.2.0] - 2026-07-25
 

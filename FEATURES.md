@@ -184,6 +184,12 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Playback speed** is handled by Bunny Stream's own player UI (the ⚙️
   settings icon) — there's nothing to build server-side since the iframe
   embed already exposes it.
+- **Rate limiting**: comments (5/minute), ratings, and likes/dislikes
+  (20/minute each) are capped per logged-in user via a DB-backed count over
+  a rolling window (`src/lib/rate-limit.ts`), returning 429 once exceeded.
+  `/api/view-events` isn't covered by this — see its own cookie-based
+  throttle below, kept separate since it's unauthenticated and specifically
+  designed to avoid a DB read/write per view.
 - **ViewEvent writes are throttled per browser per item** (`/api/view-events`,
   fired client-side by `ViewEventBeacon`) using a 30-minute cookie rather
   than a DB check: a cookie read is free, so a throttled repeat view costs

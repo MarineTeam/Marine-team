@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { isPluginEnabled } from "@/lib/plugins";
 import { getComments } from "@/lib/content";
+import { rateLimitResponse, windowStart } from "@/lib/rate-limit";
 
 const querySchema = z.object({
   type: z.enum(["series", "video"]),
@@ -32,6 +33,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const limited = await rateLimitResponse(
+    () => prisma.comment.count({ where: { userId: user.id, createdAt: { gte: windowStart(60) } } }),
+    5,
+  );
+  if (limited) return limited;
 
   const { type, id, body, parentId } = postSchema.parse(await request.json());
 
