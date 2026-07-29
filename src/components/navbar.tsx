@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getCurrentUser, getSessionIdentity } from "@/lib/current-user";
 import { getPluginStates } from "@/lib/plugins";
+import { getDisplayName } from "@/lib/profile";
 import { PushNotificationToggle } from "@/components/push-notification-toggle";
 import { MobileMenu } from "@/components/mobile-menu";
 
@@ -14,6 +15,7 @@ export async function Navbar() {
   const notificationsOn = plugins.notifications;
   const subscriptionsOn = plugins.subscriptions;
   const playlistsOn = plugins.playlists;
+  const profilesOn = plugins.profiles;
   const unauthorized = !user && identity !== null;
 
   return (
@@ -59,11 +61,16 @@ export async function Navbar() {
               Subscriptions
             </Link>
           )}
+          {user && profilesOn && (
+            <Link href="/profile" className="hover:underline">
+              Profile
+            </Link>
+          )}
           {user && notificationsOn && <PushNotificationToggle />}
           {user ? (
             <>
               <span className="text-zinc-500 max-w-[10rem] sm:max-w-none truncate">
-                {user.name ?? user.email}
+                {getDisplayName(user)}
               </span>
               <a
                 href="/auth/logout"
@@ -93,12 +100,13 @@ export async function Navbar() {
         </div>
         <div className="sm:hidden ml-auto">
           <MobileMenu
-            user={user ? { name: user.name, email: user.email, role: user.role } : null}
+            user={user ? { name: user.name, displayName: user.displayName, email: user.email, role: user.role } : null}
             unauthorized={unauthorized}
             watchLaterOn={watchLaterOn}
             playlistsOn={playlistsOn}
             subscriptionsOn={subscriptionsOn}
             notificationsOn={notificationsOn}
+            profilesOn={profilesOn}
           />
         </div>
       </nav>

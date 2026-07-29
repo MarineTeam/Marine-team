@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { BottomNav } from "@/components/bottom-nav";
+import { BottomNavServer } from "@/components/bottom-nav-server";
 import { PwaRegister } from "@/components/pwa-register";
 import { AnnouncementBannerServer } from "@/components/announcement-banner-server";
 import "./globals.css";
@@ -63,7 +63,7 @@ export default function RootLayout({
         <Navbar />
         <main className="flex-1 pb-16 sm:pb-0">{children}</main>
         <Footer />
-        <BottomNav />
+        <BottomNavServer />
       </body>
     </html>
   );

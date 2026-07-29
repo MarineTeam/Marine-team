@@ -7,6 +7,9 @@ import { DragHandle, PositionInput, useDragReorder } from "@/components/reorder-
 import { reorderArray } from "@/lib/reorder";
 import { ViewerAccessManager } from "@/components/viewer-access-manager";
 import { ThumbnailManager } from "@/components/thumbnail-manager";
+import { CaptionsManager } from "@/components/captions-manager";
+import { ChapterManager } from "@/components/chapter-manager";
+import { TranscriptManager } from "@/components/transcript-manager";
 import {
   TargetSelect,
   formatTarget,
@@ -29,6 +32,7 @@ type Video = {
   series: { id: string; title: string } | null;
   category: { id: string; name: string } | null;
   thumbnailPreviewUrl: string;
+  transcript: string | null;
 };
 type BunnyLibraryVideo = {
   guid: string;
@@ -75,6 +79,9 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [managingAccessId, setManagingAccessId] = useState<string | null>(null);
   const [managingThumbnailId, setManagingThumbnailId] = useState<string | null>(null);
+  const [managingChaptersId, setManagingChaptersId] = useState<string | null>(null);
+  const [managingTranscriptId, setManagingTranscriptId] = useState<string | null>(null);
+  const [managingCaptionsId, setManagingCaptionsId] = useState<string | null>(null);
 
   async function load() {
     const [videosRes, seriesRes, categoriesRes] = await Promise.all([
@@ -298,6 +305,22 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
     await load();
   }
 
+  async function bulkSchedule() {
+    const input = prompt(`Publish ${selectedIds.size} video(s) at (YYYY-MM-DDTHH:MM, local time)?`, "");
+    if (!input?.trim()) return;
+    await fetch("/api/admin/videos/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ids: Array.from(selectedIds),
+        action: "schedule",
+        publishAt: new Date(input.trim()).toISOString(),
+      }),
+    });
+    setSelectedIds(new Set());
+    await load();
+  }
+
   async function bulkDelete() {
     if (!confirm(`Delete ${selectedIds.size} video(s)? This also removes them from Bunny Stream.`))
       return;
@@ -479,6 +502,12 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
           >
             Unpublish
           </button>
+          <button
+            onClick={bulkSchedule}
+            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+          >
+            Schedule publish…
+          </button>
           <button onClick={bulkDelete} className="rounded-md border border-red-300 px-2 py-1 text-red-600 dark:border-red-900">
             Delete
           </button>
@@ -601,10 +630,28 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
                 Thumbnail
               </button>
               <button
+                onClick={() => setManagingChaptersId(managingChaptersId === v.id ? null : v.id)}
+                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+              >
+                Chapters
+              </button>
+              <button
+                onClick={() => setManagingTranscriptId(managingTranscriptId === v.id ? null : v.id)}
+                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+              >
+                Transcript
+              </button>
+              <button
                 onClick={() => setManagingAccessId(managingAccessId === v.id ? null : v.id)}
                 className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
               >
                 Viewers
+              </button>
+              <button
+                onClick={() => setManagingCaptionsId(managingCaptionsId === v.id ? null : v.id)}
+                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+              >
+                Captions
               </button>
               <button onClick={() => remove(v.id)} className="text-red-600 hover:underline">
                 Delete
@@ -616,9 +663,24 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
               <ThumbnailManager videoId={v.id} currentUrl={v.thumbnailPreviewUrl} onChange={load} />
             </div>
           )}
+          {managingChaptersId === v.id && (
+            <div className="px-4 pb-4">
+              <ChapterManager videoId={v.id} />
+            </div>
+          )}
+          {managingTranscriptId === v.id && (
+            <div className="px-4 pb-4">
+              <TranscriptManager videoId={v.id} currentTranscript={v.transcript} onChange={load} />
+            </div>
+          )}
           {managingAccessId === v.id && (
             <div className="px-4 pb-4">
               <ViewerAccessManager type="video" id={v.id} />
+            </div>
+          )}
+          {managingCaptionsId === v.id && (
+            <div className="px-4 pb-4">
+              <CaptionsManager videoId={v.id} />
             </div>
           )}
           </li>

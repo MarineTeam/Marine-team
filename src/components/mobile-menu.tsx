@@ -4,14 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { PushNotificationToggle } from "@/components/push-notification-toggle";
+import { getDisplayName } from "@/lib/profile";
 
 type MobileMenuProps = {
-  user: { name: string | null; email: string; role: string } | null;
+  user: { name: string | null; displayName: string | null; email: string; role: string } | null;
   unauthorized: boolean;
   watchLaterOn: boolean;
   playlistsOn: boolean;
   subscriptionsOn: boolean;
   notificationsOn: boolean;
+  profilesOn: boolean;
 };
 
 export function MobileMenu({
@@ -21,6 +23,7 @@ export function MobileMenu({
   playlistsOn,
   subscriptionsOn,
   notificationsOn,
+  profilesOn,
 }: MobileMenuProps) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -112,7 +115,7 @@ export function MobileMenu({
           <div className="flex-1 overflow-y-auto px-4 py-4">
             {user ? (
               <div className="mb-4 border-b border-zinc-200 pb-4 dark:border-zinc-800">
-                <p className="truncate font-medium">{user.name ?? user.email}</p>
+                <p className="truncate font-medium">{getDisplayName(user)}</p>
                 {user.role === "ADMIN" && (
                   <Link
                     href="/admin"
@@ -151,6 +154,11 @@ export function MobileMenu({
               {user && subscriptionsOn && (
                 <Link href="/subscriptions" onClick={() => setOpen(false)} className="py-3">
                   Subscriptions
+                </Link>
+              )}
+              {user && profilesOn && (
+                <Link href="/profile" onClick={() => setOpen(false)} className="py-3">
+                  Profile
                 </Link>
               )}
               {user && notificationsOn && (

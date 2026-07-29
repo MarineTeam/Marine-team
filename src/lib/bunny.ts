@@ -187,14 +187,17 @@ export async function bunnySetStreamThumbnail(videoId: string, thumbnailUrl: str
   }
 }
 
+export type BunnyStreamCaption = { srclang: string; label: string | null };
+
 export type BunnyStreamVideo = {
   guid: string;
   status: number;
   length?: number;
   thumbnailFileName?: string | null;
+  captions?: BunnyStreamCaption[] | null;
 };
 
-/** Fetches a single video's current state from Bunny (status, duration, thumbnail file name). */
+/** Fetches a single video's current state from Bunny (status, duration, thumbnail file name, captions). */
 export async function bunnyGetStreamVideo(videoId: string): Promise<BunnyStreamVideo> {
   const res = await fetch(`${STREAM_API_BASE}/library/${streamLibraryId()}/videos/${videoId}`, {
     headers: { AccessKey: streamApiKey() },
@@ -203,6 +206,46 @@ export async function bunnyGetStreamVideo(videoId: string): Promise<BunnyStreamV
     throw new Error(`Bunny Stream get video failed: ${res.status} ${await res.text()}`);
   }
   return (await res.json()) as BunnyStreamVideo;
+}
+
+/**
+ * Adds (or replaces) a caption track, identified by `srclang`. Bunny stores
+ * the caption itself and bakes a CC toggle into its own embed player once
+ * one exists — nothing on our side needs to render or serve the file.
+ * `captionsFile` is the raw .vtt/.srt content; Bunny's API wants it base64.
+ */
+export async function bunnyAddCaption(
+  videoId: string,
+  srclang: string,
+  label: string,
+  captionsFile: string,
+): Promise<void> {
+  const res = await fetch(
+    `${STREAM_API_BASE}/library/${streamLibraryId()}/videos/${videoId}/captions/${encodeURIComponent(srclang)}`,
+    {
+      method: "POST",
+      headers: { AccessKey: streamApiKey(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        srclang,
+        label,
+        captionsFile: Buffer.from(captionsFile, "utf-8").toString("base64"),
+      }),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Bunny Stream add caption failed: ${res.status} ${await res.text()}`);
+  }
+}
+
+/** Removes a caption track by its srclang. */
+export async function bunnyDeleteCaption(videoId: string, srclang: string): Promise<void> {
+  const res = await fetch(
+    `${STREAM_API_BASE}/library/${streamLibraryId()}/videos/${videoId}/captions/${encodeURIComponent(srclang)}`,
+    { method: "DELETE", headers: { AccessKey: streamApiKey() } },
+  );
+  if (!res.ok) {
+    throw new Error(`Bunny Stream delete caption failed: ${res.status} ${await res.text()}`);
+  }
 }
 
 /** Bunny's file name for an auto-generated thumbnail; custom ones get their own name. */

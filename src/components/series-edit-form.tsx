@@ -21,6 +21,7 @@ type Series = {
   unpublishAt: Date | string | null;
   requireSequential: boolean;
 };
+type Draft = { data: Record<string, unknown>; updatedAt: string };
 
 /** Converts a Date/ISO string to the value a <input type="datetime-local"> expects (local time, no seconds). */
 function toDatetimeLocal(value: Date | string | null): string {
@@ -33,11 +34,15 @@ function toDatetimeLocal(value: Date | string | null): string {
 export function SeriesEditForm({
   series,
   categories,
+  initialDraft,
 }: {
   series: Series;
   categories: Category[];
+  initialDraft: Draft | null;
 }) {
   const router = useRouter();
+  const [draft, setDraft] = useState(initialDraft);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [title, setTitle] = useState(series.title);
   const [slug, setSlug] = useState(series.slug);
   const [description, setDescription] = useState(series.description ?? "");
@@ -56,6 +61,25 @@ export function SeriesEditForm({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
+  function buildPayload() {
+    return {
+      title,
+      slug,
+      description,
+      coverImageUrl,
+      categoryId: categoryId || null,
+      memberOnly,
+      hidden,
+      published,
+      featured,
+      pinned,
+      tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+      publishAt: publishAt ? new Date(publishAt).toISOString() : null,
+      unpublishAt: unpublishAt ? new Date(unpublishAt).toISOString() : null,
+      requireSequential,
+    };
+  }
+
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -65,24 +89,14 @@ export function SeriesEditForm({
       const res = await fetch(`/api/admin/series/${series.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          slug,
-          description,
-          coverImageUrl,
-          categoryId: categoryId || null,
-          memberOnly,
-          hidden,
-          published,
-          featured,
-          pinned,
-          tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-          publishAt: publishAt ? new Date(publishAt).toISOString() : null,
-          unpublishAt: unpublishAt ? new Date(unpublishAt).toISOString() : null,
-          requireSequential,
-        }),
+        body: JSON.stringify(buildPayload()),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed to save");
+      // Publishing supersedes any staged draft.
+      if (draft) {
+        await fetch(`/api/admin/series/${series.id}/draft`, { method: "DELETE" });
+        setDraft(null);
+      }
       setSaved(true);
       router.refresh();
     } catch (err) {
@@ -90,6 +104,50 @@ export function SeriesEditForm({
     } finally {
       setSaving(false);
     }
+  }
+
+  async function saveAsDraft() {
+    setSavingDraft(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const res = await fetch(`/api/admin/series/${series.id}/draft`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildPayload()),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed to save draft");
+      setDraft(await res.json());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save draft");
+    } finally {
+      setSavingDraft(false);
+    }
+  }
+
+  function loadDraftIntoForm() {
+    if (!draft) return;
+    const d = draft.data as Partial<ReturnType<typeof buildPayload>> & { tags?: string[] };
+    if (d.title !== undefined) setTitle(d.title);
+    if (d.slug !== undefined) setSlug(d.slug);
+    if (d.description !== undefined) setDescription(d.description ?? "");
+    if (d.coverImageUrl !== undefined) setCoverImageUrl(d.coverImageUrl ?? "");
+    if (d.categoryId !== undefined) setCategoryId(d.categoryId ?? "");
+    if (d.memberOnly !== undefined) setMemberOnly(d.memberOnly);
+    if (d.hidden !== undefined) setHidden(d.hidden);
+    if (d.published !== undefined) setPublished(d.published);
+    if (d.featured !== undefined) setFeatured(d.featured);
+    if (d.pinned !== undefined) setPinned(d.pinned);
+    if (d.tags !== undefined) setTags(d.tags.join(", "));
+    if (d.publishAt !== undefined) setPublishAt(toDatetimeLocal(d.publishAt as string | null));
+    if (d.unpublishAt !== undefined) setUnpublishAt(toDatetimeLocal(d.unpublishAt as string | null));
+    if (d.requireSequential !== undefined) setRequireSequential(d.requireSequential);
+  }
+
+  async function discardDraft() {
+    if (!confirm("Discard the saved draft? This can't be undone.")) return;
+    await fetch(`/api/admin/series/${series.id}/draft`, { method: "DELETE" });
+    setDraft(null);
   }
 
   async function remove() {
@@ -101,6 +159,18 @@ export function SeriesEditForm({
   }
 
   return (
+    <div className="space-y-3">
+      {draft && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950">
+          <span>Unpublished draft saved {new Date(draft.updatedAt).toLocaleString()}.</span>
+          <button type="button" onClick={loadDraftIntoForm} className="underline">
+            Load into form
+          </button>
+          <button type="button" onClick={discardDraft} className="ml-auto text-red-600 underline">
+            Discard draft
+          </button>
+        </div>
+      )}
     <form
       onSubmit={save}
       className="space-y-3 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4"
@@ -231,11 +301,19 @@ export function SeriesEditForm({
           Require watching in order
         </label>
         <button
+          type="button"
+          onClick={saveAsDraft}
+          disabled={savingDraft}
+          className="sm:ml-auto rounded-md border border-zinc-300 px-4 py-2 text-sm disabled:opacity-50 dark:border-zinc-700"
+        >
+          {savingDraft ? "Saving draft…" : "Save as draft"}
+        </button>
+        <button
           type="submit"
           disabled={saving}
-          className="sm:ml-auto rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+          className="rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
         >
-          {saving ? "Saving…" : "Save"}
+          {saving ? "Publishing…" : "Publish now"}
         </button>
         <button
           type="button"
@@ -248,5 +326,6 @@ export function SeriesEditForm({
       {saved && <p className="text-sm text-green-600">Saved.</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
     </form>
+    </div>
   );
 }

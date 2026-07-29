@@ -57,8 +57,9 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 
 - **Favorites** (`/favorites`) — bookmark a series or video.
 - **Watch later** (`/watch-later`) — a separate queue from Favorites.
-- **Comments** — discuss a series or video; authors can delete their own,
-  moderators can delete any (see Permissions).
+- **Comments** — discuss a series or video, one level of replies deep;
+  authors can delete their own comments and replies, moderators can delete
+  any (see Permissions).
 - **Ratings** — a 1-5 star rating on a series or video; average and count
   shown to everyone, the stars are only clickable when logged in.
 - **View counts** — a simple counter shown on series/video pages.
@@ -68,11 +69,27 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Subscriptions** (`/subscriptions`) — follow a series or category; when a
   followed series publishes a new video, its subscribers get a push
   notification (in addition to, and independent from, the general
-  Notifications plugin above).
+  Notifications plugin above). Each subscription has a mute toggle that
+  keeps the follow but skips push notifications for it.
 - **Playlists** (`/playlists`) — member-created, ordered, reorderable video
   collections, separate from the single site-wide Watch Later queue.
 - **Likes / dislikes** — a thumbs up/down on a series or video, shown
   alongside (and independent from) the 1-5 star Ratings plugin.
+- **Watch history** — gates the `/recently-played` page and its bottom-nav
+  tab, matching the toggle pattern of the other member features.
+- **Profiles** (`/profile`) — lets a member set a display name, shown
+  instead of their Auth0 account name in comments and the navbar. Blank
+  falls back to the Auth0 name, then the email.
+- **Chapters** — an admin-managed, ordered list of named timestamps on a
+  video; the video page shows a jump-to-section list underneath the player.
+  Clicking a chapter reloads the embed starting at that timestamp (Bunny's
+  iframe has no seek API — see the technical note below).
+- **Transcripts** — an admin-pasted full-text transcript per video, shown in
+  a collapsible panel; when this plugin is on, `/search` also matches
+  against transcript text (weighted below a title/description match).
+- **Recommendations** — a homepage "Because you watched X" row for logged-in
+  members, anchored on the series of their most recently watched video and
+  reusing the same same-category/shared-tag logic as related content.
 
 ## Auth
 
@@ -92,7 +109,8 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   files hosted directly in Bunny).
 - **Bulk actions & filtering** — multi-select Publish/Unpublish/Delete and
   a title filter box on the series/video/file lists; series can be
-  recategorized individually or in bulk.
+  recategorized individually or in bulk. "Schedule publish…" sets a
+  future `publishAt` across the whole selection in one prompt.
 - **Audit log** (`/admin/audit`) — an append-only record of admin/editor
   actions, exportable as CSV or JSON.
 - **Plugins** (`/admin/plugins`) — a WordPress-style list of the optional
@@ -114,6 +132,13 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   soon as any such grant exists for an item, "Members only" no longer gates
   it — only the granted roles/people (and admins) can view it. Files aren't
   covered — they stay governed by their own "Members only" flag.
+- **Draft mode for series edits**: a series' edit page has a "Save as draft"
+  action alongside "Publish now" — it stages the form's field values in a
+  single pending `DraftRevision` row (upserted, not versioned) without
+  touching the live series. A banner shows the pending draft with "Load
+  into form" and "Discard" actions; publishing clears any staged draft.
+  Scoped to series only — videos are edited inline in the video list rather
+  than through a comparable multi-field form.
 - **Hide content**: a series, video, or file can be marked `hidden` from its
   admin edit page, independent of `published`/`memberOnly`. Hidden content is
   excluded from every guest- and member-facing listing, search, RSS/podcast
@@ -126,6 +151,11 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   members see it normally. Visiting a member-only item's URL directly still
   shows a "log in to view" gate rather than a 404, so a shared link still
   invites sign-up.
+
+- **Webhooks** (`/admin/webhooks`) — admin-configured outgoing URLs that get
+  a JSON POST whenever a series or video is published; optionally signed
+  with a secret as an `X-Webhook-Signature` header (hex HMAC-SHA256). Needs
+  the Webhooks plugin enabled in Plugins.
 
 ## Admin analytics (`/admin/analytics`)
 
@@ -143,6 +173,9 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Up next autoplay** has the same limitation: there's no "video ended"
   event to hook, so autoplay fires a timer based on the video's known
   duration rather than a real end-of-playback signal.
+- **Chapters** have the same root cause too: since the embed has no seek
+  API, clicking a chapter reloads the iframe with a new `t=` start-time
+  query param instead of seeking a live player.
 - **View counts** are a simple per-page-load counter, not deduplicated or
   spam-resistant — a basic "how many hits" number, not analytics. Trending
   and the admin analytics dashboard use a separate timestamped view log for
@@ -151,6 +184,12 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Playback speed** is handled by Bunny Stream's own player UI (the ⚙️
   settings icon) — there's nothing to build server-side since the iframe
   embed already exposes it.
+- **Rate limiting**: comments (5/minute), ratings, and likes/dislikes
+  (20/minute each) are capped per logged-in user via a DB-backed count over
+  a rolling window (`src/lib/rate-limit.ts`), returning 429 once exceeded.
+  `/api/view-events` isn't covered by this — see its own cookie-based
+  throttle below, kept separate since it's unauthenticated and specifically
+  designed to avoid a DB read/write per view.
 - **ViewEvent writes are throttled per browser per item** (`/api/view-events`,
   fired client-side by `ViewEventBeacon`) using a 30-minute cookie rather
   than a DB check: a cookie read is free, so a throttled repeat view costs

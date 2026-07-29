@@ -14,6 +14,11 @@ enum Role {
   ADMIN
 }
 
+enum NotificationFrequency {
+  INSTANT
+  DAILY
+}
+
 enum VideoStatus {
   PROCESSING
   READY
@@ -33,32 +38,41 @@ enum ReactionType {
 // pending row after seeing the attempt. ADMIN_EMAILS self-authorizes as
 // ADMIN on first login so there's always a way in.
 model User {
-  id                 String               @id @default(cuid())
-  auth0Id            String?              @unique
-  email              String               @unique
-  name               String?
-  picture            String?
-  role               Role                 @default(MEMBER)
-  authorized         Boolean              @default(false)
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  categoryEditors    CategoryEditor[]
-  seriesEditors      SeriesEditor[]
-  watchProgress      WatchProgress[]
-  seriesFavorites    SeriesFavorite[]
-  videoFavorites     VideoFavorite[]
-  comments           Comment[]
-  groupAssignments   GroupAssignment[]
-  ratings            Rating[]
-  seriesWatchLater   SeriesWatchLater[]
-  videoWatchLater    VideoWatchLater[]
-  categoryWatchLater CategoryWatchLater[]
-  pushSubscriptions  PushSubscription[]
-  subscriptions      Subscription[]
-  playlists          Playlist[]
-  reactions          Reaction[]
-  seriesViewGrants   SeriesViewer[]
-  videoViewGrants    VideoViewer[]
+  id                    String                @id @default(cuid())
+  auth0Id               String?               @unique
+  email                 String                @unique
+  name                  String?
+  // Member-chosen display name, shown instead of the Auth0 `name` wherever
+  // the Profiles plugin is on (comments, the navbar). Independent of `name`,
+  // which getCurrentUser() keeps synced from the Auth0 session on every login.
+  displayName           String?
+  picture               String?
+  role                  Role                  @default(MEMBER)
+  authorized            Boolean               @default(false)
+  // Instant (default) sends a push the moment content publishes, matching
+  // every plugin's existing behavior. Daily batches the same events into
+  // one push, sent by a scheduled job — see PendingNotification.
+  notificationFrequency NotificationFrequency @default(INSTANT)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  pendingNotifications  PendingNotification[]
+  categoryEditors       CategoryEditor[]
+  seriesEditors         SeriesEditor[]
+  watchProgress         WatchProgress[]
+  seriesFavorites       SeriesFavorite[]
+  videoFavorites        VideoFavorite[]
+  comments              Comment[]
+  groupAssignments      GroupAssignment[]
+  ratings               Rating[]
+  seriesWatchLater      SeriesWatchLater[]
+  videoWatchLater       VideoWatchLater[]
+  categoryWatchLater    CategoryWatchLater[]
+  pushSubscriptions     PushSubscription[]
+  subscriptions         Subscription[]
+  playlists             Playlist[]
+  reactions             Reaction[]
+  seriesViewGrants      SeriesViewer[]
+  videoViewGrants       VideoViewer[]
 }
 
 // Grants a non-admin user editor access to one category (and everything
@@ -172,6 +186,9 @@ model Video {
   // (via our admin UI or Bunny's dashboard) changes it. Synced from the
   // Bunny API; null falls back to the "thumbnail.jpg" default.
   thumbnailFileName String?
+  // Full text transcript, admin-entered. Shown in a collapsible panel by
+  // the Transcripts plugin and matched by search when that plugin is on.
+  transcript        String?
   durationSeconds   Int?
   status            VideoStatus        @default(PROCESSING)
   memberOnly        Boolean            @default(false)
@@ -198,11 +215,26 @@ model Video {
   playlistItems     PlaylistItem[]
   viewerGroups      VideoViewerGroup[]
   viewers           VideoViewer[]
+  chapters          Chapter[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
   @@index([seriesId])
   @@index([categoryId])
+}
+
+// A named timestamp within a video (e.g. "Intro", "Q&A"), for the Chapters
+// plugin's jump-to-section list on the video page.
+model Chapter {
+  id               String   @id @default(cuid())
+  video            Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId          String
+  title            String
+  timestampSeconds Int
+  position         Int      @default(0)
+  createdAt        DateTime @default(now())
+
+  @@index([videoId])
 }
 
 // A member's bookmark of a series, for a "My Favorites" page.
@@ -232,19 +264,26 @@ model VideoFavorite {
 }
 
 // A member's comment on a series or a video (exactly one of seriesId/videoId is set).
+// Threading is one level deep: a reply's parentId always points at a
+// top-level comment (see the flattening logic in the comments API), so
+// `replies` below never itself has replies.
 model Comment {
-  id        String   @id @default(cuid())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String    @id @default(cuid())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-  series    Series?  @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  series    Series?   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
   seriesId  String?
-  video     Video?   @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  video     Video?    @relation(fields: [videoId], references: [id], onDelete: Cascade)
   videoId   String?
   body      String
-  createdAt DateTime @default(now())
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  parentId  String?
+  replies   Comment[] @relation("CommentReplies")
+  createdAt DateTime  @default(now())
 
   @@index([seriesId])
   @@index([videoId])
+  @@index([parentId])
 }
 
 // Per-user resume position for a video, approximated from periodic
@@ -430,6 +469,32 @@ model PushSubscription {
   @@index([userId])
 }
 
+// A single pending set of field edits for a series, staged separately from
+// the live row so they can be reviewed/loaded or discarded before going
+// live, without keeping full revision history. One row per series
+// (upserted), not a version log.
+model DraftRevision {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  data       Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([entityType, entityId])
+}
+
+// An outgoing webhook URL notified when the Webhooks plugin is on and a
+// series/video is published (see src/lib/webhooks.ts). `secret`, if set,
+// signs the payload as an X-Webhook-Signature header (hex HMAC-SHA256).
+model Webhook {
+  id        String   @id @default(cuid())
+  url       String
+  secret    String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
 // A dismissible site-wide banner message; only the most recent `active` one shows.
 model Announcement {
   id        String   @id @default(cuid())
@@ -450,12 +515,30 @@ model Subscription {
   seriesId   String?
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   categoryId String?
+  // Keeps the follow (still listed on /subscriptions) but excludes this
+  // subscriber from push notifications for new content under it.
+  muted      Boolean   @default(false)
   createdAt  DateTime  @default(now())
 
   @@unique([userId, seriesId])
   @@unique([userId, categoryId])
   @@index([seriesId])
   @@index([categoryId])
+}
+
+// One row per notification a DAILY-frequency user would otherwise have
+// received instantly. The digest cron (see /api/cron/notification-digest)
+// batches every pending row per user into a single push, then deletes them.
+model PendingNotification {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  title     String
+  body      String
+  url       String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 // A member-created ordered collection of videos, distinct from the single

@@ -3,15 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const TABS = [
-  { href: "/", label: "Home", icon: HomeIcon, exact: true },
-  { href: "/recently-played", label: "Recently Played", icon: ClockIcon, exact: false },
-  { href: "/favorites", label: "Favourites", icon: StarIcon, exact: false },
-  { href: "/recently-added", label: "Recently Added", icon: SparkleIcon, exact: false },
+const ALL_TABS = [
+  { href: "/", label: "Home", icon: HomeIcon, exact: true, slug: null },
+  { href: "/recently-played", label: "Recently Played", icon: ClockIcon, exact: false, slug: "watch-history" },
+  { href: "/favorites", label: "Favourites", icon: StarIcon, exact: false, slug: null },
+  { href: "/recently-added", label: "Recently Added", icon: SparkleIcon, exact: false, slug: null },
 ] as const;
 
-export function BottomNav() {
+export function BottomNav({ watchHistoryOn = true }: { watchHistoryOn?: boolean }) {
   const pathname = usePathname();
+  const TABS = ALL_TABS.filter((tab) => tab.slug !== "watch-history" || watchHistoryOn);
 
   return (
     <nav

@@ -1,14 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { getDisplayName } from "@/lib/profile";
 
-type Comment = {
-  id: string;
-  body: string;
-  createdAt: string;
-  userId: string;
-  user: { id: string; name: string | null; email: string; picture: string | null };
-};
+type CommentUser = { id: string; name: string | null; displayName: string | null; email: string; picture: string | null };
+type Reply = { id: string; body: string; createdAt: string; userId: string; user: CommentUser };
+type Comment = Reply & { replies: Reply[] };
 
 export function CommentSection({
   type,
@@ -27,6 +24,9 @@ export function CommentSection({
   const [body, setBody] = useState("");
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyBody, setReplyBody] = useState("");
+  const [replyPosting, setReplyPosting] = useState(false);
 
   async function load() {
     const res = await fetch(`/api/comments?type=${type}&id=${id}`);
@@ -54,16 +54,40 @@ export function CommentSection({
     }
   }
 
+  async function postReply(e: React.FormEvent, parentId: string) {
+    e.preventDefault();
+    if (!replyBody.trim()) return;
+    setReplyPosting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, id, body: replyBody, parentId }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed to post reply");
+      setReplyBody("");
+      setReplyingTo(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to post reply");
+    } finally {
+      setReplyPosting(false);
+    }
+  }
+
   async function remove(commentId: string) {
     if (!confirm("Delete this comment?")) return;
     await fetch(`/api/comments/${commentId}`, { method: "DELETE" });
     await load();
   }
 
+  const replyCount = comments.reduce((sum, c) => sum + c.replies.length, 0);
+
   return (
     <section className="space-y-4">
       <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-        Comments {comments.length > 0 && `(${comments.length})`}
+        Comments {comments.length + replyCount > 0 && `(${comments.length + replyCount})`}
       </h2>
 
       {currentUserId ? (
@@ -97,7 +121,7 @@ export function CommentSection({
         {comments.map((c) => (
           <li key={c.id} className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium">{c.user.name ?? c.user.email}</p>
+              <p className="text-sm font-medium">{getDisplayName(c.user)}</p>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-zinc-400">
                   {new Date(c.createdAt).toLocaleString()}
@@ -115,6 +139,66 @@ export function CommentSection({
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap">
               {c.body}
             </p>
+
+            {currentUserId && (
+              <button
+                onClick={() => {
+                  setReplyingTo(replyingTo === c.id ? null : c.id);
+                  setReplyBody("");
+                }}
+                className="mt-2 text-xs text-zinc-500 hover:underline"
+              >
+                {replyingTo === c.id ? "Cancel" : "Reply"}
+              </button>
+            )}
+
+            {c.replies.length > 0 && (
+              <ul className="mt-3 space-y-3 border-l border-zinc-200 pl-3 dark:border-zinc-800">
+                {c.replies.map((r) => (
+                  <li key={r.id}>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium">{getDisplayName(r.user)}</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-zinc-400">
+                          {new Date(r.createdAt).toLocaleString()}
+                        </span>
+                        {(r.userId === currentUserId || canModerate) && (
+                          <button
+                            onClick={() => remove(r.id)}
+                            className="text-xs text-red-600 hover:underline"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap">
+                      {r.body}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {replyingTo === c.id && (
+              <form onSubmit={(e) => postReply(e, c.id)} className="mt-3 space-y-2 pl-3">
+                <textarea
+                  value={replyBody}
+                  onChange={(e) => setReplyBody(e.target.value)}
+                  placeholder={`Reply to ${getDisplayName(c.user)}…`}
+                  rows={2}
+                  autoFocus
+                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                />
+                <button
+                  type="submit"
+                  disabled={replyPosting || !replyBody.trim()}
+                  className="rounded-md bg-zinc-900 text-white px-4 py-1.5 text-sm hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+                >
+                  {replyPosting ? "Posting…" : "Post reply"}
+                </button>
+              </form>
+            )}
           </li>
         ))}
         {comments.length === 0 && <li className="text-sm text-zinc-500">No comments yet.</li>}

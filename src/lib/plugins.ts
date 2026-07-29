@@ -14,6 +14,12 @@ export const PLUGIN_META = [
   { slug: "playlists", name: "Playlists", description: "Lets members build their own ordered video playlists." },
   { slug: "likes-dislikes", name: "Likes / dislikes", description: "Lets members like or dislike a series or video." },
   { slug: "up-next", name: "Up next", description: "Shows an \"Up next\" panel with the next video in a series, with an autoplay option." },
+  { slug: "watch-history", name: "Watch history", description: "Shows a \"Recently Played\" page and nav tab of everything a member has watched." },
+  { slug: "profiles", name: "Profiles", description: "Lets members set a display name shown instead of their Auth0 name in comments and the navbar." },
+  { slug: "chapters", name: "Chapters", description: "Shows a jump-to-section chapter list under a video, admin-managed per video." },
+  { slug: "transcripts", name: "Transcripts", description: "Shows a collapsible full-text transcript under a video and includes it in search results." },
+  { slug: "recommendations", name: "Recommendations", description: "Shows a personalized \"Because you watched\" row on the homepage, based on the member's most recent watch." },
+  { slug: "webhooks", name: "Webhooks", description: "Posts a JSON payload to admin-configured URLs whenever a series or video is published." },
 ] as const;
 
 export type PluginSlug = (typeof PLUGIN_META)[number]["slug"];

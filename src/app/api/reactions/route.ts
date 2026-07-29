@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { isPluginEnabled } from "@/lib/plugins";
+import { rateLimitResponse, windowStart } from "@/lib/rate-limit";
 import {
   getSeriesReactionSummary,
   getVideoReactionSummary,
@@ -39,6 +40,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const limited = await rateLimitResponse(
+    () => prisma.reaction.count({ where: { userId: user.id, updatedAt: { gte: windowStart(60) } } }),
+    20,
+  );
+  if (limited) return limited;
 
   const { type, id, value } = postSchema.parse(await request.json());
 

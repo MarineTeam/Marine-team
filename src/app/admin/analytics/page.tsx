@@ -40,14 +40,21 @@ export default async function AnalyticsPage() {
       <section className="space-y-3">
         <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Top videos</h2>
         <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
-          {topVideos.map(({ video, views }) => (
+          {topVideos.map(({ video, views, completionRate }) => (
             <li key={video.id} className="p-3 flex items-center justify-between text-sm">
               <span className="truncate">{video.title}</span>
-              <span className="text-zinc-500 shrink-0">{views} views</span>
+              <span className="text-zinc-500 shrink-0">
+                {views} views
+                {completionRate != null && ` · ${Math.round(completionRate * 100)}% watch-through`}
+              </span>
             </li>
           ))}
           {topVideos.length === 0 && <li className="p-3 text-sm text-zinc-500">No views recorded yet.</li>}
         </ul>
+        <p className="text-xs text-zinc-500">
+          Watch-through is the share of this window&apos;s viewers (by heartbeat progress) who reached
+          the end of the video — not shown when nobody&apos;s progress was recorded in the window.
+        </p>
       </section>
     </div>
   );

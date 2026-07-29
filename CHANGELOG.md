@@ -6,6 +6,38 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Watch history plugin**: the `/recently-played` page and its bottom-nav
+  tab are now gated by a new "Watch history" plugin toggle, matching every
+  other optional member feature.
+- **Comment replies**: comments now support one level of threaded replies.
+  A reply to a reply attaches to that reply's top-level parent instead of
+  nesting further.
+- **Profiles plugin** (`/profile`): members can set a display name shown
+  instead of their Auth0 account name in comments and the navbar.
+- **Chapters plugin**: admins can add named timestamps to a video from the
+  video manager; the video page shows a clickable chapter list underneath
+  the player.
+- **Transcripts plugin**: admins can paste a full-text transcript per video,
+  shown in a collapsible panel and matched by `/search` when the plugin is on.
+- **Recommendations plugin**: a personalized "Because you watched X"
+  homepage row for logged-in members.
+- **Webhooks plugin** (`/admin/webhooks`): admins can register outgoing URLs
+  that get a signed JSON POST when a series or video is published.
+- **Subscription mute**: each entry on `/subscriptions` has a mute toggle
+  that keeps the follow but skips push notifications for it.
+- **Bulk schedule publish**: the series/video/file admin lists gained a
+  "Schedule publish…" bulk action, setting a future `publishAt` across the
+  whole selection in one prompt instead of one item at a time.
+- **Draft mode for series edits**: "Save as draft" stages a series edit
+  form's values without publishing; a banner offers "Load into form" /
+  "Discard" for the pending draft.
+- **Rate limiting**: comments, ratings, and likes/dislikes now return 429
+  once a logged-in user exceeds a per-minute cap, via a DB-backed rolling
+  count rather than an in-memory limiter (this app runs on serverless
+  functions with no shared process state).
+
 ## [1.2.0] - 2026-07-25
 
 ### Added

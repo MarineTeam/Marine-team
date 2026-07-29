@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { canEditSeries } from "@/lib/permissions";
+import { getDraft } from "@/lib/drafts";
 import { SeriesEditForm } from "@/components/series-edit-form";
 import { VideoManager } from "@/components/video-manager";
 import { FileManager } from "@/components/file-manager";
@@ -22,6 +23,7 @@ export default async function SeriesDetailPage({
 
   if (!series || !user) notFound();
   if (!(await canEditSeries(user, series))) notFound();
+  const draft = await getDraft("series", series.id);
 
   return (
     <div className="space-y-8">
@@ -32,7 +34,11 @@ export default async function SeriesDetailPage({
         <h1 className="text-xl font-semibold mt-1">{series.title}</h1>
       </div>
 
-      <SeriesEditForm series={series} categories={categories} />
+      <SeriesEditForm
+        series={series}
+        categories={categories}
+        initialDraft={draft ? { data: draft.data as Record<string, unknown>, updatedAt: draft.updatedAt.toISOString() } : null}
+      />
       <ViewerAccessManager type="series" id={series.id} />
       <VideoManager seriesId={series.id} />
       <FileManager seriesId={series.id} />

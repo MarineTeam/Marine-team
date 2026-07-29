@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db";
 import { unstable_cache } from "next/cache";
 import type { Prisma } from "@prisma/client";
+import { isPluginEnabled } from "@/lib/plugins";
+import { fuzzyMatchScore } from "@/lib/fuzzy";
 
 export function canAccess(memberOnly: boolean, isLoggedIn: boolean): boolean {
   return !memberOnly || isLoggedIn;
@@ -371,6 +373,7 @@ export async function searchContent(query: string, isLoggedIn: boolean) {
   if (!q) return { categories: [], series: [], videos: [] };
   const qLower = q.toLowerCase();
   const where = { ...publishedNow(), ...guestFilter(isLoggedIn) };
+  const transcriptsOn = await isPluginEnabled("transcripts");
 
   const [categories, seriesCandidates, videoCandidates] = await Promise.all([
     prisma.category.findMany({
@@ -410,6 +413,7 @@ export async function searchContent(query: string, isLoggedIn: boolean) {
             OR: [
               { title: { contains: q, mode: "insensitive" } },
               { description: { contains: q, mode: "insensitive" } },
+              ...(transcriptsOn ? [{ transcript: { contains: q, mode: "insensitive" as const } }] : []),
             ],
           },
         ],
@@ -419,29 +423,74 @@ export async function searchContent(query: string, isLoggedIn: boolean) {
     }),
   ]);
 
-  const series = seriesCandidates
+  let series = seriesCandidates
     .map((s) => ({ item: s, score: relevanceScore(q, s.title, s.description) + (s.tags.includes(qLower) ? 15 : 0) }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 20)
     .map((r) => r.item);
 
-  const videos = videoCandidates
+  let videos = videoCandidates
     .map((v) => ({ item: v, score: relevanceScore(q, v.title, v.description) }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 20)
     .map((r) => r.item);
+
+  // The exact/substring search above finds nothing on a typo ("chruch" never
+  // matches "Church" via `contains`). Only kicks in when that pass came back
+  // empty, so the common case pays no extra query; capped at 500 rows, which
+  // comfortably covers a single church's catalog without scanning unbounded
+  // tables on a much larger deployment.
+  const FUZZY_THRESHOLD = 0.6;
+  function fuzzyRank<T>(items: T[], titleOf: (item: T) => string): T[] {
+    return items
+      .map((item) => ({ item, score: fuzzyMatchScore(q, titleOf(item)) }))
+      .filter((r) => r.score >= FUZZY_THRESHOLD)
+      .sort((a, b) => b.score - a.score)
+      .map((r) => r.item);
+  }
+
+  if (series.length === 0) {
+    const allSeries = await prisma.series.findMany({ where: publishedNow(), take: 500 });
+    series = fuzzyRank(allSeries, (s) => s.title).slice(0, 20);
+  }
+  if (videos.length === 0) {
+    const allVideos = await prisma.video.findMany({
+      where: { ...where, status: "READY" },
+      include: { series: true },
+      take: 500,
+    });
+    videos = fuzzyRank(allVideos, (v) => v.title).slice(0, 20);
+  }
 
   return { categories, series, videos };
 }
 
 // --- Comments ----------------------------------------------------------------
 
+/**
+ * Top-level comments (newest first) with their replies nested underneath
+ * (oldest first, reading like a conversation) — threading is one level deep,
+ * so a reply's own `replies` array is always empty.
+ */
 export async function getComments(type: "series" | "video", id: string) {
-  return prisma.comment.findMany({
+  const all = await prisma.comment.findMany({
     where: type === "series" ? { seriesId: id } : { videoId: id },
-    include: { user: { select: { id: true, name: true, email: true, picture: true } } },
-    orderBy: { createdAt: "desc" },
+    include: { user: { select: { id: true, name: true, displayName: true, email: true, picture: true } } },
+    orderBy: { createdAt: "asc" },
   });
+
+  const repliesByParent = new Map<string, typeof all>();
+  for (const c of all) {
+    if (!c.parentId) continue;
+    const list = repliesByParent.get(c.parentId) ?? [];
+    list.push(c);
+    repliesByParent.set(c.parentId, list);
+  }
+
+  return all
+    .filter((c) => !c.parentId)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .map((c) => ({ ...c, replies: repliesByParent.get(c.id) ?? [] }));
 }
 
 // --- Ratings ---------------------------------------------------------------
@@ -645,11 +694,12 @@ export async function getSubscriptions(userId: string) {
   return { seriesSubs, categorySubs };
 }
 
-/** Users subscribed to a series itself, or to its category (or an ancestor of it). */
+/** Users subscribed (and not muted) to a series itself, or to its category (or an ancestor of it). */
 export async function getSubscriberUserIdsForSeries(seriesId: string, categoryId: string | null): Promise<string[]> {
   const categoryChain = categoryId ? await categoryChainIds(categoryId) : [];
   const subs = await prisma.subscription.findMany({
     where: {
+      muted: false,
       OR: [{ seriesId }, ...(categoryChain.length > 0 ? [{ categoryId: { in: categoryChain } }] : [])],
     },
     select: { userId: true },
@@ -657,11 +707,11 @@ export async function getSubscriberUserIdsForSeries(seriesId: string, categoryId
   return Array.from(new Set(subs.map((s) => s.userId)));
 }
 
-/** Users subscribed to a category directly (or to an ancestor of it) — for a video/file attached straight to a category. */
+/** Users subscribed (and not muted) to a category directly (or to an ancestor of it) — for a video/file attached straight to a category. */
 export async function getSubscriberUserIdsForCategory(categoryId: string): Promise<string[]> {
   const categoryChain = await categoryChainIds(categoryId);
   const subs = await prisma.subscription.findMany({
-    where: { categoryId: { in: categoryChain } },
+    where: { categoryId: { in: categoryChain }, muted: false },
     select: { userId: true },
   });
   return Array.from(new Set(subs.map((s) => s.userId)));
@@ -805,12 +855,29 @@ export async function getAnalyticsSummary(days = 30) {
     }),
   ]);
 
-  const [seriesById, videosById] = await Promise.all([
+  const topVideoIds = topVideosGrouped.map((g) => g.videoId as string);
+  const [seriesById, videosById, progressTotal, progressCompleted] = await Promise.all([
     prisma.series.findMany({ where: { id: { in: topSeriesGrouped.map((g) => g.seriesId as string) } } }),
-    prisma.video.findMany({ where: { id: { in: topVideosGrouped.map((g) => g.videoId as string) } } }),
+    prisma.video.findMany({ where: { id: { in: topVideoIds } } }),
+    prisma.watchProgress.groupBy({
+      by: ["videoId"],
+      where: { videoId: { in: topVideoIds }, updatedAt: { gte: since } },
+      _count: { _all: true },
+    }),
+    prisma.watchProgress.groupBy({
+      by: ["videoId"],
+      where: { videoId: { in: topVideoIds }, updatedAt: { gte: since }, completed: true },
+      _count: { _all: true },
+    }),
   ]);
   const seriesMap = new Map(seriesById.map((s) => [s.id, s]));
   const videoMap = new Map(videosById.map((v) => [v.id, v]));
+  // Fraction of this window's watchers who reached the end, per video —
+  // reuses the same heartbeat data that already powers "Continue watching"
+  // and resume-on-return, so this costs one extra groupBy pair, not a new
+  // tracking mechanism.
+  const totalByVideo = new Map(progressTotal.map((g) => [g.videoId, g._count._all]));
+  const completedByVideo = new Map(progressCompleted.map((g) => [g.videoId, g._count._all]));
 
   return {
     totalViews,
@@ -818,9 +885,44 @@ export async function getAnalyticsSummary(days = 30) {
       .map((g) => ({ series: seriesMap.get(g.seriesId as string), views: g._count.seriesId }))
       .filter((r): r is { series: NonNullable<typeof r.series>; views: number } => Boolean(r.series)),
     topVideos: topVideosGrouped
-      .map((g) => ({ video: videoMap.get(g.videoId as string), views: g._count.videoId }))
-      .filter((r): r is { video: NonNullable<typeof r.video>; views: number } => Boolean(r.video)),
+      .map((g) => {
+        const video = videoMap.get(g.videoId as string);
+        const total = totalByVideo.get(g.videoId as string) ?? 0;
+        const completed = completedByVideo.get(g.videoId as string) ?? 0;
+        return {
+          video,
+          views: g._count.videoId,
+          completionRate: total > 0 ? completed / total : null,
+        };
+      })
+      .filter(
+        (r): r is { video: NonNullable<typeof r.video>; views: number; completionRate: number | null } =>
+          Boolean(r.video),
+      ),
   };
+}
+
+// --- Recommendations -----------------------------------------------------
+
+/**
+ * A "Because you watched X" row for the homepage: anchored on the series of
+ * the user's most recently watched video (any progress, not just
+ * in-progress ones), then reusing getRelatedSeries' same-category/shared-tag
+ * logic. Returns null if the user has no watch history yet, or their most
+ * recent watch was a standalone video with no series to anchor on.
+ */
+export async function getRecommendedSeries(userId: string, limit = 8) {
+  const recent = await prisma.watchProgress.findFirst({
+    where: { userId, positionSeconds: { gt: 0 }, video: { seriesId: { not: null } } },
+    orderBy: { updatedAt: "desc" },
+    include: { video: { include: { series: true } } },
+  });
+  const anchor = recent?.video.series;
+  if (!anchor) return null;
+
+  const series = await getRelatedSeries(anchor, limit);
+  if (series.length === 0) return null;
+  return { anchorTitle: anchor.title, series };
 }
 
 // --- Up next -----------------------------------------------------------------
@@ -842,6 +944,38 @@ export async function getUpNextVideo(
     orderBy: { position: "asc" },
     include: { series: true },
   });
+}
+
+// --- Sitemap -----------------------------------------------------------------
+
+/**
+ * Everything a public sitemap should list: published categories and series
+ * (both list publicly with a "Members" badge even when memberOnly, per
+ * guestFilter's note above), guest-visible videos (memberOnly ones excluded,
+ * same as public video listings), and every distinct series tag.
+ */
+export async function getSitemapData() {
+  const [categories, series, videos] = await Promise.all([
+    prisma.category.findMany({ where: publishedNow(), select: { slug: true, updatedAt: true } }),
+    prisma.series.findMany({ where: publishedNow(), select: { slug: true, updatedAt: true, tags: true } }),
+    prisma.video.findMany({
+      where: { ...publishedNow(), memberOnly: false, status: "READY" },
+      select: { slug: true, updatedAt: true },
+    }),
+  ]);
+
+  const tagSet = new Set<string>();
+  for (const s of series) {
+    for (const t of s.tags) tagSet.add(t);
+  }
+
+  return { categories, series, videos, tags: Array.from(tagSet) };
+}
+
+// --- Chapters ----------------------------------------------------------------
+
+export async function getVideoChapters(videoId: string) {
+  return prisma.chapter.findMany({ where: { videoId }, orderBy: { position: "asc" } });
 }
 
 // --- Scheduled premieres -------------------------------------------------
