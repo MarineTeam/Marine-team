@@ -48,3 +48,33 @@ export async function POST(request: NextRequest) {
   await prisma.subscription.create({ data: { userId: user.id, categoryId: id } });
   return NextResponse.json({ subscribed: true });
 }
+
+const muteSchema = z.object({
+  type: z.enum(["series", "category"]),
+  id: z.string().min(1),
+  muted: z.boolean(),
+});
+
+/** Sets whether an existing subscription is muted (skipped for push notifications), without unfollowing it. */
+export async function PATCH(request: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const { type, id, muted } = muteSchema.parse(await request.json());
+
+  try {
+    const subscription =
+      type === "series"
+        ? await prisma.subscription.update({
+            where: { userId_seriesId: { userId: user.id, seriesId: id } },
+            data: { muted },
+          })
+        : await prisma.subscription.update({
+            where: { userId_categoryId: { userId: user.id, categoryId: id } },
+            data: { muted },
+          });
+    return NextResponse.json(subscription);
+  } catch {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+}

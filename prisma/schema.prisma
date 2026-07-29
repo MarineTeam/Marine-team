@@ -490,6 +490,9 @@ model Subscription {
   seriesId   String?
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   categoryId String?
+  // Keeps the follow (still listed on /subscriptions) but excludes this
+  // subscriber from push notifications for new content under it.
+  muted      Boolean   @default(false)
   createdAt  DateTime  @default(now())
 
   @@unique([userId, seriesId])

@@ -69,7 +69,8 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Subscriptions** (`/subscriptions`) — follow a series or category; when a
   followed series publishes a new video, its subscribers get a push
   notification (in addition to, and independent from, the general
-  Notifications plugin above).
+  Notifications plugin above). Each subscription has a mute toggle that
+  keeps the follow but skips push notifications for it.
 - **Playlists** (`/playlists`) — member-created, ordered, reorderable video
   collections, separate from the single site-wide Watch Later queue.
 - **Likes / dislikes** — a thumbs up/down on a series or video, shown

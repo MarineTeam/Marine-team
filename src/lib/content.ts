@@ -666,11 +666,12 @@ export async function getSubscriptions(userId: string) {
   return { seriesSubs, categorySubs };
 }
 
-/** Users subscribed to a series itself, or to its category (or an ancestor of it). */
+/** Users subscribed (and not muted) to a series itself, or to its category (or an ancestor of it). */
 export async function getSubscriberUserIdsForSeries(seriesId: string, categoryId: string | null): Promise<string[]> {
   const categoryChain = categoryId ? await categoryChainIds(categoryId) : [];
   const subs = await prisma.subscription.findMany({
     where: {
+      muted: false,
       OR: [{ seriesId }, ...(categoryChain.length > 0 ? [{ categoryId: { in: categoryChain } }] : [])],
     },
     select: { userId: true },
@@ -678,11 +679,11 @@ export async function getSubscriberUserIdsForSeries(seriesId: string, categoryId
   return Array.from(new Set(subs.map((s) => s.userId)));
 }
 
-/** Users subscribed to a category directly (or to an ancestor of it) — for a video/file attached straight to a category. */
+/** Users subscribed (and not muted) to a category directly (or to an ancestor of it) — for a video/file attached straight to a category. */
 export async function getSubscriberUserIdsForCategory(categoryId: string): Promise<string[]> {
   const categoryChain = await categoryChainIds(categoryId);
   const subs = await prisma.subscription.findMany({
-    where: { categoryId: { in: categoryChain } },
+    where: { categoryId: { in: categoryChain }, muted: false },
     select: { userId: true },
   });
   return Array.from(new Set(subs.map((s) => s.userId)));

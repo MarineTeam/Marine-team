@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/current-user";
 import { getSubscriptions } from "@/lib/content";
 import { SeriesTile } from "@/components/series-tile";
+import { SubscriptionMuteToggle } from "@/components/subscription-mute-toggle";
 
 export default async function SubscriptionsPage() {
   const user = await getCurrentUser();
@@ -38,13 +39,15 @@ export default async function SubscriptionsPage() {
           <div className="space-y-3">
             {categorySubs.map((s) =>
               s.category ? (
-                <Link
-                  key={s.id}
-                  href={`/categories/${s.category.slug}`}
-                  className="block rounded-xl border border-zinc-200 bg-white p-3 shadow-sm hover:-translate-y-0.5 hover:shadow-lg transition dark:border-zinc-800 dark:bg-zinc-900"
-                >
-                  <span className="font-medium">{s.category.name}</span>
-                </Link>
+                <div key={s.id} className="flex items-center gap-2">
+                  <Link
+                    href={`/categories/${s.category.slug}`}
+                    className="flex-1 block rounded-xl border border-zinc-200 bg-white p-3 shadow-sm hover:-translate-y-0.5 hover:shadow-lg transition dark:border-zinc-800 dark:bg-zinc-900"
+                  >
+                    <span className="font-medium">{s.category.name}</span>
+                  </Link>
+                  <SubscriptionMuteToggle type="category" id={s.category.id} initialMuted={s.muted} />
+                </div>
               ) : null,
             )}
           </div>
@@ -55,7 +58,16 @@ export default async function SubscriptionsPage() {
         <section className="space-y-3">
           <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Series</h2>
           <div className="space-y-3">
-            {seriesSubs.map((s) => (s.series ? <SeriesTile key={s.id} series={s.series} /> : null))}
+            {seriesSubs.map((s) =>
+              s.series ? (
+                <div key={s.id} className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <SeriesTile series={s.series} />
+                  </div>
+                  <SubscriptionMuteToggle type="series" id={s.series.id} initialMuted={s.muted} />
+                </div>
+              ) : null,
+            )}
           </div>
         </section>
       )}

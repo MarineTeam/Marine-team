@@ -25,6 +25,8 @@ All notable changes to this project are documented here. Format follows
   homepage row for logged-in members.
 - **Webhooks plugin** (`/admin/webhooks`): admins can register outgoing URLs
   that get a signed JSON POST when a series or video is published.
+- **Subscription mute**: each entry on `/subscriptions` has a mute toggle
+  that keeps the follow but skips push notifications for it.
 
 ## [1.2.0] - 2026-07-25
 
