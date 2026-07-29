@@ -38,41 +38,41 @@ enum ReactionType {
 // pending row after seeing the attempt. ADMIN_EMAILS self-authorizes as
 // ADMIN on first login so there's always a way in.
 model User {
-  id                 String               @id @default(cuid())
-  auth0Id            String?              @unique
-  email              String               @unique
-  name               String?
+  id                    String                @id @default(cuid())
+  auth0Id               String?               @unique
+  email                 String                @unique
+  name                  String?
   // Member-chosen display name, shown instead of the Auth0 `name` wherever
   // the Profiles plugin is on (comments, the navbar). Independent of `name`,
   // which getCurrentUser() keeps synced from the Auth0 session on every login.
-  displayName        String?
-  picture            String?
-  role               Role                 @default(MEMBER)
-  authorized         Boolean              @default(false)
+  displayName           String?
+  picture               String?
+  role                  Role                  @default(MEMBER)
+  authorized            Boolean               @default(false)
   // Instant (default) sends a push the moment content publishes, matching
   // every plugin's existing behavior. Daily batches the same events into
   // one push, sent by a scheduled job — see PendingNotification.
   notificationFrequency NotificationFrequency @default(INSTANT)
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  pendingNotifications PendingNotification[]
-  categoryEditors    CategoryEditor[]
-  seriesEditors      SeriesEditor[]
-  watchProgress      WatchProgress[]
-  seriesFavorites    SeriesFavorite[]
-  videoFavorites     VideoFavorite[]
-  comments           Comment[]
-  groupAssignments   GroupAssignment[]
-  ratings            Rating[]
-  seriesWatchLater   SeriesWatchLater[]
-  videoWatchLater    VideoWatchLater[]
-  categoryWatchLater CategoryWatchLater[]
-  pushSubscriptions  PushSubscription[]
-  subscriptions      Subscription[]
-  playlists          Playlist[]
-  reactions          Reaction[]
-  seriesViewGrants   SeriesViewer[]
-  videoViewGrants    VideoViewer[]
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  pendingNotifications  PendingNotification[]
+  categoryEditors       CategoryEditor[]
+  seriesEditors         SeriesEditor[]
+  watchProgress         WatchProgress[]
+  seriesFavorites       SeriesFavorite[]
+  videoFavorites        VideoFavorite[]
+  comments              Comment[]
+  groupAssignments      GroupAssignment[]
+  ratings               Rating[]
+  seriesWatchLater      SeriesWatchLater[]
+  videoWatchLater       VideoWatchLater[]
+  categoryWatchLater    CategoryWatchLater[]
+  pushSubscriptions     PushSubscription[]
+  subscriptions         Subscription[]
+  playlists             Playlist[]
+  reactions             Reaction[]
+  seriesViewGrants      SeriesViewer[]
+  videoViewGrants       VideoViewer[]
 }
 
 // Grants a non-admin user editor access to one category (and everything
