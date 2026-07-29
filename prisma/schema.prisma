@@ -232,19 +232,26 @@ model VideoFavorite {
 }
 
 // A member's comment on a series or a video (exactly one of seriesId/videoId is set).
+// Threading is one level deep: a reply's parentId always points at a
+// top-level comment (see the flattening logic in the comments API), so
+// `replies` below never itself has replies.
 model Comment {
-  id        String   @id @default(cuid())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String    @id @default(cuid())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-  series    Series?  @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  series    Series?   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
   seriesId  String?
-  video     Video?   @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  video     Video?    @relation(fields: [videoId], references: [id], onDelete: Cascade)
   videoId   String?
   body      String
-  createdAt DateTime @default(now())
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  parentId  String?
+  replies   Comment[] @relation("CommentReplies")
+  createdAt DateTime  @default(now())
 
   @@index([seriesId])
   @@index([videoId])
+  @@index([parentId])
 }
 
 // Per-user resume position for a video, approximated from periodic

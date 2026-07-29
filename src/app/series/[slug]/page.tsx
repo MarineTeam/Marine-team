@@ -85,7 +85,11 @@ export default async function SeriesPage({
     relatedOn && !seriesLocked ? getRelatedSeries(series) : Promise.resolve([]),
     commentsOn && !seriesLocked ? getComments("series", series.id) : Promise.resolve([]),
   ]);
-  const initialComments = comments.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }));
+  const initialComments = comments.map((c) => ({
+    ...c,
+    createdAt: c.createdAt.toISOString(),
+    replies: c.replies.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })),
+  }));
 
   // Gated by seriesLocked to match the ViewEventBeacon below and the video
   // page, where the access check returns early: someone who only ever sees

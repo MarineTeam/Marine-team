@@ -57,8 +57,9 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 
 - **Favorites** (`/favorites`) — bookmark a series or video.
 - **Watch later** (`/watch-later`) — a separate queue from Favorites.
-- **Comments** — discuss a series or video; authors can delete their own,
-  moderators can delete any (see Permissions).
+- **Comments** — discuss a series or video, one level of replies deep;
+  authors can delete their own comments and replies, moderators can delete
+  any (see Permissions).
 - **Ratings** — a 1-5 star rating on a series or video; average and count
   shown to everyone, the stars are only clickable when logged in.
 - **View counts** — a simple counter shown on series/video pages.

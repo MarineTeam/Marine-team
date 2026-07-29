@@ -436,12 +436,30 @@ export async function searchContent(query: string, isLoggedIn: boolean) {
 
 // --- Comments ----------------------------------------------------------------
 
+/**
+ * Top-level comments (newest first) with their replies nested underneath
+ * (oldest first, reading like a conversation) — threading is one level deep,
+ * so a reply's own `replies` array is always empty.
+ */
 export async function getComments(type: "series" | "video", id: string) {
-  return prisma.comment.findMany({
+  const all = await prisma.comment.findMany({
     where: type === "series" ? { seriesId: id } : { videoId: id },
     include: { user: { select: { id: true, name: true, email: true, picture: true } } },
-    orderBy: { createdAt: "desc" },
+    orderBy: { createdAt: "asc" },
   });
+
+  const repliesByParent = new Map<string, typeof all>();
+  for (const c of all) {
+    if (!c.parentId) continue;
+    const list = repliesByParent.get(c.parentId) ?? [];
+    list.push(c);
+    repliesByParent.set(c.parentId, list);
+  }
+
+  return all
+    .filter((c) => !c.parentId)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .map((c) => ({ ...c, replies: repliesByParent.get(c.id) ?? [] }));
 }
 
 // --- Ratings ---------------------------------------------------------------

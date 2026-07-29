@@ -110,7 +110,11 @@ export default async function VideoPage({
     commentsOn ? getComments("video", video.id) : Promise.resolve([]),
     upNextOn ? getUpNextVideo(video, isLoggedIn) : Promise.resolve(null),
   ]);
-  const initialComments = comments.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }));
+  const initialComments = comments.map((c) => ({
+    ...c,
+    createdAt: c.createdAt.toISOString(),
+    replies: c.replies.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })),
+  }));
 
   if (!isPendingPremiere && viewCountsOn) await incrementVideoViewCount(video.id);
 
