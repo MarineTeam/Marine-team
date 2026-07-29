@@ -1,8 +1,9 @@
 import { getCurrentUser } from "@/lib/current-user";
+import { isPluginEnabled } from "@/lib/plugins";
 import { ProfileForm } from "@/components/profile-form";
 
 export default async function ProfilePage() {
-  const user = await getCurrentUser();
+  const [user, notificationsOn] = await Promise.all([getCurrentUser(), isPluginEnabled("notifications")]);
 
   if (!user) {
     return (
@@ -21,7 +22,11 @@ export default async function ProfilePage() {
   return (
     <div className="max-w-md mx-auto px-4 py-10 space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight">Profile</h1>
-      <ProfileForm currentDisplayName={user.displayName} />
+      <ProfileForm
+        currentDisplayName={user.displayName}
+        notificationsOn={notificationsOn}
+        currentNotificationFrequency={user.notificationFrequency}
+      />
     </div>
   );
 }

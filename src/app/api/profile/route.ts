@@ -7,21 +7,31 @@ import { isPluginEnabled } from "@/lib/plugins";
 const schema = z.object({
   // Empty string clears the display name, falling back to the Auth0 name.
   displayName: z.string().trim().max(50).nullable(),
+  notificationFrequency: z.enum(["INSTANT", "DAILY"]).optional(),
 });
 
-/** Sets the logged-in user's display name, shown instead of their Auth0 name wherever the Profiles plugin is on. */
+/**
+ * Sets the logged-in user's display name (gated by the Profiles plugin) and
+ * push notification frequency (gated by the Notifications plugin). Each
+ * field only applies when its own plugin is on, so disabling Profiles after
+ * a member set a frequency preference doesn't also wipe that preference.
+ */
 export async function PATCH(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  if (!(await isPluginEnabled("profiles"))) {
-    return NextResponse.json({ error: "Profiles are disabled" }, { status: 403 });
-  }
+  const { displayName, notificationFrequency } = schema.parse(await request.json());
+  const [profilesOn, notificationsOn] = await Promise.all([
+    isPluginEnabled("profiles"),
+    isPluginEnabled("notifications"),
+  ]);
 
-  const { displayName } = schema.parse(await request.json());
   await prisma.user.update({
     where: { id: user.id },
-    data: { displayName: displayName || null },
+    data: {
+      ...(profilesOn ? { displayName: displayName || null } : {}),
+      ...(notificationsOn && notificationFrequency ? { notificationFrequency } : {}),
+    },
   });
   return NextResponse.json({ ok: true });
 }

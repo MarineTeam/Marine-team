@@ -14,6 +14,11 @@ enum Role {
   ADMIN
 }
 
+enum NotificationFrequency {
+  INSTANT
+  DAILY
+}
+
 enum VideoStatus {
   PROCESSING
   READY
@@ -44,8 +49,13 @@ model User {
   picture            String?
   role               Role                 @default(MEMBER)
   authorized         Boolean              @default(false)
+  // Instant (default) sends a push the moment content publishes, matching
+  // every plugin's existing behavior. Daily batches the same events into
+  // one push, sent by a scheduled job — see PendingNotification.
+  notificationFrequency NotificationFrequency @default(INSTANT)
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
+  pendingNotifications PendingNotification[]
   categoryEditors    CategoryEditor[]
   seriesEditors      SeriesEditor[]
   watchProgress      WatchProgress[]
@@ -514,6 +524,21 @@ model Subscription {
   @@unique([userId, categoryId])
   @@index([seriesId])
   @@index([categoryId])
+}
+
+// One row per notification a DAILY-frequency user would otherwise have
+// received instantly. The digest cron (see /api/cron/notification-digest)
+// batches every pending row per user into a single push, then deletes them.
+model PendingNotification {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  title     String
+  body      String
+  url       String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 // A member-created ordered collection of videos, distinct from the single
