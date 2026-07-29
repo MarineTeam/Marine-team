@@ -6,6 +6,28 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Speakers**: an admin-managed directory of preachers/presenters
+  (`/admin/speakers`), attachable to a video from the video manager.
+  `/speakers` and `/speakers/[slug]` list them alongside their published,
+  viewable videos.
+- **Scripture references**: free-form Bible references on a video (e.g.
+  "John 3:16-18"), edited from a new "Scripture" panel in the video manager
+  and browsable at `/scripture` (an index of referenced books) and
+  `/scripture/[book]`.
+- **Live streaming plugin** (`/admin/live`): schedule a live stream that
+  points at an existing embed (YouTube, Boxcast, etc.). `/live` shows the
+  current stream while it's live, a countdown to the next scheduled one
+  otherwise, and a "Live now" banner appears on the homepage and in the nav.
+  Publishing a stream sends a push notification like publishing a video does.
+- **Search filters + sort**: `/search` gained category and speaker filters
+  plus a relevance/newest sort toggle, and now also matches on speaker name.
+- **Trigram-backed search**: the fuzzy fallback in `/search` (and the typo
+  tolerance it provides) now ranks candidates by Postgres trigram similarity
+  (`pg_trgm`, new GIN indexes) instead of scanning up to 500 rows into
+  memory with a JS Levenshtein matcher, which is retired along with it.
+
 ## [1.3.0] - 2026-07-29
 
 ### Added

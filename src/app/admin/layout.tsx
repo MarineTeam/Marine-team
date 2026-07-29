@@ -8,6 +8,8 @@ const adminLinks = [
   { href: "/admin/categories", label: "Categories" },
   { href: "/admin/series", label: "Series" },
   { href: "/admin/videos", label: "Videos" },
+  { href: "/admin/speakers", label: "Speakers" },
+  { href: "/admin/live", label: "Live streaming" },
   { href: "/admin/files", label: "Files" },
   { href: "/admin/users", label: "Access" },
   { href: "/admin/permissions", label: "Permissions" },
@@ -41,17 +43,30 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   let links = adminLinks;
   if (user.role !== "ADMIN") {
-    const [canManageUsers, canManagePermissions, canManagePlugins, canViewAuditLog, canViewAnalytics] =
-      await Promise.all([
-        hasCapability(user, "manage_users"),
-        hasCapability(user, "manage_permissions"),
-        hasCapability(user, "manage_plugins"),
-        hasCapability(user, "view_audit_log"),
-        hasCapability(user, "view_analytics"),
-      ]);
+    const [
+      canManageUsers,
+      canManagePermissions,
+      canManagePlugins,
+      canViewAuditLog,
+      canViewAnalytics,
+      canManageVideosSiteWide,
+    ] = await Promise.all([
+      hasCapability(user, "manage_users"),
+      hasCapability(user, "manage_permissions"),
+      hasCapability(user, "manage_plugins"),
+      hasCapability(user, "view_audit_log"),
+      hasCapability(user, "view_analytics"),
+      hasCapability(user, "manage_videos"),
+    ]);
     links = [
       { href: "/admin/series", label: "Series" },
       { href: "/admin/videos", label: "Videos" },
+      ...(canManageVideosSiteWide
+        ? [
+            { href: "/admin/speakers", label: "Speakers" },
+            { href: "/admin/live", label: "Live streaming" },
+          ]
+        : []),
       { href: "/admin/files", label: "Files" },
       ...(canManageUsers ? [{ href: "/admin/users", label: "Access" }] : []),
       ...(canManagePermissions ? [{ href: "/admin/permissions", label: "Permissions" }] : []),

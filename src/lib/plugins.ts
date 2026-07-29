@@ -20,6 +20,7 @@ export const PLUGIN_META = [
   { slug: "transcripts", name: "Transcripts", description: "Shows a collapsible full-text transcript under a video and includes it in search results." },
   { slug: "recommendations", name: "Recommendations", description: "Shows a personalized \"Because you watched\" row on the homepage, based on the member's most recent watch." },
   { slug: "webhooks", name: "Webhooks", description: "Posts a JSON payload to admin-configured URLs whenever a series or video is published." },
+  { slug: "live-streaming", name: "Live streaming", description: "Shows a \"Live now\" banner and /live page for admin-scheduled live streams, with a push notification when one goes live." },
 ] as const;
 
 export type PluginSlug = (typeof PLUGIN_META)[number]["slug"];

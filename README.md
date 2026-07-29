@@ -121,14 +121,30 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   `related-content` plugin.
 - **Relevance-ranked search**: `/search` and the navbar search box rank
   results by how well they match — an exact or prefix title match outranks
-  a description-only hit — rather than raw database order. When the exact
-  pass returns no series (or no videos), a fuzzy fallback re-ranks up to 500
-  published rows by word-level Levenshtein distance (`src/lib/fuzzy.ts`) so
-  a typo like "chruch" still finds "Church". It only runs on an empty
-  result, so the common case pays no extra query.
+  a description-only hit — across categories, series, videos, and speaker
+  names, with optional category/speaker filters and a relevance-vs-newest
+  sort. When the exact pass returns no series (or no videos), a fuzzy
+  fallback re-ranks candidates by Postgres trigram similarity (`pg_trgm`,
+  via the GIN indexes added in the `search_trigram_indexes` migration) so a
+  typo like "chruch" still finds "Church". It only runs on an empty result,
+  so the common case pays no extra query.
+- **Speakers**: an admin-managed directory (`src/app/admin/speakers`) of
+  preachers/presenters, attachable to a video from the video manager.
+  `/speakers` and `/speakers/[slug]` list them and their published videos.
+- **Scripture references**: free-form Bible references on a video (e.g.
+  "John 3:16-18"), edited from the video manager's "Scripture" panel and
+  browsable at `/scripture` and `/scripture/[book]` (`scriptureBook()` in
+  `src/lib/content.ts` derives the book from the leading text of a reference).
+- **Live streaming** (plugin): `LiveStream` rows point at a stream already
+  hosted elsewhere (YouTube, Boxcast, etc. — Bunny Stream has no live
+  ingest). `/live` shows the current stream when live, a countdown to the
+  next scheduled one otherwise, and a "Live now" banner appears on the
+  homepage and nav while one is live. Publishing a stream pushes a
+  notification the same way publishing a video does.
 - **Sitemap**: `/sitemap.xml` (`src/app/sitemap.ts`, backed by
   `getSitemapData()`) lists published categories and series, guest-visible
-  videos, and every distinct series tag. It's `force-dynamic` because the
+  videos, every distinct series tag, every speaker, every distinct
+  scripture book, and `/live`. It's `force-dynamic` because the
   database isn't reachable at build time here, same as the root layout, and
   it uses `APP_BASE_URL` for absolute URLs.
 - **Closed captions**: each row of the admin video list has a **Captions**
@@ -169,6 +185,7 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     playlists, separate from the single Watch Later queue.
   - **Likes / dislikes**: a thumbs up/down on a series or video, alongside
     (and independent from) the star Ratings plugin.
+  - **Live streaming**: see above.
 - **Sequential unlock**: a per-series "Require watching in order" toggle
   (`Series.requireSequential`, set on the series edit page — not a plugin,
   since it's a property of one series rather than a site feature). When on,
@@ -262,9 +279,9 @@ Written for a Postgres free tier, where every query counts:
 `npm test` runs the vitest suite in `src/lib/*.test.ts`. It covers the pure
 and query-shaping logic that tends to break silently — `canAccess`,
 `categoryChainIds`, sequential-unlock derivation, `hasCapability` and
-category-scope resolution, plugin override precedence, `reorderArray`, and
-the fuzzy matcher. `@/lib/db` is mocked throughout, so the suite needs no
-database and no environment variables.
+category-scope resolution, plugin override precedence, and `reorderArray`.
+`@/lib/db` is mocked throughout, so the suite needs no database and no
+environment variables.
 
 `.github/workflows/ci.yml` runs on every pull request and every push to
 `main`: type check (`tsc --noEmit`), lint (`eslint .`), `npm test`, then
@@ -280,6 +297,11 @@ Vercel builds run `prisma migrate deploy && next build` (see `vercel.json`).
 Schema changes are tracked as migration files under `prisma/migrations/` —
 `prisma db push` is no longer used anywhere, because it has no history, no
 rollback, and refuses (or destroys data) on changes it can't make in place.
+
+The `search_trigram_indexes` migration runs `CREATE EXTENSION IF NOT EXISTS
+pg_trgm`, which needs the database user to have (or be granted) that
+privilege — already the case on Prisma Postgres, Neon, Supabase, and RDS
+with `rds_superuser`, but worth checking on a locked-down managed instance.
 
 To change the schema:
 

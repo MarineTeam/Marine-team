@@ -1,8 +1,7 @@
 import { prisma } from "@/lib/db";
 import { unstable_cache } from "next/cache";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { isPluginEnabled } from "@/lib/plugins";
-import { fuzzyMatchScore } from "@/lib/fuzzy";
 
 export function canAccess(memberOnly: boolean, isLoggedIn: boolean): boolean {
   return !memberOnly || isLoggedIn;
@@ -364,61 +363,139 @@ function relevanceScore(q: string, title: string, description?: string | null): 
 }
 
 /**
- * Public search across categories, series, and videos by name/title/
- * description/tags, ranked by relevance rather than database order —
- * an exact/prefix title match outranks a description-only hit.
+ * Trigram similarity (pg_trgm, 0-1) below which a fuzzy candidate is
+ * discarded as too dissimilar to be a useful "did you mean" result.
  */
-export async function searchContent(query: string, isLoggedIn: boolean) {
+const FUZZY_SIMILARITY_THRESHOLD = 0.25;
+
+/**
+ * Trigram-ranked series ids matching `q` by title similarity, computed in
+ * Postgres (via the GIN trigram indexes from the search_trigram_indexes
+ * migration) rather than pulling candidate rows into memory — this is the
+ * fuzzy fallback used when the exact/substring pass finds nothing. Series
+ * list for every viewer regardless of memberOnly (badged, gated on their own
+ * page), matching the exact-match query above, so there's no guest filter here.
+ */
+async function fuzzySeriesIds(q: string, limit: number): Promise<string[]> {
+  const now = new Date();
+  const rows = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT id FROM "Series"
+    WHERE published = true AND hidden = false
+      AND ("publishAt" IS NULL OR "publishAt" <= ${now})
+      AND ("unpublishAt" IS NULL OR "unpublishAt" > ${now})
+      AND similarity(title, ${q}) > ${FUZZY_SIMILARITY_THRESHOLD}
+    ORDER BY similarity(title, ${q}) DESC
+    LIMIT ${limit}
+  `;
+  return rows.map((r) => r.id);
+}
+
+/** Same as fuzzySeriesIds, but for videos — which do apply the guest filter (member-only videos link straight to playable content). */
+async function fuzzyVideoIds(q: string, isLoggedIn: boolean, limit: number): Promise<string[]> {
+  const now = new Date();
+  const memberOnlyClause = isLoggedIn ? Prisma.empty : Prisma.sql`AND "memberOnly" = false`;
+  const rows = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT id FROM "Video"
+    WHERE published = true AND hidden = false AND status = 'READY'
+      AND ("publishAt" IS NULL OR "publishAt" <= ${now})
+      AND ("unpublishAt" IS NULL OR "unpublishAt" > ${now})
+      ${memberOnlyClause}
+      AND similarity(title, ${q}) > ${FUZZY_SIMILARITY_THRESHOLD}
+    ORDER BY similarity(title, ${q}) DESC
+    LIMIT ${limit}
+  `;
+  return rows.map((r) => r.id);
+}
+
+export type SearchFilters = {
+  /** Restrict videos (and series, via their own or their series' category) to this category. */
+  categoryId?: string;
+  /** Restrict videos to this speaker. */
+  speakerId?: string;
+  sort?: "relevance" | "newest";
+};
+
+/** Category and speaker options for the /search filter selects. */
+export async function getSearchFilterOptions() {
+  const [categories, speakers] = await Promise.all([
+    prisma.category.findMany({ where: publishedNow(), orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.speaker.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+  ]);
+  return { categories, speakers };
+}
+
+/**
+ * Public search across categories, series, and videos by name/title/
+ * description/tags/speaker, ranked by relevance rather than database order —
+ * an exact/prefix title match outranks a description-only hit. Optional
+ * `filters` narrow by category/speaker and switch relevance for recency.
+ */
+export async function searchContent(query: string, isLoggedIn: boolean, filters: SearchFilters = {}) {
   const q = query.trim();
   if (!q) return { categories: [], series: [], videos: [] };
   const qLower = q.toLowerCase();
   const where = { ...publishedNow(), ...guestFilter(isLoggedIn) };
   const transcriptsOn = await isPluginEnabled("transcripts");
+  const sort = filters.sort ?? "relevance";
+
+  const seriesCategoryFilter: Prisma.SeriesWhereInput = filters.categoryId ? { categoryId: filters.categoryId } : {};
+  const videoCategoryFilter: Prisma.VideoWhereInput = filters.categoryId
+    ? { OR: [{ categoryId: filters.categoryId }, { series: { categoryId: filters.categoryId } }] }
+    : {};
+  const videoSpeakerFilter: Prisma.VideoWhereInput = filters.speakerId ? { speakerId: filters.speakerId } : {};
 
   const [categories, seriesCandidates, videoCandidates] = await Promise.all([
-    prisma.category.findMany({
-      // Member-only categories and series stay findable (badged and gated),
-      // matching the homepage listing.
-      where: { name: { contains: q, mode: "insensitive" }, ...publishedNow() },
-      orderBy: categoryOrder,
-      include: {
-        series: { where: publishedNow(), orderBy: seriesOrder },
-        children: true,
-        videos: { where, orderBy: { position: "asc" } },
-        files: { where, orderBy: { position: "asc" } },
-      },
-      take: 20,
-    }),
-    prisma.series.findMany({
-      where: {
-        AND: [
-          publishedNow(),
-          {
-            OR: [
-              { title: { contains: q, mode: "insensitive" } },
-              { description: { contains: q, mode: "insensitive" } },
-              { tags: { has: qLower } },
+    filters.categoryId || filters.speakerId
+      ? Promise.resolve([])
+      : prisma.category.findMany({
+          // Member-only categories and series stay findable (badged and gated),
+          // matching the homepage listing.
+          where: { name: { contains: q, mode: "insensitive" }, ...publishedNow() },
+          orderBy: categoryOrder,
+          include: {
+            series: { where: publishedNow(), orderBy: seriesOrder },
+            children: true,
+            videos: { where, orderBy: { position: "asc" } },
+            files: { where, orderBy: { position: "asc" } },
+          },
+          take: 20,
+        }),
+    filters.speakerId
+      ? Promise.resolve([])
+      : prisma.series.findMany({
+          where: {
+            AND: [
+              publishedNow(),
+              seriesCategoryFilter,
+              {
+                OR: [
+                  { title: { contains: q, mode: "insensitive" } },
+                  { description: { contains: q, mode: "insensitive" } },
+                  { tags: { has: qLower } },
+                ],
+              },
             ],
           },
-        ],
-      },
-      take: 50,
-    }),
+          take: 50,
+        }),
     prisma.video.findMany({
       where: {
         AND: [
           where,
           { status: "READY" },
+          videoCategoryFilter,
+          videoSpeakerFilter,
           {
             OR: [
               { title: { contains: q, mode: "insensitive" } },
               { description: { contains: q, mode: "insensitive" } },
               ...(transcriptsOn ? [{ transcript: { contains: q, mode: "insensitive" as const } }] : []),
+              { speaker: { name: { contains: q, mode: "insensitive" } } },
             ],
           },
         ],
       },
-      include: { series: true },
+      include: { series: true, speaker: true },
       take: 50,
     }),
   ]);
@@ -430,36 +507,42 @@ export async function searchContent(query: string, isLoggedIn: boolean) {
     .map((r) => r.item);
 
   let videos = videoCandidates
-    .map((v) => ({ item: v, score: relevanceScore(q, v.title, v.description) }))
+    .map((v) => ({
+      item: v,
+      score:
+        relevanceScore(q, v.title, v.description) + (v.speaker?.name.toLowerCase().includes(qLower) ? 20 : 0),
+    }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 20)
     .map((r) => r.item);
 
   // The exact/substring search above finds nothing on a typo ("chruch" never
   // matches "Church" via `contains`). Only kicks in when that pass came back
-  // empty, so the common case pays no extra query; capped at 500 rows, which
-  // comfortably covers a single church's catalog without scanning unbounded
-  // tables on a much larger deployment.
-  const FUZZY_THRESHOLD = 0.6;
-  function fuzzyRank<T>(items: T[], titleOf: (item: T) => string): T[] {
-    return items
-      .map((item) => ({ item, score: fuzzyMatchScore(q, titleOf(item)) }))
-      .filter((r) => r.score >= FUZZY_THRESHOLD)
-      .sort((a, b) => b.score - a.score)
-      .map((r) => r.item);
-  }
-
-  if (series.length === 0) {
-    const allSeries = await prisma.series.findMany({ where: publishedNow(), take: 500 });
-    series = fuzzyRank(allSeries, (s) => s.title).slice(0, 20);
+  // empty, so the common case pays no extra query — ranked in Postgres via
+  // pg_trgm (fuzzySeriesIds/fuzzyVideoIds) rather than an in-memory scan.
+  if (series.length === 0 && !filters.speakerId) {
+    const ids = await fuzzySeriesIds(q, 20);
+    if (ids.length > 0) {
+      const rows = await prisma.series.findMany({ where: { id: { in: ids }, ...seriesCategoryFilter } });
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      series = ids.map((id) => byId.get(id)).filter((r): r is NonNullable<typeof r> => Boolean(r));
+    }
   }
   if (videos.length === 0) {
-    const allVideos = await prisma.video.findMany({
-      where: { ...where, status: "READY" },
-      include: { series: true },
-      take: 500,
-    });
-    videos = fuzzyRank(allVideos, (v) => v.title).slice(0, 20);
+    const ids = await fuzzyVideoIds(q, isLoggedIn, 20);
+    if (ids.length > 0) {
+      const rows = await prisma.video.findMany({
+        where: { id: { in: ids }, ...videoCategoryFilter, ...videoSpeakerFilter },
+        include: { series: true, speaker: true },
+      });
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      videos = ids.map((id) => byId.get(id)).filter((r): r is NonNullable<typeof r> => Boolean(r));
+    }
+  }
+
+  if (sort === "newest") {
+    series = [...series].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    videos = [...videos].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   return { categories, series, videos };
@@ -955,21 +1038,33 @@ export async function getUpNextVideo(
  * same as public video listings), and every distinct series tag.
  */
 export async function getSitemapData() {
-  const [categories, series, videos] = await Promise.all([
+  const [categories, series, videos, speakers] = await Promise.all([
     prisma.category.findMany({ where: publishedNow(), select: { slug: true, updatedAt: true } }),
     prisma.series.findMany({ where: publishedNow(), select: { slug: true, updatedAt: true, tags: true } }),
     prisma.video.findMany({
       where: { ...publishedNow(), memberOnly: false, status: "READY" },
-      select: { slug: true, updatedAt: true },
+      select: { slug: true, updatedAt: true, scriptureRefs: true },
     }),
+    prisma.speaker.findMany({ select: { slug: true, updatedAt: true } }),
   ]);
 
   const tagSet = new Set<string>();
   for (const s of series) {
     for (const t of s.tags) tagSet.add(t);
   }
+  const bookSet = new Set<string>();
+  for (const v of videos) {
+    for (const ref of v.scriptureRefs) bookSet.add(scriptureBook(ref));
+  }
 
-  return { categories, series, videos, tags: Array.from(tagSet) };
+  return {
+    categories,
+    series,
+    videos,
+    tags: Array.from(tagSet),
+    speakers,
+    scriptureBooks: Array.from(bookSet),
+  };
 }
 
 // --- Chapters ----------------------------------------------------------------
@@ -977,6 +1072,91 @@ export async function getSitemapData() {
 export async function getVideoChapters(videoId: string) {
   return prisma.chapter.findMany({ where: { videoId }, orderBy: { position: "asc" } });
 }
+
+// --- Speakers ------------------------------------------------------------
+
+export async function getSpeakers() {
+  return prisma.speaker.findMany({ orderBy: { position: "asc" } });
+}
+
+/** A speaker plus their published, viewable videos, for /speakers/[slug]. */
+export async function getSpeakerBySlug(slug: string, isLoggedIn: boolean) {
+  const speaker = await prisma.speaker.findUnique({ where: { slug } });
+  if (!speaker) return null;
+  const videos = await prisma.video.findMany({
+    where: { speakerId: speaker.id, status: "READY", ...publishedNow(), ...guestFilter(isLoggedIn) },
+    orderBy: { createdAt: "desc" },
+    include: { series: true },
+  });
+  return { speaker, videos };
+}
+
+// --- Scripture references -------------------------------------------------
+
+/**
+ * Leading book name of a reference like "1 John 3:16-18" -> "1 John", or
+ * "Psalm 23" -> "Psalm". Best-effort: strips a trailing chapter (and
+ * optional verse/range) token, falling back to the whole string when there
+ * isn't one, since admins enter these as free text.
+ */
+export function scriptureBook(ref: string): string {
+  const trimmed = ref.trim();
+  const match = trimmed.match(/^(.*?)\s+\d+(?::\d+(?:-\d+)?)?$/);
+  return (match ? match[1] : trimmed).trim();
+}
+
+/** Distinct scripture books referenced by published, viewable videos, for a /scripture index. */
+export async function getScriptureBooks(isLoggedIn: boolean): Promise<string[]> {
+  const videos = await prisma.video.findMany({
+    where: { status: "READY", scriptureRefs: { isEmpty: false }, ...publishedNow(), ...guestFilter(isLoggedIn) },
+    select: { scriptureRefs: true },
+  });
+  const books = new Set<string>();
+  for (const v of videos) {
+    for (const ref of v.scriptureRefs) books.add(scriptureBook(ref));
+  }
+  return Array.from(books).sort();
+}
+
+/** Published, viewable videos whose scriptureRefs include a reference to the given book (case-insensitive). */
+export async function getVideosByScriptureBook(book: string, isLoggedIn: boolean) {
+  const videos = await prisma.video.findMany({
+    where: { status: "READY", scriptureRefs: { isEmpty: false }, ...publishedNow(), ...guestFilter(isLoggedIn) },
+    orderBy: { createdAt: "desc" },
+    include: { series: true },
+  });
+  const target = book.toLowerCase();
+  return videos.filter((v) => v.scriptureRefs.some((ref) => scriptureBook(ref).toLowerCase() === target));
+}
+
+// --- Live streaming --------------------------------------------------------
+
+async function getCurrentLiveStreamUncached() {
+  const now = new Date();
+  return prisma.liveStream.findFirst({
+    where: { published: true, startAt: { lte: now }, OR: [{ endAt: null }, { endAt: { gt: now } }] },
+    orderBy: { startAt: "desc" },
+  });
+}
+
+/** Cached briefly: shared across every visitor, but shouldn't lag far behind the actual start/end time. */
+export const getCurrentLiveStream = unstable_cache(getCurrentLiveStreamUncached, ["current-live-stream"], {
+  revalidate: 30,
+  tags: ["live-streams"],
+});
+
+async function getNextLiveStreamUncached() {
+  return prisma.liveStream.findFirst({
+    where: { published: true, startAt: { gt: new Date() } },
+    orderBy: { startAt: "asc" },
+  });
+}
+
+/** Cached: the next scheduled stream, for a countdown on /live when nothing is live right now. */
+export const getNextLiveStream = unstable_cache(getNextLiveStreamUncached, ["next-live-stream"], {
+  revalidate: 60,
+  tags: ["live-streams"],
+});
 
 // --- Scheduled premieres -------------------------------------------------
 

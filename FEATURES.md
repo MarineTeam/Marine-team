@@ -22,10 +22,24 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   so content can go live or expire automatically without a manual step.
 - **Search** — `/search` and the navbar search box rank results by
   relevance (exact/prefix title match outranks a description-only hit)
-  across category names, series titles/descriptions/tags, and video
-  titles/descriptions. If that exact pass finds no series or no videos, a
-  typo-tolerant fuzzy pass runs as a fallback, matching titles by edit
-  distance so "chruch" still finds "Church" — see the technical note below.
+  across category names, series titles/descriptions/tags, video
+  titles/descriptions, and speaker names. Filters narrow results to one
+  category and/or speaker, and a sort toggle switches between relevance and
+  newest-first. If the exact pass finds no series or no videos, a
+  typo-tolerant fuzzy pass runs as a fallback, ranking by Postgres trigram
+  similarity so "chruch" still finds "Church" — see the technical note below.
+- **Speakers** — an admin-managed directory of preachers/presenters
+  (`/speakers`, `/speakers/[slug]`), attachable to a video from the video
+  manager; a speaker's page lists their published, viewable videos.
+- **Scripture references** — free-form Bible references on a video (e.g.
+  "John 3:16-18"), shown as chips and browsable at `/scripture` (an index of
+  referenced books) and `/scripture/[book]`.
+- **Live streaming** (plugin) — an admin-scheduled `LiveStream` pointing at
+  an already-hosted embed (YouTube, Boxcast, etc. — Bunny Stream has no live
+  ingest). `/live` shows the current stream when one is live, a countdown to
+  the next scheduled one otherwise, and a site-wide "Live now" banner appears
+  on the homepage and in the nav while a stream is live. Publishing a stream
+  sends a push notification, same as a new video.
 - **Continue watching / recently added** — a periodic heartbeat approximates
   watch position (see note below) and powers a homepage "Continue watching"
   row with resume-from-where-you-left-off; a "Recently added" row shows the
@@ -214,11 +228,10 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Fuzzy search is a fallback, not the default path**: the exact/substring
   query runs first and, when it matches anything, nothing else happens — so
   the common case pays no extra query. Only when a pass comes back empty
-  does the fuzzy path load up to 500 published rows and rank them in memory
-  by word-level Levenshtein distance (`src/lib/fuzzy.ts`, unit tested
-  directly), keeping the added cost off the hot path. The 500-row cap
-  comfortably covers a single church's catalog rather than scanning an
-  unbounded table.
+  does the fuzzy path run, ranking candidates by Postgres trigram similarity
+  (`similarity()`, via the `pg_trgm` extension and GIN indexes added in the
+  `search_trigram_indexes` migration) rather than pulling rows into memory —
+  this scales with the database, not with an in-memory row cap.
 - **Closed captions live in Bunny, not here**: there's no local copy and no
   new `Video` column — the admin route reads and writes Bunny's captions
   API directly, so every render path picks up a new track for free, the

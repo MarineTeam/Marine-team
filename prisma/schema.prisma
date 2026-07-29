@@ -189,6 +189,11 @@ model Video {
   // Full text transcript, admin-entered. Shown in a collapsible panel by
   // the Transcripts plugin and matched by search when that plugin is on.
   transcript        String?
+  // Free-form Bible references entered by the admin (e.g. "John 3:16-18"),
+  // shown as chips on the video page and matched by search; also powers
+  // /scripture/[book] listings, matching Series.tags' book-of-a-verse-first
+  // token as the "book" for that route.
+  scriptureRefs     String[]           @default([])
   durationSeconds   Int?
   status            VideoStatus        @default(PROCESSING)
   memberOnly        Boolean            @default(false)
@@ -204,6 +209,9 @@ model Video {
   // skipping the series layer for categories that don't need it (see FileAsset.categoryId too).
   category          Category?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   categoryId        String?
+  // Who preached/presented this video; optional since not every video is a sermon.
+  speaker           Speaker?           @relation(fields: [speakerId], references: [id], onDelete: SetNull)
+  speakerId         String?
   watchProgress     WatchProgress[]
   favoritedBy       VideoFavorite[]
   comments          Comment[]
@@ -221,6 +229,7 @@ model Video {
 
   @@index([seriesId])
   @@index([categoryId])
+  @@index([speakerId])
 }
 
 // A named timestamp within a video (e.g. "Intro", "Q&A"), for the Chapters
@@ -235,6 +244,21 @@ model Chapter {
   createdAt        DateTime @default(now())
 
   @@index([videoId])
+}
+
+// A preacher/presenter, browsable at /speakers/[slug] alongside their videos.
+// Not a plugin: like Chapters/Transcripts, it's admin-managed content rather
+// than a toggleable site feature.
+model Speaker {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  bio       String?
+  photoUrl  String?
+  position  Int      @default(0)
+  videos    Video[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // A member's bookmark of a series, for a "My Favorites" page.
@@ -501,6 +525,27 @@ model Announcement {
   message   String
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
+}
+
+// A live event: an embedded third-party player (YouTube/Boxcast/Resi/etc.),
+// not video hosted by us — Bunny Stream has no live ingest, so this just
+// points at wherever the stream already is. `published` gates visibility the
+// same way Series/Video use it; `startAt`/`endAt` drive the "Live now" badge
+// and the pre-stream countdown (endAt is a soft cutoff, not enforced against
+// the embed itself, since we can't detect when the third party actually stops).
+model LiveStream {
+  id            String    @id @default(cuid())
+  title         String
+  description   String?
+  embedUrl      String
+  coverImageUrl String?
+  published     Boolean   @default(false)
+  startAt       DateTime
+  endAt         DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([startAt])
 }
 
 // A member following a series or category (exactly one of seriesId/categoryId

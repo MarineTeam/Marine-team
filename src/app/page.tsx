@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { HeroBanner } from "@/components/hero-banner";
 import { CategoryTile } from "@/components/category-tile";
 import { SeriesTile } from "@/components/series-tile";
@@ -13,6 +14,7 @@ import {
   getContinueWatching,
   getTrendingSeries,
   getRecommendedSeries,
+  getCurrentLiveStream,
 } from "@/lib/content";
 
 export default async function Home() {
@@ -28,8 +30,10 @@ export default async function Home() {
   ]);
   const viewCountsOn = plugins["view-counts"];
   const recommendationsOn = plugins.recommendations;
+  const liveStreamingOn = plugins["live-streaming"];
   const trending = viewCountsOn ? await getTrendingSeries() : [];
   const recommended = user && recommendationsOn ? await getRecommendedSeries(user.id) : null;
+  const liveStream = liveStreamingOn ? await getCurrentLiveStream() : null;
 
   // Every published category lists, empty or not — matching how an empty
   // series still appears, so a category isn't invisible until it has content.
@@ -37,6 +41,16 @@ export default async function Home() {
 
   return (
     <div className="pb-12">
+      {liveStream && (
+        <Link
+          href="/live"
+          className="flex items-center justify-center gap-2 bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+          Live now: {liveStream.title}
+        </Link>
+      )}
+
       {featured && (
         <div className="hidden sm:block">
           <HeroBanner series={featured} />

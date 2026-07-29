@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
-  const { categories, series, videos, tags } = await getSitemapData();
+  const { categories, series, videos, tags, speakers, scriptureBooks } = await getSitemapData();
 
   return [
     { url: baseUrl, changeFrequency: "daily", priority: 1 },
@@ -34,5 +34,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly" as const,
       priority: 0.3,
     })),
+    ...speakers.map((s) => ({
+      url: `${baseUrl}/speakers/${s.slug}`,
+      lastModified: s.updatedAt,
+      changeFrequency: "weekly" as const,
+      priority: 0.4,
+    })),
+    ...scriptureBooks.map((book) => ({
+      url: `${baseUrl}/scripture/${encodeURIComponent(book)}`,
+      changeFrequency: "weekly" as const,
+      priority: 0.3,
+    })),
+    { url: `${baseUrl}/live`, changeFrequency: "hourly" as const, priority: 0.5 },
   ];
 }

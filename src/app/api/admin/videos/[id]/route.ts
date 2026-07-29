@@ -21,6 +21,8 @@ export const updateSchema = z
       .optional(),
     description: z.string().optional(),
     transcript: z.string().optional().nullable(),
+    scriptureRefs: z.array(z.string().min(1)).optional(),
+    speakerId: z.string().optional().nullable(),
     seriesId: z.string().optional().nullable(),
     categoryId: z.string().optional().nullable(),
     memberOnly: z.boolean().optional(),
