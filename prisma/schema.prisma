@@ -202,11 +202,26 @@ model Video {
   playlistItems     PlaylistItem[]
   viewerGroups      VideoViewerGroup[]
   viewers           VideoViewer[]
+  chapters          Chapter[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
   @@index([seriesId])
   @@index([categoryId])
+}
+
+// A named timestamp within a video (e.g. "Intro", "Q&A"), for the Chapters
+// plugin's jump-to-section list on the video page.
+model Chapter {
+  id               String   @id @default(cuid())
+  video            Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId          String
+  title            String
+  timestampSeconds Int
+  position         Int      @default(0)
+  createdAt        DateTime @default(now())
+
+  @@index([videoId])
 }
 
 // A member's bookmark of a series, for a "My Favorites" page.

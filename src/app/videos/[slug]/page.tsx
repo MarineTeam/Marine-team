@@ -16,12 +16,14 @@ import {
   getVideoReactionSummary,
   getUserVideoReaction,
   getComments,
+  getVideoChapters,
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
 import { getPluginStates } from "@/lib/plugins";
 import { bunnyStreamEmbedUrl, bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { WatchProgressTracker } from "@/components/watch-progress-tracker";
+import { VideoPlayer } from "@/components/video-player";
 import { FavoriteButton } from "@/components/favorite-button";
 import { WatchLaterButton } from "@/components/watch-later-button";
 import { SubscribeButton } from "@/components/subscribe-button";
@@ -98,18 +100,21 @@ export default async function VideoPage({
     playlists: playlistsOn,
     "likes-dislikes": likesOn,
     "up-next": upNextOn,
+    chapters: chaptersOn,
   } = plugins;
   const resumeAt = progress && !progress.completed ? progress.positionSeconds : 0;
 
-  const [ratingSummary, myRating, reactionSummary, myReaction, related, comments, upNext] = await Promise.all([
-    ratingsOn ? getVideoRatingSummary(video.id) : Promise.resolve({ average: 0, count: 0 }),
-    ratingsOn && user ? getUserVideoRating(user.id, video.id) : Promise.resolve(null),
-    likesOn ? getVideoReactionSummary(video.id) : Promise.resolve({ likes: 0, dislikes: 0 }),
-    likesOn && user ? getUserVideoReaction(user.id, video.id) : Promise.resolve(null),
-    relatedOn ? getRelatedVideos(video, isLoggedIn) : Promise.resolve([]),
-    commentsOn ? getComments("video", video.id) : Promise.resolve([]),
-    upNextOn ? getUpNextVideo(video, isLoggedIn) : Promise.resolve(null),
-  ]);
+  const [ratingSummary, myRating, reactionSummary, myReaction, related, comments, upNext, chapters] =
+    await Promise.all([
+      ratingsOn ? getVideoRatingSummary(video.id) : Promise.resolve({ average: 0, count: 0 }),
+      ratingsOn && user ? getUserVideoRating(user.id, video.id) : Promise.resolve(null),
+      likesOn ? getVideoReactionSummary(video.id) : Promise.resolve({ likes: 0, dislikes: 0 }),
+      likesOn && user ? getUserVideoReaction(user.id, video.id) : Promise.resolve(null),
+      relatedOn ? getRelatedVideos(video, isLoggedIn) : Promise.resolve([]),
+      commentsOn ? getComments("video", video.id) : Promise.resolve([]),
+      upNextOn ? getUpNextVideo(video, isLoggedIn) : Promise.resolve(null),
+      chaptersOn ? getVideoChapters(video.id) : Promise.resolve([]),
+    ]);
   const initialComments = comments.map((c) => ({
     ...c,
     createdAt: c.createdAt.toISOString(),
@@ -180,14 +185,10 @@ export default async function VideoPage({
           )}
         </div>
       ) : video.status === "READY" ? (
-        <div className="aspect-video overflow-hidden rounded-lg bg-black">
-          <iframe
-            src={bunnyStreamEmbedUrl(video.bunnyVideoId, resumeAt)}
-            className="h-full w-full"
-            allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture"
-            allowFullScreen
-          />
-        </div>
+        <VideoPlayer
+          embedUrl={bunnyStreamEmbedUrl(video.bunnyVideoId, resumeAt)}
+          chapters={chaptersOn ? chapters : []}
+        />
       ) : (
         <div className="aspect-video flex items-center justify-center rounded-lg bg-zinc-100 text-zinc-500 dark:bg-zinc-800">
           This video is still processing. Please check back soon.

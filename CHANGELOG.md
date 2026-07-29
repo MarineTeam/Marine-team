@@ -16,6 +16,9 @@ All notable changes to this project are documented here. Format follows
   nesting further.
 - **Profiles plugin** (`/profile`): members can set a display name shown
   instead of their Auth0 account name in comments and the navbar.
+- **Chapters plugin**: admins can add named timestamps to a video from the
+  video manager; the video page shows a clickable chapter list underneath
+  the player.
 
 ## [1.2.0] - 2026-07-25
 

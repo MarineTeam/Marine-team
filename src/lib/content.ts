@@ -862,6 +862,12 @@ export async function getUpNextVideo(
   });
 }
 
+// --- Chapters ----------------------------------------------------------------
+
+export async function getVideoChapters(videoId: string) {
+  return prisma.chapter.findMany({ where: { videoId }, orderBy: { position: "asc" } });
+}
+
 // --- Scheduled premieres -------------------------------------------------
 
 /**

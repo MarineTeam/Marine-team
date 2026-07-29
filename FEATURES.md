@@ -79,6 +79,10 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Profiles** (`/profile`) — lets a member set a display name, shown
   instead of their Auth0 account name in comments and the navbar. Blank
   falls back to the Auth0 name, then the email.
+- **Chapters** — an admin-managed, ordered list of named timestamps on a
+  video; the video page shows a jump-to-section list underneath the player.
+  Clicking a chapter reloads the embed starting at that timestamp (Bunny's
+  iframe has no seek API — see the technical note below).
 
 ## Auth
 
@@ -149,6 +153,9 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Up next autoplay** has the same limitation: there's no "video ended"
   event to hook, so autoplay fires a timer based on the video's known
   duration rather than a real end-of-playback signal.
+- **Chapters** have the same root cause too: since the embed has no seek
+  API, clicking a chapter reloads the iframe with a new `t=` start-time
+  query param instead of seeking a live player.
 - **View counts** are a simple per-page-load counter, not deduplicated or
   spam-resistant — a basic "how many hits" number, not analytics. Trending
   and the admin analytics dashboard use a separate timestamped view log for

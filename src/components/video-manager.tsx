@@ -7,6 +7,7 @@ import { DragHandle, PositionInput, useDragReorder } from "@/components/reorder-
 import { reorderArray } from "@/lib/reorder";
 import { ViewerAccessManager } from "@/components/viewer-access-manager";
 import { ThumbnailManager } from "@/components/thumbnail-manager";
+import { ChapterManager } from "@/components/chapter-manager";
 import {
   TargetSelect,
   formatTarget,
@@ -75,6 +76,7 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [managingAccessId, setManagingAccessId] = useState<string | null>(null);
   const [managingThumbnailId, setManagingThumbnailId] = useState<string | null>(null);
+  const [managingChaptersId, setManagingChaptersId] = useState<string | null>(null);
 
   async function load() {
     const [videosRes, seriesRes, categoriesRes] = await Promise.all([
@@ -601,6 +603,12 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
                 Thumbnail
               </button>
               <button
+                onClick={() => setManagingChaptersId(managingChaptersId === v.id ? null : v.id)}
+                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+              >
+                Chapters
+              </button>
+              <button
                 onClick={() => setManagingAccessId(managingAccessId === v.id ? null : v.id)}
                 className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
               >
@@ -614,6 +622,11 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
           {managingThumbnailId === v.id && (
             <div className="px-4 pb-4">
               <ThumbnailManager videoId={v.id} currentUrl={v.thumbnailPreviewUrl} onChange={load} />
+            </div>
+          )}
+          {managingChaptersId === v.id && (
+            <div className="px-4 pb-4">
+              <ChapterManager videoId={v.id} />
             </div>
           )}
           {managingAccessId === v.id && (
