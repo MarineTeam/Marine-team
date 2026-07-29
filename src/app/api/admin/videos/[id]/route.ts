@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { bunnyDeleteStreamVideo } from "@/lib/bunny";
 import { isPluginEnabled } from "@/lib/plugins";
 import { notifySubscribers } from "@/lib/push";
+import { fireWebhooks } from "@/lib/webhooks";
 import { getSubscriberUserIdsForSeries, getSubscriberUserIdsForCategory } from "@/lib/content";
 import type { User } from "@prisma/client";
 
@@ -72,6 +73,14 @@ export async function applyVideoUpdate(user: User, id: string, body: z.infer<typ
   const justPublished = existing.published === false && body.published === true;
   if (justPublished && video.status === "READY") {
     const categoryId = video.series?.categoryId ?? video.categoryId ?? null;
+    await fireWebhooks("video.published", {
+      id: video.id,
+      title: video.title,
+      slug: video.slug,
+      url: `/videos/${video.slug}`,
+      seriesId: video.seriesId,
+      seriesTitle: video.series?.title ?? null,
+    });
     if (await isPluginEnabled("notifications", categoryId)) {
       await notifySubscribers({
         title: "New video published",

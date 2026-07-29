@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureSeriesAccess, ensureCategoryAccess } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
+import { fireWebhooks } from "@/lib/webhooks";
 
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -81,6 +82,16 @@ export async function PATCH(
     const series = await prisma.series.update({ where: { id }, data: normalizeSeriesData(body) });
     await logAudit(user.email, "update", "series", series.id, JSON.stringify(body));
     revalidateTag("series", { expire: 0 });
+
+    if (existing.published === false && series.published === true) {
+      await fireWebhooks("series.published", {
+        id: series.id,
+        title: series.title,
+        slug: series.slug,
+        url: `/series/${series.slug}`,
+      });
+    }
+
     return NextResponse.json(series);
   } catch (error) {
     return errorResponse(error);

@@ -143,6 +143,11 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   shows a "log in to view" gate rather than a 404, so a shared link still
   invites sign-up.
 
+- **Webhooks** (`/admin/webhooks`) — admin-configured outgoing URLs that get
+  a JSON POST whenever a series or video is published; optionally signed
+  with a secret as an `X-Webhook-Signature` header (hex HMAC-SHA256). Needs
+  the Webhooks plugin enabled in Plugins.
+
 ## Admin analytics (`/admin/analytics`)
 
 - Needs the `view_analytics` capability. Shows total views over the last 30

@@ -23,6 +23,8 @@ All notable changes to this project are documented here. Format follows
   shown in a collapsible panel and matched by `/search` when the plugin is on.
 - **Recommendations plugin**: a personalized "Because you watched X"
   homepage row for logged-in members.
+- **Webhooks plugin** (`/admin/webhooks`): admins can register outgoing URLs
+  that get a signed JSON POST when a series or video is published.
 
 ## [1.2.0] - 2026-07-25
 

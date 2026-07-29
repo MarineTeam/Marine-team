@@ -459,6 +459,17 @@ model PushSubscription {
   @@index([userId])
 }
 
+// An outgoing webhook URL notified when the Webhooks plugin is on and a
+// series/video is published (see src/lib/webhooks.ts). `secret`, if set,
+// signs the payload as an X-Webhook-Signature header (hex HMAC-SHA256).
+model Webhook {
+  id        String   @id @default(cuid())
+  url       String
+  secret    String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
 // A dismissible site-wide banner message; only the most recent `active` one shows.
 model Announcement {
   id        String   @id @default(cuid())
