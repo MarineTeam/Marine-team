@@ -56,6 +56,7 @@ export function UpNextPanel({
           alt=""
           width={112}
           height={64}
+          unoptimized
           className="h-16 w-28 shrink-0 rounded object-cover"
         />
       )}

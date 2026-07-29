@@ -557,6 +557,7 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
                   alt=""
                   width={64}
                   height={40}
+                  unoptimized
                   className="h-10 w-16 shrink-0 rounded object-cover bg-zinc-100 dark:bg-zinc-800"
                 />
               )}

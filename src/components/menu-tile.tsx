@@ -42,9 +42,9 @@ export function MenuTile({
     >
       <div className="relative h-16 w-16 sm:h-20 sm:w-20 shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
         {thumbnailUrl ? (
-          // A video thumbnail is Bunny-hosted, but a series/category cover
-          // image is a freeform admin-pasted URL (any host) — unoptimized
-          // rather than widening remotePatterns to any host for this shared tile.
+          // unoptimized: a series/category cover is a freeform admin-pasted
+          // URL (any host), and a video thumbnail is a Bunny signed URL that
+          // can expire before Next's optimizer re-fetches it — see next.config.ts.
           <Image src={thumbnailUrl} alt="" fill unoptimized className="object-cover" />
         ) : (
           <PlaceholderIcon />

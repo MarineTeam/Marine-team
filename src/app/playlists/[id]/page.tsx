@@ -16,7 +16,18 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
   if (owned) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
-        <PlaylistDetail playlist={owned} />
+        <PlaylistDetail
+          playlist={{
+            ...owned,
+            items: owned.items.map((item) => ({
+              ...item,
+              video: {
+                ...item.video,
+                thumbnailUrl: bunnyStreamThumbnailUrl(item.video.bunnyVideoId, item.video.thumbnailFileName),
+              },
+            })),
+          }}
+        />
       </div>
     );
   }
