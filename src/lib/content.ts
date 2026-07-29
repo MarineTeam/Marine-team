@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { unstable_cache } from "next/cache";
 import type { Prisma } from "@prisma/client";
 
 export function canAccess(memberOnly: boolean, isLoggedIn: boolean): boolean {
@@ -46,7 +47,7 @@ const categoryOrder: Prisma.CategoryOrderByWithRelationInput[] = [
 ];
 
 /** Root-level categories (no parent) for the homepage — each may have its own series, child categories, and/or videos/files attached directly (skipping the series layer). */
-export async function getPublishedCategoriesWithSeries(isLoggedIn: boolean) {
+async function getPublishedCategoriesWithSeriesUncached(isLoggedIn: boolean) {
   const where = { ...publishedNow(), ...guestFilter(isLoggedIn) };
   return prisma.category.findMany({
     // No guestFilter on categories or series (see guestFilter's note): both
@@ -63,12 +64,19 @@ export async function getPublishedCategoriesWithSeries(isLoggedIn: boolean) {
   });
 }
 
+/** Cached: this is the homepage's top-level listing query, shared by every visitor. */
+export const getPublishedCategoriesWithSeries = unstable_cache(
+  getPublishedCategoriesWithSeriesUncached,
+  ["published-categories-with-series"],
+  { revalidate: 60, tags: ["categories", "series"] },
+);
+
 /**
  * The series shown in the homepage hero banner: an explicitly featured
  * series (most recently updated), falling back to the most recently
  * updated published series with a cover image, then any published series.
  */
-export async function getFeaturedSeries() {
+async function getFeaturedSeriesUncached() {
   const where = publishedNow();
 
   const explicit = await prisma.series.findFirst({
@@ -89,19 +97,32 @@ export async function getFeaturedSeries() {
   });
 }
 
+/** Cached: the homepage hero banner is the same for every visitor. */
+export const getFeaturedSeries = unstable_cache(getFeaturedSeriesUncached, ["featured-series"], {
+  revalidate: 60,
+  tags: ["series"],
+});
+
 /**
  * Most recently added published series. `publicOnly` excludes member-only
  * series outright, for the public RSS feed: on-site listings show them with a
  * badge and gate on click, but a syndication feed gets republished and cached
  * elsewhere, so it stays strictly public.
  */
-export async function getRecentlyAddedSeries(limit = 10, publicOnly = false) {
+async function getRecentlyAddedSeriesUncached(limit = 10, publicOnly = false) {
   return prisma.series.findMany({
     where: { ...publishedNow(), ...(publicOnly ? { memberOnly: false } : {}) },
     orderBy: { createdAt: "desc" },
     take: limit,
   });
 }
+
+/** Cached: shared across every visitor and the public RSS feed. */
+export const getRecentlyAddedSeries = unstable_cache(
+  getRecentlyAddedSeriesUncached,
+  ["recently-added-series"],
+  { revalidate: 60, tags: ["series"] },
+);
 
 export type RecentlyAddedItem =
   | { kind: "category"; createdAt: Date; category: RecentlyAddedCategory }
@@ -115,7 +136,7 @@ type RecentlyAddedSeries = Awaited<ReturnType<typeof getRecentlyAddedSeries>>[nu
  * "Recently added" listings. Kept as one chronological list rather than
  * per-type sections so "recently added" actually reads as recency.
  */
-export async function getRecentlyAdded(isLoggedIn: boolean, limit = 10): Promise<RecentlyAddedItem[]> {
+async function getRecentlyAddedUncached(isLoggedIn: boolean, limit = 10): Promise<RecentlyAddedItem[]> {
   const contentWhere = { ...publishedNow(), ...guestFilter(isLoggedIn) };
   const [categories, series] = await Promise.all([
     prisma.category.findMany({
@@ -139,6 +160,12 @@ export async function getRecentlyAdded(isLoggedIn: boolean, limit = 10): Promise
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, limit);
 }
+
+/** Cached: shared across every visitor of a given login state, for the "Recently added" listings. */
+export const getRecentlyAdded = unstable_cache(getRecentlyAddedUncached, ["recently-added"], {
+  revalidate: 60,
+  tags: ["categories", "series"],
+});
 
 /** In-progress videos for a logged-in user, for a "Continue watching" row. */
 export async function getContinueWatching(userId: string, limit = 10) {
@@ -507,9 +534,15 @@ export async function incrementVideoViewCount(videoId: string) {
 
 // --- Announcements -----------------------------------------------------------
 
-export async function getActiveAnnouncement() {
+async function getActiveAnnouncementUncached() {
   return prisma.announcement.findFirst({ where: { active: true }, orderBy: { createdAt: "desc" } });
 }
+
+/** Cached: the site-wide announcement banner is the same for every visitor. */
+export const getActiveAnnouncement = unstable_cache(getActiveAnnouncementUncached, ["active-announcement"], {
+  revalidate: 60,
+  tags: ["announcements"],
+});
 
 // --- Sequential unlock -------------------------------------------------------
 
@@ -634,18 +667,27 @@ export async function getSubscriberUserIdsForCategory(categoryId: string): Promi
   return Array.from(new Set(subs.map((s) => s.userId)));
 }
 
-async function categoryChainIds(categoryId: string): Promise<string[]> {
-  const ids: string[] = [];
-  let currentId: string | null = categoryId;
-  while (currentId) {
-    ids.push(currentId);
-    const category: { parentId: string | null } | null = await prisma.category.findUnique({
-      where: { id: currentId },
-      select: { parentId: true },
-    });
-    currentId = category?.parentId ?? null;
-  }
-  return ids;
+/**
+ * A category's own id plus every ancestor's id, walking up via parentId.
+ * One recursive query instead of one round trip per level of nesting.
+ * The depth cap is a defensive bound, not an expected limit — category
+ * nesting shouldn't cycle, but a raw SQL recursion has no built-in stop.
+ */
+export async function categoryChainIds(categoryId: string): Promise<string[]> {
+  const rows = await prisma.$queryRaw<{ id: string }[]>`
+    WITH RECURSIVE chain AS (
+      SELECT id, "parentId", 1 AS depth
+      FROM "Category"
+      WHERE id = ${categoryId}
+      UNION ALL
+      SELECT c.id, c."parentId", chain.depth + 1
+      FROM "Category" c
+      JOIN chain ON c.id = chain."parentId"
+      WHERE chain.depth < 50
+    )
+    SELECT id FROM chain
+  `;
+  return rows.map((r) => r.id);
 }
 
 // --- Playlists -------------------------------------------------------------
@@ -714,7 +756,7 @@ export async function logVideoView(videoId: string, userId: string | null) {
 }
 
 /** Published series with the most views in the last `days` days, for a homepage "Trending" row. */
-export async function getTrendingSeries(limit = 10, days = 7) {
+async function getTrendingSeriesUncached(limit = 10, days = 7) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   const grouped = await prisma.viewEvent.groupBy({
     by: ["seriesId"],
@@ -735,6 +777,11 @@ export async function getTrendingSeries(limit = 10, days = 7) {
     .filter((s): s is NonNullable<typeof s> => Boolean(s))
     .slice(0, limit);
 }
+
+/** Cached: an aggregate over the last `days` days, doesn't need per-request freshness. */
+export const getTrendingSeries = unstable_cache(getTrendingSeriesUncached, ["trending-series"], {
+  revalidate: 300,
+});
 
 /** Site-wide view totals over `days` days, for the admin analytics dashboard. */
 export async function getAnalyticsSummary(days = 30) {
@@ -818,7 +865,7 @@ export async function getVideoBySlugIncludingPremiere(slug: string) {
 }
 
 /** Upcoming premieres (published, isPremiere, publishAt in the future), soonest first. */
-export async function getUpcomingPremieres(isLoggedIn: boolean, limit = 10) {
+async function getUpcomingPremieresUncached(isLoggedIn: boolean, limit = 10) {
   return prisma.video.findMany({
     where: {
       published: true,
@@ -832,6 +879,11 @@ export async function getUpcomingPremieres(isLoggedIn: boolean, limit = 10) {
     include: { series: true },
   });
 }
+
+/** Cached: shared across every visitor of a given login state. */
+export const getUpcomingPremieres = unstable_cache(getUpcomingPremieresUncached, ["upcoming-premieres"], {
+  revalidate: 60,
+});
 
 // --- Granular viewing permissions (roles + per-user grants) -----------------
 
