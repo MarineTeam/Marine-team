@@ -92,7 +92,9 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   shown to everyone, the stars are only clickable when logged in.
 - **View counts** — a simple counter shown on series/video pages.
 - **Social share** — copy-link and share-to-X/Facebook buttons.
-- **Announcements** — a dismissible (per browser session) site-wide banner.
+- **Announcements** — a dismissible (per browser session) site-wide banner,
+  optionally scheduled (start/expiry time) and targeted to guests, members,
+  or everyone.
 - **Notifications** — opt-in Web Push, sent when an admin publishes a video.
   Each member picks a frequency on `/profile`: **Instant** (the default)
   pushes the moment content publishes, **Daily digest** queues notifications
@@ -107,7 +109,10 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   Notifications plugin above). Each subscription has a mute toggle that
   keeps the follow but skips push notifications for it.
 - **Playlists** (`/playlists`) — member-created, ordered, reorderable video
-  collections, separate from the single site-wide Watch Later queue.
+  collections, separate from the single site-wide Watch Later queue. A
+  playlist can be made shareable ("Make shareable"), which lets anyone with
+  the link view it read-only at `/playlists/[id]` without logging in —
+  otherwise it's only visible to its owner.
 - **Likes / dislikes** — a thumbs up/down on a series or video, shown
   alongside (and independent from) the 1-5 star Ratings plugin.
 - **Watch history** — gates the `/recently-played` page and its bottom-nav
@@ -244,16 +249,30 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 
 ## Admin analytics (`/admin/analytics`)
 
-- Needs the `view_analytics` capability. Shows total views over the last 30
-  days plus the top 10 series and top 10 videos by view count in that
-  window, built from the same timestamped view log that powers the
-  homepage Trending row.
+- Needs the `view_analytics` capability. Shows total views over a selectable
+  window (7/30/90 days, `?days=`) plus the top 10 series and top 10 videos
+  by view count in that window, built from the same timestamped view log
+  that powers the homepage Trending row.
 - Each top video also shows a **watch-through rate**: the share of that
   window's watch-progress rows for the video that are marked completed.
   It reuses the existing heartbeat data rather than adding tracking, and is
   omitted entirely (not shown as 0%) for a video with no progress recorded
   in the window, so a stale view count can't be paired with a misleadingly
   precise 0%.
+- **Export CSV** downloads the same top-series/top-videos data for the
+  selected window as a CSV (or JSON) file, for pulling into a spreadsheet or
+  a board report.
+
+## Scheduled jobs
+
+- `/api/cron/notification-digest` (daily): batches queued daily-digest push
+  notifications — see Notifications above.
+- `/api/cron/sync-video-status` (daily): polls Bunny for every video still
+  stuck in `PROCESSING` and applies the same status/duration/thumbnail
+  update the admin's manual "Sync from Bunny" button does, so a video that
+  finished encoding doesn't sit unprocessed until someone happens to click
+  refresh. Never touches `published` — an admin still decides when to
+  publish. Both crons share the same `CRON_SECRET` bearer-token guard.
 
 ## Technical notes
 

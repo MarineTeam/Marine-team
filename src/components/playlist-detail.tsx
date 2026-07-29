@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { reorderArray } from "@/lib/reorder";
+import { ShareButtons } from "@/components/share-buttons";
 
 type Item = {
   id: string;
@@ -18,7 +19,7 @@ type Item = {
     series: { title: string } | null;
   };
 };
-type Playlist = { id: string; title: string; items: Item[] };
+type Playlist = { id: string; title: string; public: boolean; items: Item[] };
 
 export function PlaylistDetail({ playlist: initial }: { playlist: Playlist }) {
   const router = useRouter();
@@ -67,6 +68,16 @@ export function PlaylistDetail({ playlist: initial }: { playlist: Playlist }) {
     router.push("/playlists");
   }
 
+  async function togglePublic() {
+    const next = !playlist.public;
+    await fetch(`/api/playlists/${playlist.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ public: next }),
+    });
+    setPlaylist((p) => ({ ...p, public: next }));
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -89,6 +100,9 @@ export function PlaylistDetail({ playlist: initial }: { playlist: Playlist }) {
           <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-2xl font-semibold tracking-tight">{playlist.title}</h1>
             <div className="flex gap-2">
+              <button onClick={togglePublic} className="text-sm text-zinc-500 hover:underline">
+                {playlist.public ? "Make private" : "Make shareable"}
+              </button>
               <button onClick={() => setRenaming(true)} className="text-sm text-zinc-500 hover:underline">
                 Rename
               </button>
@@ -96,6 +110,11 @@ export function PlaylistDetail({ playlist: initial }: { playlist: Playlist }) {
                 Delete
               </button>
             </div>
+          </div>
+        )}
+        {playlist.public && (
+          <div className="mt-3">
+            <ShareButtons title={playlist.title} path={`/playlists/${playlist.id}`} />
           </div>
         )}
       </div>

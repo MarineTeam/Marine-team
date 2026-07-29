@@ -179,8 +179,14 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     dedup/anti-spam, it's a basic "how many hits" number, not analytics.
   - **Social share**: copy-link plus share-to-X/Facebook buttons.
   - **Announcements** (`/admin/announcements`): a dismissible (per-browser-
-    session) site-wide banner; only the newest `active` one shows, checked
-    site-wide only (no per-category override — it's a global message).
+    session) site-wide banner; only the newest `active` one matching the
+    viewer's login state shows, checked site-wide only (no per-category
+    override — it's a global message). Two optional refinements on top of
+    `active`: a `publishAt`/`expiresAt` scheduling window, and an
+    `audience` (`ALL`/`GUESTS`/`MEMBERS`) targeting the banner to logged-out
+    visitors, logged-in members, or everyone — `getActiveAnnouncement()`
+    takes the viewer's login state and is cached per state (guest vs.
+    member), not globally, since the result now differs by audience.
   - **Notifications**: Web Push to subscribed members when an admin flips a
     video from unpublished to published (see PWA below) — a no-op if VAPID
     keys aren't configured. Members choose a frequency on `/profile`:
@@ -195,7 +201,11 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     subscribers get a targeted push notification when it publishes a new
     video, on top of the general Notifications above.
   - **Playlists** (`/playlists`): member-created, reorderable video
-    playlists, separate from the single Watch Later queue.
+    playlists, separate from the single Watch Later queue. `Playlist.public`
+    (toggled from the playlist page) lets anyone with the link view it
+    read-only at `/playlists/[id]` without an account — `getPublicPlaylist()`
+    in `src/lib/content.ts` only resolves when that flag is set; otherwise
+    the route falls through to the existing owner-only `getPlaylist()`.
   - **Likes / dislikes**: a thumbs up/down on a series or video, alongside
     (and independent from) the star Ratings plugin.
   - **Live streaming**: see above.
@@ -251,7 +261,9 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   a premiere with a future publish time to show a live countdown instead of
   staying fully hidden until then.
 - **Admin analytics** (`/admin/analytics`, `view_analytics` capability):
-  30-day view totals and top series/videos, from the same view log.
+  view totals and top series/videos for a selectable window (`?days=7|30|90`),
+  from the same view log, plus a CSV/JSON export of the same data
+  (`/api/admin/analytics/export`) for pulling into a spreadsheet.
 - **Homepage rows** (`/admin/home-rows`, `manage_plugins` capability): a
   `HomeRow` per built-in section (seeded once via `ensureHomeRowsSeeded()`)
   lets an admin toggle, rename, and reorder Continue watching/Because you
@@ -367,13 +379,20 @@ To change the schema:
 
 ### Scheduled jobs
 
-`vercel.json` also declares one cron: `/api/cron/notification-digest`, daily
-at 13:00 UTC. It batches every queued `PendingNotification` per user into a
-single push and clears the queue, which is the only delivery path for members
-who chose the "Daily digest" frequency — if this cron isn't running, their
-notifications pile up and never arrive. Set `CRON_SECRET` in Vercel and the
-route will reject anything without a matching bearer token; Vercel Cron
-attaches it automatically.
+`vercel.json` declares two crons, both guarded by the same `CRON_SECRET`
+bearer-token check (Vercel Cron attaches it automatically):
+
+- `/api/cron/notification-digest`, daily at 13:00 UTC. Batches every queued
+  `PendingNotification` per user into a single push and clears the queue —
+  the only delivery path for members who chose the "Daily digest" frequency;
+  if this cron isn't running, their notifications pile up and never arrive.
+- `/api/cron/sync-video-status`, daily at 06:00 UTC. Polls Bunny for every
+  video still stuck in `PROCESSING` and reconciles its status/duration/
+  thumbnail, the same as the admin's manual "Sync from Bunny" button — so a
+  finished encode doesn't sit unprocessed until someone happens to click
+  refresh. Daily is the Hobby-plan-safe cadence (Vercel's free tier only
+  allows once-a-day cron schedules); a Pro plan can tighten this to run
+  every few minutes if stuck videos need to resolve faster.
 
 ### Preview deployments need their own database
 

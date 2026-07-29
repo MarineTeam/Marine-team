@@ -3,7 +3,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 
-const patchSchema = z.object({ title: z.string().min(1).max(200) });
+const patchSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  public: z.boolean().optional(),
+});
 
 async function ensureOwned(id: string, userId: string) {
   const playlist = await prisma.playlist.findUnique({ where: { id } });
@@ -29,8 +32,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const { id } = await params;
   if (!(await ensureOwned(id, user.id))) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { title } = patchSchema.parse(await request.json());
-  const playlist = await prisma.playlist.update({ where: { id }, data: { title } });
+  const body = patchSchema.parse(await request.json());
+  const playlist = await prisma.playlist.update({ where: { id }, data: body });
   return NextResponse.json(playlist);
 }
 

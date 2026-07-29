@@ -714,11 +714,27 @@ export async function incrementVideoViewCount(videoId: string) {
 
 // --- Announcements -----------------------------------------------------------
 
-async function getActiveAnnouncementUncached() {
-  return prisma.announcement.findFirst({ where: { active: true }, orderBy: { createdAt: "desc" } });
+/**
+ * The newest active announcement visible to a viewer of the given login
+ * state, respecting its optional publishAt/expiresAt scheduling window and
+ * audience targeting (ALL/GUESTS/MEMBERS).
+ */
+async function getActiveAnnouncementUncached(isLoggedIn: boolean) {
+  const now = new Date();
+  return prisma.announcement.findFirst({
+    where: {
+      active: true,
+      audience: isLoggedIn ? { in: ["ALL", "MEMBERS"] } : { in: ["ALL", "GUESTS"] },
+      AND: [
+        { OR: [{ publishAt: null }, { publishAt: { lte: now } }] },
+        { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+      ],
+    },
+    orderBy: { createdAt: "desc" },
+  });
 }
 
-/** Cached: the site-wide announcement banner is the same for every visitor. */
+/** Cached per login state (guest vs. member): the audience-targeted banner is the same across every visitor sharing that state. */
 export const getActiveAnnouncement = unstable_cache(getActiveAnnouncementUncached, ["active-announcement"], {
   revalidate: 60,
   tags: ["announcements"],
@@ -885,6 +901,17 @@ export async function getPlaylist(playlistId: string, userId: string) {
   return prisma.playlist.findFirst({
     where: { id: playlistId, userId },
     include: { items: { orderBy: { position: "asc" }, include: { video: { include: { series: true } } } } },
+  });
+}
+
+/** A read-only view of someone else's playlist, for /playlists/[id] when the viewer isn't its owner — only resolves if the owner made it public. */
+export async function getPublicPlaylist(playlistId: string) {
+  return prisma.playlist.findFirst({
+    where: { id: playlistId, public: true },
+    include: {
+      user: { select: { name: true, displayName: true, email: true } },
+      items: { orderBy: { position: "asc" }, include: { video: { include: { series: true } } } },
+    },
   });
 }
 

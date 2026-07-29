@@ -52,6 +52,19 @@ All notable changes to this project are documented here. Format follows
   instead of 404ing.
 - **Manual "Mark as watched"**: a toggle on the video page sets/clears
   watch completion directly, independent of the heartbeat approximation.
+- **Scheduled + targeted announcements**: an announcement can now have a
+  `publishAt`/`expiresAt` window and an audience (guests/members/everyone),
+  on top of the existing `active` toggle.
+- **Shareable playlists**: a playlist can be made "shareable", letting
+  anyone with the link view it read-only at `/playlists/[id]` without
+  logging in.
+- **Analytics date range + CSV export**: `/admin/analytics` gained a
+  7/30/90-day range picker and a CSV/JSON export of the same top-series/
+  top-videos data.
+- **Cron to reconcile stuck video processing**: a new daily
+  `/api/cron/sync-video-status` job polls Bunny for any video still stuck
+  in `PROCESSING` and applies the same status/duration/thumbnail sync the
+  admin's manual "Sync from Bunny" button does.
 
 ### Fixed
 

@@ -561,11 +561,22 @@ model Webhook {
 }
 
 // A dismissible site-wide banner message; only the most recent `active` one shows.
+enum AnnouncementAudience {
+  ALL
+  GUESTS
+  MEMBERS
+}
+
 model Announcement {
-  id        String   @id @default(cuid())
+  id        String               @id @default(cuid())
   message   String
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
+  active    Boolean              @default(true)
+  // Optional scheduling window, on top of `active`: still requires active =
+  // true, but also hides the banner outside [publishAt, expiresAt) when set.
+  publishAt DateTime?
+  expiresAt DateTime?
+  audience  AnnouncementAudience @default(ALL)
+  createdAt DateTime             @default(now())
 }
 
 // A live event: an embedded third-party player (YouTube/Boxcast/Resi/etc.),
@@ -662,6 +673,8 @@ model Playlist {
   user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
   title     String
+  // Lets anyone with the link view (read-only) this playlist at /playlists/[id], regardless of who's logged in.
+  public    Boolean        @default(false)
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
   items     PlaylistItem[]
