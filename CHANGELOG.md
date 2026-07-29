@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-29
+
 ### Added
 
 - **Watch history plugin**: the `/recently-played` page and its bottom-nav
@@ -53,6 +55,66 @@ All notable changes to this project are documented here. Format follows
 - **Typo-tolerant search**: `/search` now falls back to a fuzzy (edit
   distance) title match when the exact/substring pass returns nothing, so a
   single typo no longer yields an empty page.
+- **Mobile bottom tab bar**: Home, Recently Played, Favourites, and Recently
+  Added as a persistent bottom nav, alongside a redesigned mobile header.
+
+### Changed
+
+- **Renamed to Marine Team**: the app name now reads "Marine Team" across the
+  PWA manifest, page title, navbar, footer, homepage heading, RSS feed, and
+  the push-notification fallback title, with a new play-mark-over-a-wave icon
+  set — committed SVG sources, a separate full-bleed maskable variant, a real
+  `favicon.ico`, and an apple-touch icon.
+- **Tracked database migrations**: deploys run `prisma migrate deploy` against
+  a committed migration history (baselined by `0_init`) instead of
+  `prisma db push`, so a schema change is reviewable and can't silently fail
+  against populated tables. `db:migrate` / `db:deploy` / `db:baseline` scripts
+  wrap the workflow.
+- **Categories at parity with series**: categories can hold videos and files
+  directly without an intermediate series, gained the same descriptive and
+  publishing fields, and member-only or empty categories are now listed for
+  guests with a "Members" badge instead of being omitted.
+- **Optimized thumbnails**: Bunny Stream and Storage images render through
+  `next/image` (resizing, lazy loading, format negotiation); freeform
+  admin-pasted cover URLs stay unoptimized rather than opening
+  `remotePatterns` to any host.
+- **Fewer database queries per page**: shared listing queries (homepage,
+  hero, recently added, upcoming premieres, trending, announcement banner)
+  are cached with tag invalidation on admin writes, the recursive category
+  chain lookup is deduped into one query, and bulk publish/unpublish/delete
+  run as a single request instead of one per selected row.
+
+### Removed
+
+- **`Video.thumbnailUrl`**: the column stored a 6-hour-expiring signed URL
+  permanently and has had no readers since every render path started building
+  a fresh URL at request time.
+
+### Fixed
+
+- **Bunny thumbnails 403ing**: thumbnail URLs were signed with the embed
+  player's video-id-keyed token scheme; they are served off the Stream
+  library's CDN pull zone, which needs the path-keyed BunnyCDN scheme.
+- **Malformed file download URLs**: CDN hostname env vars are normalized
+  (protocol and stray slashes stripped), and file URLs are computed fresh
+  from the stored Bunny path rather than a stored URL, self-healing existing
+  uploads. Podcast `<guid>` no longer tracks the enclosure URL, so a hostname
+  change stops re-announcing old episodes.
+- **Category edit permissions**: a per-category editor grant no longer
+  mismatches the capability checked by the category edit page.
+- **Mobile menu**: renders full screen instead of inside the header's box,
+  and is reachable and dismissable from the keyboard.
+- **View counts on gated series**: a signed-out visitor who only saw the
+  members-only gate no longer counts as a view.
+
+### Security
+
+- **API errors no longer leak internals**: responses returned `error.message`
+  verbatim with a 400 for every thrown value, exposing Bunny response bodies,
+  Prisma query text, and env var names. Detail is now returned only for
+  errors about the caller's own request (Zod field issues, Prisma `P2025` →
+  404, `P2002` → 409, `P2003` → 400); anything else is logged server-side and
+  answered with a generic 500.
 
 ### Development
 
@@ -63,6 +125,8 @@ All notable changes to this project are documented here. Format follows
 - **CI**: a GitHub Actions workflow running the type check, lint, unit
   tests, and `prisma validate` / `prisma format --check` on every pull
   request and every push to `main`.
+- **Migrations workflow documented**: README covers creating and applying
+  migrations and keeping per-environment databases in step.
 
 ## [1.2.0] - 2026-07-25
 
