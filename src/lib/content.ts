@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { unstable_cache } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { isPluginEnabled } from "@/lib/plugins";
+import { fuzzyMatchScore } from "@/lib/fuzzy";
 
 export function canAccess(memberOnly: boolean, isLoggedIn: boolean): boolean {
   return !memberOnly || isLoggedIn;
@@ -422,17 +423,44 @@ export async function searchContent(query: string, isLoggedIn: boolean) {
     }),
   ]);
 
-  const series = seriesCandidates
+  let series = seriesCandidates
     .map((s) => ({ item: s, score: relevanceScore(q, s.title, s.description) + (s.tags.includes(qLower) ? 15 : 0) }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 20)
     .map((r) => r.item);
 
-  const videos = videoCandidates
+  let videos = videoCandidates
     .map((v) => ({ item: v, score: relevanceScore(q, v.title, v.description) }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 20)
     .map((r) => r.item);
+
+  // The exact/substring search above finds nothing on a typo ("chruch" never
+  // matches "Church" via `contains`). Only kicks in when that pass came back
+  // empty, so the common case pays no extra query; capped at 500 rows, which
+  // comfortably covers a single church's catalog without scanning unbounded
+  // tables on a much larger deployment.
+  const FUZZY_THRESHOLD = 0.6;
+  function fuzzyRank<T>(items: T[], titleOf: (item: T) => string): T[] {
+    return items
+      .map((item) => ({ item, score: fuzzyMatchScore(q, titleOf(item)) }))
+      .filter((r) => r.score >= FUZZY_THRESHOLD)
+      .sort((a, b) => b.score - a.score)
+      .map((r) => r.item);
+  }
+
+  if (series.length === 0) {
+    const allSeries = await prisma.series.findMany({ where: publishedNow(), take: 500 });
+    series = fuzzyRank(allSeries, (s) => s.title).slice(0, 20);
+  }
+  if (videos.length === 0) {
+    const allVideos = await prisma.video.findMany({
+      where: { ...where, status: "READY" },
+      include: { series: true },
+      take: 500,
+    });
+    videos = fuzzyRank(allVideos, (v) => v.title).slice(0, 20);
+  }
 
   return { categories, series, videos };
 }
