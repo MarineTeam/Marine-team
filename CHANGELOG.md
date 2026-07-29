@@ -6,6 +6,16 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Query Monitor**: a WordPress-Query-Monitor-style debug bar shown at the
+  bottom of every page — query count/time, a per-query breakdown, page
+  render time, and process memory. Controlled by the `QUERY_MONITOR_ENABLED`
+  environment variable rather than a database-toggled plugin like every
+  other optional feature, since it's an ops/dev tool; `/admin/query-monitor`
+  shows whether it's currently on but can't flip it. Renders for logged-in
+  `ADMIN` users only, even when enabled.
+
 ## [1.4.0] - 2026-07-29
 
 ### Added

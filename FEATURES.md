@@ -274,6 +274,36 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   refresh. Never touches `published` — an admin still decides when to
   publish. Both crons share the same `CRON_SECRET` bearer-token guard.
 
+## Query Monitor (`QUERY_MONITOR_ENABLED` env var)
+
+- A WordPress-Query-Monitor-style debug bar, fixed to the bottom of every
+  page: request elapsed time, the number of Prisma queries run and their
+  total time, a per-query breakdown (model.operation, a truncated args
+  preview, duration), and process memory (heap/RSS).
+- Unlike every other optional feature in this app, this isn't a
+  database-toggled `Plugin` — it's controlled entirely by the
+  `QUERY_MONITOR_ENABLED` environment variable (must be the literal string
+  `"true"`; anything else, including unset, is off), since it's an ops/dev
+  tool rather than a content feature, matching WordPress's `WP_DEBUG`
+  pattern rather than the WordPress-plugin-toggle pattern the rest of this
+  app otherwise follows.
+- Even when enabled, the bar only renders for logged-in `ADMIN` users —
+  query text/args and timings can hint at internal schema and data shape,
+  so (unlike WordPress's Query Monitor, which is itself also
+  capability-gated) it's never shown to members or guests regardless of the
+  env setting.
+- `/admin/query-monitor` shows whether it's currently enabled, but can't
+  toggle it — flipping the env var requires a redeploy, the same as `WP_DEBUG`
+  requires editing `wp-config.php` and reloading.
+- Query capture is a Prisma Client Extension (`src/lib/db.ts`) wrapping
+  every model operation; it's a no-op passthrough unless the flag is on, so
+  there's no cost in the common case. The per-request tally
+  (`src/lib/query-monitor.ts`) uses React's `cache()` — the same
+  request-scoping primitive `getCurrentUser()` already relies on — so
+  concurrent requests never mix each other's counts. Raw `$queryRaw`/
+  `$executeRaw` calls (e.g. `categoryChainIds`) aren't model operations, so
+  they aren't captured by this instrumentation.
+
 ## Technical notes
 
 - **Watch progress** is a heartbeat-based approximation, not frame-accurate:

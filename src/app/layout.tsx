@@ -6,6 +6,7 @@ import { Footer } from "@/components/footer";
 import { BottomNavServer } from "@/components/bottom-nav-server";
 import { PwaRegister } from "@/components/pwa-register";
 import { AnnouncementBannerServer } from "@/components/announcement-banner-server";
+import { QueryMonitorPanel } from "@/components/query-monitor-panel";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -64,6 +65,9 @@ export default function RootLayout({
         <main className="flex-1 pb-16 sm:pb-0">{children}</main>
         <Footer />
         <BottomNavServer />
+        <Suspense fallback={null}>
+          <QueryMonitorPanel />
+        </Suspense>
       </body>
     </html>
   );

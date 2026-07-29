@@ -21,6 +21,7 @@ const adminLinks = [
   { href: "/admin/webhooks", label: "Webhooks" },
   { href: "/admin/audit", label: "Audit log" },
   { href: "/admin/analytics", label: "Analytics" },
+  { href: "/admin/query-monitor", label: "Query Monitor" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -92,6 +93,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             { href: "/admin/home-rows", label: "Homepage" },
             { href: "/admin/announcements", label: "Announcements" },
             { href: "/admin/webhooks", label: "Webhooks" },
+            { href: "/admin/query-monitor", label: "Query Monitor" },
           ]
         : []),
       ...(canViewAuditLog ? [{ href: "/admin/audit", label: "Audit log" }] : []),
