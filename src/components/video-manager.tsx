@@ -7,6 +7,7 @@ import { DragHandle, PositionInput, useDragReorder } from "@/components/reorder-
 import { reorderArray } from "@/lib/reorder";
 import { ViewerAccessManager } from "@/components/viewer-access-manager";
 import { ThumbnailManager } from "@/components/thumbnail-manager";
+import { CaptionsManager } from "@/components/captions-manager";
 import { ChapterManager } from "@/components/chapter-manager";
 import { TranscriptManager } from "@/components/transcript-manager";
 import {
@@ -80,6 +81,7 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
   const [managingThumbnailId, setManagingThumbnailId] = useState<string | null>(null);
   const [managingChaptersId, setManagingChaptersId] = useState<string | null>(null);
   const [managingTranscriptId, setManagingTranscriptId] = useState<string | null>(null);
+  const [managingCaptionsId, setManagingCaptionsId] = useState<string | null>(null);
 
   async function load() {
     const [videosRes, seriesRes, categoriesRes] = await Promise.all([
@@ -645,6 +647,12 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
               >
                 Viewers
               </button>
+              <button
+                onClick={() => setManagingCaptionsId(managingCaptionsId === v.id ? null : v.id)}
+                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+              >
+                Captions
+              </button>
               <button onClick={() => remove(v.id)} className="text-red-600 hover:underline">
                 Delete
               </button>
@@ -668,6 +676,11 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
           {managingAccessId === v.id && (
             <div className="px-4 pb-4">
               <ViewerAccessManager type="video" id={v.id} />
+            </div>
+          )}
+          {managingCaptionsId === v.id && (
+            <div className="px-4 pb-4">
+              <CaptionsManager videoId={v.id} />
             </div>
           )}
           </li>
