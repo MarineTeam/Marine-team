@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-29
+
 ### Added
 
 - **Speakers**: an admin-managed directory of preachers/presenters
