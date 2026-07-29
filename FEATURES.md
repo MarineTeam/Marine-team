@@ -282,8 +282,9 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   preview, duration), and process memory (heap/RSS).
 - Unlike every other optional feature in this app, this isn't a
   database-toggled `Plugin` — it's controlled entirely by the
-  `QUERY_MONITOR_ENABLED` environment variable (must be the literal string
-  `"true"`; anything else, including unset, is off), since it's an ops/dev
+  `QUERY_MONITOR_ENABLED` environment variable (must be `"true"`,
+  case-insensitive — `TRUE`/`True` work too; anything else, including
+  unset, is off), since it's an ops/dev
   tool rather than a content feature, matching WordPress's `WP_DEBUG`
   pattern rather than the WordPress-plugin-toggle pattern the rest of this
   app otherwise follows.

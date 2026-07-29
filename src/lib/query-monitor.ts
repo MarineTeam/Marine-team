@@ -4,12 +4,13 @@ import { cache } from "react";
  * "Debug mode" toggle, env-controlled rather than a DB-toggled Plugin row
  * like every other optional feature — this is an ops/dev tool, not a
  * content feature, so it belongs in the deploy config, not the database.
- * Requires the literal string "true" (not just "set"), so
- * `QUERY_MONITOR_ENABLED=false` reliably disables it rather than relying on
- * presence-means-on, which would make "false" itself truthy.
+ * Requires the word "true" (case-insensitive, since env var UIs like
+ * Vercel's don't normalize casing and "TRUE" is a natural thing to type),
+ * so `QUERY_MONITOR_ENABLED=false` reliably disables it rather than relying
+ * on presence-means-on, which would make "false" itself truthy.
  */
 export function isQueryMonitorEnabled(): boolean {
-  return process.env.QUERY_MONITOR_ENABLED === "true";
+  return process.env.QUERY_MONITOR_ENABLED?.toLowerCase() === "true";
 }
 
 export type QueryLogEntry = {
