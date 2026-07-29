@@ -889,6 +889,32 @@ export async function getUpNextVideo(
   });
 }
 
+// --- Sitemap -----------------------------------------------------------------
+
+/**
+ * Everything a public sitemap should list: published categories and series
+ * (both list publicly with a "Members" badge even when memberOnly, per
+ * guestFilter's note above), guest-visible videos (memberOnly ones excluded,
+ * same as public video listings), and every distinct series tag.
+ */
+export async function getSitemapData() {
+  const [categories, series, videos] = await Promise.all([
+    prisma.category.findMany({ where: publishedNow(), select: { slug: true, updatedAt: true } }),
+    prisma.series.findMany({ where: publishedNow(), select: { slug: true, updatedAt: true, tags: true } }),
+    prisma.video.findMany({
+      where: { ...publishedNow(), memberOnly: false, status: "READY" },
+      select: { slug: true, updatedAt: true },
+    }),
+  ]);
+
+  const tagSet = new Set<string>();
+  for (const s of series) {
+    for (const t of s.tags) tagSet.add(t);
+  }
+
+  return { categories, series, videos, tags: Array.from(tagSet) };
+}
+
 // --- Chapters ----------------------------------------------------------------
 
 export async function getVideoChapters(videoId: string) {
