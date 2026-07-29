@@ -304,6 +304,15 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   concurrent requests never mix each other's counts. Raw `$queryRaw`/
   `$executeRaw` calls (e.g. `categoryChainIds`) aren't model operations, so
   they aren't captured by this instrumentation.
+- Next.js's App Router reuses the root layout's previous render across
+  client-side (`<Link>`) navigations rather than re-executing it — "partial
+  rendering" — so without help the bar would keep showing whichever page
+  triggered the last full/hard load. `QueryMonitorRefresher`
+  (`src/components/query-monitor-refresher.tsx`), rendered alongside the
+  bar, forces a `router.refresh()` on every path change so the layout (and
+  the bar with it) recomputes against each page's own request. Only mounted
+  when the bar itself is — i.e. never for anyone but an enabled-and-`ADMIN`
+  viewer — so it costs nothing for ordinary visitors.
 
 ## Technical notes
 

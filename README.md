@@ -346,6 +346,13 @@ Written for a Postgres free tier, where every query counts:
   (the same primitive `getCurrentUser()` uses), so concurrent requests never
   mix each other's counts — verified by firing concurrent requests with
   known, distinct query counts and confirming none leaked into another's tally.
+  Client-side `<Link>` navigations reuse the root layout's previous render
+  instead of re-executing it (Next's "partial rendering"), so
+  `QueryMonitorRefresher` forces a `router.refresh()` on every path change
+  while the bar is mounted, otherwise it'd keep showing whichever page
+  triggered the last full load — verified with a real browser clicking
+  between routes with different query counts and confirming each one's
+  numbers actually updated.
 
 ## Testing & CI
 
