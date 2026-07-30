@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/lib/current-user";
-import { isQueryMonitorEnabled, getQueryMonitorSnapshot } from "@/lib/query-monitor";
+import { isQueryMonitorEnvEnabled, isQueryMonitorAdminEnabled, getQueryMonitorSnapshot } from "@/lib/query-monitor";
 import { QueryMonitorRefresher } from "@/components/query-monitor-refresher";
 
 function formatMb(bytes: number): string {
@@ -8,16 +8,19 @@ function formatMb(bytes: number): string {
 
 /**
  * A Query Monitor-style debug bar (query count/time, page timing, process
- * memory) at the bottom of every page when QUERY_MONITOR_ENABLED=true.
- * Visible to ADMIN only, even when enabled — query args and timings can
- * hint at internal schema/data shape, so this mirrors WordPress's Query
- * Monitor plugin, which likewise restricts to users who can manage the
- * site rather than showing it to every visitor.
+ * memory) at the bottom of every page — shown only when QUERY_MONITOR_ENABLED
+ * is set AND the admin switch at /admin/query-monitor is on, and even then
+ * only to logged-in ADMIN users. Query args and timings can hint at internal
+ * schema/data shape, so this mirrors WordPress's Query Monitor plugin, which
+ * likewise restricts to users who can manage the site rather than showing it
+ * to every visitor. The env check runs first and is synchronous, so a
+ * disabled deploy never pays for the admin-switch DB read or the user lookup.
  */
 export async function QueryMonitorPanel() {
-  if (!isQueryMonitorEnabled()) return null;
+  if (!isQueryMonitorEnvEnabled()) return null;
   const user = await getCurrentUser();
   if (user?.role !== "ADMIN") return null;
+  if (!(await isQueryMonitorAdminEnabled())) return null;
 
   const { elapsedMs, queries, totalQueryMs, memory } = getQueryMonitorSnapshot();
 
