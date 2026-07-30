@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-07-30
+
 ### Added
 
 - **Query Monitor**: a WordPress-Query-Monitor-style debug bar shown at the
@@ -15,6 +17,18 @@ All notable changes to this project are documented here. Format follows
   other optional feature, since it's an ops/dev tool; `/admin/query-monitor`
   shows whether it's currently on but can't flip it. Renders for logged-in
   `ADMIN` users only, even when enabled.
+
+### Fixed
+
+- **Bunny thumbnails**: four `<Image>` usages (admin video list, admin
+  thumbnail manager, the "Up next" panel, and playlist detail) were missing
+  `unoptimized`, routing signed, short-lived Bunny thumbnail URLs through
+  `/_next/image`'s optimizer, which could re-fetch the origin URL after the
+  signature expired and surface as a broken image. All Bunny-thumbnail
+  `<Image>` usages are now `unoptimized`, and `next.config.ts`'s now-unused
+  `remotePatterns` is removed. Also fixes `playlist-detail.tsx` (a client
+  component) recomputing its thumbnail URL client-side with no signing
+  token on re-render; the URL is now signed server-side and passed down.
 
 ## [1.4.0] - 2026-07-29
 
