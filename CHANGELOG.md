@@ -12,11 +12,13 @@ All notable changes to this project are documented here. Format follows
 
 - **Query Monitor**: a WordPress-Query-Monitor-style debug bar shown at the
   bottom of every page — query count/time, a per-query breakdown, page
-  render time, and process memory. Controlled by the `QUERY_MONITOR_ENABLED`
-  environment variable rather than a database-toggled plugin like every
-  other optional feature, since it's an ops/dev tool; `/admin/query-monitor`
-  shows whether it's currently on but can't flip it. Renders for logged-in
-  `ADMIN` users only, even when enabled.
+  render time, and process memory. Gated by two switches, both required: the
+  `QUERY_MONITOR_ENABLED` environment variable (case-insensitive, a redeploy
+  to flip) and a DB-backed admin switch toggleable right on
+  `/admin/query-monitor` with no redeploy needed. Renders for logged-in
+  `ADMIN` users only, even when both are on, and updates on every
+  client-side navigation rather than freezing at whichever page
+  triggered the last full load.
 
 ### Fixed
 

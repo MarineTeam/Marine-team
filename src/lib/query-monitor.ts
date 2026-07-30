@@ -1,16 +1,45 @@
 import { cache } from "react";
+import { prisma } from "@/lib/db";
 
 /**
- * "Debug mode" toggle, env-controlled rather than a DB-toggled Plugin row
- * like every other optional feature — this is an ops/dev tool, not a
- * content feature, so it belongs in the deploy config, not the database.
+ * The env flag is the deploy-level kill switch — off here means the query
+ * capture machinery in src/lib/db.ts doesn't run at all, not just "hidden".
  * Requires the word "true" (case-insensitive, since env var UIs like
  * Vercel's don't normalize casing and "TRUE" is a natural thing to type),
  * so `QUERY_MONITOR_ENABLED=false` reliably disables it rather than relying
  * on presence-means-on, which would make "false" itself truthy.
  */
-export function isQueryMonitorEnabled(): boolean {
+export function isQueryMonitorEnvEnabled(): boolean {
   return process.env.QUERY_MONITOR_ENABLED?.toLowerCase() === "true";
+}
+
+/**
+ * Slug for the DB-backed admin on/off switch (src/app/admin/query-monitor,
+ * src/app/api/admin/query-monitor). Deliberately not in PLUGIN_META
+ * (src/lib/plugins.ts) — this is an ops/dev tool, not a content feature, so
+ * it doesn't belong on /admin/plugins or support per-category overrides —
+ * but it reuses the same `Plugin` table/shape rather than a bespoke model,
+ * since "a named boolean toggle" is exactly what that table already is.
+ */
+export const QUERY_MONITOR_ADMIN_SLUG = "query-monitor";
+
+/**
+ * The admin-facing switch, on top of the env flag: an admin can turn the
+ * bar off (e.g. during a live demo) without touching deploy config, and it
+ * comes back the moment they turn it back on — no redeploy either way.
+ * Defaults to on (fails open) when no row exists yet, matching
+ * getPluginStates()'s convention, so the bar isn't silently invisible the
+ * first time someone sets QUERY_MONITOR_ENABLED without ever having
+ * visited /admin/query-monitor.
+ */
+export async function isQueryMonitorAdminEnabled(): Promise<boolean> {
+  const row = await prisma.plugin.findUnique({ where: { slug: QUERY_MONITOR_ADMIN_SLUG } });
+  return row?.enabled ?? true;
+}
+
+/** Effective on/off state: both the env flag and the admin switch must be on. */
+export async function isQueryMonitorEnabled(): Promise<boolean> {
+  return isQueryMonitorEnvEnabled() && (await isQueryMonitorAdminEnabled());
 }
 
 export type QueryLogEntry = {

@@ -337,15 +337,29 @@ Written for a Postgres free tier, where every query counts:
   WordPress-Query-Monitor-style debug bar at the bottom of every page —
   query count/time, a per-query breakdown, page render time, and process
   memory — so the query counts above are something you can actually watch
-  rather than take on faith. Env-controlled rather than a database-toggled
-  `Plugin` like every other optional feature (see `/admin/query-monitor`,
-  which shows the current on/off state but can't flip it), and only renders
-  for logged-in `ADMIN` users even when on. `src/lib/db.ts` wraps every
-  Prisma model call in a client extension that's a no-op unless the flag is
-  set; `src/lib/query-monitor.ts` tallies per request via React's `cache()`
+  rather than take on faith. Two switches gate it: that env var (a redeploy
+  to flip) and a DB-backed admin switch on `/admin/query-monitor` (no
+  redeploy — e.g. to hide the bar mid-demo); both must be on, and even then
+  it only renders for logged-in `ADMIN` users. The admin switch reuses the
+  `Plugin` table (slug `"query-monitor"`) but is deliberately excluded from
+  `PLUGIN_META`/`/admin/plugins`, since it's an ops toggle with no
+  per-category meaning — `/api/admin/plugins` filters to `PLUGIN_META`'s own
+  slugs so it doesn't show up there with a nonsensical "Category overrides"
+  control. `src/lib/db.ts` wraps every Prisma model call in a client
+  extension that's a no-op unless the *env* flag is set — checking the DB
+  switch too would add a query to every query, so recording only depends on
+  the env flag and the DB switch purely gates whether the bar renders;
+  `src/lib/query-monitor.ts` tallies per request via React's `cache()`
   (the same primitive `getCurrentUser()` uses), so concurrent requests never
   mix each other's counts — verified by firing concurrent requests with
   known, distinct query counts and confirming none leaked into another's tally.
+  Client-side `<Link>` navigations reuse the root layout's previous render
+  instead of re-executing it (Next's "partial rendering"), so
+  `QueryMonitorRefresher` forces a `router.refresh()` on every path change
+  while the bar is mounted, otherwise it'd keep showing whichever page
+  triggered the last full load — verified with a real browser clicking
+  between routes with different query counts and confirming each one's
+  numbers actually updated.
 
 ## Testing & CI
 

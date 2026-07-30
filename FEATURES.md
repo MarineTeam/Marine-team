@@ -280,30 +280,47 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   page: request elapsed time, the number of Prisma queries run and their
   total time, a per-query breakdown (model.operation, a truncated args
   preview, duration), and process memory (heap/RSS).
-- Unlike every other optional feature in this app, this isn't a
-  database-toggled `Plugin` — it's controlled entirely by the
-  `QUERY_MONITOR_ENABLED` environment variable (must be `"true"`,
-  case-insensitive — `TRUE`/`True` work too; anything else, including
-  unset, is off), since it's an ops/dev
-  tool rather than a content feature, matching WordPress's `WP_DEBUG`
-  pattern rather than the WordPress-plugin-toggle pattern the rest of this
-  app otherwise follows.
-- Even when enabled, the bar only renders for logged-in `ADMIN` users —
-  query text/args and timings can hint at internal schema and data shape,
-  so (unlike WordPress's Query Monitor, which is itself also
-  capability-gated) it's never shown to members or guests regardless of the
-  env setting.
-- `/admin/query-monitor` shows whether it's currently enabled, but can't
-  toggle it — flipping the env var requires a redeploy, the same as `WP_DEBUG`
-  requires editing `wp-config.php` and reloading.
+- Two switches gate it, both required:
+  - The `QUERY_MONITOR_ENABLED` environment variable (must be `"true"`,
+    case-insensitive — `TRUE`/`True` work too; anything else, including
+    unset, is off) — the deploy-level kill switch, matching WordPress's
+    `WP_DEBUG` rather than a database-toggled `Plugin`. Flipping it requires
+    a redeploy; `/admin/query-monitor` can only report its current value.
+  - A DB-backed admin switch, toggleable right on `/admin/query-monitor`
+    (`manage_plugins` capability) with no redeploy needed — e.g. to hide the
+    bar during a live demo and bring it back a minute later. Stored as a
+    `Plugin` row with slug `"query-monitor"` (`QUERY_MONITOR_ADMIN_SLUG` in
+    `src/lib/query-monitor.ts`) reusing the existing table/shape, but
+    deliberately left out of `PLUGIN_META` — it's an ops tool with no
+    per-category meaning, so it doesn't appear on `/admin/plugins` or get a
+    "Category overrides" control (`/api/admin/plugins` explicitly filters to
+    `PLUGIN_META`'s own slugs to keep it out). Defaults to on (fails open)
+    the first time, so setting the env var alone is enough to see the bar
+    without a trip to this page first.
+- Even when both switches are on, the bar only renders for logged-in
+  `ADMIN` users — query text/args and timings can hint at internal schema
+  and data shape, so (unlike WordPress's Query Monitor, which is itself
+  also capability-gated) it's never shown to members or guests regardless
+  of either switch.
 - Query capture is a Prisma Client Extension (`src/lib/db.ts`) wrapping
-  every model operation; it's a no-op passthrough unless the flag is on, so
-  there's no cost in the common case. The per-request tally
+  every model operation; it's a no-op passthrough unless the env flag is
+  on — checking the admin switch too would mean a DB read on every single
+  query, so recording is gated on the env flag alone and the admin switch
+  only affects whether the bar renders. The per-request tally
   (`src/lib/query-monitor.ts`) uses React's `cache()` — the same
   request-scoping primitive `getCurrentUser()` already relies on — so
   concurrent requests never mix each other's counts. Raw `$queryRaw`/
   `$executeRaw` calls (e.g. `categoryChainIds`) aren't model operations, so
   they aren't captured by this instrumentation.
+- Next.js's App Router reuses the root layout's previous render across
+  client-side (`<Link>`) navigations rather than re-executing it — "partial
+  rendering" — so without help the bar would keep showing whichever page
+  triggered the last full/hard load. `QueryMonitorRefresher`
+  (`src/components/query-monitor-refresher.tsx`), rendered alongside the
+  bar, forces a `router.refresh()` on every path change so the layout (and
+  the bar with it) recomputes against each page's own request. Only mounted
+  when the bar itself is — i.e. never for anyone but an enabled-and-`ADMIN`
+  viewer — so it costs nothing for ordinary visitors.
 
 ## Technical notes
 
