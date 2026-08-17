@@ -1,6 +1,14 @@
 import { cache } from "react";
+import { headers } from "next/headers";
 import { auth0 } from "@/lib/auth0";
 import { prisma } from "@/lib/db";
+import {
+  authorizeIdentity,
+  clientIpFrom,
+  normalizeEmail,
+  providerFromSub,
+  recordAccessAttempt,
+} from "@/lib/authorization";
 import type { User } from "@prisma/client";
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
@@ -8,7 +16,14 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
   .map((email) => email.trim().toLowerCase())
   .filter(Boolean);
 
-export type SessionIdentity = { email: string; name: string | null; picture: string | null };
+export type SessionIdentity = {
+  email: string;
+  name: string | null;
+  picture: string | null;
+  /** The organization claim from the verified ID token — never anything the browser sent. */
+  orgId: string | null;
+  sub: string;
+};
 
 /**
  * Returns the raw Auth0 identity for whoever is logged in to Auth0,
@@ -21,35 +36,72 @@ export const getSessionIdentity = cache(async (): Promise<SessionIdentity | null
   const session = await auth0.getSession();
   if (!session?.user?.sub || !session.user.email) return null;
   return {
-    email: session.user.email.toLowerCase(),
+    email: normalizeEmail(session.user.email),
     name: session.user.name ?? null,
     picture: session.user.picture ?? null,
+    orgId: session.user.org_id ?? null,
+    sub: session.user.sub,
   };
 });
 
 /**
- * Records every Auth0 login attempt as a User row (so admins can see it at
- * /admin/users and decide whether to grant access), but only returns a
- * user — meaning "treat as logged in" — once `authorized` is true. A brand
- * new row starts unauthorized unless the email is in ADMIN_EMAILS, which
- * self-authorizes as ADMIN so there's always a way in.
+ * Resolves the member behind the current request, or null — and null is the
+ * only thing the rest of the app ever needs to know about a failed
+ * authorization.
  *
- * A single `upsert` (no separate `findUnique` first): the `update` branch
- * only sets `role`/`authorized` when forcing bootstrap-admin status, so a
- * returning non-bootstrap user's existing values are left untouched by
- * simply not naming those keys, rather than reading them first to echo
- * them back. Wrapped in React's `cache()` so the ~30 call sites across the
- * app (Navbar on every page, each page itself, admin layout, ...) share
- * one query per request instead of hitting the DB 2-3x per request.
+ * Two independent checks, both of which must pass (see
+ * src/lib/authorization.ts):
+ *
+ *  1. **Organization membership**, from the `org_id` claim of the ID token the
+ *     Auth0 SDK has already verified.
+ *  2. **The email allowlist** in PostgreSQL.
+ *
+ * Because both are re-evaluated here, and this runs server-side on every page
+ * and API request, revoking an email takes effect on that member's *next
+ * request* — an already-issued session cookie buys nothing. That's the whole
+ * reason the check lives at this choke point rather than only at login.
+ *
+ * `User.authorized` is kept in step with the answer, so the many existing
+ * queries that filter on it (notification fan-out, admin lists) stay correct
+ * without every one of them learning about the allowlist.
+ *
+ * Wrapped in React's `cache()` so the ~30 call sites across a single request
+ * share one evaluation rather than each hitting the database.
  */
 export const getCurrentUser = cache(async (): Promise<User | null> => {
-  const session = await auth0.getSession();
-  if (!session?.user?.sub || !session.user.email) return null;
+  const identity = await getSessionIdentity();
+  if (!identity) return null;
 
-  const { sub, name, picture } = session.user;
-  const email = session.user.email.toLowerCase();
+  const { sub, name, picture, email, orgId } = identity;
+  const decision = await authorizeIdentity({ email, orgId });
+
+  if (!decision.allowed) {
+    // Record the attempt so an administrator can see it, but only once an
+    // hour per email: a revoked member with the site open in a tab would
+    // otherwise write a row on every poll.
+    const requestHeaders = await headers().catch(() => null);
+    await recordAccessAttempt({
+      email,
+      auth0UserId: sub,
+      provider: providerFromSub(sub),
+      attemptType: "SESSION",
+      organizationMember: decision.organizationMember,
+      emailAuthorized: decision.emailAuthorized,
+      reason: decision.reason,
+      ipAddress: requestHeaders ? clientIpFrom(requestHeaders) : null,
+      userAgent: requestHeaders?.get("user-agent") ?? null,
+      dedupeMinutes: 60,
+    });
+
+    // Demote any existing row so the rest of the app — which reads
+    // `authorized` directly in places — agrees with this decision.
+    await prisma.user.updateMany({ where: { email, authorized: true }, data: { authorized: false } });
+    return null;
+  }
+
+  // Authorized: keep the row in sync with the session, and with the fact that
+  // the allowlist currently says yes.
   const isBootstrapAdmin = ADMIN_EMAILS.includes(email);
-
   const user = await prisma.user.upsert({
     where: { email },
     create: {
@@ -58,17 +110,18 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
       name,
       picture,
       role: isBootstrapAdmin ? "ADMIN" : "MEMBER",
-      authorized: isBootstrapAdmin,
+      authorized: true,
     },
     update: {
       auth0Id: sub,
       name,
       picture,
-      ...(isBootstrapAdmin ? { role: "ADMIN" as const, authorized: true } : {}),
+      authorized: true,
+      ...(isBootstrapAdmin ? { role: "ADMIN" as const } : {}),
     },
   });
 
-  return user.authorized ? user : null;
+  return user;
 });
 
 export async function requireAdmin(): Promise<User> {

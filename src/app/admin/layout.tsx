@@ -15,6 +15,8 @@ const adminLinks = [
   { href: "/admin/share-links", label: "Share links" },
   { href: "/admin/trash", label: "Trash" },
   { href: "/admin/users", label: "Access" },
+  { href: "/admin/authorized-emails", label: "Authorized emails" },
+  { href: "/admin/access-attempts", label: "Access attempts" },
   { href: "/admin/permissions", label: "Permissions" },
   { href: "/admin/plugins", label: "Plugins" },
   { href: "/admin/downloads", label: "Downloads" },
@@ -90,7 +92,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       ...(canModerateComments ? [{ href: "/admin/comments", label: "Comment moderation" }] : []),
       ...(canShareContent ? [{ href: "/admin/share-links", label: "Share links" }] : []),
       ...(canSeeTrash ? [{ href: "/admin/trash", label: "Trash" }] : []),
-      ...(canManageUsers ? [{ href: "/admin/users", label: "Access" }] : []),
+      ...(canManageUsers
+        ? [
+            { href: "/admin/users", label: "Access" },
+            { href: "/admin/authorized-emails", label: "Authorized emails" },
+          ]
+        : []),
       ...(canManagePermissions ? [{ href: "/admin/permissions", label: "Permissions" }] : []),
       ...(canManagePlugins
         ? [
@@ -102,7 +109,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             { href: "/admin/query-monitor", label: "Query Monitor" },
           ]
         : []),
-      ...(canViewAuditLog ? [{ href: "/admin/audit", label: "Audit log" }] : []),
+      ...(canViewAuditLog
+        ? [
+            { href: "/admin/audit", label: "Audit log" },
+            { href: "/admin/access-attempts", label: "Access attempts" },
+          ]
+        : []),
       ...(canViewAnalytics ? [{ href: "/admin/analytics", label: "Analytics" }] : []),
     ];
   }

@@ -74,16 +74,48 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   is what every public listing sorts by.
 - **Auth**: `/auth/login`, `/auth/logout`, `/auth/callback` are handled
   automatically by the Auth0 SDK's `proxy.ts` (Next.js 16 renamed Middleware
-  to Proxy). Logging in with Auth0 only proves identity — it does **not**
-  grant access by itself. Every login attempt gets a `User` row (so it's
-  visible at `/admin/users`), but `getCurrentUser()` only treats someone as
-  logged in once their row's `authorized` flag is true. Emails in
-  `ADMIN_EMAILS` self-authorize as `ADMIN` on first login (so you always
-  have a way in); everyone else shows up under "Pending login attempts" at
-  `/admin/users` until an admin clicks **Grant access** — or you can
-  pre-authorize an email there before they ever log in. Someone who isn't
-  authorized yet sees "Access not authorized" in the Navbar instead of
-  being treated as a member.
+  to Proxy, and Proxy runs in the Node.js runtime, so Prisma works there).
+  Access requires **two** independent checks, both of which must pass:
+  1. **Marine Team organization membership.** `src/lib/auth0.ts` sends
+     `organization: AUTH0_ORGANIZATION_ID` on the authorization request, so
+     Auth0 refuses non-members at the identity provider — a personal Google
+     account never reaches the callback with a usable token — and
+     `isOrganizationMember()` re-checks the `org_id` claim of the *verified ID
+     token* server-side. The parameter we send is a request; the claim is the
+     proof. Membership is never read from anything the browser controls, and
+     the check fails closed if `AUTH0_ORGANIZATION_ID` is unset.
+  2. **An ACTIVE `AuthorizedEmail` row** in PostgreSQL, managed at
+     `/admin/authorized-emails`. Stored trimmed + lowercased behind a unique
+     index, so casing and whitespace can't create a second row or dodge a
+     lookup (`normalizeEmail()` is the only way an address is ever compared or
+     written).
+
+  Both run inside `getCurrentUser()` — the choke point every server-rendered
+  page and API already goes through — so **revocation applies to existing
+  sessions**: remove an email and that person is refused on their very next
+  request, cookie or no cookie. `User.authorized` is kept in step with the
+  decision so the older queries that read it stay correct.
+
+  Signup is closed off separately by an Auth0 **Pre-User-Registration Action**
+  that calls `POST /api/auth/registration-check` (bearer secret, 5s timeout,
+  fails closed, returns only a boolean). The Action never holds database
+  credentials — see `auth0-actions/README.md` for the source and the dashboard
+  checklist.
+
+  Every refusal — organization rejection, missing-state callback error, an
+  unauthorized email, or a revoked session — lands on `/access-denied` with one
+  plain message and no stack trace, Auth0 error, or Prisma detail. Because the
+  SDK writes its session cookie *after* the `onCallback` hook returns,
+  `src/proxy.ts` strips it from any response redirecting there, so no
+  application session exists after a failed authorization. State, nonce, and
+  CSRF validation are untouched.
+
+  Refused attempts are recorded in `UnauthorizedAccessAttempt` (no tokens,
+  codes, or passwords — only who was refused and why), shown at
+  `/admin/access-attempts`, and pruned after 90 days by the daily cron. The
+  first refusal for an address emails the admins; the same address is then
+  left alone for an hour and no more than ten notifications go out per hour
+  overall, both counted in Postgres (no Redis anywhere in this app).
 - **Admin CMS** (`/admin`): manage categories, series, videos, and files.
   Video upload creates a placeholder in Bunny Stream, signs a TUS upload
   session, and streams the file straight from the browser to Bunny; small

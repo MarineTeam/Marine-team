@@ -47,7 +47,7 @@ export function ShareLinkList({
   onChange,
 }: {
   links: ShareLinkRow[];
-  /** Base path the row's id is appended to, e.g. "/api/share-links". */
+  /** Base path the row's id is appended to, e.g. "/api/share-links"; PATCH revokes, DELETE removes. */
   revokeEndpoint: string;
   showOwner?: boolean;
   onChange: () => void;
@@ -56,16 +56,29 @@ export function ShareLinkList({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function revoke(link: ShareLinkRow) {
-    if (!confirm("Revoke this link? Anyone holding it loses access immediately.")) return;
+  /**
+   * Revoke (PATCH) keeps the row, marked dead, so the sharer can still see
+   * they sent it. Delete (DELETE) removes it from the list entirely. Both stop
+   * the link working — the token only resolves through this row — so deleting
+   * an active link isn't a way to leave something live.
+   */
+  async function act(link: ShareLinkRow, action: "revoke" | "delete") {
+    const confirmed =
+      action === "revoke"
+        ? confirm("Revoke this link? Anyone holding it loses access immediately.")
+        : confirm("Delete this link? It stops working and disappears from this list.");
+    if (!confirmed) return;
+
     setBusyId(link.id);
     setError(null);
     try {
-      const res = await fetch(`${revokeEndpoint}/${link.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Failed to revoke");
+      const res = await fetch(`${revokeEndpoint}/${link.id}`, {
+        method: action === "revoke" ? "PATCH" : "DELETE",
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? `Failed to ${action}`);
       onChange();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to revoke");
+      setError(err instanceof Error ? err.message : `Failed to ${action}`);
     } finally {
       setBusyId(null);
     }
@@ -155,13 +168,20 @@ export function ShareLinkList({
                 </button>
                 {!link.revokedAt && (
                   <button
-                    onClick={() => revoke(link)}
+                    onClick={() => act(link, "revoke")}
                     disabled={busyId === link.id}
-                    className="rounded-md border border-red-300 px-3 py-1 text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+                    className="rounded-md border border-amber-300 px-3 py-1 text-amber-700 hover:bg-amber-50 disabled:opacity-50 dark:border-amber-900 dark:text-amber-400 dark:hover:bg-amber-950"
                   >
-                    {busyId === link.id ? "Revoking…" : "Revoke"}
+                    Revoke
                   </button>
                 )}
+                <button
+                  onClick={() => act(link, "delete")}
+                  disabled={busyId === link.id}
+                  className="rounded-md border border-red-300 px-3 py-1 text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+                >
+                  {busyId === link.id ? "Working…" : "Delete"}
+                </button>
               </div>
             </li>
           );

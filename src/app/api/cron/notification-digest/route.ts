@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendDigestToUser } from "@/lib/push";
+import { pruneAccessAttempts } from "@/lib/authorization";
 
 /**
  * Runs once a day (see the "crons" entry in vercel.json), batching every
@@ -33,5 +34,15 @@ export async function GET(request: NextRequest) {
   }
 
   await prisma.pendingNotification.deleteMany({ where: { id: { in: pending.map((p) => p.id) } } });
-  return NextResponse.json({ usersNotified: byUser.size, itemsCleared: pending.length });
+
+  // Retention for the refused-access log, done here rather than on the request
+  // path: a site being probed shouldn't pay for cleanup on every refusal, and
+  // this job already runs daily with the right authorization.
+  const attemptsPruned = await pruneAccessAttempts();
+
+  return NextResponse.json({
+    usersNotified: byUser.size,
+    itemsCleared: pending.length,
+    attemptsPruned,
+  });
 }

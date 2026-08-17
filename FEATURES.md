@@ -341,13 +341,61 @@ browser cache: this is offline convenience, not DRM.
 
 ## Auth
 
-- Auth0 login (`/auth/login`, `/auth/logout`, `/auth/callback`) proves
-  identity only — it does not grant access by itself. Every login attempt
-  creates a `User` row; `authorized` starts `false` and must be granted by
-  an admin (or pre-authorized before the person ever logs in) before
-  they're treated as logged in anywhere else on the site.
-- Emails listed in `ADMIN_EMAILS` self-authorize as `ADMIN` on first login,
-  so there's always a way in.
+Access needs **two** independent checks, both of which must pass:
+
+```
+authenticated with Auth0
+  ↓  member of the Marine Team Auth0 organization   (org_id claim, ID token)
+  ↓  email ACTIVE in AuthorizedEmail                (PostgreSQL, via Prisma)
+  ↓  application access
+```
+
+| Marine Team member | Authorized email | Result |
+| --- | --- | --- |
+| no | no | DENY |
+| no | yes | DENY |
+| yes | no | DENY |
+| yes | yes | ALLOW |
+
+- **Organization** — the app sends `organization` on the authorization
+  request, so Auth0 refuses non-members at the identity provider (a personal
+  Google account never reaches the callback with a usable token), and
+  `isOrganizationMember()` re-checks the `org_id` claim of the verified ID
+  token server-side. The parameter we send is a request; the claim is the
+  proof. Nothing about membership is ever taken from a query string, header,
+  or anything else the browser controls.
+- **Allowlist** — `AuthorizedEmail` in PostgreSQL, managed at
+  `/admin/authorized-emails`. Emails are stored trimmed and lowercased behind
+  a unique index, so casing and whitespace can't produce a second row or slip
+  past a lookup.
+- **Where it's enforced** — `getCurrentUser()`, which every server-rendered
+  page and API request already funnels through. Both checks run there on
+  every request, so **removing an email takes effect on that person's next
+  request**; an already-issued session cookie buys nothing. `User.authorized`
+  is kept in step with the answer so the existing queries that read it stay
+  correct.
+- **Registration** — an Auth0 Pre-User-Registration Action calls
+  `POST /api/auth/registration-check` (bearer secret, 5s timeout, fails
+  closed) so an unauthorized address can't create an account at all. The
+  Action holds a URL and a secret, never database credentials, and the
+  endpoint answers with nothing but `{"allowed": true|false}` — it never
+  returns any part of the list. See `auth0-actions/README.md`.
+- **Refusals** — every rejected login, signup, or request from a revoked
+  session lands on `/access-denied`, which shows one plain message and never
+  a raw 400, a `CallbackHandlerError`, an Auth0 stack trace, or a Prisma
+  error. The two callback errors that look alarming — an organization
+  rejection, and `Missing state cookie` — are *expected* when someone tries a
+  personal account; they're caught by the SDK's `onCallback` hook and turned
+  into that page. State, nonce, and CSRF validation are untouched.
+- **No session survives a refusal** — the SDK writes its session cookie after
+  the `onCallback` hook returns, so `src/proxy.ts` strips it from any response
+  redirecting to `/access-denied`. That is what makes "no application session
+  is created after a failed authorization" true rather than merely intended.
+- **Attempts are recorded** — see Access attempts below.
+- Emails listed in `ADMIN_EMAILS` are adopted into `AuthorizedEmail` on first
+  use (as a visible, suspendable row rather than an invisible exception), so a
+  brand-new deployment has a way in. They still have to be organization
+  members: this is a source for the allowlist, not a bypass of the model.
 
 ## Admin CMS (`/admin`)
 
@@ -420,6 +468,19 @@ browser cache: this is offline convenience, not DRM.
   (web, installed app, or both), and the suggested per-device storage cap.
   Which *videos* may be downloaded is set per category/series/video on their
   own edit pages. See Downloads above.
+
+- **Authorized emails** (`/admin/authorized-emails`, needs `manage_users`) —
+  the email allowlist: add, search, suspend/reinstate, and remove, with who
+  added each address and when. Paginated. Refuses to remove the last active
+  address, which would otherwise lock everyone out of the admin area.
+
+- **Access attempts** (`/admin/access-attempts`, needs `view_audit_log`) —
+  refused logins, signups, and requests from revoked sessions: when, email,
+  provider, attempt type, which of the two checks failed, and the reason.
+  Paginated server-side with search by email and filters by reason and date,
+  a mark-reviewed action, and a prune button. No credential material of any
+  kind is stored — no tokens, codes, or passwords — and records are pruned
+  after 90 days by the daily cron.
 
 - **Share links** (`/admin/share-links`, needs `share_content`) — every share
   link on the site, whoever created it: target, owner, public or private,

@@ -6,6 +6,51 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Security
+
+- **Two-factor authorization: Auth0 organization membership AND a PostgreSQL
+  email allowlist.** Access now requires both — being a member of the Marine
+  Team Auth0 organization *and* having an ACTIVE `AuthorizedEmail` row.
+  Neither is sufficient alone, and neither is ever read from anything the
+  browser controls: membership comes from the `org_id` claim of the verified
+  ID token, the allowlist from the database.
+  - Both checks run inside `getCurrentUser()`, the choke point every
+    server-rendered page and API already goes through, so **revocation
+    applies to existing sessions** — remove an email and that person is
+    refused on their next request rather than whenever their cookie expires.
+  - Emails are stored trimmed and lowercased behind a unique index, and
+    `normalizeEmail()` is the only way one is ever compared or written, so
+    casing and whitespace can't create a duplicate row or dodge a lookup.
+  - New **Authorized emails** admin page (`manage_users`): add, search,
+    suspend/reinstate, remove, with who added each address and when. Refuses
+    to remove the last active address, which would lock everyone out.
+  - An Auth0 **Pre-User-Registration Action** (source in `auth0-actions/`)
+    calls the new `POST /api/auth/registration-check` so unauthorized
+    addresses can't create accounts. The Action holds a URL and a shared
+    secret, never database credentials; the endpoint answers with nothing but
+    a boolean, compares the secret in constant time, and fails closed on
+    timeout, misconfiguration, or any answer that isn't a clear yes.
+  - Every refusal now lands on a friendly `/access-denied` page instead of a
+    raw 400, `CallbackHandlerError`, Auth0 stack trace, or Prisma error. The
+    organization-rejection and missing-state callback errors are handled as
+    the *expected* outcomes they are for a personal account — state, nonce,
+    and CSRF validation are untouched.
+  - **No application session survives a failed authorization**: the SDK
+    writes its session cookie after the `onCallback` hook returns, so
+    `src/proxy.ts` strips it from any response redirecting to
+    `/access-denied`.
+  - Refused logins, signups, and requests from revoked sessions are recorded
+    in `UnauthorizedAccessAttempt` — who was refused, which of the two checks
+    failed, and why, with **no credential material of any kind**. Visible at
+    the new **Access attempts** admin page (`view_audit_log`): paginated
+    server-side, searchable by email, filterable by reason and date, with
+    mark-reviewed and prune. Pruned after 90 days by the daily cron.
+  - Administrators are emailed on a refusal, through the existing Resend
+    integration. Abuse is bounded by an hour-long per-address cooldown and a
+    ceiling of ten notification emails per hour, both counted in Postgres —
+    the attempt is always recorded, only the emailing is throttled. No Redis
+    is involved anywhere.
+
 ### Added
 
 - **Downloads** (new plugin): members can save a video to their device and
@@ -91,6 +136,10 @@ All notable changes to this project are documented here. Format follows
 
 ### Changed
 
+- Shared links can now be **deleted** as well as revoked, in both the member's
+  own list and the admin panel. Revoking keeps the record and marks it dead;
+  deleting removes the row. Either way the link stops working, since the token
+  only resolves through that row.
 - Autoplay is now a per-device setting rather than a hidden localStorage flag
   owned by the "Up next" panel: turning it on there and in
   `/profile/settings` is the same switch, and it now also starts the video
