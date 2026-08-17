@@ -22,7 +22,7 @@ import {
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
-import { canShareTarget } from "@/lib/share-links";
+import { getShareOptions } from "@/lib/share-links";
 import { getPluginStates } from "@/lib/plugins";
 import { bunnyStreamEmbedUrl, bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { WatchProgressTracker } from "@/components/watch-progress-tracker";
@@ -127,7 +127,7 @@ export default async function VideoPage({
     upNext,
     chapters,
     sermonNotes,
-    canShare,
+    shareOptions,
   ] = await Promise.all([
       ratingsOn ? getVideoRatingSummary(video.id) : Promise.resolve({ average: 0, count: 0 }),
       ratingsOn && user ? getUserVideoRating(user.id, video.id) : Promise.resolve(null),
@@ -139,14 +139,14 @@ export default async function VideoPage({
       chaptersOn ? getVideoChapters(video.id) : Promise.resolve([]),
       sermonNotesOn && user ? getSermonNotes(user.id, video.id) : Promise.resolve([]),
       shareLinksOn
-        ? canShareTarget(user, {
+        ? getShareOptions(user, {
             type: "video",
             id: video.id,
             memberOnly: video.memberOnly,
             categoryId: video.categoryId,
             seriesId: video.seriesId,
           })
-        : Promise.resolve(false),
+        : Promise.resolve({ canShare: false, targetIsRestricted: false, canGrantAccess: false }),
     ]);
   const initialComments = comments.map((c) => ({
     ...c,
@@ -211,7 +211,9 @@ export default async function VideoPage({
       {/* Not while sequence-locked: the member can't watch this episode yet,
           so handing out a link to it would be odd — matches the series page,
           which hides the panel behind the same gate. */}
-      {canShare && !sequenceLocked && <ShareLinkPanel videoId={video.id} />}
+      {shareOptions.canShare && !sequenceLocked && (
+        <ShareLinkPanel videoId={video.id} canGrantAccess={shareOptions.canGrantAccess} />
+      )}
 
       {isPendingPremiere && video.publishAt ? (
         <PremiereCountdown premiereAt={video.publishAt.toISOString()} />

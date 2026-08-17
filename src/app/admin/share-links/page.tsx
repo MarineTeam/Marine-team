@@ -96,10 +96,15 @@ export default function ShareLinksAdminPage() {
             ))}
           </optgroup>
         </select>
+        {/* The override is always offered here: reaching this page means
+            holding `share_content`. It's a no-op on content that isn't
+            restricted, and the API still refuses a grant outside the scope
+            the capability was granted for. */}
         <ShareLinkForm
           target={parsedTarget}
           endpoint="/api/admin/share-links"
           disabled={!parsedTarget}
+          canGrantAccess
           onCreated={(link) => setLinks((current) => [link, ...current])}
         />
       </section>

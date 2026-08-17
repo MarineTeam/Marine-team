@@ -7,31 +7,48 @@ const { shareLinkStatus } = await import("./share-access");
 
 describe("shareLinkPolicy", () => {
   it("lets anyone share content that is already public, granting nothing", () => {
-    expect(shareLinkPolicy({ canShareRestricted: false, targetIsRestricted: false })).toEqual({
-      allowed: true,
-      grantsAccess: false,
-    });
+    expect(
+      shareLinkPolicy({ canShareRestricted: false, targetIsRestricted: false, grantAccessRequested: false }),
+    ).toEqual({ allowed: true, grantsAccess: false });
   });
 
-  it("refuses a plain member sharing restricted content", () => {
-    const result = shareLinkPolicy({ canShareRestricted: false, targetIsRestricted: true });
+  it("lets a plain member share restricted content as a plain link", () => {
+    // No override asked for, so nothing is being handed out: the link only
+    // opens for someone who already has access.
+    expect(
+      shareLinkPolicy({ canShareRestricted: false, targetIsRestricted: true, grantAccessRequested: false }),
+    ).toEqual({ allowed: true, grantsAccess: false });
+  });
+
+  it("refuses a plain member asking to override a restriction", () => {
+    const result = shareLinkPolicy({
+      canShareRestricted: false,
+      targetIsRestricted: true,
+      grantAccessRequested: true,
+    });
     expect(result.allowed).toBe(false);
   });
 
-  it("lets a permitted sharer share restricted content, with a real grant", () => {
-    expect(shareLinkPolicy({ canShareRestricted: true, targetIsRestricted: true })).toEqual({
-      allowed: true,
-      grantsAccess: true,
-    });
+  it("grants access when a permitted sharer asks for the override", () => {
+    expect(
+      shareLinkPolicy({ canShareRestricted: true, targetIsRestricted: true, grantAccessRequested: true }),
+    ).toEqual({ allowed: true, grantsAccess: true });
   });
 
-  it("doesn't attach a grant to public content even for a permitted sharer", () => {
-    // Nothing to grant, so the link stays an ordinary link — which keeps it
-    // out of the grant lookup in getShareGrants entirely.
-    expect(shareLinkPolicy({ canShareRestricted: true, targetIsRestricted: false })).toEqual({
-      allowed: true,
-      grantsAccess: false,
-    });
+  it("withholds the grant when a permitted sharer doesn't ask for it", () => {
+    // The capability is permission to override, not an automatic one — an
+    // admin sending an ordinary link should be sending an ordinary link.
+    expect(
+      shareLinkPolicy({ canShareRestricted: true, targetIsRestricted: true, grantAccessRequested: false }),
+    ).toEqual({ allowed: true, grantsAccess: false });
+  });
+
+  it("ignores an override asked for on content that isn't restricted", () => {
+    // Nothing to grant, so the link stays an ordinary one — which keeps it out
+    // of the grant lookup in getShareGrants entirely.
+    expect(
+      shareLinkPolicy({ canShareRestricted: true, targetIsRestricted: false, grantAccessRequested: true }),
+    ).toEqual({ allowed: true, grantsAccess: false });
   });
 });
 

@@ -19,7 +19,7 @@ import {
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
-import { canShareTarget } from "@/lib/share-links";
+import { getShareOptions } from "@/lib/share-links";
 import { getPluginStates } from "@/lib/plugins";
 import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { FavoriteButton } from "@/components/favorite-button";
@@ -85,7 +85,7 @@ export default async function SeriesPage({
     "share-links": shareLinksOn,
   } = plugins;
 
-  const [ratingSummary, myRating, reactionSummary, myReaction, related, comments, canShare] = await Promise.all([
+  const [ratingSummary, myRating, reactionSummary, myReaction, related, comments, shareOptions] = await Promise.all([
     ratingsOn ? getSeriesRatingSummary(series.id) : Promise.resolve({ average: 0, count: 0 }),
     ratingsOn && user ? getUserSeriesRating(user.id, series.id) : Promise.resolve(null),
     likesOn ? getSeriesReactionSummary(series.id) : Promise.resolve({ likes: 0, dislikes: 0 }),
@@ -93,13 +93,13 @@ export default async function SeriesPage({
     relatedOn && !seriesLocked ? getRelatedSeries(series) : Promise.resolve([]),
     commentsOn && !seriesLocked ? getComments("series", series.id) : Promise.resolve([]),
     shareLinksOn && !seriesLocked
-      ? canShareTarget(user, {
+      ? getShareOptions(user, {
           type: "series",
           id: series.id,
           memberOnly: series.memberOnly,
           categoryId: series.categoryId,
         })
-      : Promise.resolve(false),
+      : Promise.resolve({ canShare: false, targetIsRestricted: false, canGrantAccess: false }),
   ]);
   const initialComments = comments.map((c) => ({
     ...c,
@@ -163,9 +163,9 @@ export default async function SeriesPage({
             <ShareButtons title={series.title} path={`/series/${series.slug}`} />
           </div>
         )}
-        {canShare && (
+        {shareOptions.canShare && (
           <div className="mt-3">
-            <ShareLinkPanel seriesId={series.id} />
+            <ShareLinkPanel seriesId={series.id} canGrantAccess={shareOptions.canGrantAccess} />
           </div>
         )}
         {series.tags.length > 0 && (

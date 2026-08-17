@@ -24,17 +24,23 @@ export function ShareLinkForm({
   endpoint,
   onCreated,
   disabled = false,
+  canGrantAccess = false,
 }: {
   target: ShareLinkFormTarget | null;
   /** "/api/share-links" for members, "/api/admin/share-links" for the admin panel. */
   endpoint: string;
   onCreated: (link: ShareLinkRow) => void;
   disabled?: boolean;
+  /** Whether to offer the members-only override — see getShareOptions. */
+  canGrantAccess?: boolean;
 }) {
   const [visibility, setVisibility] = useState<"PUBLIC" | "EMAIL">("PUBLIC");
   const [emails, setEmails] = useState("");
   const [note, setNote] = useState("");
   const [expiresInDays, setExpiresInDays] = useState("");
+  const [grantAccess, setGrantAccess] = useState(false);
+  const [usePassword, setUsePassword] = useState(false);
+  const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,12 +62,18 @@ export function ShareLinkForm({
           emails: visibility === "EMAIL" ? emails : undefined,
           note: note.trim() || null,
           expiresInDays: expiresInDays ? Number(expiresInDays) : null,
+          grantAccess: canGrantAccess ? grantAccess : false,
+          password: usePassword ? password : null,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed to create link");
       onCreated(await res.json());
       setEmails("");
       setNote("");
+      // Cleared deliberately: the password can't be shown back later (only its
+      // hash is kept), so leaving it in the box would suggest otherwise.
+      setPassword("");
+      setUsePassword(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create link");
     } finally {
@@ -112,6 +124,63 @@ export function ShareLinkForm({
         </div>
       )}
 
+      {canGrantAccess && (
+        <label className="flex items-start gap-2 rounded-md bg-amber-50 p-2 dark:bg-amber-950/30">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={grantAccess}
+            onChange={(e) => setGrantAccess(e.target.checked)}
+          />
+          <span>
+            Let recipients watch this even though it&apos;s restricted
+            <span className="block text-xs text-zinc-500">
+              Overrides &ldquo;Members only&rdquo; and any viewer restriction for this link alone — the way to give one
+              guest access without opening the content to anyone else. Leave this off and the link only works for
+              people who already have access.
+            </span>
+          </span>
+        </label>
+      )}
+
+      <div className="space-y-2">
+        <label className="flex items-start gap-2">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={usePassword}
+            onChange={(e) => setUsePassword(e.target.checked)}
+          />
+          <span>
+            Require a password
+            <span className="block text-xs text-zinc-500">
+              Recipients type it before the link opens. Pass it on yourself — we never include it in the email.
+            </span>
+          </span>
+        </label>
+        {usePassword && (
+          <div>
+            <label htmlFor="share-password" className="sr-only">
+              Share password
+            </label>
+            <input
+              id="share-password"
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              minLength={6}
+              maxLength={128}
+              autoComplete="off"
+              placeholder="At least 6 characters"
+              className="w-full rounded-md border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+            />
+            <p className="mt-1 text-xs text-zinc-500">
+              Shown in plain text so you can copy it — we can&apos;t show it again once the link is created.
+            </p>
+          </div>
+        )}
+      </div>
+
       <div className="flex flex-wrap gap-3">
         <div className="min-w-0 flex-1">
           <label htmlFor="share-note" className="block font-medium">
@@ -149,7 +218,7 @@ export function ShareLinkForm({
       {error && <p className="text-red-600">{error}</p>}
       <button
         type="submit"
-        disabled={saving || disabled}
+        disabled={saving || disabled || (usePassword && password.trim().length < 6)}
         className="rounded-md bg-zinc-900 text-white px-4 py-1.5 hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
       >
         {saving ? "Creating…" : "Create link"}

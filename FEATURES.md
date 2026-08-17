@@ -203,16 +203,41 @@ A revocable, tracked link to one series or video, opened at `/s/[token]`.
 Unlike copying the page URL, the sharer keeps a list of what they've handed
 out, sees how often each link has been opened, and can switch any of them off.
 
-- **Who can share.** Two tiers, enforced in `shareLinkPolicy`:
+- **Who can share, and the members-only override.** Overriding the gate is
+  **opt-in per link** — a checkbox on the share form, not a consequence of who
+  is sharing. Three outcomes, enforced in `shareLinkPolicy`:
   - Content that is already public to anyone: **any logged-in member** can
-    share it (with the Share links plugin on). The link grants nothing the
-    recipient didn't already have — it's a tracked, revocable link.
-  - Content that is gated (`memberOnly`, or restricted to viewer
-    groups/users): only an **admin** or someone holding the new
-    **`share_content`** capability can share it, and their link carries a
-    real access grant. The capability can be granted site-wide or scoped to
-    a category/series, so a group can be given sharing rights over just
-    their own section.
+    share it (with the Share links plugin on). There's nothing to override, so
+    the checkbox doesn't appear.
+  - Gated content (`memberOnly`, or restricted to viewer groups/users) with
+    **no** override: any logged-in member can share it. The link is a plain
+    tracked link — it only opens for someone who already has access, which is
+    what makes "here's the one I was watching" safe between two members.
+  - Gated content **with** the override ticked: only an **admin** or someone
+    holding the **`share_content`** capability, and their link carries a real
+    access grant. This is how one guest gets into a members-only series
+    without loosening it for anyone else. The capability can be granted
+    site-wide or scoped to a category/series, so a group can be given sharing
+    rights over just their own section — and a scoped holder is still refused
+    an override outside that scope.
+
+  The capability is permission to override, never an automatic one: an admin
+  who leaves the box unticked sends an ordinary link. Links carrying an
+  override are badged **"Grants access"** in both listings.
+- **Optional password.** Any sharer can add a passphrase to a link (at least
+  6 characters), independent of public vs private — so a public link can be
+  "anyone with the link *and* the password". Opening it lands on
+  `/share/unlock/[token]`, which asks for the passphrase before the link
+  redeems; getting it right is what sets the cookie, so nothing is granted and
+  no open is recorded until then. Once unlocked, that browser isn't asked
+  again. Stored as a salted scrypt hash (`src/lib/share-password.ts`), never
+  returned to any client — not even to the sharer, who can't be shown it again
+  — and never included in the recipient email, which only mentions that a
+  password is needed. Ten wrong guesses inside 15 minutes and the link stops
+  answering for 15 minutes; the tally is kept on the row (serverless has no
+  shared memory, same reasoning as `src/lib/rate-limit.ts`) and clears itself
+  on success or once the window passes. To change a password, revoke the link
+  and make a new one.
 - **Public vs private.** A public link opens for anyone holding it, logged in
   or not. A private link is addressed to specific emails: each recipient is
   emailed their link (and gets an inbox notification if they already have an
@@ -243,7 +268,8 @@ out, sees how often each link has been opened, and can switch any of them off.
   or trashed item wouldn't resolve on its own page either). Members are
   capped at 20 new links an hour. Withdrawing someone's `share_content`
   capability does **not** retroactively kill links they already created —
-  that's what the admin list and its Revoke button are for.
+  that's what the admin list and its Revoke button are for. A link's password
+  and expiry can't be edited after the fact; revoke and re-share instead.
 
 ## Auth
 

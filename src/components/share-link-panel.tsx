@@ -12,7 +12,16 @@ import { ShareLinkList, type ShareLinkRow } from "@/components/share-link-list";
  *
  * Their full list across all content lives at /profile/shared-links.
  */
-export function ShareLinkPanel({ seriesId, videoId }: { seriesId?: string; videoId?: string }) {
+export function ShareLinkPanel({
+  seriesId,
+  videoId,
+  canGrantAccess = false,
+}: {
+  seriesId?: string;
+  videoId?: string;
+  /** Whether this sharer may override the content's restriction — resolved server-side. */
+  canGrantAccess?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [links, setLinks] = useState<ShareLinkRow[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -49,6 +58,7 @@ export function ShareLinkPanel({ seriesId, videoId }: { seriesId?: string; video
           <ShareLinkForm
             target={target}
             endpoint="/api/share-links"
+            canGrantAccess={canGrantAccess}
             onCreated={(link) => setLinks((current) => [link, ...current])}
           />
           <div className="space-y-2">

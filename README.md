@@ -247,18 +247,24 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   applies to series and videos, not files, which stay governed by their own
   "Members only" flag.
 - **Share links**: a revocable, tracked link to one series or video, opened at
-  `/s/[token]`. Anyone may share content that is already public (a plain
-  tracked link); sharing gated content needs the `share_content` capability
-  and produces a link that actually grants view access, checked by
-  `canViewSeries`/`canViewVideo` alongside the grants above. Redemption stores
-  the token in an httpOnly cookie so access survives navigation, but the
-  cookie is re-validated against the DB on every request — revoking is
-  immediate. Links can be public or addressed to specific emails (which
-  requires logging in as that address), can expire, and are listed for the
-  sharer at `/profile/shared-links` and for admins at `/admin/share-links`.
-  Split across `src/lib/share-access.ts` (redeem + resolve grants) and
+  `/s/[token]`. Any member may share, including gated content — but a link only
+  *overrides* a members-only/viewer restriction when the sharer ticks the
+  override box, which needs the `share_content` capability (site-wide or scoped
+  to a category/series). That opt-in is the "let this one guest in" path;
+  without it the link opens only for people who already have access.
+  Access-granting links are checked by `canViewSeries`/`canViewVideo` alongside
+  the grants above. Redemption stores the token in an httpOnly cookie so access
+  survives navigation, but the cookie is re-validated against the DB on every
+  request — revoking is immediate. Links can be public or addressed to specific
+  emails (which requires logging in as that address), can carry an optional
+  scrypt-hashed password (`src/lib/share-password.ts`, unlocked at
+  `/share/unlock/[token]` with a per-link lockout after repeated wrong
+  guesses), can expire, and are listed for the sharer at
+  `/profile/shared-links` and for admins at `/admin/share-links`. Split across
+  `src/lib/share-access.ts` (redeem + resolve grants) and
   `src/lib/share-links.ts` (create, list, revoke) so `content.ts` can consult
-  grants without importing the permission machinery it depends on.
+  grants without importing the permission machinery it depends on; the stored
+  password hash is stripped from every API response by a single DTO mapper.
 - **The profile area** (`/profile`): the member's account hub — inbox,
   shared links, downloads, and settings — shown identically on the web and in
   the PWA, with a Profile tab in the mobile bottom nav badged with the unread

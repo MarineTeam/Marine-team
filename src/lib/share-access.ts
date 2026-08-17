@@ -132,6 +132,22 @@ export const getShareGrants = cache(async (): Promise<ShareGrants> => {
   return grants;
 });
 
+/**
+ * Whether this browser has already redeemed `token`.
+ *
+ * For a password-protected link this is what stands in for "already unlocked":
+ * only a successful unlock ever puts the token in the cookie, so holding it is
+ * proof the password was typed once — the recipient isn't asked again every
+ * time they open the link.
+ */
+export async function hasRedeemedShareToken(token: string): Promise<boolean> {
+  try {
+    return readCookieTokens((await cookies()).get(SHARE_COOKIE)?.value).includes(token);
+  } catch {
+    return false;
+  }
+}
+
 /** The cookie value + options for a browser that just redeemed `token`, keeping any it already held. */
 export function shareCookiePayload(existingRaw: string | undefined, token: string) {
   const tokens = [token, ...readCookieTokens(existingRaw).filter((t) => t !== token)].slice(0, MAX_COOKIE_TOKENS);

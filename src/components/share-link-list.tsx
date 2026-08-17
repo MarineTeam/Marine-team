@@ -8,6 +8,8 @@ export type ShareLinkRow = {
   visibility: "PUBLIC" | "EMAIL";
   grantsAccess: boolean;
   note: string | null;
+  /** Whether a password is set — never the password or its hash, which stay server-side. */
+  passwordProtected: boolean;
   expiresAt: string | null;
   revokedAt: string | null;
   viewCount: number;
@@ -121,6 +123,11 @@ export function ShareLinkList({
                   {link.grantsAccess && (
                     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
                       Grants access
+                    </span>
+                  )}
+                  {link.passwordProtected && (
+                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                      🔒 Password
                     </span>
                   )}
                 </div>

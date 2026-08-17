@@ -847,38 +847,49 @@ model SlugAlias {
 // revoke it at any time.
 //
 // `grantsAccess` is what makes a link more than a URL — see
-// src/lib/share-links.ts for who is allowed to set it. Only a sharer who
-// holds the `share_content` capability (or an admin) can create one, and
-// only for content that is actually gated; a link to already-public
-// content leaves it false and needs no special permission, so ordinary
-// members can share too.
+// src/lib/share-links.ts for who is allowed to set it. It's opt-in per
+// link: a sharer holding the `share_content` capability (or an admin)
+// chooses whether this particular link overrides the member-only/viewer
+// restriction, which is how one guest can be let in without opening the
+// content to anyone else. Left false, the link is an ordinary tracked
+// link that anyone may create.
 model ShareLink {
-  id           String               @id @default(cuid())
+  id                   String               @id @default(cuid())
   // The unguessable secret in the URL. Long enough not to be brute-forced;
   // the row is the only place it's stored, so revoking really does kill it.
-  token        String               @unique
-  createdBy    User                 @relation(fields: [createdById], references: [id], onDelete: Cascade)
-  createdById  String
-  series       Series?              @relation(fields: [seriesId], references: [id], onDelete: Cascade)
-  seriesId     String?
-  video        Video?               @relation(fields: [videoId], references: [id], onDelete: Cascade)
-  videoId      String?
-  visibility   ShareVisibility      @default(PUBLIC)
+  token                String               @unique
+  createdBy            User                 @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdById          String
+  series               Series?              @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  seriesId             String?
+  video                Video?               @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId              String?
+  visibility           ShareVisibility      @default(PUBLIC)
   // Whether opening the link lets the recipient view content they couldn't
   // otherwise (member-only, or restricted to viewer groups/users). False for
   // links to content that was already public, which need no grant at all.
-  grantsAccess Boolean              @default(false)
+  grantsAccess         Boolean              @default(false)
   // Optional sharer-facing label ("sent to the elders"), so a long list of
   // links stays legible months later.
-  note         String?
-  expiresAt    DateTime?
+  note                 String?
+  // Optional second factor the sharer can add: scrypt hash + salt of a
+  // passphrase the recipient must type at /s/[token] before the link does
+  // anything (see src/lib/share-password.ts). Never sent to a client — the
+  // API strips it, and it can't be shown back to the sharer either.
+  passwordHash         String?
+  // Brute-force brake on that passphrase. Counted in the row rather than in
+  // memory because this runs on serverless functions with no shared process
+  // state — the same reasoning as src/lib/rate-limit.ts. Reset on success.
+  failedUnlockAttempts Int                  @default(0)
+  lastFailedUnlockAt   DateTime?
+  expiresAt            DateTime?
   // Set instead of deleting the row, so a revoked link stays visible (and
   // auditable) in the sharer's list and the admin panel.
-  revokedAt    DateTime?
-  viewCount    Int                  @default(0)
-  lastViewedAt DateTime?
-  createdAt    DateTime             @default(now())
-  recipients   ShareLinkRecipient[]
+  revokedAt            DateTime?
+  viewCount            Int                  @default(0)
+  lastViewedAt         DateTime?
+  createdAt            DateTime             @default(now())
+  recipients           ShareLinkRecipient[]
 
   @@index([createdById])
   @@index([seriesId])

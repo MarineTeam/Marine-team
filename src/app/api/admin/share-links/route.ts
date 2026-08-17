@@ -4,6 +4,7 @@ import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureCapability } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { createShareLink, getShareLinks, parseRecipientEmails } from "@/lib/share-links";
+import { SHARE_PASSWORD_MAX_LENGTH } from "@/lib/share-password";
 
 const createSchema = z.object({
   seriesId: z.string().optional(),
@@ -12,6 +13,8 @@ const createSchema = z.object({
   emails: z.string().max(2000).optional(),
   note: z.string().max(200).nullable().optional(),
   expiresInDays: z.number().int().min(1).max(365).nullable().optional(),
+  grantAccess: z.boolean().optional(),
+  password: z.string().max(SHARE_PASSWORD_MAX_LENGTH).nullable().optional(),
 });
 
 /**
@@ -49,13 +52,23 @@ export async function POST(request: NextRequest) {
       emails: parseRecipientEmails(body.emails ?? ""),
       note: body.note ?? null,
       expiresInDays: body.expiresInDays ?? null,
+      grantAccess: body.grantAccess ?? false,
+      password: body.password ?? null,
     });
     await logAudit(
       user.email,
       "create",
       "share-link",
       link.id,
-      `${link.visibility === "EMAIL" ? "private" : "public"} link to ${link.video?.title ?? link.series?.title ?? "?"}`,
+      [
+        link.visibility === "EMAIL" ? "private" : "public",
+        "link to",
+        link.video?.title ?? link.series?.title ?? "?",
+        link.grantsAccess ? "(grants access)" : null,
+        link.passwordProtected ? "(password protected)" : null,
+      ]
+        .filter(Boolean)
+        .join(" "),
     );
     return NextResponse.json(link, { status: 201 });
   } catch (error) {

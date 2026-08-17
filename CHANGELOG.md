@@ -13,12 +13,17 @@ All notable changes to this project are documented here. Format follows
   needed) or **private** to named emails, in which case each recipient is
   emailed their link and must log in as that address to open it — forwarding
   it on hands over nothing. Optional expiry of 1–365 days.
-  - Two sharing tiers: any logged-in member can share content that is already
-    public (a tracked, revocable link that grants nothing extra), while
-    sharing gated content — `memberOnly`, or restricted to viewer
-    groups/users — needs the new **`share_content`** capability, grantable
-    site-wide or scoped to a category/series, and produces a link that
-    actually grants view access.
+  - Any logged-in member can share, including gated content, but a link only
+    **overrides** a members-only or viewer restriction when the sharer ticks
+    the override box — which needs the new **`share_content`** capability,
+    grantable site-wide or scoped to a category/series. That opt-in is how one
+    guest is let into a members-only series without loosening it for anyone
+    else; left unticked, the link opens only for people who already have
+    access. The capability is permission to override, never an automatic one.
+  - Optional **password** on any link (public or private), asked for at
+    `/share/unlock/[token]` before the link redeems. Stored as a salted scrypt
+    hash, never returned to a client or included in the recipient email, and
+    protected by a per-link lockout after ten wrong guesses in 15 minutes.
   - Redemption records the open and stores the token in an httpOnly cookie so
     access survives navigating around the site, but the cookie holds tokens
     only: every request re-validates them against the database, so a revoke

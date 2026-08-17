@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionIdentity } from "@/lib/current-user";
-import { shareCookiePayload, shareLinkStatus, shareTargetPath, SHARE_COOKIE } from "@/lib/share-access";
+import {
+  hasRedeemedShareToken,
+  shareCookiePayload,
+  shareLinkStatus,
+  shareTargetPath,
+  SHARE_COOKIE,
+} from "@/lib/share-access";
 import { recordShareLinkView } from "@/lib/share-links";
 
 /**
@@ -24,6 +30,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         visibility: true,
         revokedAt: true,
         expiresAt: true,
+        passwordHash: true,
         recipients: { select: { email: true } },
         series: { select: { slug: true, published: true, hidden: true, deletedAt: true } },
         video: { select: { slug: true, published: true, hidden: true, deletedAt: true } },
@@ -49,6 +56,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const path = shareTargetPath(link);
   if (!path || !target || target.deletedAt || !target.published || target.hidden) {
     return NextResponse.redirect(new URL("/share/unavailable?reason=gone", request.url));
+  }
+
+  // Password-protected and not unlocked in this browser yet: hand off to the
+  // unlock page, which posts to /api/share-links/unlock. Nothing is recorded
+  // and no cookie is set here — getting the cookie *is* being unlocked.
+  if (link.passwordHash && !(await hasRedeemedShareToken(token))) {
+    return NextResponse.redirect(new URL(`/share/unlock/${encodeURIComponent(token)}`, request.url));
   }
 
   await recordShareLinkView(link.id);
