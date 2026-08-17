@@ -1,34 +1,107 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { readDeviceSettings, writeDeviceSettings } from "@/lib/device-settings";
+import {
+  DOWNLOADS_CHANGED_EVENT,
+  downloadsSupported,
+  formatBytes,
+  reconcileDownloads,
+  removeAllDownloads,
+  removeDownload,
+  type DownloadedVideo,
+} from "@/lib/offline-downloads";
 
 /**
- * The downloads section: the network preference, which is stored now, and the
- * download list, which is a placeholder until offline playback ships.
+ * The downloads section of the profile: what this device is allowed to do,
+ * the network preference, and the files themselves.
  *
- * The preference is deliberately live rather than waiting for the feature —
- * it's per-device (see device-settings.ts), so a member setting it on their
- * phone today is exactly the answer the downloader will need later, and
- * asking now avoids a surprise data-plan charge the first time it works.
+ * The list is per device and read straight from Cache Storage — the server
+ * never learns what's been downloaded, so it can't render this and doesn't
+ * try. Playback is an ordinary `<video>` pointing at the cached URL, which
+ * the service worker answers with no network at all.
  */
-export function DownloadsManager() {
+export function DownloadsManager({
+  pluginOn,
+  permitted,
+  platform,
+  maxDeviceGb,
+}: {
+  pluginOn: boolean;
+  permitted: boolean;
+  platform: "WEB" | "PWA" | "BOTH";
+  maxDeviceGb: number;
+}) {
   const [overCellular, setOverCellular] = useState(false);
+  const [items, setItems] = useState<DownloadedVideo[]>([]);
+  const [playing, setPlaying] = useState<DownloadedVideo | null>(null);
   const [ready, setReady] = useState(false);
+  const [supported, setSupported] = useState(true);
+
+  const refresh = useCallback(async () => {
+    setItems(await reconcileDownloads());
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setOverCellular(readDeviceSettings().downloadOverCellular);
+    setSupported(downloadsSupported());
     setReady(true);
-  }, []);
+    refresh();
 
-  function change(value: boolean) {
+    window.addEventListener(DOWNLOADS_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(DOWNLOADS_CHANGED_EVENT, refresh);
+  }, [refresh]);
+
+  function changeNetwork(value: boolean) {
     setOverCellular(value);
     writeDeviceSettings({ downloadOverCellular: value });
   }
 
+  async function remove(item: DownloadedVideo) {
+    if (playing?.videoId === item.videoId) setPlaying(null);
+    await removeDownload(item.videoId);
+    await refresh();
+  }
+
+  async function clearAll() {
+    if (!confirm("Remove every downloaded video from this device?")) return;
+    setPlaying(null);
+    await removeAllDownloads();
+    await refresh();
+  }
+
+  const usedBytes = items.reduce((total, item) => total + item.bytes, 0);
+  const usedFraction = Math.min(1, usedBytes / (maxDeviceGb * 1024 ** 3));
+
   return (
     <div className="space-y-6">
+      <section className="space-y-2">
+        <h3 className="text-sm font-medium">Availability</h3>
+        {!pluginOn ? (
+          <p className="text-sm text-zinc-500">Downloads are turned off for this site.</p>
+        ) : !permitted ? (
+          <p className="text-sm text-zinc-500">
+            Your account doesn&apos;t have download access. Ask an admin if you think it should.
+          </p>
+        ) : !supported ? (
+          <p className="text-sm text-zinc-500">
+            This browser can&apos;t store downloads. Try installing the app, or use a different browser.
+          </p>
+        ) : (
+          <p className="text-sm text-zinc-500">
+            You can download videos for offline viewing
+            {platform === "PWA"
+              ? " in the installed app"
+              : platform === "WEB"
+                ? " on the web"
+                : " here and in the installed app"}
+            . Look for the ⬇ Download button under a video. Individual videos can still be excluded by an admin.
+          </p>
+        )}
+      </section>
+
       <section className="space-y-2">
         <h3 className="text-sm font-medium">Network</h3>
         <fieldset className="space-y-2 text-sm" disabled={!ready}>
@@ -39,7 +112,7 @@ export function DownloadsManager() {
               name="download-network"
               className="mt-1"
               checked={!overCellular}
-              onChange={() => change(false)}
+              onChange={() => changeNetwork(false)}
             />
             <span>
               Wi-Fi only
@@ -52,7 +125,7 @@ export function DownloadsManager() {
               name="download-network"
               className="mt-1"
               checked={overCellular}
-              onChange={() => change(true)}
+              onChange={() => changeNetwork(true)}
             />
             <span>
               Wi-Fi or mobile data
@@ -62,18 +135,97 @@ export function DownloadsManager() {
             </span>
           </label>
         </fieldset>
-        <p className="text-xs text-zinc-500">Applies to this device only.</p>
+        <p className="text-xs text-zinc-500">
+          Applies to this device only. Detecting a mobile connection isn&apos;t possible in every browser — where
+          it isn&apos;t, downloads go ahead.
+        </p>
       </section>
 
-      <section className="space-y-2">
-        <h3 className="text-sm font-medium">Manage downloads</h3>
-        <div className="rounded-lg border border-dashed border-zinc-300 p-6 text-center dark:border-zinc-700">
-          <p className="text-sm font-medium">No downloads on this device</p>
-          <p className="mt-1 text-xs text-zinc-500">
-            Downloading videos for offline playback isn&apos;t available yet. When it is, anything you&apos;ve saved
-            will be listed here with the space it uses and a way to remove it.
-          </p>
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-medium">On this device</h3>
+          {items.length > 0 && (
+            <button
+              onClick={clearAll}
+              className="rounded-md border border-zinc-300 px-3 py-1 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+            >
+              Remove all
+            </button>
+          )}
         </div>
+
+        {items.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-zinc-300 p-6 text-center dark:border-zinc-700">
+            <p className="text-sm font-medium">Nothing downloaded yet</p>
+            <p className="mt-1 text-xs text-zinc-500">
+              Downloaded videos are kept on this device and play without a connection.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-1">
+              <div className="h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
+                <div className="h-full bg-sky-600" style={{ width: `${Math.round(usedFraction * 100)}%` }} />
+              </div>
+              <p className="text-xs text-zinc-500">
+                {formatBytes(usedBytes)} used of a suggested {maxDeviceGb} GB · {items.length} video
+                {items.length === 1 ? "" : "s"}
+              </p>
+            </div>
+
+            {playing && (
+              <div className="space-y-1">
+                {/* Served from Cache Storage by the service worker, so this
+                    plays with no connection. */}
+                <video src={playing.cacheUrl} controls autoPlay className="w-full rounded-lg bg-black" />
+                <div className="flex items-center justify-between text-xs text-zinc-500">
+                  <span className="truncate">{playing.title}</span>
+                  <button onClick={() => setPlaying(null)} className="underline">
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+              {items.map((item) => (
+                <li key={item.videoId} className="flex flex-wrap items-center justify-between gap-2 p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{item.title}</p>
+                    <p className="truncate text-xs text-zinc-500">
+                      {item.seriesTitle ? `${item.seriesTitle} · ` : ""}
+                      {formatBytes(item.bytes)} · saved{" "}
+                      {new Date(item.downloadedAt).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2 text-sm">
+                    <button
+                      onClick={() => setPlaying(item)}
+                      className="rounded-md border border-zinc-300 px-3 py-1 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                    >
+                      Play offline
+                    </button>
+                    <Link
+                      href={`/videos/${item.videoSlug}`}
+                      className="rounded-md border border-zinc-300 px-3 py-1 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                    >
+                      Open page
+                    </Link>
+                    <button
+                      onClick={() => remove(item)}
+                      className="rounded-md border border-red-300 px-3 py-1 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </section>
     </div>
   );

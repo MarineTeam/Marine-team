@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { getUnreadNotificationCount } from "@/lib/inbox";
+import { getDownloadAccessSummary } from "@/lib/downloads";
 
 /**
  * The profile's landing card: what's waiting for the member, and the way in
@@ -12,7 +13,7 @@ export default async function ProfileOverviewPage() {
   const user = await getCurrentUser();
   if (!user) return null; // The layout already gates on login.
 
-  const [unreadCount, activeShareLinks, favoriteCount, playlistCount] = await Promise.all([
+  const [unreadCount, activeShareLinks, favoriteCount, playlistCount, downloadAccess] = await Promise.all([
     getUnreadNotificationCount(user.id),
     prisma.shareLink.count({
       where: {
@@ -23,6 +24,7 @@ export default async function ProfileOverviewPage() {
     }),
     prisma.videoFavorite.count({ where: { userId: user.id } }),
     prisma.playlist.count({ where: { userId: user.id } }),
+    getDownloadAccessSummary(user),
   ]);
 
   const cards = [
@@ -41,8 +43,8 @@ export default async function ProfileOverviewPage() {
     {
       href: "/profile/downloads",
       label: "Downloads",
-      value: "Coming soon",
-      detail: "Choose whether downloads may use mobile data.",
+      value: downloadAccess.pluginOn && downloadAccess.permitted ? "Available" : "Off",
+      detail: "Videos saved to this device, and when they may use mobile data.",
     },
     {
       href: "/profile/settings",

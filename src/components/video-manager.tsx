@@ -27,6 +27,7 @@ type Video = {
   slug: string;
   status: "PROCESSING" | "READY" | "FAILED";
   memberOnly: boolean;
+  downloadEnabled: boolean | null;
   hidden: boolean;
   published: boolean;
   unpublishAt: string | null;
@@ -265,6 +266,22 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [field]: !v[field] }),
+    });
+    await load();
+  }
+
+  /**
+   * Cycles the tri-state download override: inherit -> allow -> block ->
+   * inherit. A cycling button rather than the select used on the category and
+   * series forms, to match the other per-row flags here — and because most
+   * videos are left inheriting, which is one click away from either end.
+   */
+  async function cycleDownload(v: Video) {
+    const next = v.downloadEnabled === null ? true : v.downloadEnabled ? false : null;
+    await fetch(`/api/admin/videos/${v.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ downloadEnabled: next }),
     });
     await load();
   }
@@ -647,6 +664,23 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
                 className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${v.hidden ? "border-red-400 text-red-600 dark:text-red-400" : "border-zinc-300"}`}
               >
                 {v.hidden ? "Hidden" : "Visible"}
+              </button>
+              <button
+                onClick={() => cycleDownload(v)}
+                className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${
+                  v.downloadEnabled === false
+                    ? "border-red-400 text-red-600 dark:text-red-400"
+                    : v.downloadEnabled === true
+                      ? "border-green-400 text-green-700 dark:text-green-400"
+                      : "border-zinc-300"
+                }`}
+                title="Downloads: click to cycle inherit / allow / block"
+              >
+                {v.downloadEnabled === null
+                  ? "⬇ Inherit"
+                  : v.downloadEnabled
+                    ? "⬇ Allowed"
+                    : "⬇ Blocked"}
               </button>
               <button
                 onClick={() => setPremiere(v)}

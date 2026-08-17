@@ -217,6 +217,7 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   - **Share links**: gates *creating* share links (see below). Revoking is
     deliberately never gated — turning this plugin off must not trap a member
     with links they can no longer switch off.
+  - **Downloads**: offline viewing (see below).
 - **Sequential unlock**: a per-series "Require watching in order" toggle
   (`Series.requireSequential`, set on the series edit page — not a plugin,
   since it's a property of one series rather than a site feature). When on,
@@ -265,6 +266,21 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   `src/lib/share-links.ts` (create, list, revoke) so `content.ts` can consult
   grants without importing the permission machinery it depends on; the stored
   password hash is stripped from every API response by a single DTO mapper.
+- **Downloads**: members save videos to the device and play them offline.
+  Four gates, all of which must pass: the plugin (site-wide, with the usual
+  per-category override), a tri-state `downloadEnabled` on the
+  video/series/category resolved most-specific-first
+  (`resolveDownloadEnabled` in `src/lib/downloads.ts`), the `DownloadPolicy`
+  singleton's audience (any member, or named permission groups/users), and its
+  platform (web, installed PWA, or both). `/api/downloads/[videoId]` calls
+  `canViewVideo` before any of it, so downloading can only ever narrow what a
+  member can already watch. The file is a signed, short-lived Bunny **MP4**
+  URL — requiring MP4 Fallback on the Stream library, since HLS segments can't
+  be played offline by a `<video>` — streamed into Cache Storage under
+  `/offline-video/<id>.mp4` and served back by the service worker, range
+  requests included, so seeking works with no network. The downloaded list is
+  per device and never reaches the server. Admin settings at
+  `/admin/downloads`; member view at `/profile/downloads`.
 - **The profile area** (`/profile`): the member's account hub — inbox,
   shared links, downloads, and settings — shown identically on the web and in
   the PWA, with a Profile tab in the mobile bottom nav badged with the unread

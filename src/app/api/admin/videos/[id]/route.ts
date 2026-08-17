@@ -25,6 +25,8 @@ export const updateSchema = z
     seriesId: z.string().optional().nullable(),
     categoryId: z.string().optional().nullable(),
     memberOnly: z.boolean().optional(),
+    // Tri-state: null clears the override and goes back to inheriting.
+    downloadEnabled: z.boolean().nullable().optional(),
     hidden: z.boolean().optional(),
     published: z.boolean().optional(),
     publishAt: z.string().nullable().optional(),

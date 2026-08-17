@@ -23,6 +23,7 @@ import {
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
 import { getShareOptions } from "@/lib/share-links";
+import { getDownloadAvailability } from "@/lib/downloads";
 import { getPluginStates } from "@/lib/plugins";
 import { bunnyStreamEmbedUrl, bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { WatchProgressTracker } from "@/components/watch-progress-tracker";
@@ -36,6 +37,7 @@ import { StarRating } from "@/components/star-rating";
 import { ReactionButtons } from "@/components/reaction-buttons";
 import { ShareButtons } from "@/components/share-buttons";
 import { ShareLinkPanel } from "@/components/share-link-panel";
+import { DownloadButton } from "@/components/download-button";
 import { MenuTile } from "@/components/menu-tile";
 import { CommentSection } from "@/components/comment-section";
 import { SermonNotesPanel } from "@/components/sermon-notes-panel";
@@ -114,6 +116,7 @@ export default async function VideoPage({
     transcripts: transcriptsOn,
     "sermon-notes": sermonNotesOn,
     "share-links": shareLinksOn,
+    downloads: downloadsOn,
   } = plugins;
   const resumeAt = progress && !progress.completed ? progress.positionSeconds : 0;
 
@@ -128,6 +131,7 @@ export default async function VideoPage({
     chapters,
     sermonNotes,
     shareOptions,
+    downloadAvailability,
   ] = await Promise.all([
       ratingsOn ? getVideoRatingSummary(video.id) : Promise.resolve({ average: 0, count: 0 }),
       ratingsOn && user ? getUserVideoRating(user.id, video.id) : Promise.resolve(null),
@@ -147,6 +151,12 @@ export default async function VideoPage({
             seriesId: video.seriesId,
           })
         : Promise.resolve({ canShare: false, targetIsRestricted: false, canGrantAccess: false }),
+      // Platform deliberately unresolved here: only the browser knows whether
+      // it's the installed app, so the button gets the policy and finishes the
+      // decision itself.
+      downloadsOn && user
+        ? getDownloadAvailability({ user, video, platform: "any" })
+        : Promise.resolve({ allowed: false as const, reason: "plugin_off" as const, message: "" }),
     ]);
   const initialComments = comments.map((c) => ({
     ...c,
@@ -213,6 +223,16 @@ export default async function VideoPage({
           which hides the panel behind the same gate. */}
       {shareOptions.canShare && !sequenceLocked && (
         <ShareLinkPanel videoId={video.id} canGrantAccess={shareOptions.canGrantAccess} />
+      )}
+      {downloadAvailability.allowed && !sequenceLocked && !isPendingPremiere && video.status === "READY" && (
+        <DownloadButton
+          videoId={video.id}
+          title={video.title}
+          seriesTitle={video.series?.title ?? null}
+          videoSlug={video.slug}
+          durationSeconds={video.durationSeconds}
+          policyPlatform={downloadAvailability.platform}
+        />
       )}
 
       {isPendingPremiere && video.publishAt ? (

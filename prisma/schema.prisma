@@ -30,6 +30,24 @@ enum ReactionType {
   DISLIKE
 }
 
+// Where the download button is offered. Downloading is a very different
+// proposition on an installed app (where the file lives in the app's cache
+// and plays offline) than in a browser tab, so a church can enable one
+// without the other.
+enum DownloadPlatform {
+  WEB
+  PWA
+  BOTH
+}
+
+// Who may download, on top of already being able to *view* the content.
+enum DownloadAudience {
+  // Any authorized member.
+  ALL_MEMBERS
+  // Only the permission groups and specific people listed on the policy.
+  SPECIFIC
+}
+
 enum ShareVisibility {
   // Anyone holding the link can open it, no login needed.
   PUBLIC
@@ -89,6 +107,7 @@ model User {
   videoViewGrants       VideoViewer[]
   shareLinks            ShareLink[]
   notifications         Notification[]
+  downloadGrants        DownloadPolicyUser[]
 }
 
 // Grants a non-admin user editor access to one category (and everything
@@ -127,6 +146,10 @@ model Category {
   coverImageUrl     String?
   tags              String[]                 @default([])
   memberOnly        Boolean                  @default(false)
+  // Tri-state download override: null inherits (from the nearest ancestor
+  // category, then the site default), true allows, false blocks. See
+  // resolveDownloadEnabled in src/lib/downloads.ts.
+  downloadEnabled   Boolean?
   hidden            Boolean                  @default(false)
   published         Boolean                  @default(true)
   publishAt         DateTime?
@@ -167,6 +190,9 @@ model Series {
   description       String?
   coverImageUrl     String?
   memberOnly        Boolean             @default(false)
+  // Tri-state download override — see Category.downloadEnabled. Null inherits
+  // from this series' category chain.
+  downloadEnabled   Boolean?
   hidden            Boolean             @default(false)
   published         Boolean             @default(true)
   publishAt         DateTime?
@@ -222,6 +248,9 @@ model Video {
   durationSeconds   Int?
   status            VideoStatus        @default(PROCESSING)
   memberOnly        Boolean            @default(false)
+  // Tri-state download override — see Category.downloadEnabled. The most
+  // specific level, so this wins over its series and category.
+  downloadEnabled   Boolean?
   hidden            Boolean            @default(false)
   published         Boolean            @default(false)
   publishAt         DateTime?
@@ -448,14 +477,15 @@ model PluginCategoryOverride {
 // Assigning a group to a user grants those capabilities, either site-wide or
 // scoped to one category (and everything under it) or one series.
 model PermissionGroup {
-  id               String              @id @default(cuid())
-  name             String              @unique
+  id               String                @id @default(cuid())
+  name             String                @unique
   description      String?
-  capabilities     String[]            @default([])
+  capabilities     String[]              @default([])
   assignments      GroupAssignment[]
   seriesViewGrants SeriesViewerGroup[]
   videoViewGrants  VideoViewerGroup[]
-  createdAt        DateTime            @default(now())
+  downloadGrants   DownloadPolicyGroup[]
+  createdAt        DateTime              @default(now())
 }
 
 model GroupAssignment {
@@ -907,6 +937,54 @@ model ShareLinkRecipient {
   createdAt   DateTime  @default(now())
 
   @@unique([shareLinkId, email])
+}
+
+// Site-wide download settings: a single row, seeded on first read the same
+// way Plugin and HomeRow rows are (see ensureDownloadPolicy). The Downloads
+// plugin is the master on/off switch; this is everything else about *how*
+// downloading works, kept in a row rather than env vars so it's editable at
+// /admin/downloads without a redeploy.
+//
+// What may be downloaded is a separate question, answered by the tri-state
+// `downloadEnabled` on Category/Series/Video — see resolveDownloadEnabled.
+model DownloadPolicy {
+  // Fixed id: there is only ever one of these.
+  id          String                @id @default("singleton")
+  platform    DownloadPlatform      @default(BOTH)
+  audience    DownloadAudience      @default(ALL_MEMBERS)
+  // Cap on how much one device is encouraged to hold, shown in the profile's
+  // download manager. Advisory: the browser's own storage quota is the real
+  // limit, and this never blocks a download that's already started.
+  maxDeviceGb Int                   @default(8)
+  groups      DownloadPolicyGroup[]
+  users       DownloadPolicyUser[]
+  updatedAt   DateTime              @updatedAt
+}
+
+// A permission group allowed to download, when audience is SPECIFIC.
+model DownloadPolicyGroup {
+  id       String          @id @default(cuid())
+  policy   DownloadPolicy  @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  policyId String
+  group    PermissionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId  String
+
+  @@unique([policyId, groupId])
+  @@index([groupId])
+}
+
+// One person allowed to download regardless of group, when audience is
+// SPECIFIC — the same "groups or named individuals" shape as the viewer
+// grants on a restricted series/video.
+model DownloadPolicyUser {
+  id       String         @id @default(cuid())
+  policy   DownloadPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  policyId String
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String
+
+  @@unique([policyId, userId])
+  @@index([userId])
 }
 
 // A member's kept copy of a notification, shown in their profile inbox.

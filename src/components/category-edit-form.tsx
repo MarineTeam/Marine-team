@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { DownloadOverrideSelect } from "@/components/download-override-select";
 
 type Category = {
   id: string;
@@ -11,6 +12,7 @@ type Category = {
   coverImageUrl: string | null;
   tags: string[];
   memberOnly: boolean;
+  downloadEnabled: boolean | null;
   hidden: boolean;
   published: boolean;
   publishAt: Date | string | null;
@@ -35,6 +37,7 @@ export function CategoryEditForm({ category }: { category: Category }) {
   const [coverImageUrl, setCoverImageUrl] = useState(category.coverImageUrl ?? "");
   const [tags, setTags] = useState(category.tags.join(", "));
   const [memberOnly, setMemberOnly] = useState(category.memberOnly);
+  const [downloadEnabled, setDownloadEnabled] = useState(category.downloadEnabled);
   const [hidden, setHidden] = useState(category.hidden);
   const [published, setPublished] = useState(category.published);
   const [featured, setFeatured] = useState(category.featured);
@@ -61,6 +64,7 @@ export function CategoryEditForm({ category }: { category: Category }) {
           coverImageUrl,
           tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
           memberOnly,
+          downloadEnabled,
           hidden,
           published,
           featured,
@@ -177,6 +181,12 @@ export function CategoryEditForm({ category }: { category: Category }) {
           <input type="checkbox" checked={hidden} onChange={(e) => setHidden(e.target.checked)} />
           Hidden (invisible to everyone but admins/editors)
         </label>
+        <DownloadOverrideSelect
+          id="category-downloads"
+          value={downloadEnabled}
+          onChange={setDownloadEnabled}
+          inheritedLabel="follows the parent category, or the site default"
+        />
         <label className="flex items-center gap-1.5 text-sm">
           <input
             type="checkbox"

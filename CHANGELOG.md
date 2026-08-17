@@ -8,6 +8,31 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Downloads** (new plugin): members can save a video to their device and
+  watch it with no connection. The file is streamed into Cache Storage and
+  served back by the service worker — range requests included, so seeking
+  works offline — which lets an ordinary `<video>` play with the network off.
+  Requires **MP4 Fallback** on the Bunny Stream library, since HLS segments
+  can't be played offline; the API checks the file exists before offering it,
+  and the resolution is set with `BUNNY_STREAM_DOWNLOAD_HEIGHT` (720p default).
+  - **Granular control over what can be downloaded**: a three-way
+    Inherit/Allow/Block setting on every **category**, **series**, and
+    **video**, resolved most-specific-first and falling back to the nearest
+    ancestor category that has an opinion. Three states rather than a checkbox
+    so "not set" keeps following its parent as that parent changes. Edited on
+    the category and series pages, and as a cycling per-row button on
+    `/admin/videos`.
+  - **Who can download**: `/admin/downloads` chooses any member, or only named
+    permission groups and individuals. Admins always can.
+  - **Where**: the same page limits downloading to the web, the installed app,
+    or both — offline files belong to the PWA, and a church can say so.
+  - Downloading can never widen access: the API resolves `canViewVideo` first,
+    so it only ever narrows what a member could already watch.
+  - `/profile/downloads` becomes real: whether downloads are available to you
+    (and why not, if not), the Wi-Fi-only vs mobile-data preference, storage
+    used against the admin's suggested cap, and per-video **Play offline** and
+    **Remove**. The list is per device and never reaches the server, and
+    self-heals when the browser silently evicts a cached file.
 - **Share links**: revocable, tracked links to a series or video, opened at
   `/s/[token]`. A link can be **public** (anyone holding it, no account
   needed) or **private** to named emails, in which case each recipient is

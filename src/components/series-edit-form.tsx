@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { DownloadOverrideSelect } from "@/components/download-override-select";
 
 type Category = { id: string; name: string };
 type Series = {
@@ -12,6 +13,7 @@ type Series = {
   coverImageUrl: string | null;
   categoryId: string | null;
   memberOnly: boolean;
+  downloadEnabled: boolean | null;
   hidden: boolean;
   published: boolean;
   publishAt: Date | string | null;
@@ -49,6 +51,7 @@ export function SeriesEditForm({
   const [coverImageUrl, setCoverImageUrl] = useState(series.coverImageUrl ?? "");
   const [categoryId, setCategoryId] = useState(series.categoryId ?? "");
   const [memberOnly, setMemberOnly] = useState(series.memberOnly);
+  const [downloadEnabled, setDownloadEnabled] = useState(series.downloadEnabled);
   const [hidden, setHidden] = useState(series.hidden);
   const [published, setPublished] = useState(series.published);
   const [featured, setFeatured] = useState(series.featured);
@@ -69,6 +72,7 @@ export function SeriesEditForm({
       coverImageUrl,
       categoryId: categoryId || null,
       memberOnly,
+      downloadEnabled,
       hidden,
       published,
       featured,
@@ -134,6 +138,7 @@ export function SeriesEditForm({
     if (d.coverImageUrl !== undefined) setCoverImageUrl(d.coverImageUrl ?? "");
     if (d.categoryId !== undefined) setCategoryId(d.categoryId ?? "");
     if (d.memberOnly !== undefined) setMemberOnly(d.memberOnly);
+    if (d.downloadEnabled !== undefined) setDownloadEnabled(d.downloadEnabled);
     if (d.hidden !== undefined) setHidden(d.hidden);
     if (d.published !== undefined) setPublished(d.published);
     if (d.featured !== undefined) setFeatured(d.featured);
@@ -280,6 +285,12 @@ export function SeriesEditForm({
           <input type="checkbox" checked={hidden} onChange={(e) => setHidden(e.target.checked)} />
           Hidden (invisible to everyone but admins/editors)
         </label>
+        <DownloadOverrideSelect
+          id="series-downloads"
+          value={downloadEnabled}
+          onChange={setDownloadEnabled}
+          inheritedLabel="follows this series' category"
+        />
         <label className="flex items-center gap-1.5 text-sm">
           <input
             type="checkbox"

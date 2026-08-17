@@ -124,6 +124,8 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   it also holds the inbox, shared links, and account settings.
 - **Share links** — lets a member create a revocable link to a series or
   video, either public or emailed to named people. See Share links below.
+- **Downloads** — lets members save videos to their device and watch them
+  with no connection. See Downloads below.
 - **Chapters** — an admin-managed, ordered list of named timestamps on a
   video; the video page shows a jump-to-section list underneath the player.
   Clicking a chapter reloads the embed starting at that timestamp (Bunny's
@@ -271,6 +273,72 @@ out, sees how often each link has been opened, and can switch any of them off.
   that's what the admin list and its Revoke button are for. A link's password
   and expiry can't be edited after the fact; revoke and re-share instead.
 
+## Downloads
+
+Offline viewing: a member saves a video to their device and it plays with no
+connection at all. Four independent controls decide whether the ⬇ Download
+button appears under a video, and **all** of them have to pass.
+
+1. **The feature** — the Downloads plugin, site-wide at `/admin/plugins`, with
+   the usual per-category override (turn it off for one branch of the tree and
+   everything under it loses downloads).
+2. **The content** — a three-way **Downloads** setting on every category,
+   series, and video: *Inherit*, *Allow*, or *Block*. The most specific wins:
+   video, then its series, then the nearest ancestor category that has an
+   opinion, then allowed. Three states rather than a checkbox because "not
+   set" has to differ from "off" — a series left inheriting follows its
+   category *later* too, when that category changes. Set it on the category
+   and series edit pages; on `/admin/videos` it's a per-row button that cycles
+   Inherit → Allowed → Blocked.
+3. **The people** — `/admin/downloads` chooses between *any member* and *only
+   certain groups or people* (permission groups and/or named individuals, the
+   same shape as a restricted item's viewer grants). Admins can always
+   download.
+4. **The platform** — the same page picks *web and installed app*, *installed
+   app only*, or *web only*, so a church can keep offline files to the PWA
+   where they belong.
+
+None of this can widen access: `/api/downloads/[videoId]` calls `canViewVideo`
+first, so a member can only ever download something they could already watch.
+The platform is the one thing the client asserts (only the browser can see
+`display-mode: standalone`), which is why it's a placement rule rather than a
+security boundary — it never affects *who* or *what*, only *where the button
+shows*.
+
+How a download actually works:
+
+- The API hands back a short-lived **signed MP4 URL** (the same CDN
+  token scheme the thumbnails use, 30-minute TTL). This needs **MP4 Fallback**
+  enabled on the Bunny Stream library — HLS segments can't be handed to a
+  `<video>` for offline playback. The route HEADs the file first, so a library
+  without it gives "this video doesn't have a downloadable file yet" rather
+  than a broken download.
+- The browser streams the file into **Cache Storage** with a progress bar,
+  under a `/offline-video/<id>.mp4` key on our own origin. The service worker
+  answers those URLs from the cache — including **range requests**, so seeking
+  works — which is what lets an ordinary `<video>` element play with the
+  network off.
+- The download cache is deliberately excluded from the service worker's
+  activate-time cleanup, so shipping a new version never wipes someone's
+  saved videos.
+- Everything about *what* is downloaded is per device and never leaves it: the
+  file list lives in the browser's own storage, so the server can't tell you
+  what's on your phone, and downloads don't follow you to another device.
+
+Members manage it all at `/profile/downloads`: whether downloads are available
+to them (and why not, if not), the Wi-Fi-only vs mobile-data preference, how
+much space is used against the admin's suggested cap, and per-video **Play
+offline** / **Remove**. The list self-heals — browsers evict caches silently
+under storage pressure, so entries whose file has vanished are dropped on
+load rather than offering playback of something that isn't there.
+
+Limits worth knowing: the Wi-Fi-only preference relies on the Network
+Information API, which only Chromium implements — where the connection type
+can't be read, downloads go ahead rather than being blocked everywhere. The
+storage cap is advisory (the browser's own quota is the real limit) and never
+interrupts a download in progress. And downloads are MP4 files in a normal
+browser cache: this is offline convenience, not DRM.
+
 ## Auth
 
 - Auth0 login (`/auth/login`, `/auth/logout`, `/auth/callback`) proves
@@ -346,6 +414,12 @@ out, sees how often each link has been opened, and can switch any of them off.
   (or are `ADMIN`). "Hide" removes a comment from public view without
   deleting it; "Delete" is permanent, same as the existing per-comment
   delete action.
+
+- **Downloads** (`/admin/downloads`, needs `manage_plugins`) — who may
+  download (any member, or named groups/people), where the button appears
+  (web, installed app, or both), and the suggested per-device storage cap.
+  Which *videos* may be downloaded is set per category/series/video on their
+  own edit pages. See Downloads above.
 
 - **Share links** (`/admin/share-links`, needs `share_content`) — every share
   link on the site, whoever created it: target, owner, public or private,
@@ -548,8 +622,8 @@ out, sees how often each link has been opened, and can switch any of them off.
 `npm test` runs a vitest suite (`src/lib/*.test.ts`) over the logic that
 would fail quietly rather than loudly — access and capability checks,
 plugin override precedence, sequential unlock, list reordering, fuzzy
-matching, share-link sharing rules and link validity, and device-settings
-parsing. Prisma is mocked, so the suite needs no database.
+matching, share-link sharing rules and link validity, download inheritance
+and audience/platform rules, and device-settings parsing. Prisma is mocked, so the suite needs no database.
 
 GitHub Actions runs the type check, lint, that suite, and
 `prisma validate` / `prisma format --check` on every pull request and every
