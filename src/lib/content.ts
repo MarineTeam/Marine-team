@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { unstable_cache } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { isPluginEnabled } from "@/lib/plugins";
+import { getShareGrants } from "@/lib/share-access";
 
 export function canAccess(memberOnly: boolean, isLoggedIn: boolean): boolean {
   return !memberOnly || isLoggedIn;
@@ -1416,12 +1417,18 @@ async function userInAnyGroup(userId: string, groupIds: string[]): Promise<boole
  * granular viewer grants falls back to the plain `memberOnly` gate; a
  * series with at least one grant (role or specific user) requires the
  * viewer to match one of those grants — `memberOnly` no longer applies.
+ *
+ * A redeemed share link (see src/lib/share-links.ts) is a third way in,
+ * checked first because it's the cheapest and applies to logged-out
+ * visitors too: it's how a link handed to someone outside the site lets
+ * them watch without an account.
  */
 export async function canViewSeries(
   user: ViewerUser | null,
   series: { id: string; memberOnly: boolean },
 ): Promise<boolean> {
   if (user?.role === "ADMIN") return true;
+  if ((await getShareGrants()).seriesIds.has(series.id)) return true;
 
   const [groupGrants, userGrantCount] = await Promise.all([
     prisma.seriesViewerGroup.findMany({ where: { seriesId: series.id }, select: { groupId: true } }),
@@ -1444,6 +1451,7 @@ export async function canViewVideo(
   video: { id: string; memberOnly: boolean },
 ): Promise<boolean> {
   if (user?.role === "ADMIN") return true;
+  if ((await getShareGrants()).videoIds.has(video.id)) return true;
 
   const [groupGrants, userGrantCount] = await Promise.all([
     prisma.videoViewerGroup.findMany({ where: { videoId: video.id }, select: { groupId: true } }),
@@ -1475,16 +1483,21 @@ export async function getViewableVideoIds(
   if (user?.role === "ADMIN") return new Set(videos.map((v) => v.id));
 
   const ids = videos.map((v) => v.id);
-  const [groupGrants, userGrantVideoIds] = await Promise.all([
+  const [groupGrants, userGrantVideoIds, shareGrants] = await Promise.all([
     prisma.videoViewerGroup.findMany({ where: { videoId: { in: ids } }, select: { videoId: true, groupId: true } }),
     prisma.videoViewer.findMany({ where: { videoId: { in: ids } }, select: { videoId: true } }),
+    getShareGrants(),
   ]);
   const restrictedIds = new Set([...groupGrants.map((g) => g.videoId), ...userGrantVideoIds.map((g) => g.videoId)]);
 
   const result = new Set<string>();
   const stillToCheck: typeof videos = [];
   for (const v of videos) {
-    if (!restrictedIds.has(v.id)) {
+    // A redeemed share link settles it either way, and works logged out —
+    // so it's checked before the restriction/memberOnly split below.
+    if (shareGrants.videoIds.has(v.id)) {
+      result.add(v.id);
+    } else if (!restrictedIds.has(v.id)) {
       if (canAccess(v.memberOnly, Boolean(user))) result.add(v.id);
     } else {
       stillToCheck.push(v);

@@ -6,6 +6,69 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Share links**: revocable, tracked links to a series or video, opened at
+  `/s/[token]`. A link can be **public** (anyone holding it, no account
+  needed) or **private** to named emails, in which case each recipient is
+  emailed their link and must log in as that address to open it — forwarding
+  it on hands over nothing. Optional expiry of 1–365 days.
+  - Two sharing tiers: any logged-in member can share content that is already
+    public (a tracked, revocable link that grants nothing extra), while
+    sharing gated content — `memberOnly`, or restricted to viewer
+    groups/users — needs the new **`share_content`** capability, grantable
+    site-wide or scoped to a category/series, and produces a link that
+    actually grants view access.
+  - Redemption records the open and stores the token in an httpOnly cookie so
+    access survives navigating around the site, but the cookie holds tokens
+    only: every request re-validates them against the database, so a revoke
+    takes effect immediately even for a browser that already holds the link.
+  - A "Share a link" panel on any series/video page the member may share,
+    listing their existing links for that content; the full list at
+    `/profile/shared-links`; and `/admin/share-links` for admins and
+    `share_content` holders, listing **every** link with its owner, filters,
+    and an audited Revoke. A dead link lands the recipient on
+    `/share/unavailable`, which says whether it was revoked, expired, or
+    meant for a different account.
+  - Gated by a new **Share links** plugin. Revoking is never gated, so
+    turning the plugin off can't trap someone with links they can't switch
+    off.
+- **Profile area** (`/profile`): the member's account hub, the same on the web
+  and in the installed PWA, with a Profile tab added to the mobile bottom nav
+  badged with the unread count.
+  - **Inbox** — every notification the site has sent, persisted as
+    `Notification` rows alongside each push/email send, so it's a complete
+    record even for a member who never allowed push or who read it elsewhere.
+    Mark one or all read, open the linked content, delete individually or
+    clear the lot.
+  - **Shared links** and **Downloads** sections, the latter holding the
+    Wi-Fi-only vs mobile-data preference (live now) ahead of offline playback
+    itself.
+  - **Settings** split into per-device and per-account: **Theme**
+    (System/Light/Dark), **Language** (English only for now), **Autoplay**,
+    **Default playback speed**, and the download-network choice are stored in
+    localStorage per device; display name, notification frequency, and email
+    opt-in stay on the account.
+  - **Delete account** — type your own email to confirm, then the `User` row
+    and everything cascading from it is removed and the browser is logged
+    out. Refused for the last remaining admin, which would otherwise leave
+    nobody able to grant access again.
+- **Theme setting**: dark mode is now a class on `<html>` rather than only the
+  OS preference, applied by a blocking inline script before first paint (no
+  flash of the wrong theme) and kept in step with the OS and other tabs while
+  the page is open. The `prefers-color-scheme` media query remains as the
+  no-JS fallback.
+
+### Changed
+
+- Autoplay is now a per-device setting rather than a hidden localStorage flag
+  owned by the "Up next" panel: turning it on there and in
+  `/profile/settings` is the same switch, and it now also starts the video
+  itself, not just the roll-on to the next episode.
+- The **Profile** nav link no longer depends on the Profiles plugin — that
+  plugin still governs display names, but the profile area itself now holds
+  the inbox, shared links, and account settings, which a member always needs.
+
 ## [1.5.0] - 2026-07-30
 
 ### Added

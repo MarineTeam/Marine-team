@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 
 export function ProfileForm({
   currentDisplayName,
+  profilesOn,
   notificationsOn,
   currentNotificationFrequency,
   currentEmailNotifications,
 }: {
   currentDisplayName: string | null;
+  profilesOn: boolean;
   notificationsOn: boolean;
   currentNotificationFrequency: "INSTANT" | "DAILY";
   currentEmailNotifications: boolean;
@@ -49,21 +51,26 @@ export function ProfileForm({
 
   return (
     <form onSubmit={save} className="space-y-3">
-      <div>
-        <label htmlFor="displayName" className="block text-sm font-medium">
-          Display name
-        </label>
-        <input
-          id="displayName"
-          type="text"
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-          maxLength={50}
-          placeholder="How your name appears on comments"
-          className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-        />
-        <p className="mt-1 text-xs text-zinc-500">Leave blank to use your account name instead.</p>
-      </div>
+      {/* Gated on the Profiles plugin, which is what the PATCH route honours
+          too: with it off, a saved display name is simply left alone rather
+          than shown as an editable field that wouldn't take. */}
+      {profilesOn && (
+        <div>
+          <label htmlFor="displayName" className="block text-sm font-medium">
+            Display name
+          </label>
+          <input
+            id="displayName"
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            maxLength={50}
+            placeholder="How your name appears on comments"
+            className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          />
+          <p className="mt-1 text-xs text-zinc-500">Leave blank to use your account name instead.</p>
+        </div>
+      )}
       {notificationsOn && (
         <div>
           <label htmlFor="notificationFrequency" className="block text-sm font-medium">

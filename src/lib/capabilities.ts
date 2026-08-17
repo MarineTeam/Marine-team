@@ -6,6 +6,7 @@ export const CAPABILITIES = [
   { key: "manage_files", label: "Manage files", hint: "Upload, edit, and delete files" },
   { key: "publish_content", label: "Publish content", hint: "Publish/unpublish, feature, and pin content" },
   { key: "moderate_comments", label: "Moderate comments", hint: "Delete or hide any comment, not just your own" },
+  { key: "share_content", label: "Share restricted content", hint: "Create share links that grant access to member-only or restricted content" },
   { key: "manage_users", label: "Manage users", hint: "Grant access and change roles" },
   { key: "manage_permissions", label: "Manage permissions", hint: "Create groups and assign them to users" },
   { key: "manage_plugins", label: "Manage plugins", hint: "Enable or disable optional features" },

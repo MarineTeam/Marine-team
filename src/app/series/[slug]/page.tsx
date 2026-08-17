@@ -19,6 +19,7 @@ import {
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
+import { canShareTarget } from "@/lib/share-links";
 import { getPluginStates } from "@/lib/plugins";
 import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { FavoriteButton } from "@/components/favorite-button";
@@ -27,6 +28,7 @@ import { SubscribeButton } from "@/components/subscribe-button";
 import { StarRating } from "@/components/star-rating";
 import { ReactionButtons } from "@/components/reaction-buttons";
 import { ShareButtons } from "@/components/share-buttons";
+import { ShareLinkPanel } from "@/components/share-link-panel";
 import { SeriesTile } from "@/components/series-tile";
 import { MenuTile } from "@/components/menu-tile";
 import { FileList } from "@/components/file-list";
@@ -80,15 +82,24 @@ export default async function SeriesPage({
     "social-share": socialShareOn,
     subscriptions: subscriptionsOn,
     "likes-dislikes": likesOn,
+    "share-links": shareLinksOn,
   } = plugins;
 
-  const [ratingSummary, myRating, reactionSummary, myReaction, related, comments] = await Promise.all([
+  const [ratingSummary, myRating, reactionSummary, myReaction, related, comments, canShare] = await Promise.all([
     ratingsOn ? getSeriesRatingSummary(series.id) : Promise.resolve({ average: 0, count: 0 }),
     ratingsOn && user ? getUserSeriesRating(user.id, series.id) : Promise.resolve(null),
     likesOn ? getSeriesReactionSummary(series.id) : Promise.resolve({ likes: 0, dislikes: 0 }),
     likesOn && user ? getUserSeriesReaction(user.id, series.id) : Promise.resolve(null),
     relatedOn && !seriesLocked ? getRelatedSeries(series) : Promise.resolve([]),
     commentsOn && !seriesLocked ? getComments("series", series.id) : Promise.resolve([]),
+    shareLinksOn && !seriesLocked
+      ? canShareTarget(user, {
+          type: "series",
+          id: series.id,
+          memberOnly: series.memberOnly,
+          categoryId: series.categoryId,
+        })
+      : Promise.resolve(false),
   ]);
   const initialComments = comments.map((c) => ({
     ...c,
@@ -150,6 +161,11 @@ export default async function SeriesPage({
         {!seriesLocked && socialShareOn && (
           <div className="mt-3">
             <ShareButtons title={series.title} path={`/series/${series.slug}`} />
+          </div>
+        )}
+        {canShare && (
+          <div className="mt-3">
+            <ShareLinkPanel seriesId={series.id} />
           </div>
         )}
         {series.tags.length > 0 && (

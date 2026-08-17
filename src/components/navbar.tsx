@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getCurrentUser, getSessionIdentity } from "@/lib/current-user";
 import { getPluginStates } from "@/lib/plugins";
 import { getDisplayName } from "@/lib/profile";
+import { getUnreadNotificationCount } from "@/lib/inbox";
 import { PushNotificationToggle } from "@/components/push-notification-toggle";
 import { MobileMenu } from "@/components/mobile-menu";
 
@@ -15,9 +16,9 @@ export async function Navbar() {
   const notificationsOn = plugins.notifications;
   const subscriptionsOn = plugins.subscriptions;
   const playlistsOn = plugins.playlists;
-  const profilesOn = plugins.profiles;
   const liveStreamingOn = plugins["live-streaming"];
   const unauthorized = !user && identity !== null;
+  const unreadCount = user ? await getUnreadNotificationCount(user.id) : 0;
 
   return (
     <header className="border-b border-zinc-200 bg-white/80 backdrop-blur sticky top-0 z-10 dark:bg-zinc-950/80 dark:border-zinc-800">
@@ -67,9 +68,14 @@ export async function Navbar() {
               Subscriptions
             </Link>
           )}
-          {user && profilesOn && (
-            <Link href="/profile" className="hover:underline">
+          {user && (
+            <Link href="/profile" className="flex items-center gap-1.5 hover:underline">
               Profile
+              {unreadCount > 0 && (
+                <span className="rounded-full bg-sky-600 px-1.5 text-[11px] leading-5 text-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </Link>
           )}
           {user && notificationsOn && <PushNotificationToggle />}
@@ -112,8 +118,8 @@ export async function Navbar() {
             playlistsOn={playlistsOn}
             subscriptionsOn={subscriptionsOn}
             notificationsOn={notificationsOn}
-            profilesOn={profilesOn}
             liveStreamingOn={liveStreamingOn}
+            unreadCount={unreadCount}
           />
         </div>
       </nav>

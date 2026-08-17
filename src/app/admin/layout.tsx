@@ -12,6 +12,7 @@ const adminLinks = [
   { href: "/admin/live", label: "Live streaming" },
   { href: "/admin/files", label: "Files" },
   { href: "/admin/comments", label: "Comment moderation" },
+  { href: "/admin/share-links", label: "Share links" },
   { href: "/admin/trash", label: "Trash" },
   { href: "/admin/users", label: "Access" },
   { href: "/admin/permissions", label: "Permissions" },
@@ -57,6 +58,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       canManageCategories,
       canManageSeries,
       canManageFiles,
+      canShareContent,
       moderateScope,
     ] = await Promise.all([
       hasCapability(user, "manage_users"),
@@ -68,6 +70,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       hasCapability(user, "manage_categories"),
       hasCapability(user, "manage_series"),
       hasCapability(user, "manage_files"),
+      hasCapability(user, "share_content"),
       getCapabilityScope(user, "moderate_comments"),
     ]);
     const canModerateComments =
@@ -84,6 +87,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         : []),
       { href: "/admin/files", label: "Files" },
       ...(canModerateComments ? [{ href: "/admin/comments", label: "Comment moderation" }] : []),
+      ...(canShareContent ? [{ href: "/admin/share-links", label: "Share links" }] : []),
       ...(canSeeTrash ? [{ href: "/admin/trash", label: "Trash" }] : []),
       ...(canManageUsers ? [{ href: "/admin/users", label: "Access" }] : []),
       ...(canManagePermissions ? [{ href: "/admin/permissions", label: "Permissions" }] : []),

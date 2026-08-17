@@ -117,10 +117,13 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   alongside (and independent from) the 1-5 star Ratings plugin.
 - **Watch history** — gates the `/recently-played` page and its bottom-nav
   tab, matching the toggle pattern of the other member features.
-- **Profiles** (`/profile`) — lets a member set a display name, shown
-  instead of their Auth0 account name in comments and the navbar. Blank
-  falls back to the Auth0 name, then the email. The page also hosts the
-  notification frequency selector described above.
+- **Profiles** — lets a member set a display name, shown instead of their
+  Auth0 account name in comments and the navbar. Blank falls back to the
+  Auth0 name, then the email. The field lives on `/profile/settings`; the
+  profile area itself is always available (see The profile area below), since
+  it also holds the inbox, shared links, and account settings.
+- **Share links** — lets a member create a revocable link to a series or
+  video, either public or emailed to named people. See Share links below.
 - **Chapters** — an admin-managed, ordered list of named timestamps on a
   video; the video page shows a jump-to-section list underneath the player.
   Clicking a chapter reloads the embed starting at that timestamp (Bunny's
@@ -143,6 +146,104 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   approximation — useful when a member watched elsewhere, or the heartbeat
   missed the very end. Affects the same completion flag that gates
   sequential unlock and feeds the watch-through-rate analytics.
+
+## The profile area (`/profile`)
+
+One account area, the same on the web and in the installed PWA, reachable
+from the navbar and from a **Profile** tab in the mobile bottom nav (with an
+unread badge). Five sections:
+
+- **Overview** — what's waiting: unread count, active shared links, and
+  shortcuts into favorites/playlists/watch later/recently played.
+- **Inbox** (`/profile/inbox`) — every notification the site has sent this
+  member, kept as `Notification` rows written alongside each push/email send.
+  It fills up whether or not push was ever allowed, so it works as the
+  catch-up record on a device that never got the notification: mark one or
+  all read, open the linked content, delete individually or clear the lot.
+  The push permission toggle sits at the top of this page.
+- **Shared links** (`/profile/shared-links`) — every link this member has
+  handed out, with its status, recipients, open count, and a Revoke button.
+- **Downloads** (`/profile/downloads`) — the Wi-Fi-only vs Wi-Fi-or-mobile-data
+  preference (stored per device, live now) and a placeholder download list;
+  offline playback itself is still to come.
+- **Settings** (`/profile/settings`) — two groups, in this order:
+  - **This device** (localStorage, works logged out, differs per device):
+    **Theme** (System/Light/Dark), **Language** (English only for now, the
+    selector is disabled), **Autoplay**, and **Default playback speed**.
+  - **Account** (applies wherever they log in): display name (Profiles
+    plugin), notification frequency and email opt-in (Notifications plugin),
+    and **Delete account**.
+
+Notes on the device settings:
+
+- **Theme** is a `dark`/`light` class on `<html>`, stamped by a blocking
+  inline script (`THEME_INIT_SCRIPT`) before first paint so the page never
+  flashes the wrong theme; a `ThemeSync` client component keeps "System"
+  following the OS while the page is open, and picks up changes made in
+  another tab. Tailwind's `dark:` variant is redefined to key off that class
+  (`@custom-variant` in `globals.css`), with the old `prefers-color-scheme`
+  media query kept as a no-JS fallback.
+- **Autoplay** genuinely starts the video and drives the "Up next" roll-on —
+  the toggle in the Up next panel is the same preference, not a second one.
+- **Default playback speed** is stored and shown as a reminder under the
+  player, but can't be applied automatically: Bunny's embed takes no
+  playback-rate parameter and exposes no postMessage API, the same limitation
+  as chapters and watch progress (see the technical notes).
+- **Delete account** requires typing the account's own email address, then
+  hard-deletes the `User` row — every relation cascades (comments, notes,
+  playlists, favorites, watch progress, push subscriptions, share links they
+  created) and the browser is sent to `/auth/logout`. The only trace left is
+  the audit-log entry, which stores an email rather than a foreign key. The
+  last remaining admin is refused, since that would leave nobody able to
+  grant access again.
+
+## Share links
+
+A revocable, tracked link to one series or video, opened at `/s/[token]`.
+Unlike copying the page URL, the sharer keeps a list of what they've handed
+out, sees how often each link has been opened, and can switch any of them off.
+
+- **Who can share.** Two tiers, enforced in `shareLinkPolicy`:
+  - Content that is already public to anyone: **any logged-in member** can
+    share it (with the Share links plugin on). The link grants nothing the
+    recipient didn't already have — it's a tracked, revocable link.
+  - Content that is gated (`memberOnly`, or restricted to viewer
+    groups/users): only an **admin** or someone holding the new
+    **`share_content`** capability can share it, and their link carries a
+    real access grant. The capability can be granted site-wide or scoped to
+    a category/series, so a group can be given sharing rights over just
+    their own section.
+- **Public vs private.** A public link opens for anyone holding it, logged in
+  or not. A private link is addressed to specific emails: each recipient is
+  emailed their link (and gets an inbox notification if they already have an
+  account), and opening it requires being logged in as that address — so
+  forwarding it on doesn't hand over access.
+- **How the grant works.** `/s/[token]` validates the link, records the open,
+  and stores the token in an httpOnly `share_access` cookie before
+  redirecting to the content — so the recipient keeps access as they browse
+  the rest of the series instead of losing it on the first click. The cookie
+  holds tokens only, never a grant: every request re-checks each one against
+  the DB (revoked? expired? right recipient?), so a revoke takes effect
+  immediately even for a browser that already holds the link.
+  `canViewSeries`/`canViewVideo`/`getViewableVideoIds` consult the resolved
+  grants first, which is also what makes a shared link work for someone with
+  no account at all.
+- **Where to share.** A "Share a link" panel on any series/video page the
+  member is allowed to share, which also lists their existing links for that
+  content. `/admin/share-links` (visible to admins and `share_content`
+  holders) lists **every** link on the site with its owner, filters by
+  active/revoked, revokes any of them (audited), and can create a link for
+  any series or video without navigating to its page.
+- **Expiry and revocation.** Optional expiry of 1–365 days; revoking sets
+  `revokedAt` rather than deleting the row, so a dead link stays visible in
+  both lists. Recipients of a link that no longer works land on
+  `/share/unavailable`, which says specifically whether it was revoked,
+  expired, or meant for another account.
+- **Limits.** Only published, visible content can be shared (an unpublished
+  or trashed item wouldn't resolve on its own page either). Members are
+  capped at 20 new links an hour. Withdrawing someone's `share_content`
+  capability does **not** retroactively kill links they already created —
+  that's what the admin list and its Revoke button are for.
 
 ## Auth
 
@@ -219,6 +320,12 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   (or are `ADMIN`). "Hide" removes a comment from public view without
   deleting it; "Delete" is permanent, same as the existing per-comment
   delete action.
+
+- **Share links** (`/admin/share-links`, needs `share_content`) — every share
+  link on the site, whoever created it: target, owner, public or private,
+  recipients, whether it grants access, open count, and a Revoke button
+  (audited). Filterable by active vs revoked/expired, and can create a link
+  for any series or video from a picker. See Share links above.
 
 - **Homepage rows** (`/admin/home-rows`, needs `manage_plugins`) — turn any
   of the homepage's built-in rows (Continue watching, Because you watched,
@@ -414,8 +521,9 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 
 `npm test` runs a vitest suite (`src/lib/*.test.ts`) over the logic that
 would fail quietly rather than loudly — access and capability checks,
-plugin override precedence, sequential unlock, list reordering, and fuzzy
-matching. Prisma is mocked, so the suite needs no database.
+plugin override precedence, sequential unlock, list reordering, fuzzy
+matching, share-link sharing rules and link validity, and device-settings
+parsing. Prisma is mocked, so the suite needs no database.
 
 GitHub Actions runs the type check, lint, that suite, and
 `prisma validate` / `prisma format --check` on every pull request and every

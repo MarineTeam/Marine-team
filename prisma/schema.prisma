@@ -30,6 +30,14 @@ enum ReactionType {
   DISLIKE
 }
 
+enum ShareVisibility {
+  // Anyone holding the link can open it, no login needed.
+  PUBLIC
+  // Only the listed recipient emails can open it, and only after logging in
+  // as that email — the link alone isn't enough.
+  EMAIL
+}
+
 // Auth0 login only proves identity, not that we let someone in: anyone
 // who attempts to log in gets a row here (so admins can see the attempt
 // at /admin/users), but `authorized` starts false and getCurrentUser()
@@ -79,6 +87,8 @@ model User {
   reactions             Reaction[]
   seriesViewGrants      SeriesViewer[]
   videoViewGrants       VideoViewer[]
+  shareLinks            ShareLink[]
+  notifications         Notification[]
 }
 
 // Grants a non-admin user editor access to one category (and everything
@@ -184,6 +194,7 @@ model Series {
   viewEvents        ViewEvent[]
   viewerGroups      SeriesViewerGroup[]
   viewers           SeriesViewer[]
+  shareLinks        ShareLink[]
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 }
@@ -242,6 +253,7 @@ model Video {
   viewers           VideoViewer[]
   chapters          Chapter[]
   sermonNotes       SermonNote[]
+  shareLinks        ShareLink[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
@@ -826,4 +838,81 @@ model SlugAlias {
 
   @@unique([type, oldSlug])
   @@index([targetId])
+}
+
+// A revocable, tracked link to one series or video (exactly one of
+// seriesId/videoId is set, like Reaction/Subscription), opened at
+// /s/[token]. Distinct from just copying the page URL: the sharer sees
+// every link they've handed out, how often it's been opened, and can
+// revoke it at any time.
+//
+// `grantsAccess` is what makes a link more than a URL — see
+// src/lib/share-links.ts for who is allowed to set it. Only a sharer who
+// holds the `share_content` capability (or an admin) can create one, and
+// only for content that is actually gated; a link to already-public
+// content leaves it false and needs no special permission, so ordinary
+// members can share too.
+model ShareLink {
+  id           String               @id @default(cuid())
+  // The unguessable secret in the URL. Long enough not to be brute-forced;
+  // the row is the only place it's stored, so revoking really does kill it.
+  token        String               @unique
+  createdBy    User                 @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdById  String
+  series       Series?              @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  seriesId     String?
+  video        Video?               @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId      String?
+  visibility   ShareVisibility      @default(PUBLIC)
+  // Whether opening the link lets the recipient view content they couldn't
+  // otherwise (member-only, or restricted to viewer groups/users). False for
+  // links to content that was already public, which need no grant at all.
+  grantsAccess Boolean              @default(false)
+  // Optional sharer-facing label ("sent to the elders"), so a long list of
+  // links stays legible months later.
+  note         String?
+  expiresAt    DateTime?
+  // Set instead of deleting the row, so a revoked link stays visible (and
+  // auditable) in the sharer's list and the admin panel.
+  revokedAt    DateTime?
+  viewCount    Int                  @default(0)
+  lastViewedAt DateTime?
+  createdAt    DateTime             @default(now())
+  recipients   ShareLinkRecipient[]
+
+  @@index([createdById])
+  @@index([seriesId])
+  @@index([videoId])
+}
+
+// One allowed recipient of an EMAIL-visibility share link. Stored lowercased,
+// and matched against the logged-in session's email — so forwarding the link
+// on doesn't hand access to whoever receives it.
+model ShareLinkRecipient {
+  id          String    @id @default(cuid())
+  shareLink   ShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+  shareLinkId String
+  email       String
+  createdAt   DateTime  @default(now())
+
+  @@unique([shareLinkId, email])
+}
+
+// A member's kept copy of a notification, shown in their profile inbox.
+// Written alongside every push/email send (see notifySubscribers), so the
+// inbox has a full history even for members who never allowed push or who
+// read it on a different device. Unlike PendingNotification — which is a
+// short-lived queue the digest cron drains and deletes — these rows stay
+// until the member deletes them.
+model Notification {
+  id        String    @id @default(cuid())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  title     String
+  body      String
+  url       String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
 }

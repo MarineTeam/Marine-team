@@ -22,6 +22,7 @@ import {
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
+import { canShareTarget } from "@/lib/share-links";
 import { getPluginStates } from "@/lib/plugins";
 import { bunnyStreamEmbedUrl, bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { WatchProgressTracker } from "@/components/watch-progress-tracker";
@@ -34,6 +35,7 @@ import { AddToPlaylistButton } from "@/components/add-to-playlist-button";
 import { StarRating } from "@/components/star-rating";
 import { ReactionButtons } from "@/components/reaction-buttons";
 import { ShareButtons } from "@/components/share-buttons";
+import { ShareLinkPanel } from "@/components/share-link-panel";
 import { MenuTile } from "@/components/menu-tile";
 import { CommentSection } from "@/components/comment-section";
 import { SermonNotesPanel } from "@/components/sermon-notes-panel";
@@ -111,11 +113,22 @@ export default async function VideoPage({
     chapters: chaptersOn,
     transcripts: transcriptsOn,
     "sermon-notes": sermonNotesOn,
+    "share-links": shareLinksOn,
   } = plugins;
   const resumeAt = progress && !progress.completed ? progress.positionSeconds : 0;
 
-  const [ratingSummary, myRating, reactionSummary, myReaction, related, comments, upNext, chapters, sermonNotes] =
-    await Promise.all([
+  const [
+    ratingSummary,
+    myRating,
+    reactionSummary,
+    myReaction,
+    related,
+    comments,
+    upNext,
+    chapters,
+    sermonNotes,
+    canShare,
+  ] = await Promise.all([
       ratingsOn ? getVideoRatingSummary(video.id) : Promise.resolve({ average: 0, count: 0 }),
       ratingsOn && user ? getUserVideoRating(user.id, video.id) : Promise.resolve(null),
       likesOn ? getVideoReactionSummary(video.id) : Promise.resolve({ likes: 0, dislikes: 0 }),
@@ -125,6 +138,15 @@ export default async function VideoPage({
       upNextOn ? getUpNextVideo(video, isLoggedIn) : Promise.resolve(null),
       chaptersOn ? getVideoChapters(video.id) : Promise.resolve([]),
       sermonNotesOn && user ? getSermonNotes(user.id, video.id) : Promise.resolve([]),
+      shareLinksOn
+        ? canShareTarget(user, {
+            type: "video",
+            id: video.id,
+            memberOnly: video.memberOnly,
+            categoryId: video.categoryId,
+            seriesId: video.seriesId,
+          })
+        : Promise.resolve(false),
     ]);
   const initialComments = comments.map((c) => ({
     ...c,
@@ -186,6 +208,10 @@ export default async function VideoPage({
         </div>
       )}
       {socialShareOn && <ShareButtons title={video.title} path={`/videos/${video.slug}`} />}
+      {/* Not while sequence-locked: the member can't watch this episode yet,
+          so handing out a link to it would be odd — matches the series page,
+          which hides the panel behind the same gate. */}
+      {canShare && !sequenceLocked && <ShareLinkPanel videoId={video.id} />}
 
       {isPendingPremiere && video.publishAt ? (
         <PremiereCountdown premiereAt={video.publishAt.toISOString()} />

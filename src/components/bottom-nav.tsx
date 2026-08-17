@@ -4,15 +4,33 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const ALL_TABS = [
-  { href: "/", label: "Home", icon: HomeIcon, exact: true, slug: null },
-  { href: "/recently-played", label: "Recently Played", icon: ClockIcon, exact: false, slug: "watch-history" },
-  { href: "/favorites", label: "Favourites", icon: StarIcon, exact: false, slug: null },
-  { href: "/recently-added", label: "Recently Added", icon: SparkleIcon, exact: false, slug: null },
+  { href: "/", label: "Home", icon: HomeIcon, exact: true, slug: null, memberOnly: false },
+  { href: "/recently-played", label: "Recently Played", icon: ClockIcon, exact: false, slug: "watch-history", memberOnly: false },
+  { href: "/favorites", label: "Favourites", icon: StarIcon, exact: false, slug: null, memberOnly: false },
+  { href: "/recently-added", label: "Recently Added", icon: SparkleIcon, exact: false, slug: null, memberOnly: false },
+  // Last, and only when logged in: the profile hub is the account area of the
+  // installed app, where the inbox and settings live.
+  { href: "/profile", label: "Profile", icon: PersonIcon, exact: false, slug: null, memberOnly: true },
 ] as const;
 
-export function BottomNav({ watchHistoryOn = true }: { watchHistoryOn?: boolean }) {
+/**
+ * `unreadCount` badges the Profile tab, so an installed PWA shows waiting
+ * notifications the way a native app would — without it, a member would only
+ * discover their inbox by opening it.
+ */
+export function BottomNav({
+  watchHistoryOn = true,
+  loggedIn = false,
+  unreadCount = 0,
+}: {
+  watchHistoryOn?: boolean;
+  loggedIn?: boolean;
+  unreadCount?: number;
+}) {
   const pathname = usePathname();
-  const TABS = ALL_TABS.filter((tab) => tab.slug !== "watch-history" || watchHistoryOn);
+  const TABS = ALL_TABS.filter(
+    (tab) => (tab.slug !== "watch-history" || watchHistoryOn) && (!tab.memberOnly || loggedIn),
+  );
 
   return (
     <nav
@@ -28,11 +46,21 @@ export function BottomNav({ watchHistoryOn = true }: { watchHistoryOn?: boolean 
             href={href}
             className="flex flex-1 flex-col items-center gap-1 py-2 text-[11px]"
           >
-            <Icon
-              className={`h-6 w-6 ${
-                active ? "text-zinc-900 dark:text-white" : "text-zinc-400 dark:text-zinc-500"
-              }`}
-            />
+            <span className="relative">
+              <Icon
+                className={`h-6 w-6 ${
+                  active ? "text-zinc-900 dark:text-white" : "text-zinc-400 dark:text-zinc-500"
+                }`}
+              />
+              {href === "/profile" && unreadCount > 0 && (
+                <span
+                  aria-label={`${unreadCount} unread notifications`}
+                  className="absolute -right-1.5 -top-1 min-w-4 rounded-full bg-sky-600 px-1 text-center text-[10px] font-medium leading-4 text-white"
+                >
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </span>
             <span
               className={
                 active
@@ -75,6 +103,15 @@ function StarIcon({ className }: { className?: string }) {
         strokeLinejoin="round"
         strokeLinecap="round"
       />
+    </svg>
+  );
+}
+
+function PersonIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className={className} aria-hidden>
+      <circle cx="12" cy="8.5" r="3.5" />
+      <path d="M5 20c0-3.3 3.1-6 7-6s7 2.7 7 6" strokeLinecap="round" />
     </svg>
   );
 }

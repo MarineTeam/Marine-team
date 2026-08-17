@@ -3,14 +3,17 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-
-const AUTOPLAY_KEY = "up-next-autoplay";
+import { readDeviceSettings, writeDeviceSettings } from "@/lib/device-settings";
 
 /**
  * Shows the next video in the series with an autoplay toggle. Since Bunny's
  * iframe embed has no documented postMessage API for an exact "ended" event
  * (same limitation noted for watch progress), autoplay is a best-effort
  * timer keyed off the video's known duration rather than a real end event.
+ *
+ * The toggle is the same per-device autoplay setting as the one in
+ * /profile/settings — flipping it here is a shortcut to that preference, not a
+ * second switch that could disagree with it.
  */
 export function UpNextPanel({
   href,
@@ -30,7 +33,7 @@ export function UpNextPanel({
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setAutoplay(typeof window !== "undefined" && localStorage.getItem(AUTOPLAY_KEY) === "true");
+    setAutoplay(readDeviceSettings().autoplay);
   }, []);
 
   useEffect(() => {
@@ -45,7 +48,7 @@ export function UpNextPanel({
   function toggleAutoplay() {
     const next = !autoplay;
     setAutoplay(next);
-    localStorage.setItem(AUTOPLAY_KEY, String(next));
+    writeDeviceSettings({ autoplay: next });
   }
 
   return (

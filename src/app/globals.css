@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/*
+ * Dark mode is a class on <html>, not just the OS preference, so the theme
+ * setting in /profile/settings can override it per device. The inline script
+ * in the root layout (THEME_INIT_SCRIPT) stamps exactly one of `dark`/`light`
+ * before first paint; the media query below is the no-JS fallback, scoped with
+ * :not(.light) so an explicit light choice still wins.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -13,10 +22,15 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
+}
+
+:root.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 body {

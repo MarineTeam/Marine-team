@@ -5,8 +5,10 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { BottomNavServer } from "@/components/bottom-nav-server";
 import { PwaRegister } from "@/components/pwa-register";
+import { ThemeSync } from "@/components/theme-sync";
 import { AnnouncementBannerServer } from "@/components/announcement-banner-server";
 import { QueryMonitorPanel } from "@/components/query-monitor-panel";
+import { THEME_INIT_SCRIPT } from "@/lib/device-settings";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -55,9 +57,22 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      // The theme script below adds a `dark`/`light` class to this element
+      // before React hydrates, which is a deliberate mismatch with what the
+      // server rendered.
+      suppressHydrationWarning
     >
+      <head>
+        {/*
+          Blocking and inline, ahead of any markup, so the stored theme is
+          applied before first paint. A deferred script — or doing this in an
+          effect — would show one frame of the wrong theme on every load.
+        */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col bg-zinc-50 dark:bg-black">
         <PwaRegister />
+        <ThemeSync />
         <Suspense fallback={null}>
           <AnnouncementBannerServer />
         </Suspense>

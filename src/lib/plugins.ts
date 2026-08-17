@@ -22,6 +22,7 @@ export const PLUGIN_META = [
   { slug: "webhooks", name: "Webhooks", description: "Posts a JSON payload to admin-configured URLs whenever a series or video is published." },
   { slug: "live-streaming", name: "Live streaming", description: "Shows a \"Live now\" banner and /live page for admin-scheduled live streams, with a push notification when one goes live." },
   { slug: "sermon-notes", name: "Sermon notes", description: "Lets members keep their own timestamped notes on a video, exportable as a text file." },
+  { slug: "share-links", name: "Share links", description: "Lets members create revocable share links to a series or video, public or emailed to specific people." },
 ] as const;
 
 export type PluginSlug = (typeof PLUGIN_META)[number]["slug"];

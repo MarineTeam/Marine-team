@@ -13,8 +13,8 @@ type MobileMenuProps = {
   playlistsOn: boolean;
   subscriptionsOn: boolean;
   notificationsOn: boolean;
-  profilesOn: boolean;
   liveStreamingOn: boolean;
+  unreadCount: number;
 };
 
 export function MobileMenu({
@@ -24,8 +24,8 @@ export function MobileMenu({
   playlistsOn,
   subscriptionsOn,
   notificationsOn,
-  profilesOn,
   liveStreamingOn,
+  unreadCount,
 }: MobileMenuProps) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -163,9 +163,21 @@ export function MobileMenu({
                   Subscriptions
                 </Link>
               )}
-              {user && profilesOn && (
-                <Link href="/profile" onClick={() => setOpen(false)} className="py-3">
-                  Profile
+              {/* Not gated on the Profiles plugin: that plugin governs display
+                  names, while /profile is the account area itself — inbox,
+                  shared links, settings — which a member always needs. */}
+              {user && (
+                <Link
+                  href="/profile"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center justify-between py-3"
+                >
+                  <span>Profile</span>
+                  {unreadCount > 0 && (
+                    <span className="rounded-full bg-sky-600 px-2 text-xs leading-5 text-white">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
                 </Link>
               )}
               {user && notificationsOn && (

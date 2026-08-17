@@ -1,33 +1,102 @@
+import Link from "next/link";
+import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
-import { isPluginEnabled } from "@/lib/plugins";
-import { ProfileForm } from "@/components/profile-form";
+import { getUnreadNotificationCount } from "@/lib/inbox";
 
-export default async function ProfilePage() {
-  const [user, notificationsOn] = await Promise.all([getCurrentUser(), isPluginEnabled("notifications")]);
+/**
+ * The profile's landing card: what's waiting for the member, and the way in
+ * to each section. Deliberately a summary rather than a settings form — the
+ * settings live on their own tab so this stays readable on a phone.
+ */
+export default async function ProfileOverviewPage() {
+  const user = await getCurrentUser();
+  if (!user) return null; // The layout already gates on login.
 
-  if (!user) {
-    return (
-      <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-        <p className="font-medium">Log in to edit your profile.</p>
-        <a
-          href="/auth/login"
-          className="mt-4 inline-block rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
-        >
-          Log in
-        </a>
-      </div>
-    );
-  }
+  const [unreadCount, activeShareLinks, favoriteCount, playlistCount] = await Promise.all([
+    getUnreadNotificationCount(user.id),
+    prisma.shareLink.count({
+      where: {
+        createdById: user.id,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+    }),
+    prisma.videoFavorite.count({ where: { userId: user.id } }),
+    prisma.playlist.count({ where: { userId: user.id } }),
+  ]);
+
+  const cards = [
+    {
+      href: "/profile/inbox",
+      label: "Inbox",
+      value: unreadCount > 0 ? `${unreadCount} unread` : "All caught up",
+      detail: "New content, announcements, and links shared with you.",
+    },
+    {
+      href: "/profile/shared-links",
+      label: "Shared links",
+      value: `${activeShareLinks} active`,
+      detail: "Links you've handed out, and the switch to revoke them.",
+    },
+    {
+      href: "/profile/downloads",
+      label: "Downloads",
+      value: "Coming soon",
+      detail: "Choose whether downloads may use mobile data.",
+    },
+    {
+      href: "/profile/settings",
+      label: "Settings",
+      value: "This device",
+      detail: "Theme, playback, and your account.",
+    },
+  ];
 
   return (
-    <div className="max-w-md mx-auto px-4 py-10 space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Profile</h1>
-      <ProfileForm
-        currentDisplayName={user.displayName}
-        notificationsOn={notificationsOn}
-        currentNotificationFrequency={user.notificationFrequency}
-        currentEmailNotifications={user.emailNotifications}
-      />
+    <div className="space-y-6">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {cards.map((card) => (
+          <Link
+            key={card.href}
+            href={card.href}
+            className="rounded-lg border border-zinc-200 p-4 hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-900"
+          >
+            <p className="text-sm text-zinc-500">{card.label}</p>
+            <p className="mt-0.5 font-medium">{card.value}</p>
+            <p className="mt-1 text-xs text-zinc-500">{card.detail}</p>
+          </Link>
+        ))}
+      </div>
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-medium">Your library</h2>
+        <div className="flex flex-wrap gap-2 text-sm">
+          <Link
+            href="/favorites"
+            className="rounded-md border border-zinc-300 px-3 py-1.5 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          >
+            Favorites ({favoriteCount})
+          </Link>
+          <Link
+            href="/playlists"
+            className="rounded-md border border-zinc-300 px-3 py-1.5 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          >
+            Playlists ({playlistCount})
+          </Link>
+          <Link
+            href="/watch-later"
+            className="rounded-md border border-zinc-300 px-3 py-1.5 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          >
+            Watch later
+          </Link>
+          <Link
+            href="/recently-played"
+            className="rounded-md border border-zinc-300 px-3 py-1.5 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          >
+            Recently played
+          </Link>
+        </div>
+      </section>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import webpush from "web-push";
 import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/email";
+import { recordNotifications } from "@/lib/inbox";
 
 let configured = false;
 
@@ -103,12 +104,23 @@ async function notifyEmailSubscribers(payload: { title: string; body: string; ur
   await Promise.all(users.map((u) => sendEmail(u.email, payload.title, payload.body, payload.url)));
 }
 
+/**
+ * Fans one notification out across all three channels: push (instant or
+ * queued for the digest), email for those opted in, and a kept copy in the
+ * recipient's profile inbox. The inbox copy is written for everyone in scope,
+ * not just push/email subscribers — it's the fallback record of what was
+ * sent, readable whenever the member next opens their profile.
+ */
 export async function notifySubscribers(
   payload: { title: string; body: string; url?: string },
   userIds?: string[],
 ) {
   if (userIds && userIds.length === 0) return;
-  await Promise.all([notifyPushSubscribers(payload, userIds), notifyEmailSubscribers(payload, userIds)]);
+  await Promise.all([
+    notifyPushSubscribers(payload, userIds),
+    notifyEmailSubscribers(payload, userIds),
+    recordNotifications(payload, userIds),
+  ]);
 }
 
 /** Used only by the daily digest cron: sends one already-batched message straight to a user's own subscriptions. */

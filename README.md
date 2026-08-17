@@ -214,6 +214,9 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     text file. The timestamp field is prefilled once from the same
     elapsed-time heartbeat used for Continue watching, then edited freely —
     it isn't kept in sync with real playback (see the technical notes below).
+  - **Share links**: gates *creating* share links (see below). Revoking is
+    deliberately never gated — turning this plugin off must not trap a member
+    with links they can no longer switch off.
 - **Sequential unlock**: a per-series "Require watching in order" toggle
   (`Series.requireSequential`, set on the series edit page — not a plugin,
   since it's a property of one series rather than a site feature). When on,
@@ -224,8 +227,9 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   phpBB/WordPress-style permission builder — define named groups (e.g.
   "Moderators") as a custom bundle of capabilities from a fixed list
   (`src/lib/capabilities.ts`: manage categories/series/videos/files, publish
-  content, moderate comments, manage users/permissions/plugins, view audit
-  log), then assign a group to a user site-wide or scoped to one category
+  content, moderate comments, share restricted content, manage
+  users/permissions/plugins, view audit log), then assign a group to a user
+  site-wide or scoped to one category
   (and everything under it) or one series. This sits alongside the older
   simple per-category/series "content-editor" grants in `/admin/users` —
   both are checked by `src/lib/permissions.ts`. The real `ADMIN` role
@@ -242,6 +246,28 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   `src/lib/content.ts`. With no grants, behavior is unchanged. This only
   applies to series and videos, not files, which stay governed by their own
   "Members only" flag.
+- **Share links**: a revocable, tracked link to one series or video, opened at
+  `/s/[token]`. Anyone may share content that is already public (a plain
+  tracked link); sharing gated content needs the `share_content` capability
+  and produces a link that actually grants view access, checked by
+  `canViewSeries`/`canViewVideo` alongside the grants above. Redemption stores
+  the token in an httpOnly cookie so access survives navigation, but the
+  cookie is re-validated against the DB on every request — revoking is
+  immediate. Links can be public or addressed to specific emails (which
+  requires logging in as that address), can expire, and are listed for the
+  sharer at `/profile/shared-links` and for admins at `/admin/share-links`.
+  Split across `src/lib/share-access.ts` (redeem + resolve grants) and
+  `src/lib/share-links.ts` (create, list, revoke) so `content.ts` can consult
+  grants without importing the permission machinery it depends on.
+- **The profile area** (`/profile`): the member's account hub — inbox,
+  shared links, downloads, and settings — shown identically on the web and in
+  the PWA, with a Profile tab in the mobile bottom nav badged with the unread
+  count. Notifications are persisted as `Notification` rows by
+  `notifySubscribers`, so the inbox is a complete record regardless of whether
+  push or email reached the member. Theme/language/autoplay/playback
+  speed/download-network live in localStorage (`src/lib/device-settings.ts`),
+  deliberately per device rather than on the `User` row; account-level
+  settings and account deletion sit below them on `/profile/settings`.
 - **Continue watching / recently added**: logged-in users get a periodic
   heartbeat (`src/components/watch-progress-tracker.tsx`) that approximates
   watch position (Bunny's iframe embed has no documented postMessage API
