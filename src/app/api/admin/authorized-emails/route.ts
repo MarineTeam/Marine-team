@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureCapability } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
-import { isValidEmail, normalizeEmail } from "@/lib/authorization";
+import { allowlistRequired, authorizationMode, isValidEmail, normalizeEmail } from "@/lib/authorization";
 
 const createSchema = z.object({
   email: z.string().min(3).max(254),
@@ -50,7 +50,16 @@ export async function GET(request: NextRequest) {
       prisma.authorizedEmail.count({ where }),
     ]);
 
-    return NextResponse.json({ rows, total, page, pageSize: PAGE_SIZE });
+    // The active mode travels with the list so the screen can say plainly
+    // whether this list is currently being enforced at all.
+    return NextResponse.json({
+      rows,
+      total,
+      page,
+      pageSize: PAGE_SIZE,
+      mode: authorizationMode(),
+      enforced: allowlistRequired(),
+    });
   } catch (error) {
     return errorResponse(error);
   }

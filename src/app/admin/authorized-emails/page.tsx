@@ -11,6 +11,14 @@ type Row = {
   createdAt: string;
 };
 
+const MODE_COPY: Record<string, string> = {
+  BOTH: "Signing in needs both halves: membership of the Marine Team organization in Auth0, and an active entry here. Adding an address on its own doesn't let a personal account in.",
+  ORGANIZATION:
+    "This deployment currently authorizes on Auth0 organization membership alone. Entries here are kept but not enforced.",
+  ALLOWLIST:
+    "This deployment currently authorizes on this list alone. Auth0 organization membership is not being required.",
+};
+
 /**
  * The email allowlist. Being on this list is only half of what gets someone
  * in — they must also be a member of the Marine Team Auth0 organization — so
@@ -19,6 +27,8 @@ type Row = {
  */
 export default function AuthorizedEmailsAdminPage() {
   const [rows, setRows] = useState<Row[]>([]);
+  const [mode, setMode] = useState<"BOTH" | "ORGANIZATION" | "ALLOWLIST">("BOTH");
+  const [enforced, setEnforced] = useState(true);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -36,6 +46,8 @@ export default function AuthorizedEmailsAdminPage() {
       const data = await res.json();
       setRows(data.rows);
       setTotal(data.total);
+      setMode(data.mode);
+      setEnforced(data.enforced);
     } else {
       setError((await res.json()).error ?? "Failed to load the list");
     }
@@ -105,11 +117,27 @@ export default function AuthorizedEmailsAdminPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold">Authorized emails</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Signing in needs <strong>both</strong> halves: membership of the Marine Team organization in Auth0, and
-          an active entry here. Adding an address on its own doesn&apos;t let a personal account in.
-        </p>
+        <p className="mt-1 text-sm text-zinc-500">{MODE_COPY[mode]}</p>
       </div>
+
+      {/* A relaxed mode is a deployment-wide security decision, so it's stated
+          on the screen it affects rather than left to whoever remembers the
+          environment variable. */}
+      {mode !== "BOTH" && (
+        <p
+          className={`rounded-md border px-3 py-2 text-sm ${
+            enforced
+              ? "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
+              : "border-red-300 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
+          }`}
+        >
+          <strong>AUTHORIZATION_MODE is set to {mode}.</strong>{" "}
+          {enforced
+            ? "Auth0 organization membership is not being checked."
+            : "This list is not being checked — anyone in the Marine Team organization can sign in."}{" "}
+          Set it back to BOTH to require both.
+        </p>
+      )}
 
       <form onSubmit={add} className="space-y-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
         <h2 className="text-sm font-medium">Add an email</h2>

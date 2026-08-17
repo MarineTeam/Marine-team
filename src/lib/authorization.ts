@@ -19,6 +19,52 @@ import type { AccessAttemptType, AccessDenialReason } from "@prisma/client";
  */
 
 /**
+ * Which of the two checks are actually required, set by the
+ * `AUTHORIZATION_MODE` environment variable.
+ *
+ * `BOTH` is the default and the intended posture. The other two exist for
+ * deployments that only want one gate — a tenant with no Auth0 organization
+ * yet, or one where the organization *is* the whole membership list and a
+ * separate allowlist is just bookkeeping.
+ */
+export type AuthorizationMode = "BOTH" | "ORGANIZATION" | "ALLOWLIST";
+
+const AUTHORIZATION_MODES: AuthorizationMode[] = ["BOTH", "ORGANIZATION", "ALLOWLIST"];
+
+/**
+ * Reads the mode, defaulting to the strictest one.
+ *
+ * Anything unrecognised — a typo, an empty string, a value meant for a
+ * different app — resolves to `BOTH` rather than to something permissive. A
+ * misconfigured environment variable must never be the thing that opens a
+ * door, so there is deliberately no value that disables both checks.
+ */
+export function authorizationMode(): AuthorizationMode {
+  const configured = process.env.AUTHORIZATION_MODE?.trim().toUpperCase();
+  return AUTHORIZATION_MODES.includes(configured as AuthorizationMode)
+    ? (configured as AuthorizationMode)
+    : "BOTH";
+}
+
+/** Whether the organization half is enforced under the active mode. */
+export function organizationRequired(mode = authorizationMode()): boolean {
+  return mode === "BOTH" || mode === "ORGANIZATION";
+}
+
+/** Whether the database allowlist is enforced under the active mode. */
+export function allowlistRequired(mode = authorizationMode()): boolean {
+  return mode === "BOTH" || mode === "ALLOWLIST";
+}
+
+/** One line describing the active mode, for the admin screens. */
+export const MODE_DESCRIPTIONS: Record<AuthorizationMode, string> = {
+  BOTH: "Members need Marine Team membership in Auth0 AND an active entry here.",
+  ORGANIZATION:
+    "Members only need Marine Team membership in Auth0 — this list is not currently enforced.",
+  ALLOWLIST: "Members only need an active entry here — Auth0 organization membership is not enforced.",
+};
+
+/**
  * The one way an email is ever compared or stored. Every lookup, insert, and
  * claim check goes through this, so " Alice@Example.com " and
  * "alice@example.com" can't be different rows or different answers.
@@ -92,7 +138,9 @@ async function adoptBootstrapAdmin(normalizedEmail: string): Promise<boolean> {
 }
 
 export type AuthorizationResult =
-  | { allowed: true; organizationMember: true; emailAuthorized: true }
+  // Both results are reported even when allowed, since under a single-check
+  // mode one of them can legitimately be false.
+  | { allowed: true; organizationMember: boolean; emailAuthorized: boolean }
   | {
       allowed: false;
       organizationMember: boolean;
@@ -100,33 +148,65 @@ export type AuthorizationResult =
       reason: AccessDenialReason;
     };
 
-/** Which denial to record, given which halves failed — kept pure so the truth table is testable. */
-export function denialReasonFor(organizationMember: boolean, emailAuthorized: boolean): AccessDenialReason {
-  if (!organizationMember && !emailAuthorized) return "NOT_ORG_MEMBER_AND_EMAIL_NOT_AUTHORIZED";
-  if (!organizationMember) return "NOT_ORG_MEMBER";
+/**
+ * Whether the two check results add up to access under the active mode. Pure,
+ * so the whole truth table — three modes by four combinations — is testable
+ * without a database or a session.
+ */
+export function isAuthorized(
+  mode: AuthorizationMode,
+  organizationMember: boolean,
+  emailAuthorized: boolean,
+): boolean {
+  if (organizationRequired(mode) && !organizationMember) return false;
+  if (allowlistRequired(mode) && !emailAuthorized) return false;
+  return true;
+}
+
+/**
+ * Which denial to record. Only reports checks the active mode actually
+ * enforces: under ORGANIZATION mode an address that happens not to be on the
+ * allowlist didn't cause the refusal, and saying it did would send an
+ * administrator to fix the wrong thing.
+ */
+export function denialReasonFor(
+  mode: AuthorizationMode,
+  organizationMember: boolean,
+  emailAuthorized: boolean,
+): AccessDenialReason {
+  const failedOrg = organizationRequired(mode) && !organizationMember;
+  const failedAllowlist = allowlistRequired(mode) && !emailAuthorized;
+
+  if (failedOrg && failedAllowlist) return "NOT_ORG_MEMBER_AND_EMAIL_NOT_AUTHORIZED";
+  if (failedOrg) return "NOT_ORG_MEMBER";
   return "EMAIL_NOT_AUTHORIZED";
 }
 
 /**
- * The whole decision for one identity. Both halves are always evaluated (not
- * short-circuited) so the recorded attempt says which of them failed, which is
- * what an administrator needs to know to fix it.
+ * The whole decision for one identity.
+ *
+ * Both halves are always evaluated, even the one the active mode doesn't
+ * enforce, so the recorded attempt captures the full picture — an
+ * administrator reviewing a refusal under ORGANIZATION mode can still see
+ * whether that person was on the allowlist, which is exactly what they need
+ * before tightening the mode back up.
  */
 export async function authorizeIdentity(identity: {
   email: string | null | undefined;
   orgId: string | null | undefined;
 }): Promise<AuthorizationResult> {
+  const mode = authorizationMode();
   const organizationMember = isOrganizationMember(identity.orgId);
   const emailAuthorized = await isEmailAuthorized(identity.email);
 
-  if (organizationMember && emailAuthorized) {
-    return { allowed: true, organizationMember: true, emailAuthorized: true };
+  if (isAuthorized(mode, organizationMember, emailAuthorized)) {
+    return { allowed: true, organizationMember, emailAuthorized };
   }
   return {
     allowed: false,
     organizationMember,
     emailAuthorized,
-    reason: denialReasonFor(organizationMember, emailAuthorized),
+    reason: denialReasonFor(mode, organizationMember, emailAuthorized),
   };
 }
 

@@ -14,8 +14,10 @@ vi.mock("@/lib/db", () => ({
 vi.mock("@/lib/email", () => ({ sendEmail: vi.fn() }));
 
 const {
+  authorizationMode,
   authorizeIdentity,
   denialReasonFor,
+  isAuthorized,
   isEmailAuthorized,
   isOrganizationMember,
   isValidEmail,
@@ -29,10 +31,12 @@ beforeEach(() => {
   upsertMock.mockReset().mockResolvedValue({});
   process.env.AUTH0_ORGANIZATION_ID = ORG;
   process.env.ADMIN_EMAILS = "";
+  delete process.env.AUTHORIZATION_MODE;
 });
 
 afterEach(() => {
   delete process.env.AUTH0_ORGANIZATION_ID;
+  delete process.env.AUTHORIZATION_MODE;
 });
 
 describe("normalizeEmail", () => {
@@ -131,11 +135,105 @@ describe("isEmailAuthorized", () => {
   });
 });
 
+describe("authorizationMode", () => {
+  it("defaults to requiring both checks", () => {
+    expect(authorizationMode()).toBe("BOTH");
+  });
+
+  it("accepts the three modes, case-insensitively and untrimmed", () => {
+    process.env.AUTHORIZATION_MODE = "organization";
+    expect(authorizationMode()).toBe("ORGANIZATION");
+    process.env.AUTHORIZATION_MODE = "  AllowList  ";
+    expect(authorizationMode()).toBe("ALLOWLIST");
+    process.env.AUTHORIZATION_MODE = "BOTH";
+    expect(authorizationMode()).toBe("BOTH");
+  });
+
+  it("falls back to BOTH for anything unrecognised, rather than to something permissive", () => {
+    // A typo in an environment variable must never be what opens a door.
+    for (const value of ["", "  ", "NONE", "OFF", "false", "EITHER", "ALL"]) {
+      process.env.AUTHORIZATION_MODE = value;
+      expect(authorizationMode()).toBe("BOTH");
+    }
+  });
+});
+
+describe("isAuthorized — every mode against every combination", () => {
+  const cases: [string, boolean, boolean, boolean, boolean, boolean][] = [
+    // mode label,        org,   email, BOTH,  ORGANIZATION, ALLOWLIST
+    ["neither", false, false, false, false, false],
+    ["email only", false, true, false, false, true],
+    ["org only", true, false, false, true, false],
+    ["both", true, true, true, true, true],
+  ];
+
+  for (const [label, org, email, both, orgMode, allowlistMode] of cases) {
+    it(`${label}: BOTH=${both} ORGANIZATION=${orgMode} ALLOWLIST=${allowlistMode}`, () => {
+      expect(isAuthorized("BOTH", org, email)).toBe(both);
+      expect(isAuthorized("ORGANIZATION", org, email)).toBe(orgMode);
+      expect(isAuthorized("ALLOWLIST", org, email)).toBe(allowlistMode);
+    });
+  }
+
+  it("never lets any mode admit someone who failed every check", () => {
+    for (const mode of ["BOTH", "ORGANIZATION", "ALLOWLIST"] as const) {
+      expect(isAuthorized(mode, false, false)).toBe(false);
+    }
+  });
+});
+
 describe("denialReasonFor", () => {
-  it("names whichever halves failed", () => {
-    expect(denialReasonFor(false, false)).toBe("NOT_ORG_MEMBER_AND_EMAIL_NOT_AUTHORIZED");
-    expect(denialReasonFor(false, true)).toBe("NOT_ORG_MEMBER");
-    expect(denialReasonFor(true, false)).toBe("EMAIL_NOT_AUTHORIZED");
+  it("names whichever halves failed, under BOTH", () => {
+    expect(denialReasonFor("BOTH", false, false)).toBe("NOT_ORG_MEMBER_AND_EMAIL_NOT_AUTHORIZED");
+    expect(denialReasonFor("BOTH", false, true)).toBe("NOT_ORG_MEMBER");
+    expect(denialReasonFor("BOTH", true, false)).toBe("EMAIL_NOT_AUTHORIZED");
+  });
+
+  it("only blames checks the mode actually enforces", () => {
+    // Under ORGANIZATION mode the allowlist didn't cause the refusal, so
+    // saying it did would send an administrator to fix the wrong thing.
+    expect(denialReasonFor("ORGANIZATION", false, false)).toBe("NOT_ORG_MEMBER");
+    expect(denialReasonFor("ALLOWLIST", false, false)).toBe("EMAIL_NOT_AUTHORIZED");
+  });
+});
+
+describe("authorizeIdentity in a single-check mode", () => {
+  it("ORGANIZATION: an org member gets in with no allowlist row", async () => {
+    process.env.AUTHORIZATION_MODE = "ORGANIZATION";
+    const result = await authorizeIdentity({ email: "newhire@example.com", orgId: ORG });
+    expect(result.allowed).toBe(true);
+    // Both results are still reported, so a later tightening can be planned.
+    expect(result).toMatchObject({ organizationMember: true, emailAuthorized: false });
+  });
+
+  it("ORGANIZATION: a non-member is still refused even when allowlisted", async () => {
+    process.env.AUTHORIZATION_MODE = "ORGANIZATION";
+    findUniqueMock.mockResolvedValue({ status: "ACTIVE" });
+    expect((await authorizeIdentity({ email: "alice@example.com", orgId: null })).allowed).toBe(false);
+  });
+
+  it("ALLOWLIST: an allowlisted address gets in with no organization claim", async () => {
+    process.env.AUTHORIZATION_MODE = "ALLOWLIST";
+    findUniqueMock.mockResolvedValue({ status: "ACTIVE" });
+    const result = await authorizeIdentity({ email: "alice@example.com", orgId: null });
+    expect(result.allowed).toBe(true);
+  });
+
+  it("ALLOWLIST: an org member with no allowlist row is still refused", async () => {
+    process.env.AUTHORIZATION_MODE = "ALLOWLIST";
+    expect((await authorizeIdentity({ email: "newhire@example.com", orgId: ORG })).allowed).toBe(false);
+  });
+
+  it("ALLOWLIST: suspension still revokes", async () => {
+    process.env.AUTHORIZATION_MODE = "ALLOWLIST";
+    findUniqueMock.mockResolvedValue({ status: "SUSPENDED" });
+    expect((await authorizeIdentity({ email: "alice@example.com", orgId: ORG })).allowed).toBe(false);
+  });
+
+  it("an unrecognised mode is treated as BOTH, not as a bypass", async () => {
+    process.env.AUTHORIZATION_MODE = "NONE";
+    findUniqueMock.mockResolvedValue({ status: "ACTIVE" });
+    expect((await authorizeIdentity({ email: "alice@example.com", orgId: null })).allowed).toBe(false);
   });
 });
 

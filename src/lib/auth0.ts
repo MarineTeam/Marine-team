@@ -3,6 +3,7 @@ import { Auth0Client } from "@auth0/nextjs-auth0/server";
 import {
   authorizeIdentity,
   normalizeEmail,
+  organizationRequired,
   providerFromSub,
   recordAccessAttempt,
 } from "@/lib/authorization";
@@ -22,10 +23,19 @@ import {
 export const auth0 = new Auth0Client({
   authorizationParameters: {
     // Sending the organization makes Auth0 render that org's login and reject
-    // anyone outside it. Omitted rather than sent empty when unset, so a
-    // misconfigured deployment fails at the org *check* (which fails closed)
-    // instead of sending a malformed request.
-    ...(process.env.AUTH0_ORGANIZATION_ID ? { organization: process.env.AUTH0_ORGANIZATION_ID } : {}),
+    // anyone outside it.
+    //
+    // Withheld in ALLOWLIST mode, and that's the point of the condition: Auth0
+    // would otherwise refuse non-members at the identity provider, before our
+    // own check ever runs, making a mode that doesn't require membership
+    // behave exactly like one that does.
+    //
+    // Also omitted (rather than sent empty) when the id isn't configured, so a
+    // misconfigured deployment fails at the org *check* — which fails closed —
+    // instead of sending a malformed authorization request.
+    ...(organizationRequired() && process.env.AUTH0_ORGANIZATION_ID
+      ? { organization: process.env.AUTH0_ORGANIZATION_ID }
+      : {}),
   },
 
   /**

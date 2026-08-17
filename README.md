@@ -90,6 +90,15 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
      lookup (`normalizeEmail()` is the only way an address is ever compared or
      written).
 
+  **`AUTHORIZATION_MODE`** chooses which of the two are required: `BOTH`
+  (default), `ORGANIZATION` (membership only), or `ALLOWLIST` (the list only).
+  Unset or unrecognised resolves to `BOTH`, and no value turns both off. In
+  `ALLOWLIST` mode the app also stops sending `organization` on the login
+  request — otherwise Auth0 would reject non-members before the app's own
+  check ran, making the mode a no-op. Both check results are still recorded on
+  every refusal whatever the mode, and a relaxed mode shows as a banner on
+  `/admin/authorized-emails`.
+
   Both run inside `getCurrentUser()` — the choke point every server-rendered
   page and API already goes through — so **revocation applies to existing
   sessions**: remove an email and that person is refused on their very next

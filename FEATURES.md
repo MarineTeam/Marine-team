@@ -357,6 +357,24 @@ authenticated with Auth0
 | yes | no | DENY |
 | yes | yes | ALLOW |
 
+**Which checks are required** is set by the `AUTHORIZATION_MODE` environment
+variable, for deployments that only want one gate:
+
+| `AUTHORIZATION_MODE` | Org member | Authorized email | Who gets in |
+| --- | --- | --- | --- |
+| `BOTH` (default) | required | required | both, as above |
+| `ORGANIZATION` | required | ignored | any Marine Team member |
+| `ALLOWLIST` | ignored | required | anyone on the list |
+
+Unset or unrecognised resolves to `BOTH` — a typo must never be the thing that
+opens a door, and there is no value that switches both checks off. In
+`ALLOWLIST` mode the app also stops sending `organization` on the login
+request, because Auth0 would otherwise reject non-members before the app's own
+check ran, making the mode a no-op. Both results are recorded on every refusal
+regardless of mode, so an administrator can see what would happen under a
+stricter setting. A relaxed mode is stated in a banner on
+`/admin/authorized-emails` rather than left to whoever remembers the variable.
+
 - **Organization** — the app sends `organization` on the authorization
   request, so Auth0 refuses non-members at the identity provider (a personal
   Google account never reaches the callback with a usable token), and

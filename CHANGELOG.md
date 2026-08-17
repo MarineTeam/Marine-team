@@ -14,6 +14,13 @@ All notable changes to this project are documented here. Format follows
   Neither is sufficient alone, and neither is ever read from anything the
   browser controls: membership comes from the `org_id` claim of the verified
   ID token, the allowlist from the database.
+  - **`AUTHORIZATION_MODE`** selects which checks are required — `BOTH`
+    (default), `ORGANIZATION`, or `ALLOWLIST` — for deployments that only want
+    one gate. Unset or unrecognised means `BOTH`; no value disables both. In
+    `ALLOWLIST` mode the app stops sending `organization` on the login request,
+    since Auth0 would otherwise refuse non-members before the app's own check
+    and make the mode a no-op. A relaxed mode is shown as a banner on the
+    Authorized emails screen rather than living only in an env var.
   - Both checks run inside `getCurrentUser()`, the choke point every
     server-rendered page and API already goes through, so **revocation
     applies to existing sessions** — remove an email and that person is
