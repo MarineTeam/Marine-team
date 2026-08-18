@@ -65,7 +65,16 @@ export function DownloadButton({
     try {
       const res = await fetch(`/api/downloads/${videoId}?platform=${currentPlatform()}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Couldn't start the download");
+
+      if (!res.ok) {
+        throw new Error(data.error ?? "Couldn't start the download");
+      }
+
+      if (!data.url) {
+        throw new Error(
+          "The server did not provide a download URL.",
+        );
+      }
 
       setState("downloading");
       setProgress(0);
