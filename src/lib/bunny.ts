@@ -187,24 +187,52 @@ export async function bunnySetStreamThumbnail(videoId: string, thumbnailUrl: str
   }
 }
 
-export type BunnyStreamCaption = { srclang: string; label: string | null };
+export type BunnyStreamCaption = {
+  srclang: string;
+  label: string | null;
+};
 
 export type BunnyStreamVideo = {
   guid: string;
+  title?: string;
   status: number;
   length?: number;
+  width?: number;
+  height?: number;
   thumbnailFileName?: string | null;
   captions?: BunnyStreamCaption[] | null;
+
+  /**
+   * Bunny reports whether MP4 fallback files have actually been generated
+   * for this particular video.
+   */
+  hasMP4Fallback?: boolean;
+
+  /**
+   * Bunny returns this as a string such as:
+   * "240p,360p,480p,720p"
+   */
+  availableResolutions?: string | null;
 };
 
-/** Fetches a single video's current state from Bunny (status, duration, thumbnail file name, captions). */
+/** Fetches a single video's current state from Bunny. */
 export async function bunnyGetStreamVideo(videoId: string): Promise<BunnyStreamVideo> {
-  const res = await fetch(`${STREAM_API_BASE}/library/${streamLibraryId()}/videos/${videoId}`, {
-    headers: { AccessKey: streamApiKey() },
-  });
+  const res = await fetch(
+    `${STREAM_API_BASE}/library/${streamLibraryId()}/videos/${videoId}`,
+    {
+      headers: {
+        AccessKey: streamApiKey(),
+      },
+      // Bunny metadata can change while encoding, so don't let Next cache it.
+      cache: "no-store",
+    },
+  );
+
   if (!res.ok) {
-    throw new Error(`Bunny Stream get video failed: ${res.status} ${await res.text()}`);
+    const body = await res.text().catch(() => "");
+    throw new Error(`Bunny Stream get video failed: ${res.status}${body ? ` ${body}` : ""}`);
   }
+
   return (await res.json()) as BunnyStreamVideo;
 }
 
@@ -272,8 +300,81 @@ export function bunnyStreamThumbnailUrl(videoId: string, fileName?: string | nul
   return `https://${cdnHostname}${path}${authParams ? `?${authParams}` : ""}`;
 }
 
-/** Heights Bunny Stream can produce an MP4 fallback for, best first. */
-const MP4_HEIGHTS = [1080, 720, 480, 360, 240] as const;
+/**
+ * Bunny MP4 fallback renditions that this application understands.
+ *
+ * Ordered highest -> lowest so that when several renditions are available we
+ * can select the best one without requesting a rendition Bunny did not make.
+ */
+export const MP4_HEIGHTS = [1080, 720, 480, 360, 240] as const;
+
+export type Mp4Height = (typeof MP4_HEIGHTS)[number];
+
+export type BunnyMp4Availability = {
+  hasMP4Fallback: boolean;
+  availableResolutions: Mp4Height[];
+};
+
+/**
+ * Parses Bunny's availableResolutions field.
+ *
+ * Bunny normally returns something similar to:
+ *
+ *   "240p,360p,480p,720p"
+ *
+ * Be deliberately tolerant here because this value comes from an external
+ * API and should never be trusted to have one exact formatting forever.
+ */
+export function parseBunnyResolutions(
+  availableResolutions: string | null | undefined,
+): Mp4Height[] {
+  if (!availableResolutions) return [];
+
+  const values = availableResolutions
+    .split(/[,\s;|]+/)
+    .map((value) => {
+      const match = value.match(/(\d{3,4})p?/i);
+      return match ? Number(match[1]) : NaN;
+    })
+    .filter((height): height is Mp4Height =>
+      MP4_HEIGHTS.includes(height as Mp4Height),
+    );
+
+  return [...new Set(values)].sort((a, b) => b - a);
+}
+
+/**
+ * Returns the application's configured maximum download resolution.
+ *
+ * This is a maximum, not a requirement. If the video only has 480p available
+ * and the configured maximum is 720p, 480p is selected.
+ */
+export function downloadHeight(): Mp4Height {
+  const configured = Number(process.env.BUNNY_STREAM_DOWNLOAD_HEIGHT);
+
+  return MP4_HEIGHTS.includes(configured as Mp4Height)
+    ? (configured as Mp4Height)
+    : 720;
+}
+
+/**
+ * Selects the best MP4 resolution that Bunny actually generated while
+ * respecting the application's configured maximum.
+ */
+export function selectMp4Height(
+  availableResolutions: string | null | undefined,
+): Mp4Height | null {
+  const available = parseBunnyResolutions(availableResolutions);
+  const maxHeight = downloadHeight();
+
+  for (const height of available) {
+    if (height <= maxHeight) {
+      return height;
+    }
+  }
+
+  return available.length > 0 ? available[available.length - 1] : null;
+}
 
 /**
  * A signed, time-limited URL for the video's MP4 fallback file, used by the
@@ -283,48 +384,23 @@ const MP4_HEIGHTS = [1080, 720, 480, 360, 240] as const;
  *
  * Requires **MP4 Fallback** to be enabled on the Bunny Stream library
  * (Stream → your library → Encoding); without it these paths 404, which is
- * why /api/downloads/[videoId] HEADs the URL before handing it out rather
- * than letting a member discover it as a broken download.
+ * why /api/downloads/[videoId] uses Bunny's hasMP4Fallback and
+ * availableResolutions fields rather than letting a member discover it as
+ * a broken download.
  *
  * Served off the same library pull zone as the thumbnail, so it uses the same
  * general CDN token scheme (path + expires) rather than the embed-specific
  * one. The TTL is short: the URL is fetched and stored by the browser
  * immediately, and shouldn't stay valid as a shareable direct link.
  */
-export function bunnyStreamMp4Url(videoId: string, height?: number): string {
+export function bunnyStreamMp4Url(videoId: string, height: Mp4Height): string {
   const rawHostname = process.env.BUNNY_STREAM_CDN_HOSTNAME;
   if (!rawHostname) return "";
   const cdnHostname = normalizeHostname(rawHostname);
   const tokenAuthKey = process.env.BUNNY_STREAM_TOKEN_AUTH_KEY;
-  const path = `/${videoId}/play_${height ?? downloadHeight()}p.mp4`;
+  const path = `/${videoId}/play_${height}p.mp4`;
   const authParams = tokenAuthKey ? pullZoneAuthParams(tokenAuthKey, path, 30 * 60) : "";
   return `https://${cdnHostname}${path}${authParams ? `?${authParams}` : ""}`;
-}
-
-/**
- * The resolution downloads are served at. 720p by default: a sermon-length
- * video at 1080p is a big ask of a phone's storage and of a church's
- * bandwidth bill, and 720p is the highest rendition most Bunny libraries
- * enable by default anyway.
- */
-export function downloadHeight(): number {
-  const configured = Number(process.env.BUNNY_STREAM_DOWNLOAD_HEIGHT);
-  return MP4_HEIGHTS.includes(configured as (typeof MP4_HEIGHTS)[number]) ? configured : 720;
-}
-
-/**
- * Whether the MP4 actually exists, checked with a HEAD before the URL is
- * handed to a browser. Bunny returns 404 for a library without MP4 fallback
- * enabled, and for a video still encoding.
- */
-export async function bunnyMp4Exists(url: string): Promise<boolean> {
-  if (!url) return false;
-  try {
-    const res = await fetch(url, { method: "HEAD" });
-    return res.ok;
-  } catch {
-    return false;
-  }
 }
 
 export function bunnyStreamEmbedUrl(videoId: string, startSeconds?: number): string {
