@@ -3,33 +3,76 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { errorResponse } from "@/lib/api-guard";
 import { canViewVideo } from "@/lib/content";
-import { bunnyMp4Exists, bunnyStreamMp4Url, downloadHeight } from "@/lib/bunny";
+import {
+  bunnyGetStreamVideo,
+  bunnyStreamMp4Url,
+  selectMp4Height,
+} from "@/lib/bunny";
 import { DENIAL_MESSAGES, getDownloadAvailability } from "@/lib/downloads";
 import type { ClientPlatform } from "@/lib/download-platform";
 
+type DownloadErrorReason =
+  | "not_logged_in"
+  | "not_permitted"
+  | "content_blocked"
+  | "no_file"
+  | "resolution_unavailable"
+  | "bunny_error";
+
+function bunnyErrorStatus(error: unknown): number | null {
+  if (!(error instanceof Error)) return null;
+
+  const match = error.message.match(
+    /Bunny Stream get video failed:\s*(\d{3})/,
+  );
+
+  return match ? Number(match[1]) : null;
+}
+
 /**
- * Hands out a short-lived, signed URL for a video's MP4 so the browser can
- * store it for offline playback.
+ * Hands out a short-lived, signed URL for a video's MP4 fallback so the
+ * browser can download it into Cache Storage for offline playback.
  *
- * Deliberately not a redirect to the file: the client needs the URL itself to
- * fetch it into the Cache Storage the service worker reads from, and getting
- * a JSON refusal back is what lets the button explain *why* it can't download
- * rather than opening a broken tab.
+ * Important:
  *
- * Order of checks matters. Viewing access comes first and is absolute — the
- * download rules can only ever narrow what a member can already watch, never
- * widen it, so a share-link grant or a members-only pass is honoured here by
- * reusing canViewVideo rather than restating it.
+ * - Authorization is checked before talking to Bunny.
+ * - Bunny's hasMP4Fallback field is used instead of guessing.
+ * - Bunny's availableResolutions field determines which MP4 rendition exists.
+ * - We never expose the Bunny API key.
+ * - We do not use HEAD as the availability test.
  */
-export async function GET(request: NextRequest, { params }: { params: Promise<{ videoId: string }> }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ videoId: string }> },
+) {
   try {
     const { videoId } = await params;
-    const platform: ClientPlatform = request.nextUrl.searchParams.get("platform") === "pwa" ? "pwa" : "web";
+
+    const platform: ClientPlatform =
+      request.nextUrl.searchParams.get("platform") === "pwa"
+        ? "pwa"
+        : "web";
+
+    if (!videoId || videoId.length > 128) {
+      return NextResponse.json(
+        {
+          error: "Video not found.",
+          reason: "video_not_found",
+        },
+        { status: 404 },
+      );
+    }
 
     const [user, video] = await Promise.all([
       getCurrentUser(),
       prisma.video.findFirst({
-        where: { id: videoId, published: true, hidden: false, deletedAt: null, status: "READY" },
+        where: {
+          id: videoId,
+          published: true,
+          hidden: false,
+          deletedAt: null,
+          status: "READY",
+        },
         select: {
           id: true,
           title: true,
@@ -44,30 +87,66 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         },
       }),
     ]);
-    if (!video) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    if (!video) {
+      return NextResponse.json(
+        { error: "Video not found.", reason: "video_not_found" },
+        { status: 404 },
+      );
+    }
 
     if (!(await canViewVideo(user, video))) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Forbidden.", reason: "not_permitted" },
+        { status: 403 },
+      );
     }
 
     const availability = await getDownloadAvailability({ user, video, platform });
     if (!availability.allowed) {
       return NextResponse.json(
-        { error: availability.message, reason: availability.reason },
+        { error: availability.message, reason: availability.reason as DownloadErrorReason },
         { status: availability.reason === "not_logged_in" ? 403 : 409 },
       );
     }
 
-    const url = bunnyStreamMp4Url(video.bunnyVideoId);
-    if (!(await bunnyMp4Exists(url))) {
-      return NextResponse.json({ error: DENIAL_MESSAGES.no_file, reason: "no_file" }, { status: 409 });
+    let bunnyVideo: Awaited<ReturnType<typeof bunnyGetStreamVideo>>;
+    try {
+      bunnyVideo = await bunnyGetStreamVideo(video.bunnyVideoId);
+    } catch (error) {
+      const status = bunnyErrorStatus(error);
+      if (status === 404) {
+        return NextResponse.json(
+          { error: DENIAL_MESSAGES.no_file, reason: "no_file" as DownloadErrorReason },
+          { status: 409 },
+        );
+      }
+      throw error;
     }
+
+    if (!bunnyVideo.hasMP4Fallback) {
+      return NextResponse.json(
+        { error: DENIAL_MESSAGES.no_file, reason: "no_file" as DownloadErrorReason },
+        { status: 409 },
+      );
+    }
+
+    const selectedHeight = selectMp4Height(bunnyVideo.availableResolutions);
+    if (!selectedHeight) {
+      return NextResponse.json(
+        {
+          error: DENIAL_MESSAGES.no_file,
+          reason: "resolution_unavailable" as DownloadErrorReason,
+        },
+        { status: 409 },
+      );
+    }
+
+    const url = bunnyStreamMp4Url(video.bunnyVideoId, selectedHeight);
 
     return NextResponse.json({
       url,
-      // Used as the saved file name in the browser-download fallback, and as
-      // the cache key's label in the offline list.
-      fileName: `${video.slug}-${downloadHeight()}p.mp4`,
+      fileName: `${video.slug}-${selectedHeight}p.mp4`,
       title: video.title,
       seriesTitle: video.series?.title ?? null,
       durationSeconds: video.durationSeconds,
