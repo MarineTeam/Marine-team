@@ -58,9 +58,9 @@ export function allowlistRequired(mode = authorizationMode()): boolean {
 
 /** One line describing the active mode, for the admin screens. */
 export const MODE_DESCRIPTIONS: Record<AuthorizationMode, string> = {
-  BOTH: "Members need Marine Team membership in Auth0 AND an active entry here.",
+  BOTH: "Members need membership of an approved Auth0 organization AND an active entry here.",
   ORGANIZATION:
-    "Members only need Marine Team membership in Auth0 — this list is not currently enforced.",
+    "Members only need membership of an approved Auth0 organization — this list is not currently enforced.",
   ALLOWLIST: "Members only need an active entry here — Auth0 organization membership is not enforced.",
 };
 
@@ -80,23 +80,40 @@ export function isValidEmail(email: string): boolean {
   return /^[^@]+@[^@.]+(\.[^@.]+)+$/.test(email);
 }
 
-/** The organization the ID token must name. Unset means the org check can't be satisfied — see requiredOrganizationId. */
-export function requiredOrganizationId(): string | null {
-  return process.env.AUTH0_ORGANIZATION_ID?.trim() || null;
+/**
+ * Every Auth0 organization this deployment accepts, from a comma-separated
+ * `AUTH0_ORGANIZATION_ID`.
+ *
+ * A single value is still valid and still behaves exactly as it did when this
+ * was a one-org setting — which is what lets a deployment add a second
+ * organization without any change in behaviour until it actually does.
+ *
+ * An empty list means the organization check cannot be satisfied by anyone; see
+ * isOrganizationMember, which treats that as a denial rather than a no-op.
+ */
+export function allowedOrganizationIds(): string[] {
+  return (process.env.AUTH0_ORGANIZATION_ID ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
 }
 
 /**
- * Whether the session's organization claim matches the configured one.
+ * Whether the session's organization claim names one of the accepted
+ * organizations.
  *
  * Fails closed when `AUTH0_ORGANIZATION_ID` isn't set: a missing configuration
  * must not silently turn a required check into a no-op. The comparison is
  * against the claim from the verified ID token, never a query parameter or
- * header, so a browser can't assert membership it doesn't have.
+ * header, so a browser can't assert membership it doesn't have — a member who
+ * picks an organization at the Auth0 prompt is still only admitted if that
+ * organization is one we listed.
  */
 export function isOrganizationMember(orgIdFromToken: string | null | undefined): boolean {
-  const required = requiredOrganizationId();
-  if (!required) return false;
-  return orgIdFromToken === required;
+  if (!orgIdFromToken) return false;
+  const allowed = allowedOrganizationIds();
+  if (allowed.length === 0) return false;
+  return allowed.includes(orgIdFromToken);
 }
 
 /** Whether this email is on the allowlist and active. Takes any casing; normalizes before the lookup. */

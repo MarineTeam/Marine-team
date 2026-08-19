@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Auth0Client } from "@auth0/nextjs-auth0/server";
 import {
+  allowedOrganizationIds,
   authorizeIdentity,
   normalizeEmail,
   organizationRequired,
@@ -9,32 +10,35 @@ import {
 } from "@/lib/authorization";
 
 /**
- * The Auth0 client, configured to require membership of the Marine Team
- * organization and to turn every refusal into a friendly page rather than a
- * stack trace.
+ * The Auth0 client, configured to require membership of one of this
+ * deployment's accepted organizations and to turn every refusal into a
+ * friendly page rather than a stack trace.
  *
- * `AUTH0_ORGANIZATION_ID` is passed as an authorization parameter so Auth0
- * itself refuses non-members at the identity provider — a personal Google
- * account never reaches our callback with a usable token. The same value is
- * checked again server-side against the ID token's `org_id` claim (see
- * src/lib/authorization.ts), because a parameter we send is a request and the
- * claim is the proof.
+ * When exactly one organization is configured, its id is passed as an
+ * authorization parameter so Auth0 renders that org's login directly and
+ * refuses everyone else at the identity provider — a personal Google account
+ * never reaches our callback with a usable token. With two or more configured,
+ * the parameter is left out instead, which is what makes Auth0 show its own
+ * organization picker rather than assuming one. Either way, the organization
+ * the member ends up with is checked again server-side against the ID token's
+ * `org_id` claim (see isOrganizationMember in src/lib/authorization.ts),
+ * because a parameter we send is a request and the claim is the proof — a
+ * picker choice made in the browser is never trusted on its own.
  */
 export const auth0 = new Auth0Client({
   authorizationParameters: {
-    // Sending the organization makes Auth0 render that org's login and reject
-    // anyone outside it.
-    //
     // Withheld in ALLOWLIST mode, and that's the point of the condition: Auth0
     // would otherwise refuse non-members at the identity provider, before our
     // own check ever runs, making a mode that doesn't require membership
     // behave exactly like one that does.
     //
-    // Also omitted (rather than sent empty) when the id isn't configured, so a
-    // misconfigured deployment fails at the org *check* — which fails closed —
-    // instead of sending a malformed authorization request.
-    ...(organizationRequired() && process.env.AUTH0_ORGANIZATION_ID
-      ? { organization: process.env.AUTH0_ORGANIZATION_ID }
+    // Also withheld with zero or with more than one organization configured:
+    // zero should fail at the org *check* (which fails closed) rather than
+    // send a malformed authorization request, and more than one is exactly
+    // when Auth0's own organization prompt is wanted instead of us picking
+    // for the member.
+    ...(organizationRequired() && allowedOrganizationIds().length === 1
+      ? { organization: allowedOrganizationIds()[0] }
       : {}),
   },
 

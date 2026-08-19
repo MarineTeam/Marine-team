@@ -76,14 +76,20 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   automatically by the Auth0 SDK's `proxy.ts` (Next.js 16 renamed Middleware
   to Proxy, and Proxy runs in the Node.js runtime, so Prisma works there).
   Access requires **two** independent checks, both of which must pass:
-  1. **Marine Team organization membership.** `src/lib/auth0.ts` sends
-     `organization: AUTH0_ORGANIZATION_ID` on the authorization request, so
-     Auth0 refuses non-members at the identity provider — a personal Google
-     account never reaches the callback with a usable token — and
+  1. **Membership of an approved Auth0 organization.** `AUTH0_ORGANIZATION_ID`
+     is a comma-separated list of accepted org ids. With exactly one
+     configured, `src/lib/auth0.ts` sends it as `organization` on the
+     authorization request, so Auth0 refuses non-members at the identity
+     provider — a personal Google account never reaches the callback with a
+     usable token. With two or more configured, that parameter is left out
+     instead, so Auth0's own organization prompt shows and the member picks
+     which one they're signing in to (requires "Prompt for Organization" on
+     for this Application in the Auth0 dashboard). Either way,
      `isOrganizationMember()` re-checks the `org_id` claim of the *verified ID
-     token* server-side. The parameter we send is a request; the claim is the
-     proof. Membership is never read from anything the browser controls, and
-     the check fails closed if `AUTH0_ORGANIZATION_ID` is unset.
+     token* server-side against the same list. The parameter we send — or the
+     choice made at Auth0's prompt — is a request; the claim is the proof.
+     Membership is never read from anything the browser controls, and the
+     check fails closed if `AUTH0_ORGANIZATION_ID` is unset.
   2. **An ACTIVE `AuthorizedEmail` row** in PostgreSQL, managed at
      `/admin/authorized-emails` ("Who can sign in"; the Grant/Revoke buttons
      on `/admin/users`, "Members & roles", write to the same list). Stored trimmed + lowercased behind a unique

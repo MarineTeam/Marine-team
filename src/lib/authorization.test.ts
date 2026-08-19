@@ -14,6 +14,7 @@ vi.mock("@/lib/db", () => ({
 vi.mock("@/lib/email", () => ({ sendEmail: vi.fn() }));
 
 const {
+  allowedOrganizationIds,
   authorizationMode,
   authorizeIdentity,
   denialReasonFor,
@@ -86,6 +87,41 @@ describe("isOrganizationMember", () => {
     delete process.env.AUTH0_ORGANIZATION_ID;
     expect(isOrganizationMember(ORG)).toBe(false);
     expect(isOrganizationMember(null)).toBe(false);
+  });
+
+  it("accepts any organization in a comma-separated list, and rejects one that isn't listed", () => {
+    process.env.AUTH0_ORGANIZATION_ID = "org_a,org_b";
+    expect(isOrganizationMember("org_a")).toBe(true);
+    expect(isOrganizationMember("org_b")).toBe(true);
+    expect(isOrganizationMember("org_c")).toBe(false);
+  });
+
+  it("tolerates whitespace around each id in the list", () => {
+    process.env.AUTH0_ORGANIZATION_ID = "  org_a ,  org_b  ";
+    expect(isOrganizationMember("org_a")).toBe(true);
+    expect(isOrganizationMember("org_b")).toBe(true);
+  });
+
+  it("fails closed on a whitespace- or comma-only value, not just an unset one", () => {
+    process.env.AUTH0_ORGANIZATION_ID = " , , ";
+    expect(isOrganizationMember(ORG)).toBe(false);
+    expect(allowedOrganizationIds()).toEqual([]);
+  });
+});
+
+describe("allowedOrganizationIds", () => {
+  it("parses a single value the same as before — the existing single-org deployment shape", () => {
+    expect(allowedOrganizationIds()).toEqual([ORG]);
+  });
+
+  it("parses a comma-separated list, trimmed and with empties dropped", () => {
+    process.env.AUTH0_ORGANIZATION_ID = "org_a, org_b ,,org_c";
+    expect(allowedOrganizationIds()).toEqual(["org_a", "org_b", "org_c"]);
+  });
+
+  it("is empty when unset", () => {
+    delete process.env.AUTH0_ORGANIZATION_ID;
+    expect(allowedOrganizationIds()).toEqual([]);
   });
 });
 

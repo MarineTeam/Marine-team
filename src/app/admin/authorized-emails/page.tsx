@@ -12,7 +12,7 @@ type Row = {
 };
 
 const MODE_COPY: Record<string, string> = {
-  BOTH: "Signing in needs both halves: membership of the Marine Team organization in Auth0, and an active entry here. Adding an address on its own doesn't let a personal account in.",
+  BOTH: "Signing in needs both halves: membership of an approved organization in Auth0, and an active entry here. Adding an address on its own doesn't let a personal account in.",
   ORGANIZATION:
     "This deployment currently authorizes on Auth0 organization membership alone. Entries here are kept but not enforced.",
   ALLOWLIST:
@@ -72,7 +72,7 @@ export default function AuthorizedEmailsAdminPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to add");
-      setStatus(`${data.email} can now sign in, once they're a Marine Team member.`);
+      setStatus(`${data.email} can now sign in, once they're a member of an approved organization.`);
       setEmail("");
       setNote("");
       await load();
@@ -143,7 +143,7 @@ export default function AuthorizedEmailsAdminPage() {
           <strong>AUTHORIZATION_MODE is set to {mode}.</strong>{" "}
           {enforced
             ? "Auth0 organization membership is not being checked."
-            : "This list is not being checked — anyone in the Marine Team organization can sign in."}{" "}
+            : "This list is not being checked — anyone in an approved organization can sign in."}{" "}
           Set it back to BOTH to require both.
         </p>
       )}
