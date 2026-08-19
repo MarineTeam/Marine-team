@@ -36,9 +36,10 @@ export const auth0 = new Auth0Client({
     // that does; in EITHER mode it would be worse — it would block the
     // personal-account path entirely, since Auth0 would reject anyone who
     // isn't an org member before they ever get a chance to be let in on their
-    // allowlist entry instead. (EITHER mode also needs "Organization Usage:
-    // Optional" set in the Auth0 dashboard — see .env.example — so Auth0
-    // itself doesn't insist on an organization when we don't ask for one.)
+    // allowlist entry instead. (EITHER mode also needs this Application's
+    // "Type of Users" set to "Both" in the Auth0 dashboard's Login Experience
+    // tab — see .env.example — so Auth0 itself doesn't insist on an
+    // organization when we don't ask for one.)
     //
     // Also withheld with zero or with more than one organization configured:
     // zero should fail at the org *check* (which fails closed) rather than

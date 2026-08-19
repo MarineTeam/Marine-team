@@ -407,10 +407,11 @@ left to whoever remembers the variable.
 is a member of an approved organization signs in on that alone, and someone
 who isn't — a personal Google account, say — still gets in with an ACTIVE
 allowlist entry, with neither required of the other. It needs one additional
-Auth0 dashboard setting beyond what the other modes need: **Organization
-Usage: Optional** for this Application, under Application → Organizations —
-without it, Auth0 itself still insists on an organization even when the app
-stops asking for one, and the personal-account path never becomes reachable.
+Auth0 dashboard setting beyond what the other modes need: this Application's
+**"Type of Users"** set to **"Both"**, under Application → **Login
+Experience** — without it, Auth0 itself still insists on an organization even
+when the app stops asking for one, and the personal-account path never
+becomes reachable.
 
 - **Organization** — `AUTH0_ORGANIZATION_ID` is a comma-separated list of
   accepted organization ids, so a deployment isn't limited to one. With

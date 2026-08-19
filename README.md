@@ -104,10 +104,10 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   Unset or unrecognised resolves to `BOTH`, and no value turns both checks off
   entirely. `EITHER` is the "personal account or organization account" mode:
   an organization member gets in without an allowlist entry, and someone with
-  no organization still gets in with an ACTIVE entry — it also needs
-  "Organization Usage: Optional" set for this Application in the Auth0
-  dashboard, or Auth0 itself will keep insisting on an organization before our
-  check ever runs. In `ALLOWLIST` or `EITHER` mode the app also stops sending
+  no organization still gets in with an ACTIVE entry — it also needs this
+  Application's "Type of Users" set to "Both" (Login Experience tab in the
+  Auth0 dashboard), or Auth0 itself will keep insisting on an organization
+  before our check ever runs. In `ALLOWLIST` or `EITHER` mode the app also stops sending
   `organization` on the login request — otherwise Auth0 would reject
   non-members before the app's own check ran, which in `ALLOWLIST` mode would
   make it a no-op and in `EITHER` mode would block the personal-account path
