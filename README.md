@@ -324,6 +324,15 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   per device and never reaches the server. Admin settings at
   `/admin/downloads`; member view at `/profile/downloads`.
 
+  A plain page load with no network — including the installed PWA's own
+  `start_url` on a cold launch — has no HTML to render and would otherwise hit
+  the OS's own offline error, which has no way to reach a video already saved
+  to the device. `public/sw.js` falls back to `public/offline.html` (precached
+  at install time) for any navigation whose network request fails; that page
+  is static and reads nothing but the same `localStorage` index and Cache
+  Storage the download feature already writes, so it needs no server, no auth,
+  and no build step.
+
   The MP4 rendition isn't assumed. Bunny reports `hasMP4Fallback` and
   `availableResolutions` per video — enabling MP4 Fallback on a library only
   affects uploads made afterward, so older videos routinely have neither —

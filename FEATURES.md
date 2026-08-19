@@ -333,6 +333,20 @@ How a download actually works:
 - Everything about *what* is downloaded is per device and never leaves it: the
   file list lives in the browser's own storage, so the server can't tell you
   what's on your phone, and downloads don't follow you to another device.
+- **Opening the app with no connection lands on the downloaded videos, not a
+  browser error.** The rest of the site is intentionally never cached (it's
+  dynamic and often auth-gated), which means a plain page load with no network
+  — including the installed PWA's own `start_url` on a cold launch — has
+  nothing to serve and would otherwise hit the OS's own "you're offline"
+  screen, with no way to reach a video already saved to the device. `public/
+  offline.html` is the one exception: a static, unauthenticated, data-free
+  page precached at service-worker install time. It reads the same
+  `localStorage` download index this feature already writes and plays
+  straight out of Cache Storage — no server round trip. The service worker's
+  `fetch` handler serves it for any navigation whose network request fails
+  (`event.request.mode === "navigate"`, caught and swapped for the cached
+  fallback); everything else still goes to the network first, so this never
+  makes a page look stale.
 
 Members manage it all at `/profile/downloads`: whether downloads are available
 to them (and why not, if not), the Wi-Fi-only vs mobile-data preference, how

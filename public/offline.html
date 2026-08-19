@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Offline — Marine Team</title>
+<link rel="icon" href="/icon.svg" />
+<script>
+// Same key/logic as src/lib/device-settings.ts THEME_INIT_SCRIPT, kept in
+// sync by hand since this file can't import from the app bundle — it has to
+// stand alone so the service worker can serve it with zero network.
+(function () {
+  try {
+    var raw = localStorage.getItem("marine-device-settings");
+    var theme = raw ? (JSON.parse(raw) || {}).theme : "system";
+    if (theme !== "light" && theme !== "dark") theme = "system";
+    var dark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.classList.add(dark ? "dark" : "light");
+  } catch (e) {}
+})();
+</script>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #fff;
+    color: #18181b;
+  }
+  html.dark body { background: #09090b; color: #fafafa; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 24px 16px 64px; }
+  .banner {
+    display: flex; align-items: center; gap: 10px;
+    border: 1px solid #fde68a; background: #fffbeb; color: #92400e;
+    border-radius: 8px; padding: 10px 14px; font-size: 14px; margin-bottom: 24px;
+  }
+  html.dark .banner { border-color: #78350f; background: rgba(120,53,15,0.25); color: #fbbf24; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #71717a; font-size: 14px; margin: 0 0 20px; }
+  html.dark .sub { color: #a1a1aa; }
+  #player { display: none; margin-bottom: 20px; }
+  #player video { width: 100%; border-radius: 10px; background: #000; display: block; }
+  #player .now-playing { font-size: 14px; margin: 8px 0 0; color: #52525b; }
+  html.dark #player .now-playing { color: #d4d4d8; }
+  ul { list-style: none; margin: 0; padding: 0; border: 1px solid #e4e4e7; border-radius: 10px; overflow: hidden; }
+  html.dark ul { border-color: #27272a; }
+  li { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid #e4e4e7; }
+  html.dark li { border-color: #27272a; }
+  li:last-child { border-bottom: none; }
+  .meta { min-width: 0; }
+  .title { font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .detail { font-size: 12px; color: #71717a; margin-top: 2px; }
+  html.dark .detail { color: #a1a1aa; }
+  .actions { display: flex; gap: 6px; flex-shrink: 0; }
+  button {
+    font: inherit; font-size: 13px; cursor: pointer; border-radius: 6px;
+    border: 1px solid #d4d4d8; background: #fff; color: inherit; padding: 6px 10px;
+  }
+  html.dark button { border-color: #3f3f46; background: #18181b; }
+  button:hover { background: #f4f4f5; }
+  html.dark button:hover { background: #27272a; }
+  button.play { border-color: #0284c7; color: #0369a1; }
+  html.dark button.play { color: #38bdf8; }
+  button.remove { color: #b91c1c; border-color: #fecaca; }
+  html.dark button.remove { color: #f87171; border-color: #7f1d1d; }
+  .empty { font-size: 14px; color: #71717a; padding: 24px 4px; }
+  html.dark .empty { color: #a1a1aa; }
+  #reconnect { margin-top: 28px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="banner">You're offline. Here's what you've already downloaded to this device.</div>
+  <h1>Downloaded videos</h1>
+  <p class="sub">These play from what's already saved here — no connection needed.</p>
+
+  <div id="player">
+    <video id="video" controls playsinline></video>
+    <p class="now-playing" id="now-playing"></p>
+  </div>
+
+  <ul id="list"></ul>
+  <p class="empty" id="empty" style="display:none">
+    Nothing downloaded on this device yet. Connect and save a video from a video page to watch it here later.
+  </p>
+
+  <div id="reconnect">
+    <button id="retry">Try Marine Team again</button>
+    <span id="retry-status" class="detail"></span>
+  </div>
+</div>
+
+<script>
+// Mirrors the constants in src/lib/offline-downloads.ts and public/sw.js.
+// Kept as literals rather than an import — this page is a static asset the
+// service worker precaches, so it has to work standing completely alone.
+var INDEX_KEY = "marine-downloads-index";
+var DOWNLOAD_CACHE = "marine-team-downloads-v1";
+
+function readIndex() {
+  try {
+    var parsed = JSON.parse(localStorage.getItem(INDEX_KEY) || "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(function (item) { return item && item.videoId && item.cacheUrl; });
+  } catch (e) {
+    return [];
+  }
+}
+
+function writeIndex(items) {
+  try {
+    localStorage.setItem(INDEX_KEY, JSON.stringify(items));
+  } catch (e) {}
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return "";
+  if (bytes < 1024 * 1024) return Math.max(1, Math.round(bytes / 1024)) + " KB";
+  if (bytes < 1024 * 1024 * 1024) return Math.round(bytes / (1024 * 1024)) + " MB";
+  return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB";
+}
+
+function formatDuration(seconds) {
+  if (!seconds) return "";
+  var m = Math.floor(seconds / 60);
+  var s = Math.floor(seconds % 60);
+  return m + ":" + (s < 10 ? "0" : "") + s;
+}
+
+function render() {
+  var list = document.getElementById("list");
+  var empty = document.getElementById("empty");
+  var items = readIndex();
+  list.innerHTML = "";
+
+  if (items.length === 0) {
+    list.style.display = "none";
+    empty.style.display = "block";
+    return;
+  }
+  list.style.display = "";
+  empty.style.display = "none";
+
+  items.forEach(function (item) {
+    var li = document.createElement("li");
+
+    var meta = document.createElement("div");
+    meta.className = "meta";
+    var title = document.createElement("div");
+    title.className = "title";
+    title.textContent = item.title || "Untitled video";
+    var detail = document.createElement("div");
+    detail.className = "detail";
+    var bits = [];
+    if (item.seriesTitle) bits.push(item.seriesTitle);
+    var dur = formatDuration(item.durationSeconds);
+    if (dur) bits.push(dur);
+    var size = formatBytes(item.bytes);
+    if (size) bits.push(size);
+    detail.textContent = bits.join(" · ");
+    meta.appendChild(title);
+    meta.appendChild(detail);
+
+    var actions = document.createElement("div");
+    actions.className = "actions";
+
+    var playBtn = document.createElement("button");
+    playBtn.className = "play";
+    playBtn.textContent = "▶ Play";
+    playBtn.addEventListener("click", function () { play(item); });
+
+    var removeBtn = document.createElement("button");
+    removeBtn.className = "remove";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", function () { remove(item); });
+
+    actions.appendChild(playBtn);
+    actions.appendChild(removeBtn);
+
+    li.appendChild(meta);
+    li.appendChild(actions);
+    list.appendChild(li);
+  });
+}
+
+function play(item) {
+  var player = document.getElementById("player");
+  var video = document.getElementById("video");
+  var nowPlaying = document.getElementById("now-playing");
+  // The service worker answers this path straight from Cache Storage
+  // (including range requests), so this works with no network at all —
+  // see the DOWNLOAD_PATH_PREFIX handler in public/sw.js.
+  video.src = item.cacheUrl;
+  nowPlaying.textContent = item.title || "";
+  player.style.display = "block";
+  player.scrollIntoView({ behavior: "smooth", block: "start" });
+  video.play().catch(function () {});
+}
+
+function remove(item) {
+  if (!window.confirm('Remove "' + (item.title || "this video") + '" from this device?')) return;
+  var afterDelete = function () {
+    writeIndex(readIndex().filter(function (i) { return i.videoId !== item.videoId; }));
+    render();
+  };
+  if ("caches" in window) {
+    caches.open(DOWNLOAD_CACHE).then(function (cache) {
+      return cache.delete(item.cacheUrl);
+    }).then(afterDelete, afterDelete);
+  } else {
+    afterDelete();
+  }
+}
+
+document.getElementById("retry").addEventListener("click", function () {
+  var status = document.getElementById("retry-status");
+  status.textContent = " Checking…";
+  fetch("/", { method: "HEAD", cache: "no-store" })
+    .then(function () { window.location.href = "/"; })
+    .catch(function () { status.textContent = " Still offline."; });
+});
+
+render();
+</script>
+</body>
+</html>
