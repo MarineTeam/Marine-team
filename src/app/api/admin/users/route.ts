@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureCapability } from "@/lib/permissions";
+import { grantEmailAccess } from "@/lib/authorization";
 
 const createSchema = z.object({
   email: z.string().email(),
@@ -40,6 +41,14 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.create({
       data: { email, role: body.role ?? "MEMBER", authorized: true },
+    });
+    // The allowlist is what getCurrentUser() actually reads; setting
+    // `authorized` alone would be undone on this person's first request.
+    await grantEmailAccess({
+      email,
+      actorId: actor.id,
+      actorEmail: actor.email,
+      note: "Pre-authorized from Access",
     });
     return NextResponse.json(user, { status: 201 });
   } catch (error) {

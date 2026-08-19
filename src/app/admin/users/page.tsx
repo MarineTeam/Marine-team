@@ -159,9 +159,16 @@ export default function UsersAdminPage() {
       <div>
         <h1 className="text-xl font-semibold">Access</h1>
         <p className="text-sm text-zinc-500">
-          Only authorized emails (or emails in the <code>ADMIN_EMAILS</code> env var) can log in.
-          Anyone else who attempts to log in shows up below as pending — you decide whether to
-          grant them access.
+          Accounts and roles. Anyone who attempts to log in shows up below as pending — you decide
+          whether to grant them access.
+        </p>
+        <p className="mt-2 text-sm text-zinc-500">
+          Granting or revoking here writes to the same list as{" "}
+          <a href="/admin/authorized-emails" className="underline">
+            Authorized emails
+          </a>
+          , which is what actually decides who may sign in. Use that page to add someone who
+          hasn&apos;t logged in yet, or to see who granted an address and when.
         </p>
       </div>
 

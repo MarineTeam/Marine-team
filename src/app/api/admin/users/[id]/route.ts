@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureCapability } from "@/lib/permissions";
+import { grantEmailAccess, suspendEmailAccess } from "@/lib/authorization";
 
 const updateSchema = z.object({
   role: z.enum(["MEMBER", "ADMIN"]).optional(),
@@ -31,6 +32,22 @@ export async function PATCH(
       where: { id },
       data: { role: body.role, authorized: body.authorized },
     });
+
+    // Access itself lives in AuthorizedEmail — getCurrentUser() recomputes
+    // `User.authorized` from it on every request, so toggling the flag here
+    // without also moving the allowlist entry would be silently reverted the
+    // next time this person loaded a page.
+    if (body.authorized === true) {
+      await grantEmailAccess({
+        email: user.email,
+        actorId: actor.id,
+        actorEmail: actor.email,
+        note: "Granted from Access",
+      });
+    } else if (body.authorized === false) {
+      await suspendEmailAccess(user.email);
+    }
+
     return NextResponse.json(user);
   } catch (error) {
     return errorResponse(error);

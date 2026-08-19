@@ -118,6 +118,13 @@ export default function AuthorizedEmailsAdminPage() {
       <div>
         <h1 className="text-xl font-semibold">Authorized emails</h1>
         <p className="mt-1 text-sm text-zinc-500">{MODE_COPY[mode]}</p>
+        <p className="mt-2 text-sm text-zinc-500">
+          This is the list the app checks on every request. The Grant and Revoke buttons on{" "}
+          <a href="/admin/users" className="underline">
+            Access
+          </a>{" "}
+          write here too — that page is for accounts and roles, this one is the list itself.
+        </p>
       </div>
 
       {/* A relaxed mode is a deployment-wide security decision, so it's stated

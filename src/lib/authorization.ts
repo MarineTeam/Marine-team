@@ -137,6 +137,62 @@ async function adoptBootstrapAdmin(normalizedEmail: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * Grants an email access, and syncs the `User` row that reads from it.
+ *
+ * The single write path for "let this person in", used by both admin screens:
+ * the Authorized emails list and the Grant access button on the Access page.
+ * Having one path is the point — `getCurrentUser()` recomputes
+ * `User.authorized` from this table on every request, so anything that sets
+ * that flag *without* touching the allowlist is silently undone on the user's
+ * next page load.
+ */
+export async function grantEmailAccess({
+  email,
+  actorId,
+  actorEmail,
+  note,
+}: {
+  email: string;
+  actorId?: string | null;
+  actorEmail?: string | null;
+  note?: string | null;
+}): Promise<{ email: string }> {
+  const normalized = normalizeEmail(email);
+
+  await prisma.authorizedEmail.upsert({
+    where: { email: normalized },
+    create: {
+      email: normalized,
+      note: note?.trim() || null,
+      addedById: actorId ?? null,
+      addedByEmail: actorEmail ?? null,
+    },
+    // Re-granting a suspended address reinstates it, which is what an
+    // administrator means by pressing the button again.
+    update: { status: "ACTIVE" },
+  });
+  await prisma.user.updateMany({ where: { email: normalized }, data: { authorized: true } });
+
+  return { email: normalized };
+}
+
+/**
+ * Withdraws access: suspends the allowlist entry rather than deleting it, so
+ * the record of who granted it and when survives. The matching `User` row is
+ * demoted at once so the queries that read `authorized` directly (notification
+ * fan-out, admin lists) agree immediately, rather than waiting for that
+ * person's next request.
+ */
+export async function suspendEmailAccess(email: string): Promise<void> {
+  const normalized = normalizeEmail(email);
+  await prisma.authorizedEmail.updateMany({
+    where: { email: normalized },
+    data: { status: "SUSPENDED" },
+  });
+  await prisma.user.updateMany({ where: { email: normalized }, data: { authorized: false } });
+}
+
 export type AuthorizationResult =
   // Both results are reported even when allowed, since under a single-check
   // mode one of them can legitimately be false.
