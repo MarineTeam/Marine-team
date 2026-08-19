@@ -28,6 +28,10 @@ type Video = {
   status: "PROCESSING" | "READY" | "FAILED";
   memberOnly: boolean;
   downloadEnabled: boolean | null;
+  /** Bunny's MP4-fallback state, cached by the sync routes. Null = never synced. */
+  hasMp4Fallback: boolean | null;
+  /** Bunny's availableResolutions verbatim, e.g. "360p,480p,720p". */
+  mp4Resolutions: string | null;
   hidden: boolean;
   published: boolean;
   unpublishAt: string | null;
@@ -47,6 +51,49 @@ type BunnyLibraryVideo = {
   length: number;
   dateUploaded: string;
 };
+
+/**
+ * MP4-fallback readiness, for admins. Deliberately separate from the
+ * download-permission toggle next to it: that button controls whether we
+ * *allow* downloading, this badge reports whether Bunny actually *has* a
+ * file to hand out — an admin can turn downloads on for a video Bunny hasn't
+ * generated an MP4 for yet, and this is what would tell them.
+ *
+ * Parses `mp4Resolutions` inline rather than importing the server-side
+ * bunny.ts helpers, which pull in node:crypto and aren't meant for a client
+ * bundle.
+ */
+function Mp4Badge({ video }: { video: Video }) {
+  if (video.hasMp4Fallback === null) {
+    return (
+      <span className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-500 dark:border-zinc-700">
+        MP4: not synced
+      </span>
+    );
+  }
+  if (!video.hasMp4Fallback) {
+    return (
+      <span
+        className="rounded-md border border-amber-400 px-2 py-1 text-xs text-amber-700 dark:text-amber-400"
+        title="Bunny hasn't generated an MP4 fallback for this video. Enabling MP4 Fallback in Bunny doesn't affect videos already uploaded — this one likely needs re-uploading or repackaging."
+      >
+        MP4: none
+      </span>
+    );
+  }
+  const resolutions = (video.mp4Resolutions ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return (
+    <span
+      className="rounded-md border border-green-400 px-2 py-1 text-xs text-green-700 dark:text-green-400"
+      title={resolutions.length ? `Available: ${resolutions.join(", ")}` : undefined}
+    >
+      MP4: {resolutions.join(", ") || "available"}
+    </span>
+  );
+}
 
 function slugify(value: string) {
   return value
@@ -682,6 +729,12 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
                     ? "⬇ Allowed"
                     : "⬇ Blocked"}
               </button>
+              {/* Whether Bunny has a downloadable file, which is a separate
+                  question from whether we allow downloading. Shown because
+                  "MP4 fallback: no" is not something an admin can deduce from
+                  this app — it's decided in Bunny, and only for uploads made
+                  after MP4 Fallback was switched on there. */}
+              <Mp4Badge video={v} />
               <button
                 onClick={() => setPremiere(v)}
                 className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${v.isPremiere ? "border-purple-400 text-purple-700 dark:text-purple-400" : "border-zinc-300"}`}

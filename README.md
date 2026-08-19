@@ -323,6 +323,21 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   requests included, so seeking works with no network. The downloaded list is
   per device and never reaches the server. Admin settings at
   `/admin/downloads`; member view at `/profile/downloads`.
+
+  The MP4 rendition isn't assumed. Bunny reports `hasMP4Fallback` and
+  `availableResolutions` per video — enabling MP4 Fallback on a library only
+  affects uploads made afterward, so older videos routinely have neither —
+  and `resolveMp4Source` (`src/lib/download-source.ts`) reads that instead of
+  guessing a fixed height. It picks the highest available resolution at or
+  under `BUNNY_STREAM_DOWNLOAD_HEIGHT` (default 720p), caches the result on
+  `Video.hasMp4Fallback` / `Video.mp4Resolutions` so the member-facing request
+  is a Postgres read rather than a Bunny API call, and returns a specific
+  reason — no fallback generated, no resolution at or under the cap, Bunny/CDN
+  rejected the request (403 — almost always a token-auth or pull-zone setting,
+  not a missing file), or Bunny doesn't have the file (404) — rather than one
+  catch-all "no downloadable file" message. `/admin/videos` shows each video's
+  synced MP4 state; the sync-status routes (manual and cron) are what notice a
+  video has become downloadable after a re-upload or Bunny repackage.
 - **The profile area** (`/profile`): the member's account hub — inbox,
   shared links, downloads, and settings — shown identically on the web and in
   the PWA, with a Profile tab in the mobile bottom nav badged with the unread

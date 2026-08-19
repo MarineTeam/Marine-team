@@ -195,6 +195,18 @@ export type BunnyStreamVideo = {
   length?: number;
   thumbnailFileName?: string | null;
   captions?: BunnyStreamCaption[] | null;
+  /**
+   * Whether Bunny actually generated MP4 fallback files *for this video*.
+   *
+   * This is per-video, not per-library: turning MP4 Fallback on in the
+   * library's encoding settings only affects uploads made afterwards, so a
+   * library with the setting enabled can still be full of older videos
+   * reporting false. That distinction is the whole reason the downloads code
+   * asks Bunny instead of assuming.
+   */
+  hasMP4Fallback?: boolean;
+  /** Comma-separated, e.g. "240p,360p,480p,720p". Absent while encoding. */
+  availableResolutions?: string | null;
 };
 
 /** Fetches a single video's current state from Bunny (status, duration, thumbnail file name, captions). */
@@ -275,55 +287,106 @@ export function bunnyStreamThumbnailUrl(videoId: string, fileName?: string | nul
 /** Heights Bunny Stream can produce an MP4 fallback for, best first. */
 const MP4_HEIGHTS = [1080, 720, 480, 360, 240] as const;
 
+export type Mp4Height = (typeof MP4_HEIGHTS)[number];
+
 /**
- * A signed, time-limited URL for the video's MP4 fallback file, used by the
- * Downloads plugin — the one place a real file (rather than the iframe embed)
- * has to reach the member's device, since HLS segments can't be handed to a
- * `<video>` for offline playback.
+ * Turns Bunny's `availableResolutions` string into heights we can pick from,
+ * highest first.
  *
- * Requires **MP4 Fallback** to be enabled on the Bunny Stream library
- * (Stream → your library → Encoding); without it these paths 404, which is
- * why /api/downloads/[videoId] HEADs the URL before handing it out rather
- * than letting a member discover it as a broken download.
+ * Sorted here rather than trusting Bunny's ordering, because selectMp4Height
+ * takes the first acceptable entry and would silently hand out 240p if the
+ * API ever returned ascending order. Unknown entries (a rendition we have no
+ * MP4 constant for) are dropped rather than guessed at.
+ */
+export function parseBunnyResolutions(raw: string | null | undefined): Mp4Height[] {
+  if (!raw) return [];
+  const heights = raw
+    .split(",")
+    .map((part) => Number(part.trim().replace(/p$/i, "")))
+    .filter((height): height is Mp4Height => MP4_HEIGHTS.includes(height as Mp4Height));
+  return [...new Set(heights)].sort((a, b) => b - a);
+}
+
+/**
+ * The best rendition Bunny actually has for a video, capped at the site's
+ * configured maximum — or null when Bunny has nothing at or below the cap.
+ *
+ * Never returns a height Bunny didn't report: a 480p source has no
+ * play_720p.mp4 for Bunny to serve, and asking for one is what produced the
+ * misleading "no downloadable file" this replaced.
+ */
+export function selectMp4Height(availableResolutions: string | null | undefined): Mp4Height | null {
+  const maximum = downloadHeight();
+  return parseBunnyResolutions(availableResolutions).find((height) => height <= maximum) ?? null;
+}
+
+/**
+ * A signed, time-limited URL for one of the video's MP4 fallback renditions,
+ * used by the Downloads plugin — the one place a real file (rather than the
+ * iframe embed) has to reach the member's device, since HLS segments can't be
+ * handed to a `<video>` for offline playback.
+ *
+ * `height` is required and is expected to come from selectMp4Height, i.e. from
+ * what Bunny reported for this video. There is deliberately no default: the
+ * previous version defaulted to 720p, which meant every video without that
+ * exact rendition looked to the app like a video with no downloads at all.
  *
  * Served off the same library pull zone as the thumbnail, so it uses the same
  * general CDN token scheme (path + expires) rather than the embed-specific
  * one. The TTL is short: the URL is fetched and stored by the browser
  * immediately, and shouldn't stay valid as a shareable direct link.
  */
-export function bunnyStreamMp4Url(videoId: string, height?: number): string {
+export function bunnyStreamMp4Url(videoId: string, height: Mp4Height): string {
   const rawHostname = process.env.BUNNY_STREAM_CDN_HOSTNAME;
-  if (!rawHostname) return "";
+  if (!rawHostname) throw new Error("BUNNY_STREAM_CDN_HOSTNAME is not set");
   const cdnHostname = normalizeHostname(rawHostname);
   const tokenAuthKey = process.env.BUNNY_STREAM_TOKEN_AUTH_KEY;
-  const path = `/${videoId}/play_${height ?? downloadHeight()}p.mp4`;
+  const path = `/${videoId}/play_${height}p.mp4`;
   const authParams = tokenAuthKey ? pullZoneAuthParams(tokenAuthKey, path, 30 * 60) : "";
   return `https://${cdnHostname}${path}${authParams ? `?${authParams}` : ""}`;
 }
 
 /**
- * The resolution downloads are served at. 720p by default: a sermon-length
- * video at 1080p is a big ask of a phone's storage and of a church's
- * bandwidth bill, and 720p is the highest rendition most Bunny libraries
- * enable by default anyway.
+ * The ceiling on download quality. 720p by default: a sermon-length video at
+ * 1080p is a big ask of a phone's storage and of a church's bandwidth bill.
+ *
+ * A cap, not a demand — a video Bunny only has at 480p downloads at 480p.
  */
-export function downloadHeight(): number {
+export function downloadHeight(): Mp4Height {
   const configured = Number(process.env.BUNNY_STREAM_DOWNLOAD_HEIGHT);
-  return MP4_HEIGHTS.includes(configured as (typeof MP4_HEIGHTS)[number]) ? configured : 720;
+  return MP4_HEIGHTS.includes(configured as Mp4Height) ? (configured as Mp4Height) : 720;
 }
 
+/** What a diagnostic fetch of an MP4 URL told us. Never the reason a download is offered or withheld. */
+export type Mp4ProbeResult = "ok" | "forbidden" | "missing" | "error";
+
 /**
- * Whether the MP4 actually exists, checked with a HEAD before the URL is
- * handed to a browser. Bunny returns 404 for a library without MP4 fallback
- * enabled, and for a video still encoding.
+ * Checks an MP4 URL and classifies the answer, so a member gets told which
+ * thing went wrong.
+ *
+ * Diagnostic only, by design. Bunny's API is the authority on whether a
+ * download exists; this call can fail for reasons that have nothing to do
+ * with the file — token auth misconfigured, a CDN edge rejecting HEAD, a
+ * blocked referrer — and the old code treated every one of those as "this
+ * video has no downloadable file". A `forbidden` here means the file is very
+ * likely there and the pull zone's security settings are wrong, which is a
+ * completely different fix from re-uploading the video.
+ *
+ * Uses a 1-byte ranged GET rather than HEAD: some CDN configurations answer
+ * HEAD differently from the GET the browser will actually make, and a Range
+ * request costs no more than a HEAD while exercising the same path the
+ * download will take.
  */
-export async function bunnyMp4Exists(url: string): Promise<boolean> {
-  if (!url) return false;
+export async function probeBunnyMp4(url: string): Promise<Mp4ProbeResult> {
+  if (!url) return "error";
   try {
-    const res = await fetch(url, { method: "HEAD" });
-    return res.ok;
+    const res = await fetch(url, { headers: { Range: "bytes=0-0" } });
+    if (res.ok || res.status === 206) return "ok";
+    if (res.status === 401 || res.status === 403) return "forbidden";
+    if (res.status === 404 || res.status === 410) return "missing";
+    return "error";
   } catch {
-    return false;
+    return "error";
   }
 }
 

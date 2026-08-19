@@ -263,6 +263,19 @@ model Video {
   // (via our admin UI or Bunny's dashboard) changes it. Synced from the
   // Bunny API; null falls back to the "thumbnail.jpg" default.
   thumbnailFileName String?
+  // Bunny's MP4-fallback state for this video, cached from the Stream API by
+  // the sync routes so the download endpoint reads Postgres instead of
+  // calling Bunny on every tap. Null means "never synced" — the download
+  // endpoint then fetches once and writes the answer back.
+  //
+  // Per-video, not per-library: enabling MP4 Fallback in Bunny's encoding
+  // settings only affects later uploads, so an older video sits at false
+  // until it's re-uploaded or repackaged.
+  hasMp4Fallback    Boolean?
+  // Bunny's `availableResolutions`, verbatim (e.g. "240p,360p,480p"). Kept as
+  // the raw string so it survives Bunny adding renditions we don't know yet;
+  // parseBunnyResolutions is what interprets it.
+  mp4Resolutions    String?
   // Full text transcript, admin-entered. Shown in a collapsible panel by
   // the Transcripts plugin and matched by search when that plugin is on.
   transcript        String?

@@ -28,6 +28,12 @@ export async function POST(
         status,
         durationSeconds: data.length ?? undefined,
         thumbnailFileName: data.thumbnailFileName ?? null,
+        // Refreshed here too, so this button is the manual recovery for a
+        // video whose MP4 fallback appeared after the fact — a re-upload or a
+        // Bunny repackage. The download endpoint won't re-ask on its own once
+        // a video is cached as having no fallback.
+        hasMp4Fallback: data.hasMP4Fallback === true,
+        mp4Resolutions: data.availableResolutions ?? null,
       },
     });
     return NextResponse.json(updated);

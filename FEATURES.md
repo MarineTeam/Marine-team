@@ -308,11 +308,20 @@ shows*.
 How a download actually works:
 
 - The API hands back a short-lived **signed MP4 URL** (the same CDN
-  token scheme the thumbnails use, 30-minute TTL). This needs **MP4 Fallback**
-  enabled on the Bunny Stream library — HLS segments can't be handed to a
-  `<video>` for offline playback. The route HEADs the file first, so a library
-  without it gives "this video doesn't have a downloadable file yet" rather
-  than a broken download.
+  token scheme the thumbnails use, 30-minute TTL) at the best resolution Bunny
+  actually generated — never a guessed height. This needs **MP4 Fallback**
+  enabled on the Bunny Stream library, and only for uploads made *after* it
+  was turned on — HLS segments can't be handed to a `<video>` for offline
+  playback, and Bunny doesn't retroactively generate MP4s for older videos.
+  `resolveMp4Source` (`src/lib/download-source.ts`) reads Bunny's per-video
+  `hasMP4Fallback` / `availableResolutions` (cached on the `Video` row, synced
+  by the sync-status routes) rather than assuming a fixed height, and returns
+  one of several specific reasons — no fallback generated yet, nothing at or
+  under the configured resolution cap, the CDN rejected the request (403 —
+  almost always a token/pull-zone setting, not a missing file), or the file
+  really is missing (404) — so a misconfigured library reads differently from
+  an unencoded rendition, which reads differently from a video nobody's
+  re-uploaded since enabling the setting.
 - The browser streams the file into **Cache Storage** with a progress bar,
   under a `/offline-video/<id>.mp4` key on our own origin. The service worker
   answers those URLs from the cache — including **range requests**, so seeking

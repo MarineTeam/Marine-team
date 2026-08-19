@@ -45,6 +45,8 @@ export async function POST(request: NextRequest) {
         status: mapBunnyStreamStatus(bunnyVideo.status),
         durationSeconds: bunnyVideo.length ?? null,
         thumbnailFileName: bunnyVideo.thumbnailFileName ?? null,
+        hasMp4Fallback: bunnyVideo.hasMP4Fallback === true,
+        mp4Resolutions: bunnyVideo.availableResolutions ?? null,
       },
     });
 

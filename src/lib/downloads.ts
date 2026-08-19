@@ -32,7 +32,15 @@ export type DownloadDenialReason =
   | "not_permitted"
   | "wrong_platform"
   | "not_logged_in"
-  | "no_file";
+  // The four below are all "we couldn't get you a file", kept apart because
+  // each has a different fix and only one of them is about the video itself.
+  // Collapsing them into a single "no downloadable file" message is what made
+  // a pull-zone security problem look like a missing upload.
+  | "mp4_unavailable"
+  | "resolution_unavailable"
+  | "mp4_forbidden"
+  | "mp4_missing"
+  | "bunny_error";
 
 export type DownloadAvailability =
   | { allowed: true; platform: DownloadPlatform }
@@ -45,7 +53,11 @@ export const DENIAL_MESSAGES: Record<DownloadDenialReason, string> = {
   not_permitted: "Your account doesn't have download access.",
   wrong_platform: "Downloads aren't available here — try the installed app.",
   not_logged_in: "Log in to download.",
-  no_file: "This video doesn't have a downloadable file yet.",
+  mp4_unavailable: "This video doesn't have a downloadable version yet.",
+  resolution_unavailable: "No downloadable version of this video is available at a supported quality.",
+  mp4_forbidden: "The download was refused by our video host. An administrator has been sent the details.",
+  mp4_missing: "The downloadable file for this video is missing.",
+  bunny_error: "We couldn't prepare the download just now. Please try again.",
 };
 
 function deny(reason: DownloadDenialReason): DownloadAvailability {
@@ -122,8 +134,8 @@ export const getDownloadPolicy = cache(async () => {
  * so a member on the web is told "try the app" rather than "not available"
  * when the only problem is where they're standing.
  *
- * `no_file` isn't checked here — it needs a round trip to Bunny, so the API
- * does it last, once everything cheaper has passed.
+ * The mp4_* reasons aren't checked here — they need Bunny's metadata, so the
+ * API does that last, once everything cheaper has passed.
  *
  * Pass `platform: "any"` to skip the platform check, which is what server
  * rendering has to do: whether the visitor is the installed app or a browser

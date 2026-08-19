@@ -3,8 +3,8 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { errorResponse } from "@/lib/api-guard";
 import { canViewVideo } from "@/lib/content";
-import { bunnyMp4Exists, bunnyStreamMp4Url, downloadHeight } from "@/lib/bunny";
 import { DENIAL_MESSAGES, getDownloadAvailability } from "@/lib/downloads";
+import { resolveMp4Source } from "@/lib/download-source";
 import type { ClientPlatform } from "@/lib/download-platform";
 
 /**
@@ -38,6 +38,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           bunnyVideoId: true,
           durationSeconds: true,
           downloadEnabled: true,
+          hasMp4Fallback: true,
+          mp4Resolutions: true,
           seriesId: true,
           categoryId: true,
           series: { select: { downloadEnabled: true, categoryId: true, title: true } },
@@ -58,16 +60,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       );
     }
 
-    const url = bunnyStreamMp4Url(video.bunnyVideoId);
-    if (!(await bunnyMp4Exists(url))) {
-      return NextResponse.json({ error: DENIAL_MESSAGES.no_file, reason: "no_file" }, { status: 409 });
+    const source = await resolveMp4Source(video);
+    if (!source.ok) {
+      return NextResponse.json(
+        { error: DENIAL_MESSAGES[source.reason], reason: source.reason },
+        // 503 for "our host is having a moment" so a client can sensibly
+        // retry; 409 for the states that need a person to change something.
+        { status: source.reason === "bunny_error" ? 503 : 409 },
+      );
     }
 
     return NextResponse.json({
-      url,
+      url: source.url,
+      // The rendition Bunny actually had, not the one we asked for.
+      resolution: `${source.height}p`,
       // Used as the saved file name in the browser-download fallback, and as
       // the cache key's label in the offline list.
-      fileName: `${video.slug}-${downloadHeight()}p.mp4`,
+      fileName: `${video.slug}-${source.height}p.mp4`,
       title: video.title,
       seriesTitle: video.series?.title ?? null,
       durationSeconds: video.durationSeconds,

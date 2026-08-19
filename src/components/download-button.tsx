@@ -64,8 +64,17 @@ export function DownloadButton({
     setState("checking");
     try {
       const res = await fetch(`/api/downloads/${videoId}?platform=${currentPlatform()}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Couldn't start the download");
+      // A gateway or an offline tab can answer with something that isn't JSON;
+      // showing "Unexpected token <" to a member helps nobody.
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data.error ?? "We couldn't prepare the download. Check your connection and try again.",
+        );
+      }
+      if (typeof data.url !== "string" || !data.url) {
+        throw new Error("We couldn't prepare the download. Please try again.");
+      }
 
       setState("downloading");
       setProgress(0);
