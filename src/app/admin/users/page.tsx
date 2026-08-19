@@ -157,18 +157,18 @@ export default function UsersAdminPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-xl font-semibold">Access</h1>
+        <h1 className="text-xl font-semibold">Members &amp; roles</h1>
         <p className="text-sm text-zinc-500">
-          Accounts and roles. Anyone who attempts to log in shows up below as pending — you decide
-          whether to grant them access.
+          The people with accounts here, what they can do, and who has tried to log in. Anyone who
+          attempts to sign in shows up below as pending.
         </p>
         <p className="mt-2 text-sm text-zinc-500">
-          Granting or revoking here writes to the same list as{" "}
+          Granting or revoking here writes to{" "}
           <a href="/admin/authorized-emails" className="underline">
-            Authorized emails
+            Who can sign in
           </a>
-          , which is what actually decides who may sign in. Use that page to add someone who
-          hasn&apos;t logged in yet, or to see who granted an address and when.
+          , which is the list the app actually checks. Go there to let in someone who hasn&apos;t
+          logged in yet, or to see who granted an address and when.
         </p>
       </div>
 

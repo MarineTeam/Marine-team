@@ -20,10 +20,11 @@ const MODE_COPY: Record<string, string> = {
 };
 
 /**
- * The email allowlist. Being on this list is only half of what gets someone
- * in — they must also be a member of the Marine Team Auth0 organization — so
- * the page says so rather than letting an administrator assume adding an
- * address here is sufficient.
+ * The email allowlist, shown as "Who can sign in" — named for the question it
+ * answers, so it isn't mistaken for the Members & roles page next to it in the
+ * sidebar. Under the default BOTH mode an entry here is only half of what gets
+ * someone in (organization membership is the other half), which the copy says
+ * rather than letting an administrator assume adding an address is enough.
  */
 export default function AuthorizedEmailsAdminPage() {
   const [rows, setRows] = useState<Row[]>([]);
@@ -116,14 +117,15 @@ export default function AuthorizedEmailsAdminPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold">Authorized emails</h1>
+        <h1 className="text-xl font-semibold">Who can sign in</h1>
         <p className="mt-1 text-sm text-zinc-500">{MODE_COPY[mode]}</p>
         <p className="mt-2 text-sm text-zinc-500">
           This is the list the app checks on every request. The Grant and Revoke buttons on{" "}
           <a href="/admin/users" className="underline">
-            Access
+            Members &amp; roles
           </a>{" "}
-          write here too — that page is for accounts and roles, this one is the list itself.
+          write here too — that page is about accounts and what they can do, this one is purely
+          about who is let in at all.
         </p>
       </div>
 

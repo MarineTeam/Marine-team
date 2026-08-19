@@ -487,10 +487,14 @@ stricter setting. A relaxed mode is stated in a banner on
   Which *videos* may be downloaded is set per category/series/video on their
   own edit pages. See Downloads above.
 
-- **Authorized emails** (`/admin/authorized-emails`, needs `manage_users`) —
+- **Who can sign in** (`/admin/authorized-emails`, needs `manage_users`) —
   the email allowlist: add, search, suspend/reinstate, and remove, with who
   added each address and when. Paginated. Refuses to remove the last active
-  address, which would otherwise lock everyone out of the admin area.
+  address, which would otherwise lock everyone out of the admin area. Named
+  for the question it answers, to keep it distinct from **Members & roles**
+  (`/admin/users`) beside it — that page is accounts, roles, editor grants,
+  and pending login attempts, and its Grant/Revoke buttons write to this
+  list, which is the one the app actually checks.
 
 - **Access attempts** (`/admin/access-attempts`, needs `view_audit_log`) —
   refused logins, signups, and requests from revoked sessions: when, email,

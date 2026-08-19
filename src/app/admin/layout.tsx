@@ -14,8 +14,8 @@ const adminLinks = [
   { href: "/admin/comments", label: "Comment moderation" },
   { href: "/admin/share-links", label: "Share links" },
   { href: "/admin/trash", label: "Trash" },
-  { href: "/admin/users", label: "Access" },
-  { href: "/admin/authorized-emails", label: "Authorized emails" },
+  { href: "/admin/users", label: "Members & roles" },
+  { href: "/admin/authorized-emails", label: "Who can sign in" },
   { href: "/admin/access-attempts", label: "Access attempts" },
   { href: "/admin/permissions", label: "Permissions" },
   { href: "/admin/plugins", label: "Plugins" },
@@ -94,8 +94,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       ...(canSeeTrash ? [{ href: "/admin/trash", label: "Trash" }] : []),
       ...(canManageUsers
         ? [
-            { href: "/admin/users", label: "Access" },
-            { href: "/admin/authorized-emails", label: "Authorized emails" },
+            { href: "/admin/users", label: "Members & roles" },
+            { href: "/admin/authorized-emails", label: "Who can sign in" },
           ]
         : []),
       ...(canManagePermissions ? [{ href: "/admin/permissions", label: "Permissions" }] : []),

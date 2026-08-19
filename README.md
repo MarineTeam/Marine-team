@@ -85,7 +85,8 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
      proof. Membership is never read from anything the browser controls, and
      the check fails closed if `AUTH0_ORGANIZATION_ID` is unset.
   2. **An ACTIVE `AuthorizedEmail` row** in PostgreSQL, managed at
-     `/admin/authorized-emails`. Stored trimmed + lowercased behind a unique
+     `/admin/authorized-emails` ("Who can sign in"; the Grant/Revoke buttons
+     on `/admin/users`, "Members & roles", write to the same list). Stored trimmed + lowercased behind a unique
      index, so casing and whitespace can't create a second row or dodge a
      lookup (`normalizeEmail()` is the only way an address is ever compared or
      written).
