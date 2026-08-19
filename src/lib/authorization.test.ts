@@ -176,18 +176,20 @@ describe("authorizationMode", () => {
     expect(authorizationMode()).toBe("BOTH");
   });
 
-  it("accepts the three modes, case-insensitively and untrimmed", () => {
+  it("accepts the four modes, case-insensitively and untrimmed", () => {
     process.env.AUTHORIZATION_MODE = "organization";
     expect(authorizationMode()).toBe("ORGANIZATION");
     process.env.AUTHORIZATION_MODE = "  AllowList  ";
     expect(authorizationMode()).toBe("ALLOWLIST");
+    process.env.AUTHORIZATION_MODE = "either";
+    expect(authorizationMode()).toBe("EITHER");
     process.env.AUTHORIZATION_MODE = "BOTH";
     expect(authorizationMode()).toBe("BOTH");
   });
 
   it("falls back to BOTH for anything unrecognised, rather than to something permissive", () => {
     // A typo in an environment variable must never be what opens a door.
-    for (const value of ["", "  ", "NONE", "OFF", "false", "EITHER", "ALL"]) {
+    for (const value of ["", "  ", "NONE", "OFF", "false", "OR", "ALL"]) {
       process.env.AUTHORIZATION_MODE = value;
       expect(authorizationMode()).toBe("BOTH");
     }
@@ -195,26 +197,38 @@ describe("authorizationMode", () => {
 });
 
 describe("isAuthorized — every mode against every combination", () => {
-  const cases: [string, boolean, boolean, boolean, boolean, boolean][] = [
-    // mode label,        org,   email, BOTH,  ORGANIZATION, ALLOWLIST
-    ["neither", false, false, false, false, false],
-    ["email only", false, true, false, false, true],
-    ["org only", true, false, false, true, false],
-    ["both", true, true, true, true, true],
+  const cases: [string, boolean, boolean, boolean, boolean, boolean, boolean][] = [
+    // mode label,        org,   email, BOTH,  ORGANIZATION, ALLOWLIST, EITHER
+    ["neither", false, false, false, false, false, false],
+    ["email only", false, true, false, false, true, true],
+    ["org only", true, false, false, true, false, true],
+    ["both", true, true, true, true, true, true],
   ];
 
-  for (const [label, org, email, both, orgMode, allowlistMode] of cases) {
-    it(`${label}: BOTH=${both} ORGANIZATION=${orgMode} ALLOWLIST=${allowlistMode}`, () => {
+  for (const [label, org, email, both, orgMode, allowlistMode, eitherMode] of cases) {
+    it(`${label}: BOTH=${both} ORGANIZATION=${orgMode} ALLOWLIST=${allowlistMode} EITHER=${eitherMode}`, () => {
       expect(isAuthorized("BOTH", org, email)).toBe(both);
       expect(isAuthorized("ORGANIZATION", org, email)).toBe(orgMode);
       expect(isAuthorized("ALLOWLIST", org, email)).toBe(allowlistMode);
+      expect(isAuthorized("EITHER", org, email)).toBe(eitherMode);
     });
   }
 
   it("never lets any mode admit someone who failed every check", () => {
-    for (const mode of ["BOTH", "ORGANIZATION", "ALLOWLIST"] as const) {
+    for (const mode of ["BOTH", "ORGANIZATION", "ALLOWLIST", "EITHER"] as const) {
       expect(isAuthorized(mode, false, false)).toBe(false);
     }
+  });
+
+  it("EITHER is the one mode where org-only and email-only both admit — that's the whole point of it", () => {
+    // The "personal account or organization account" case: an org member with
+    // no allowlist row, and an allowlisted person with no organization, both
+    // get in — neither check is required of someone who has the other.
+    expect(isAuthorized("EITHER", true, false)).toBe(true);
+    expect(isAuthorized("EITHER", false, true)).toBe(true);
+    // Contrast with BOTH, which is what EITHER differs from in exactly this way.
+    expect(isAuthorized("BOTH", true, false)).toBe(false);
+    expect(isAuthorized("BOTH", false, true)).toBe(false);
   });
 });
 
@@ -230,6 +244,10 @@ describe("denialReasonFor", () => {
     // saying it did would send an administrator to fix the wrong thing.
     expect(denialReasonFor("ORGANIZATION", false, false)).toBe("NOT_ORG_MEMBER");
     expect(denialReasonFor("ALLOWLIST", false, false)).toBe("EMAIL_NOT_AUTHORIZED");
+  });
+
+  it("under EITHER, a denial always means both failed — isAuthorized only calls this once neither passed", () => {
+    expect(denialReasonFor("EITHER", false, false)).toBe("NOT_ORG_MEMBER_AND_EMAIL_NOT_AUTHORIZED");
   });
 });
 
@@ -270,6 +288,30 @@ describe("authorizeIdentity in a single-check mode", () => {
     process.env.AUTHORIZATION_MODE = "NONE";
     findUniqueMock.mockResolvedValue({ status: "ACTIVE" });
     expect((await authorizeIdentity({ email: "alice@example.com", orgId: null })).allowed).toBe(false);
+  });
+
+  it("EITHER: a personal account (no org_id) gets in on an allowlist entry alone", async () => {
+    // The scenario this mode exists for: someone with no organization at all,
+    // approved individually instead.
+    process.env.AUTHORIZATION_MODE = "EITHER";
+    findUniqueMock.mockResolvedValue({ status: "ACTIVE" });
+    const result = await authorizeIdentity({ email: "alice@example.com", orgId: null });
+    expect(result.allowed).toBe(true);
+    expect(result).toMatchObject({ organizationMember: false, emailAuthorized: true });
+  });
+
+  it("EITHER: an organization member gets in with no allowlist row", async () => {
+    process.env.AUTHORIZATION_MODE = "EITHER";
+    const result = await authorizeIdentity({ email: "newhire@example.com", orgId: ORG });
+    expect(result.allowed).toBe(true);
+    expect(result).toMatchObject({ organizationMember: true, emailAuthorized: false });
+  });
+
+  it("EITHER: someone with neither is still refused", async () => {
+    process.env.AUTHORIZATION_MODE = "EITHER";
+    const result = await authorizeIdentity({ email: "stranger@example.com", orgId: null });
+    expect(result.allowed).toBe(false);
+    if (!result.allowed) expect(result.reason).toBe("NOT_ORG_MEMBER_AND_EMAIL_NOT_AUTHORIZED");
   });
 });
 

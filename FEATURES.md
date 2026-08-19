@@ -364,45 +364,66 @@ browser cache: this is offline convenience, not DRM.
 
 ## Auth
 
-Access needs **two** independent checks, both of which must pass:
+Access is decided from **two** independent checks — by default both must
+pass, but `AUTHORIZATION_MODE` can relax that to either one alone:
 
 ```
 authenticated with Auth0
-  ↓  member of the Marine Team Auth0 organization   (org_id claim, ID token)
-  ↓  email ACTIVE in AuthorizedEmail                (PostgreSQL, via Prisma)
+  ↓  member of an approved Auth0 organization   (org_id claim, ID token)
+  ↓  email ACTIVE in AuthorizedEmail            (PostgreSQL, via Prisma)
   ↓  application access
 ```
 
-| Marine Team member | Authorized email | Result |
-| --- | --- | --- |
-| no | no | DENY |
-| no | yes | DENY |
-| yes | no | DENY |
-| yes | yes | ALLOW |
+| Org member | Authorized email | Result under `BOTH` | Result under `EITHER` |
+| --- | --- | --- | --- |
+| no | no | DENY | DENY |
+| no | yes | DENY | ALLOW |
+| yes | no | DENY | ALLOW |
+| yes | yes | ALLOW | ALLOW |
 
-**Which checks are required** is set by the `AUTHORIZATION_MODE` environment
-variable, for deployments that only want one gate:
+**How the two checks combine** is set by the `AUTHORIZATION_MODE` environment
+variable:
 
 | `AUTHORIZATION_MODE` | Org member | Authorized email | Who gets in |
 | --- | --- | --- | --- |
 | `BOTH` (default) | required | required | both, as above |
-| `ORGANIZATION` | required | ignored | any Marine Team member |
+| `ORGANIZATION` | required | ignored | any approved organization member |
 | `ALLOWLIST` | ignored | required | anyone on the list |
+| `EITHER` | sufficient alone | sufficient alone | either one, as above |
 
 Unset or unrecognised resolves to `BOTH` — a typo must never be the thing that
 opens a door, and there is no value that switches both checks off. In
-`ALLOWLIST` mode the app also stops sending `organization` on the login
-request, because Auth0 would otherwise reject non-members before the app's own
-check ran, making the mode a no-op. Both results are recorded on every refusal
-regardless of mode, so an administrator can see what would happen under a
-stricter setting. A relaxed mode is stated in a banner on
-`/admin/authorized-emails` rather than left to whoever remembers the variable.
+`ALLOWLIST` or `EITHER` mode the app also stops sending `organization` on the
+login request: in `ALLOWLIST` mode Auth0 would otherwise reject non-members
+before the app's own check ran, making the mode a no-op; in `EITHER` mode it
+would be worse, since it would block the personal-account path entirely
+before that person ever got a chance to be let in on their allowlist entry
+instead. Both results are recorded on every refusal regardless of mode, so an
+administrator can see what would happen under a stricter setting. A relaxed or
+reshaped mode is stated in a banner on `/admin/authorized-emails` rather than
+left to whoever remembers the variable.
 
-- **Organization** — the app sends `organization` on the authorization
-  request, so Auth0 refuses non-members at the identity provider (a personal
-  Google account never reaches the callback with a usable token), and
-  `isOrganizationMember()` re-checks the `org_id` claim of the verified ID
-  token server-side. The parameter we send is a request; the claim is the
+`EITHER` is the "personal account or organization account" mode: someone who
+is a member of an approved organization signs in on that alone, and someone
+who isn't — a personal Google account, say — still gets in with an ACTIVE
+allowlist entry, with neither required of the other. It needs one additional
+Auth0 dashboard setting beyond what the other modes need: **Organization
+Usage: Optional** for this Application, under Application → Organizations —
+without it, Auth0 itself still insists on an organization even when the app
+stops asking for one, and the personal-account path never becomes reachable.
+
+- **Organization** — `AUTH0_ORGANIZATION_ID` is a comma-separated list of
+  accepted organization ids, so a deployment isn't limited to one. With
+  exactly one configured (and `BOTH`/`ORGANIZATION`/`EITHER` mode), the app
+  sends it as `organization` on the authorization request, so Auth0 refuses
+  non-members at the identity provider (a personal Google account never
+  reaches the callback with a usable token). With two or more configured, that
+  parameter is left out instead, which is what makes Auth0 show its own
+  organization picker rather than assuming one (needs "Prompt for
+  Organization" turned on for this Application in the Auth0 dashboard).
+  Either way, `isOrganizationMember()` re-checks the `org_id` claim of the
+  verified ID token server-side against the same list. The parameter we
+  send — or the choice made at Auth0's prompt — is a request; the claim is the
   proof. Nothing about membership is ever taken from a query string, header,
   or anything else the browser controls.
 - **Allowlist** — `AuthorizedEmail` in PostgreSQL, managed at

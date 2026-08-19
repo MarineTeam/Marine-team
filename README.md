@@ -75,7 +75,8 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
 - **Auth**: `/auth/login`, `/auth/logout`, `/auth/callback` are handled
   automatically by the Auth0 SDK's `proxy.ts` (Next.js 16 renamed Middleware
   to Proxy, and Proxy runs in the Node.js runtime, so Prisma works there).
-  Access requires **two** independent checks, both of which must pass:
+  Access is decided from **two** independent checks — by default both must
+  pass, but `AUTHORIZATION_MODE` (below) can relax that to either one alone:
   1. **Membership of an approved Auth0 organization.** `AUTH0_ORGANIZATION_ID`
      is a comma-separated list of accepted org ids. With exactly one
      configured, `src/lib/auth0.ts` sends it as `organization` on the
@@ -97,13 +98,21 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
      lookup (`normalizeEmail()` is the only way an address is ever compared or
      written).
 
-  **`AUTHORIZATION_MODE`** chooses which of the two are required: `BOTH`
-  (default), `ORGANIZATION` (membership only), or `ALLOWLIST` (the list only).
-  Unset or unrecognised resolves to `BOTH`, and no value turns both off. In
-  `ALLOWLIST` mode the app also stops sending `organization` on the login
-  request — otherwise Auth0 would reject non-members before the app's own
-  check ran, making the mode a no-op. Both check results are still recorded on
-  every refusal whatever the mode, and a relaxed mode shows as a banner on
+  **`AUTHORIZATION_MODE`** chooses how the two combine: `BOTH` (default, an
+  AND — neither is enough alone), `ORGANIZATION` (membership only),
+  `ALLOWLIST` (the list only), or `EITHER` (an OR — either is enough alone).
+  Unset or unrecognised resolves to `BOTH`, and no value turns both checks off
+  entirely. `EITHER` is the "personal account or organization account" mode:
+  an organization member gets in without an allowlist entry, and someone with
+  no organization still gets in with an ACTIVE entry — it also needs
+  "Organization Usage: Optional" set for this Application in the Auth0
+  dashboard, or Auth0 itself will keep insisting on an organization before our
+  check ever runs. In `ALLOWLIST` or `EITHER` mode the app also stops sending
+  `organization` on the login request — otherwise Auth0 would reject
+  non-members before the app's own check ran, which in `ALLOWLIST` mode would
+  make it a no-op and in `EITHER` mode would block the personal-account path
+  entirely. Both check results are still recorded on every refusal whatever
+  the mode, and a relaxed or reshaped mode shows as a banner on
   `/admin/authorized-emails`.
 
   Both run inside `getCurrentUser()` — the choke point every server-rendered

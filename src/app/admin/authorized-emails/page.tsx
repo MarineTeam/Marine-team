@@ -17,6 +17,31 @@ const MODE_COPY: Record<string, string> = {
     "This deployment currently authorizes on Auth0 organization membership alone. Entries here are kept but not enforced.",
   ALLOWLIST:
     "This deployment currently authorizes on this list alone. Auth0 organization membership is not being required.",
+  EITHER:
+    "This deployment accepts either half on its own: membership of an approved organization in Auth0, or an active entry here. Auth0 offers a choice between a personal account and an organization at login — a personal account gets in on an entry here alone.",
+};
+
+/**
+ * Banner shown for every mode except BOTH, since a relaxed or reshaped
+ * requirement is a deployment-wide security decision worth stating on the
+ * screen it affects rather than left to whoever remembers the environment
+ * variable. Keyed by mode rather than derived from a single boolean, because
+ * EITHER isn't "less enforcement" the way ORGANIZATION/ALLOWLIST are — both
+ * checks stay live, just no longer both required of the same person.
+ */
+const MODE_BANNERS: Partial<Record<string, { tone: "amber" | "red"; text: string }>> = {
+  ORGANIZATION: {
+    tone: "red",
+    text: "This list is not being checked — anyone in an approved organization can sign in. Set it back to BOTH to require both.",
+  },
+  ALLOWLIST: {
+    tone: "amber",
+    text: "Auth0 organization membership is not being checked. Set it back to BOTH to require both.",
+  },
+  EITHER: {
+    tone: "amber",
+    text: "Either check alone is enough to sign in — this list is being checked, but no longer requires organization membership too. Set it back to BOTH to require both.",
+  },
 };
 
 /**
@@ -28,8 +53,7 @@ const MODE_COPY: Record<string, string> = {
  */
 export default function AuthorizedEmailsAdminPage() {
   const [rows, setRows] = useState<Row[]>([]);
-  const [mode, setMode] = useState<"BOTH" | "ORGANIZATION" | "ALLOWLIST">("BOTH");
-  const [enforced, setEnforced] = useState(true);
+  const [mode, setMode] = useState<"BOTH" | "ORGANIZATION" | "ALLOWLIST" | "EITHER">("BOTH");
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -48,7 +72,6 @@ export default function AuthorizedEmailsAdminPage() {
       setRows(data.rows);
       setTotal(data.total);
       setMode(data.mode);
-      setEnforced(data.enforced);
     } else {
       setError((await res.json()).error ?? "Failed to load the list");
     }
@@ -129,22 +152,18 @@ export default function AuthorizedEmailsAdminPage() {
         </p>
       </div>
 
-      {/* A relaxed mode is a deployment-wide security decision, so it's stated
-          on the screen it affects rather than left to whoever remembers the
-          environment variable. */}
-      {mode !== "BOTH" && (
+      {/* A relaxed or reshaped mode is a deployment-wide security decision, so
+          it's stated on the screen it affects rather than left to whoever
+          remembers the environment variable. */}
+      {MODE_BANNERS[mode] && (
         <p
           className={`rounded-md border px-3 py-2 text-sm ${
-            enforced
+            MODE_BANNERS[mode]!.tone === "amber"
               ? "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
               : "border-red-300 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
           }`}
         >
-          <strong>AUTHORIZATION_MODE is set to {mode}.</strong>{" "}
-          {enforced
-            ? "Auth0 organization membership is not being checked."
-            : "This list is not being checked — anyone in an approved organization can sign in."}{" "}
-          Set it back to BOTH to require both.
+          <strong>AUTHORIZATION_MODE is set to {mode}.</strong> {MODE_BANNERS[mode]!.text}
         </p>
       )}
 

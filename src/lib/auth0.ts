@@ -10,27 +10,35 @@ import {
 } from "@/lib/authorization";
 
 /**
- * The Auth0 client, configured to require membership of one of this
- * deployment's accepted organizations and to turn every refusal into a
- * friendly page rather than a stack trace.
+ * The Auth0 client, configured for this deployment's organization policy and
+ * to turn every refusal into a friendly page rather than a stack trace.
  *
- * When exactly one organization is configured, its id is passed as an
+ * When organization membership is required (BOTH or ORGANIZATION mode) and
+ * exactly one organization is configured, its id is passed as an
  * authorization parameter so Auth0 renders that org's login directly and
  * refuses everyone else at the identity provider — a personal Google account
  * never reaches our callback with a usable token. With two or more configured,
  * the parameter is left out instead, which is what makes Auth0 show its own
- * organization picker rather than assuming one. Either way, the organization
- * the member ends up with is checked again server-side against the ID token's
- * `org_id` claim (see isOrganizationMember in src/lib/authorization.ts),
- * because a parameter we send is a request and the claim is the proof — a
- * picker choice made in the browser is never trusted on its own.
+ * organization picker rather than assuming one. In ALLOWLIST or EITHER mode
+ * the parameter is always left out, since organization membership isn't
+ * mandatory there — see the comment below. Whatever the member ends up with is
+ * checked again server-side against the ID token's `org_id` claim (see
+ * isOrganizationMember in src/lib/authorization.ts), because a parameter we
+ * send is a request and the claim is the proof — a picker choice made in the
+ * browser is never trusted on its own.
  */
 export const auth0 = new Auth0Client({
   authorizationParameters: {
-    // Withheld in ALLOWLIST mode, and that's the point of the condition: Auth0
-    // would otherwise refuse non-members at the identity provider, before our
-    // own check ever runs, making a mode that doesn't require membership
-    // behave exactly like one that does.
+    // Withheld in ALLOWLIST and EITHER mode, and that's the point of the
+    // condition: Auth0 would otherwise refuse non-members at the identity
+    // provider, before our own check ever runs. In ALLOWLIST mode that would
+    // make a mode that doesn't require membership behave exactly like one
+    // that does; in EITHER mode it would be worse — it would block the
+    // personal-account path entirely, since Auth0 would reject anyone who
+    // isn't an org member before they ever get a chance to be let in on their
+    // allowlist entry instead. (EITHER mode also needs "Organization Usage:
+    // Optional" set in the Auth0 dashboard — see .env.example — so Auth0
+    // itself doesn't insist on an organization when we don't ask for one.)
     //
     // Also withheld with zero or with more than one organization configured:
     // zero should fail at the org *check* (which fails closed) rather than

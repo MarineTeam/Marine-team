@@ -3,33 +3,36 @@ import { sendEmail } from "@/lib/email";
 import type { AccessAttemptType, AccessDenialReason } from "@prisma/client";
 
 /**
- * The application's authorization model, which is two independent checks that
- * must BOTH pass:
+ * The application's authorization model: two independent checks, combined
+ * according to `AUTHORIZATION_MODE`:
  *
  *   authenticated with Auth0
- *     -> member of the Marine Team Auth0 organization   (org_id on the ID token)
- *     -> email present and ACTIVE in AuthorizedEmail    (PostgreSQL)
+ *     -> member of an approved Auth0 organization   (org_id on the ID token)
+ *     -> email present and ACTIVE in AuthorizedEmail (PostgreSQL)
  *     -> application access
  *
- * Neither is sufficient alone. The organization half is proved by the `org_id`
- * claim of the ID token the SDK has already verified — never by anything the
- * browser sends us — and the allowlist half is a database read, so removing an
- * email takes effect on the next request rather than whenever a token happens
- * to expire.
+ * The organization half is proved by the `org_id` claim of the ID token the
+ * SDK has already verified — never by anything the browser sends us — and the
+ * allowlist half is a database read, so removing an email takes effect on the
+ * next request rather than whenever a token happens to expire.
  */
 
 /**
- * Which of the two checks are actually required, set by the
- * `AUTHORIZATION_MODE` environment variable.
+ * How the two checks combine, set by the `AUTHORIZATION_MODE` environment
+ * variable.
  *
- * `BOTH` is the default and the intended posture. The other two exist for
- * deployments that only want one gate — a tenant with no Auth0 organization
- * yet, or one where the organization *is* the whole membership list and a
- * separate allowlist is just bookkeeping.
+ * `BOTH` is the default and the strictest posture: neither check is
+ * sufficient alone. `ORGANIZATION` and `ALLOWLIST` drop one check entirely,
+ * for a deployment that only wants a single gate. `EITHER` keeps both checks
+ * live but requires only one to pass — the "personal account or organization
+ * account" case: someone who is a member of an approved organization gets in
+ * on that alone, and someone who isn't (a personal Google account, say) still
+ * gets in with an ACTIVE allowlist entry. It differs from `BOTH` in exactly
+ * one way: `BOTH` is an AND of the two checks, `EITHER` is an OR.
  */
-export type AuthorizationMode = "BOTH" | "ORGANIZATION" | "ALLOWLIST";
+export type AuthorizationMode = "BOTH" | "ORGANIZATION" | "ALLOWLIST" | "EITHER";
 
-const AUTHORIZATION_MODES: AuthorizationMode[] = ["BOTH", "ORGANIZATION", "ALLOWLIST"];
+const AUTHORIZATION_MODES: AuthorizationMode[] = ["BOTH", "ORGANIZATION", "ALLOWLIST", "EITHER"];
 
 /**
  * Reads the mode, defaulting to the strictest one.
@@ -62,6 +65,8 @@ export const MODE_DESCRIPTIONS: Record<AuthorizationMode, string> = {
   ORGANIZATION:
     "Members only need membership of an approved Auth0 organization — this list is not currently enforced.",
   ALLOWLIST: "Members only need an active entry here — Auth0 organization membership is not enforced.",
+  EITHER:
+    "Members need EITHER membership of an approved Auth0 organization OR an active entry here — whichever they have is enough, and Auth0 offers a choice between a personal account and an organization at login.",
 };
 
 /**
@@ -223,14 +228,20 @@ export type AuthorizationResult =
 
 /**
  * Whether the two check results add up to access under the active mode. Pure,
- * so the whole truth table — three modes by four combinations — is testable
+ * so the whole truth table — four modes by four combinations — is testable
  * without a database or a session.
+ *
+ * `EITHER` is the one mode that isn't "AND of whichever checks are required":
+ * it's an OR of the two check results directly, which is why it's handled
+ * separately rather than folded into organizationRequired/allowlistRequired —
+ * neither check is "required" under EITHER, each is independently sufficient.
  */
 export function isAuthorized(
   mode: AuthorizationMode,
   organizationMember: boolean,
   emailAuthorized: boolean,
 ): boolean {
+  if (mode === "EITHER") return organizationMember || emailAuthorized;
   if (organizationRequired(mode) && !organizationMember) return false;
   if (allowlistRequired(mode) && !emailAuthorized) return false;
   return true;
@@ -241,12 +252,17 @@ export function isAuthorized(
  * enforces: under ORGANIZATION mode an address that happens not to be on the
  * allowlist didn't cause the refusal, and saying it did would send an
  * administrator to fix the wrong thing.
+ *
+ * Only ever called after `isAuthorized` returns false, so under `EITHER` both
+ * checks are known to have failed by the time this runs.
  */
 export function denialReasonFor(
   mode: AuthorizationMode,
   organizationMember: boolean,
   emailAuthorized: boolean,
 ): AccessDenialReason {
+  if (mode === "EITHER") return "NOT_ORG_MEMBER_AND_EMAIL_NOT_AUTHORIZED";
+
   const failedOrg = organizationRequired(mode) && !organizationMember;
   const failedAllowlist = allowlistRequired(mode) && !emailAuthorized;
 
@@ -442,7 +458,7 @@ export const DENIAL_EXPLANATIONS: Record<
   { summary: string; organization: string; allowlist: string }
 > = {
   NOT_ORG_MEMBER: {
-    summary: "Not a member of the Marine Team organization",
+    summary: "Not a member of an approved organization",
     organization: "no",
     allowlist: "yes",
   },
