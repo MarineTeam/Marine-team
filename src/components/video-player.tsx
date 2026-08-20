@@ -25,24 +25,10 @@ function withAutoplay(embedUrl: string): string {
   return url.toString();
 }
 
-export function VideoPlayer({
-  embedUrl,
-  chapters,
-  title,
-  artist,
-  artworkUrl,
-}: {
-  embedUrl: string;
-  chapters: Chapter[];
-  /** For the lock-screen/notification "Now playing" info in audio-only mode. */
-  title: string;
-  artist?: string;
-  artworkUrl?: string;
-}) {
+export function VideoPlayer({ embedUrl, chapters }: { embedUrl: string; chapters: Chapter[] }) {
   const [src, setSrc] = useState(embedUrl);
   const [preferredSpeed, setPreferredSpeed] = useState(1);
   const [copiedChapterId, setCopiedChapterId] = useState<string | null>(null);
-  const [audioOnly, setAudioOnly] = useState(false);
 
   async function copyChapterLink(id: string, seconds: number) {
     const url = `${window.location.origin}${window.location.pathname}?t=${Math.floor(seconds)}`;
@@ -65,68 +51,15 @@ export function VideoPlayer({
     if (settings.autoplay) setSrc(withAutoplay(embedUrl));
   }, [embedUrl]);
 
-  // Best-effort only: this sets what a lock-screen/notification "Now
-  // playing" card shows (title, artist, artwork), but there are no action
-  // handlers for play/pause/seek — wiring those would need control over the
-  // iframe's actual <video> element, which the missing postMessage API
-  // rules out (see withStart above). Browsers that show media controls for
-  // audio playing in a background/cross-origin iframe at all will show
-  // this info; ones that don't, won't — there's no way to detect which from here.
-  useEffect(() => {
-    if (!audioOnly || typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title,
-      artist: artist ?? "Marine Team",
-      artwork: artworkUrl ? [{ src: artworkUrl }] : [],
-    });
-    return () => {
-      navigator.mediaSession.metadata = null;
-    };
-  }, [audioOnly, title, artist, artworkUrl]);
-
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => setAudioOnly((v) => !v)}
-          className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-        >
-          {audioOnly ? "🎬 Show video" : "🎧 Audio only"}
-        </button>
-      </div>
-      {/*
-        Shrunk to a small mini-player strip rather than hidden outright when
-        audio-only. Clipping this down to ~invisible (a 1x1 box, or
-        display:none) turned out to get the iframe's background playback
-        suspended by the browser — same as backgrounding the tab did before
-        audio-only mode existed at all, which worked fine. Staying a real,
-        modestly-sized visible element avoids whatever heuristic that
-        triggers, at the cost of genuinely being "hide the video" rather
-        than "shrink the video" — Bunny's own play/pause/seek controls are
-        also out of reach at this size, until "Show video" restores it.
-      */}
-      <div className={audioOnly ? "flex items-center gap-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800" : undefined}>
-        <div
-          className={
-            audioOnly ? "w-24 shrink-0 overflow-hidden rounded bg-black" : "aspect-video overflow-hidden rounded-lg bg-black"
-          }
-          style={audioOnly ? { aspectRatio: "16 / 9" } : undefined}
-        >
-          <iframe
-            src={src}
-            className="h-full w-full"
-            allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture"
-            allowFullScreen
-          />
-        </div>
-        {audioOnly && (
-          <div className="text-sm">
-            <p className="font-medium">{title}</p>
-            <p className="text-xs text-zinc-500">
-              Audio only — tap &quot;Show video&quot; above for play/pause and seek controls.
-            </p>
-          </div>
-        )}
+      <div className="aspect-video overflow-hidden rounded-lg bg-black">
+        <iframe
+          src={src}
+          className="h-full w-full"
+          allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture"
+          allowFullScreen
+        />
       </div>
 
       {/* Bunny's embed takes no playback-rate parameter and exposes no

@@ -217,31 +217,10 @@ All notable changes to this project are documented here. Format follows
   playback there — taking priority over the viewer's own resume position —
   and a new "Share at" mm:ss field builds that link. Each chapter also gets
   its own 🔗 copy-link button using its own known timestamp.
-- **A second, direct video player, member's choice**: a video with a
-  downloadable MP4 (the same file the Downloads plugin already builds) now
-  offers a "Bunny player" / "Direct player" switch. The direct player is a
-  plain `<video>` this app owns instead of Bunny's iframe embed — a single
-  fixed resolution rather than Bunny's adaptive quality, traded for real
-  play/pause/seek, a playback-speed setting that actually applies (the
-  Bunny embed has no parameter for it), and working Media Session
-  lock-screen controls. Remembered per device, applied only when available
-  for that particular video.
-- **Audio-only playback mode**: a "🎧 Audio only" toggle on either player
-  shrinks the video to a small mini-player strip instead of hiding it
-  outright. It was originally a 1x1 hidden box, which turned out to get
-  playback suspended in the background on Android — breaking something
-  that already worked before this feature existed, since the browser shows
-  its own media notification (with working play/pause) for any playing
-  video regardless of frame. A real, modestly-sized element avoids
-  triggering that. On the Bunny player the mini strip still carries its own
-  on-screen controls, small but present; on the direct player, a dedicated
-  play/pause button and seek bar sit next to it. Both set Media Session
-  metadata (title, series, artwork) for the notification's display; only
-  the direct player wires real action handlers to it.
 - **Cast to TV**: a Chromecast button next to Download, gated the same way,
-  reuses the same signed MP4 URL as the direct player above as its cast
-  source — the default Chromecast receiver needs a direct file, not an
-  iframe embed. AirPlay needed no code: Safari already shows its own
+  reuses the signed MP4 endpoint already built for the Downloads plugin as
+  its cast source — the default Chromecast receiver needs a direct file, not
+  an iframe embed. AirPlay needed no code: Safari already shows its own
   AirPlay control for any actively-playing `<video>`, iframe or not. (The
   Chromecast piece hasn't been checked against a real Chromecast device yet
   — worth confirming on a preview deploy before relying on it.)

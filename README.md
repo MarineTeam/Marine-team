@@ -515,50 +515,21 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   The JSON-LD script tag itself renders nothing — it's invisible metadata
   for search engines, not the visible trail.
 - **Timestamp/clip sharing**: the video page reads a `?t=<seconds>` search
-  param into `resumeAt`, which both players seed their start position from
-  (the Bunny embed via `bunnyStreamEmbedUrl`'s `t=` param, the direct player
-  below via `video.currentTime`), taking priority over the viewer's own
-  watch progress. `TimestampShareLink` (mm:ss input, `parseTimestamp` from
-  `src/lib/format.ts`) builds that link, and each chapter row in both
-  players gets its own copy-link button using its own `timestampSeconds`.
-- **Two players**: `PlayerSwitcher` (`src/components/player-switcher.tsx`)
-  picks between `VideoPlayer` (Bunny's iframe embed, as above) and
-  `DirectVideoPlayer` (`src/components/direct-video-player.tsx`, a plain
-  `<video>` this app owns, playing the same signed MP4 URL already built for
-  Downloads at a single fixed resolution). The switch only appears when that
-  MP4 exists for the given video — `directPlayerAvailable`, the same
-  `getDownloadAvailability` gate as the Download/Cast buttons below — and
-  the choice is remembered via `preferredPlayer` in
-  `src/lib/device-settings.ts`. Owning the `<video>` element is what makes
-  the direct player able to do things the iframe embed can't: a real
-  `playbackRate` (the Bunny embed only ever showed the preferred speed as a
-  reminder — there's no parameter to set it), real seeking on chapter click
-  instead of reloading the iframe with a new `t=`, and working
-  `navigator.mediaSession` action handlers (play/pause/seek) rather than
-  metadata-only.
-- **Audio-only mode**: a "🎧 Audio only" toggle in both players shrinks the
-  video to a small mini-player strip rather than hiding it outright.
-  Originally implemented as a 1x1 `clip`-hidden box — that turned out to get
-  playback suspended in the background on Android, breaking something that
-  already worked before this feature existed (the browser's own media
-  notification, with working play/pause, appears for any playing `<video>`
-  regardless of frame — that's the browser detecting the element directly,
-  nothing this app does). A real, modestly-sized element avoids triggering
-  that. In `VideoPlayer` the mini strip still carries Bunny's own on-screen
-  controls, small but present; in `DirectVideoPlayer` a dedicated play/pause
-  button and seek bar sit beside it. Both also set
-  `navigator.mediaSession.metadata` (title/artist/artwork) for the
-  notification's display; only `DirectVideoPlayer` wires real action
-  handlers to it (`VideoPlayer`'s notification controls work by the browser
-  driving Bunny's own player directly, same as always).
+  param into `resumeAt`, which seeds `bunnyStreamEmbedUrl`'s `t=` param,
+  taking priority over the viewer's own watch progress.
+  `TimestampShareLink` (mm:ss input, `parseTimestamp` from
+  `src/lib/format.ts`) builds that link, and each chapter row in
+  `VideoPlayer` gets its own copy-link button using its own
+  `timestampSeconds`.
 - **Cast to TV**: `CastButton` (`src/components/cast-button.tsx`) integrates
   Google's Cast Web Sender SDK (loaded at runtime, no npm types package —
-  see the file's local ambient types) and reuses the same signed MP4 URL as
-  the direct player above, since the default Chromecast receiver needs a
-  direct file rather than an iframe embed; shown next to the download
-  button, under the same `getDownloadAvailability` gate. AirPlay needs no
-  equivalent code — Safari shows its own AirPlay control for any
-  actively-playing `<video>`, including one inside a cross-origin iframe,
+  see the file's local ambient types) and reuses the signed MP4 URL already
+  built for the Downloads plugin (`/api/downloads/[videoId]`) as its cast
+  source, since the default Chromecast receiver needs a direct file rather
+  than an iframe embed; shown next to the download button, under the same
+  `getDownloadAvailability` gate. AirPlay needs no equivalent code — Safari
+  shows its own AirPlay control for any actively-playing `<video>`,
+  including one inside a cross-origin iframe,
   since that's a system-level media route rather than something the
   missing postMessage API blocks.
 - **PWA**: `public/manifest.json` + `public/sw.js` make the site installable

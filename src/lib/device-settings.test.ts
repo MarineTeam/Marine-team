@@ -22,7 +22,6 @@ describe("parseDeviceSettings", () => {
       autoplay: true,
       defaultPlaybackSpeed: 1.5,
       downloadOverCellular: true,
-      preferredPlayer: "direct",
     };
     expect(parseDeviceSettings(JSON.stringify(stored))).toEqual(stored);
   });
@@ -52,11 +51,6 @@ describe("parseDeviceSettings", () => {
     const settings = parseDeviceSettings(JSON.stringify({ autoplay: "yes", downloadOverCellular: 1 }));
     expect(settings.autoplay).toBe(false);
     expect(settings.downloadOverCellular).toBe(false);
-  });
-
-  it("rejects a player preference it doesn't know", () => {
-    expect(parseDeviceSettings(JSON.stringify({ preferredPlayer: "direct" })).preferredPlayer).toBe("direct");
-    expect(parseDeviceSettings(JSON.stringify({ preferredPlayer: "vlc" })).preferredPlayer).toBe("bunny");
   });
 });
 

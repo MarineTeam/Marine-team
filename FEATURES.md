@@ -61,35 +61,6 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Related content** — series pages show "More like this" (same category,
   then shared tags); video pages show "More from this series" or "You might
   also like" for standalone videos.
-- **Two players, member's choice** — a video page normally plays through
-  Bunny's own iframe embed (adaptive quality, captions, native controls),
-  but for a video with a downloadable MP4 (same one the Downloads plugin
-  uses), a **"Bunny player" / "Direct player"** switch appears above it. The
-  direct player is a plain `<video>` this app owns, playing that same MP4 at
-  a single fixed resolution instead of adaptive quality — the trade for
-  actually controlling the element: real play/pause/seek, a working
-  playback-speed setting (the Bunny embed only ever showed the preferred
-  speed as a reminder — there's no parameter to set it), and working
-  Media Session lock-screen/notification controls. The choice is remembered
-  per device for next time, but only applied when the direct player is
-  available for that particular video.
-  - **Audio-only mode**, in either player, is a "🎧 Audio only" toggle that
-    shrinks the video down to a small mini-player strip (paired with a
-    "Now playing" row) rather than hiding it outright — shrinking it to
-    near-invisible (a 1x1 box, or `display:none`) turned out to get
-    playback suspended in the background on Android, the same thing that
-    background tabs are normally exempted from by the browser's own
-    play/pause notification. Staying a real, modestly-sized element avoids
-    that. On the Bunny player this mini strip still carries its on-screen
-    controls, though small; on the direct player, a dedicated play/pause
-    button and seek bar sit next to it instead.
-  - Sets lock-screen/notification "Now playing" info (title, series,
-    thumbnail) on both players via the Media Session API — but background
-    playback and Android's own media notification, with working play/pause,
-    already worked before audio-only mode existed at all. That's the
-    browser itself detecting the playing `<video>` element regardless of
-    which frame it's in, not anything built into this app; audio-only
-    mode's job is just to not break it by shrinking the frame too far.
 - **Cast to TV** — AirPlay needs no code from this app: Safari shows its own
   AirPlay control for any actively-playing `<video>`, including one inside
   Bunny's iframe, since that's a system-level media route rather than

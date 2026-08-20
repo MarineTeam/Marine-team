@@ -10,17 +10,6 @@
 
 export type ThemePreference = "system" | "light" | "dark";
 
-/**
- * "bunny" is Bunny's own iframe embed — adaptive quality, captions, native
- * controls, but no postMessage API so nothing outside it can drive playback.
- * "direct" is a plain `<video>` this app owns, playing the same signed MP4
- * the Downloads plugin already builds — a single fixed resolution instead
- * of adaptive quality, but real play/pause/seek and working Media Session
- * lock-screen controls. Only offered per-video when that MP4 exists; see
- * PlayerSwitcher.
- */
-export type PlayerPreference = "bunny" | "direct";
-
 /** Speeds offered in the settings UI; the stored value is validated against these. */
 export const PLAYBACK_SPEEDS = [0.75, 1, 1.25, 1.5, 1.75, 2] as const;
 
@@ -38,8 +27,6 @@ export type DeviceSettings = {
   defaultPlaybackSpeed: number;
   /** False (the default) keeps downloads to Wi-Fi, so nobody burns their data plan by surprise. */
   downloadOverCellular: boolean;
-  /** Which player a video page opens with, when the direct player is available for that video at all. */
-  preferredPlayer: PlayerPreference;
 };
 
 export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
@@ -48,13 +35,11 @@ export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
   autoplay: false,
   defaultPlaybackSpeed: 1,
   downloadOverCellular: false,
-  preferredPlayer: "bunny",
 };
 
 export const DEVICE_SETTINGS_KEY = "marine-device-settings";
 
 const THEMES: ThemePreference[] = ["system", "light", "dark"];
-const PLAYER_PREFERENCES: PlayerPreference[] = ["bunny", "direct"];
 
 /**
  * Reads settings out of whatever is in storage, falling back per-field.
@@ -90,9 +75,6 @@ export function parseDeviceSettings(raw: string | null | undefined): DeviceSetti
       typeof value.downloadOverCellular === "boolean"
         ? value.downloadOverCellular
         : DEFAULT_DEVICE_SETTINGS.downloadOverCellular,
-    preferredPlayer: PLAYER_PREFERENCES.includes(value.preferredPlayer as PlayerPreference)
-      ? (value.preferredPlayer as PlayerPreference)
-      : DEFAULT_DEVICE_SETTINGS.preferredPlayer,
   };
 }
 
