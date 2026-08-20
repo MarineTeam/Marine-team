@@ -42,6 +42,7 @@ import { ShareButtons } from "@/components/share-buttons";
 import { TimestampShareLink } from "@/components/timestamp-share-link";
 import { ShareLinkPanel } from "@/components/share-link-panel";
 import { DownloadButton } from "@/components/download-button";
+import { CastButton } from "@/components/cast-button";
 import { MenuTile } from "@/components/menu-tile";
 import { CommentSection } from "@/components/comment-section";
 import { SermonNotesPanel } from "@/components/sermon-notes-panel";
@@ -314,6 +315,16 @@ export default async function VideoPage({
           videoSlug={video.slug}
           durationSeconds={video.durationSeconds}
           policyPlatform={downloadAvailability.platform}
+        />
+      )}
+      {/* Same gate as the download button above: casting reuses that same
+          signed-MP4 endpoint and policy, so there's no point showing this
+          where that endpoint would just refuse. */}
+      {downloadAvailability.allowed && !sequenceLocked && !isPendingPremiere && video.status === "READY" && (
+        <CastButton
+          videoId={video.id}
+          title={video.title}
+          artworkUrl={bunnyStreamThumbnailUrl(video.bunnyVideoId, video.thumbnailFileName) || undefined}
         />
       )}
 

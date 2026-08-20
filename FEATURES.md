@@ -68,6 +68,16 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   series, thumbnail) via the Media Session API; there's no way to wire play/
   pause/seek to those controls, since (as elsewhere on this page) Bunny's
   embed exposes no postMessage API to control the video from outside it.
+- **Cast to TV** — AirPlay needs no code from this app: Safari shows its own
+  AirPlay control for any actively-playing `<video>`, including one inside
+  Bunny's iframe, since that's a system-level media route rather than
+  something the missing postMessage API blocks. Chromecast is different —
+  the default receiver needs a direct, castable file rather than an iframe
+  — so a cast button (next to Download, same gate) uses Google's Cast Web
+  Sender SDK and reuses the signed MP4 endpoint built for Downloads as its
+  media source. **Not verified against a real Chromecast device** — there
+  isn't one available in the environment this was built in; check it on a
+  preview deploy with an actual receiver.
 - **Sequential unlock** — a per-series "require watching in order" toggle
   locks a video until the previous one (by position) is marked completed in
   the viewer's watch history. Anonymous viewers are never locked out (no
