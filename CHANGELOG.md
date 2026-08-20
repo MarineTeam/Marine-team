@@ -9,18 +9,61 @@ All notable changes to this project are documented here. Format follows
 ### Security
 
 - **Two-factor authorization: Auth0 organization membership AND a PostgreSQL
-  email allowlist.** Access now requires both — being a member of the Marine
-  Team Auth0 organization *and* having an ACTIVE `AuthorizedEmail` row.
-  Neither is sufficient alone, and neither is ever read from anything the
-  browser controls: membership comes from the `org_id` claim of the verified
-  ID token, the allowlist from the database.
-  - **`AUTHORIZATION_MODE`** selects which checks are required — `BOTH`
-    (default), `ORGANIZATION`, or `ALLOWLIST` — for deployments that only want
-    one gate. Unset or unrecognised means `BOTH`; no value disables both. In
-    `ALLOWLIST` mode the app stops sending `organization` on the login request,
-    since Auth0 would otherwise refuse non-members before the app's own check
-    and make the mode a no-op. A relaxed mode is shown as a banner on the
-    Authorized emails screen rather than living only in an env var.
+  email allowlist.** Access is decided from two independent checks — being a
+  member of an approved Auth0 organization, and having an ACTIVE
+  `AuthorizedEmail` row. By default both are required and neither is
+  sufficient alone; `AUTHORIZATION_MODE` and the per-address guest exemption
+  below are the deliberate, admin-controlled exceptions to that. Neither
+  check is ever read from anything the browser controls: membership comes
+  from the `org_id` claim of the verified ID token, the allowlist from the
+  database.
+  - **`AUTHORIZATION_MODE`** selects how the two checks combine — `BOTH`
+    (default, an AND: neither is enough alone), `ORGANIZATION`, `ALLOWLIST`, or
+    the new **`EITHER`** (an OR: either check alone is enough — the "personal
+    account or organization account" case, for a member with no organization
+    at all to still get in on an allowlist entry). Unset or unrecognised means
+    `BOTH`; no value disables both checks. In `ALLOWLIST` or `EITHER` mode the
+    app stops sending `organization` on the login request, since Auth0 would
+    otherwise refuse non-members before the app's own check ever ran. A
+    relaxed or reshaped mode is shown as a banner on the Authorized emails
+    screen rather than living only in an env var.
+  - **Multiple organizations**: `AUTH0_ORGANIZATION_ID` now accepts a
+    comma-separated list. With exactly one configured, the app still sends it
+    as `organization` on the login request; with two or more, that parameter
+    is omitted and Auth0's own organization picker (Application → Login
+    Experience, "Prompt for Organization") lets the member choose instead of
+    the app picking for them. Either way, whichever organization the member
+    ends up with is re-checked server-side against the verified ID token's
+    `org_id` claim — a picker choice made in the browser is never trusted on
+    its own.
+  - **Invite a guest without relaxing `BOTH` for everyone else**: any
+    `AuthorizedEmail` row can now be individually flagged
+    **`organizationExempt`** ("Guest" on the Authorized emails screen), which
+    lets that one address in on an ACTIVE entry alone — organization
+    membership isn't asked of them, while every other address still needs
+    both checks. Narrower than `EITHER` mode, which relaxes the rule for every
+    allowlisted address at once rather than one named guest.
+    - A guest can't use the normal Log in button: it names the organization,
+      so Auth0 refuses a non-member at the identity provider before the
+      allowlist is ever consulted. The new **`/auth/guest`** route starts the
+      identical login with the organization parameter omitted, which is the
+      only way a guest's request survives long enough to be judged on their
+      exempt row — it grants nothing by itself, `authorizeIdentity` still
+      makes the actual decision.
+    - `/auth/guest` has its own switch, **closed by default**: a "Guest
+      sign-in link" toggle at the top of the Authorized emails screen, backed
+      by a database row (`AuthSettings`) rather than an env var, so opening it
+      for one guest and closing it again afterward takes effect immediately
+      with no redeploy. Closed, the route 404s indistinguishably from "no
+      organization is required here," so the response never reveals that a
+      guest path exists at all.
+  - **Access attempts now record Auth0's own reason for a callback refusal**,
+    not just a generic "Auth0 refused the login." Several of the SDK's error
+    types (an organization rejection among them) leave their own top-level
+    message at a fixed default and put the actual `error`/`error_description`
+    Auth0 sent back in a separate field the app wasn't reading; both are now
+    captured and shown on the Access attempts screen and in the admin
+    notification email.
   - Both checks run inside `getCurrentUser()`, the choke point every
     server-rendered page and API already goes through, so **revocation
     applies to existing sessions** — remove an email and that person is
@@ -65,8 +108,14 @@ All notable changes to this project are documented here. Format follows
   served back by the service worker — range requests included, so seeking
   works offline — which lets an ordinary `<video>` play with the network off.
   Requires **MP4 Fallback** on the Bunny Stream library, since HLS segments
-  can't be played offline; the API checks the file exists before offering it,
-  and the resolution is set with `BUNNY_STREAM_DOWNLOAD_HEIGHT` (720p default).
+  can't be played offline. The download endpoint reads Bunny's own per-video
+  `hasMP4Fallback`/`availableResolutions` rather than assuming a fixed
+  rendition exists — enabling MP4 Fallback only affects uploads made
+  afterward, so older videos routinely have neither — and serves the highest
+  resolution at or under `BUNNY_STREAM_DOWNLOAD_HEIGHT` (720p default), with a
+  specific reason (no fallback generated yet, nothing at or under the
+  resolution cap, the CDN rejected the request, or the file's genuinely
+  missing) instead of one catch-all "no downloadable file" message.
   - **Granular control over what can be downloaded**: a three-way
     Inherit/Allow/Block setting on every **category**, **series**, and
     **video**, resolved most-specific-first and falling back to the nearest
@@ -85,6 +134,14 @@ All notable changes to this project are documented here. Format follows
     used against the admin's suggested cap, and per-video **Play offline** and
     **Remove**. The list is per device and never reaches the server, and
     self-heals when the browser silently evicts a cached file.
+  - **Downloaded videos are now reachable with no network at all.** Opening
+    the site with no connection — including the installed PWA's own cold
+    launch — used to hit the browser's native "you're offline" page before
+    the app (and its downloaded-video list) ever loaded. A static, data-free
+    `offline.html`, reading nothing but the same localStorage index and Cache
+    Storage this feature already writes, is now precached by the service
+    worker and served for any navigation whose network request fails. The
+    rest of the site is still deliberately never cached.
 - **Share links**: revocable, tracked links to a series or video, opened at
   `/s/[token]`. A link can be **public** (anyone holding it, no account
   needed) or **private** to named emails, in which case each recipient is

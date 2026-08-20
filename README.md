@@ -176,6 +176,16 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   first refusal for an address emails the admins; the same address is then
   left alone for an hour and no more than ten notifications go out per hour
   overall, both counted in Postgres (no Redis anywhere in this app).
+
+  A callback-error attempt (Auth0 refused before the app ever saw an
+  identity) also records `detail`: the Auth0 SDK's own error code/message,
+  plus — since several error types (an organization rejection among them)
+  leave their own `.message` at a fixed generic default — the underlying
+  `error`/`error_description` Auth0 actually sent back, read from the SDK
+  error's `.cause` (`getErrorCause()` in `src/lib/auth0.ts`). Still nothing
+  but Auth0's own human-readable classification; never a token or secret.
+  Also `console.error`'d immediately, so it's in Vercel's function logs even
+  before anyone opens the admin page.
 - **Admin CMS** (`/admin`): manage categories, series, videos, and files.
   Video upload creates a placeholder in Bunny Stream, signs a TUS upload
   session, and streams the file straight from the browser to Bunny; small
