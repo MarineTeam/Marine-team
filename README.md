@@ -536,19 +536,21 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   instead of reloading the iframe with a new `t=`, and working
   `navigator.mediaSession` action handlers (play/pause/seek) rather than
   metadata-only.
-- **Audio-only mode**: a "🎧 Audio only" toggle in both players visually
-  hides the video (a 1x1 clipped box, not `display:none`, so playback isn't
-  paused or torn down) while audio keeps running. In `VideoPlayer` this also
-  hides Bunny's own on-screen controls, since there's no postMessage API to
-  reach them otherwise — pausing or seeking means switching back to video
-  first. In `DirectVideoPlayer`, a small custom play/pause button and seek
-  bar stay available, since there's a real element to drive. Both
-  best-effort set `navigator.mediaSession.metadata` (title/artist/artwork)
-  for lock-screen "Now playing" info; only the direct player's action
-  handlers actually do anything when pressed. **Neither player is
-  guaranteed to keep playing once the screen locks or the app is
-  backgrounded** — that's the browser's own policy for a playing
-  `<video>`/iframe, not something either implementation controls.
+- **Audio-only mode**: a "🎧 Audio only" toggle in both players shrinks the
+  video to a small mini-player strip rather than hiding it outright.
+  Originally implemented as a 1x1 `clip`-hidden box — that turned out to get
+  playback suspended in the background on Android, breaking something that
+  already worked before this feature existed (the browser's own media
+  notification, with working play/pause, appears for any playing `<video>`
+  regardless of frame — that's the browser detecting the element directly,
+  nothing this app does). A real, modestly-sized element avoids triggering
+  that. In `VideoPlayer` the mini strip still carries Bunny's own on-screen
+  controls, small but present; in `DirectVideoPlayer` a dedicated play/pause
+  button and seek bar sit beside it. Both also set
+  `navigator.mediaSession.metadata` (title/artist/artwork) for the
+  notification's display; only `DirectVideoPlayer` wires real action
+  handlers to it (`VideoPlayer`'s notification controls work by the browser
+  driving Bunny's own player directly, same as always).
 - **Cast to TV**: `CastButton` (`src/components/cast-button.tsx`) integrates
   Google's Cast Web Sender SDK (loaded at runtime, no npm types package —
   see the file's local ambient types) and reuses the same signed MP4 URL as

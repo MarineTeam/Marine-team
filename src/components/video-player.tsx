@@ -94,36 +94,40 @@ export function VideoPlayer({
           {audioOnly ? "🎬 Show video" : "🎧 Audio only"}
         </button>
       </div>
-      {/* Visually hidden rather than unmounted or display:none when
-          audio-only: those would tear down or suspend the iframe, cutting
-          playback. A 1x1 clipped box keeps the same iframe element on the
-          page (audio keeps playing) without showing a frame of video —
-          which does mean Bunny's own play/pause/seek controls are also out
-          of reach until "Show video" brings the frame back. */}
-      <div
-        className={audioOnly ? "overflow-hidden rounded-lg bg-black" : "aspect-video overflow-hidden rounded-lg bg-black"}
-        style={audioOnly ? { width: 1, height: 1, clip: "rect(0,0,0,0)" } : undefined}
-      >
-        <iframe
-          src={src}
-          className="h-full w-full"
-          allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture"
-          allowFullScreen
-        />
-      </div>
-      {audioOnly && (
-        <div className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-          <span className="text-2xl" aria-hidden>
-            🎧
-          </span>
+      {/*
+        Shrunk to a small mini-player strip rather than hidden outright when
+        audio-only. Clipping this down to ~invisible (a 1x1 box, or
+        display:none) turned out to get the iframe's background playback
+        suspended by the browser — same as backgrounding the tab did before
+        audio-only mode existed at all, which worked fine. Staying a real,
+        modestly-sized visible element avoids whatever heuristic that
+        triggers, at the cost of genuinely being "hide the video" rather
+        than "shrink the video" — Bunny's own play/pause/seek controls are
+        also out of reach at this size, until "Show video" restores it.
+      */}
+      <div className={audioOnly ? "flex items-center gap-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800" : undefined}>
+        <div
+          className={
+            audioOnly ? "w-24 shrink-0 overflow-hidden rounded bg-black" : "aspect-video overflow-hidden rounded-lg bg-black"
+          }
+          style={audioOnly ? { aspectRatio: "16 / 9" } : undefined}
+        >
+          <iframe
+            src={src}
+            className="h-full w-full"
+            allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+        {audioOnly && (
           <div className="text-sm">
             <p className="font-medium">{title}</p>
             <p className="text-xs text-zinc-500">
               Audio only — tap &quot;Show video&quot; above for play/pause and seek controls.
             </p>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Bunny's embed takes no playback-rate parameter and exposes no
           postMessage API to set one, so the saved default can only be a

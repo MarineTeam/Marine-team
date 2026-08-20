@@ -151,14 +151,20 @@ export function DirectVideoPlayer({
         </button>
       </div>
 
-      {/* Visually hidden rather than unmounted when audio-only, same reason
-          as the Bunny embed: keeps the element (and playback) alive. Unlike
-          that embed, real controls stay available below regardless. */}
-      <div
-        className="overflow-hidden rounded-lg bg-black"
-        style={audioOnly ? { width: 1, height: 1, clip: "rect(0,0,0,0)" } : undefined}
-      >
-        <div className={audioOnly ? undefined : "aspect-video"}>
+      {/*
+        Shrunk to a small mini-player strip rather than hidden outright when
+        audio-only — same reasoning as the Bunny embed (video-player.tsx):
+        clipping this down to ~invisible risks the browser suspending
+        background playback, the same thing that happens to a backgrounded
+        tab generally, just triggered here by the element's own size/
+        visibility rather than the tab's. A real, modestly-sized element
+        avoids that risk, at the cost of not being fully "hidden."
+      */}
+      <div className={audioOnly ? "flex items-center gap-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800" : undefined}>
+        <div
+          className={audioOnly ? "w-24 shrink-0 overflow-hidden rounded bg-black" : "aspect-video overflow-hidden rounded-lg bg-black"}
+          style={audioOnly ? { aspectRatio: "16 / 9" } : undefined}
+        >
           {src ? (
             <video
               ref={videoRef}
@@ -179,32 +185,31 @@ export function DirectVideoPlayer({
             <div className="flex h-full w-full items-center justify-center text-sm text-zinc-400">Loading…</div>
           )}
         </div>
-      </div>
-
-      {audioOnly && src && (
-        <div className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-          <button
-            onClick={() => (playing ? videoRef.current?.pause() : void videoRef.current?.play())}
-            className="rounded-full border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
-          >
-            {playing ? "⏸" : "▶️"}
-          </button>
+        {audioOnly && src && (
           <div className="flex-1 text-sm">
             <p className="font-medium">{title}</p>
-            <input
-              type="range"
-              min={0}
-              max={duration || 0}
-              value={currentTime}
-              onChange={(e) => seekTo(Number(e.target.value))}
-              className="w-full"
-            />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => (playing ? videoRef.current?.pause() : void videoRef.current?.play())}
+                className="shrink-0 rounded-full border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              >
+                {playing ? "⏸" : "▶️"}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={duration || 0}
+                value={currentTime}
+                onChange={(e) => seekTo(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
             <p className="text-xs tabular-nums text-zinc-500">
               {formatTimestamp(currentTime)} / {formatTimestamp(duration)}
             </p>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {chapters.length > 0 && (
         <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 text-sm dark:divide-zinc-800 dark:border-zinc-800">

@@ -227,17 +227,17 @@ All notable changes to this project are documented here. Format follows
   lock-screen controls. Remembered per device, applied only when available
   for that particular video.
 - **Audio-only playback mode**: a "🎧 Audio only" toggle on either player
-  visually hides the video (not `display:none`, so playback keeps running)
-  while audio continues. On the Bunny player this also hides its on-screen
-  controls — there's no postMessage API into the embed to reach them
-  otherwise, so pausing or seeking means switching back to video; on the
-  direct player, a small play/pause button and seek bar stay fully working.
-  Both best-effort set Media Session lock-screen/notification metadata
-  (title, series, artwork), though only the direct player's controls
-  actually respond to lock-screen buttons. **Neither is guaranteed to keep
-  playing once the screen locks or the app is backgrounded** — that's the
-  browser's own policy for a playing video, not something either
-  implementation controls.
+  shrinks the video to a small mini-player strip instead of hiding it
+  outright. It was originally a 1x1 hidden box, which turned out to get
+  playback suspended in the background on Android — breaking something
+  that already worked before this feature existed, since the browser shows
+  its own media notification (with working play/pause) for any playing
+  video regardless of frame. A real, modestly-sized element avoids
+  triggering that. On the Bunny player the mini strip still carries its own
+  on-screen controls, small but present; on the direct player, a dedicated
+  play/pause button and seek bar sit next to it. Both set Media Session
+  metadata (title, series, artwork) for the notification's display; only
+  the direct player wires real action handlers to it.
 - **Cast to TV**: a Chromecast button next to Download, gated the same way,
   reuses the same signed MP4 URL as the direct player above as its cast
   source — the default Chromecast receiver needs a direct file, not an
