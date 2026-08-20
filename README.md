@@ -18,18 +18,25 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
 ## Setup
 
 1. Copy `.env.example` to `.env` and fill in real values:
-   - Two Postgres connection strings: `DATABASE_URL` (**pooled** — this is
-     what the running app uses, and a serverless deployment needs pooling
-     since every concurrent function instance opens its own connection) and
-     `DIRECT_URL` (**direct**, unpooled — this is what `prisma migrate
-     deploy`/`db push` use instead, since a pooler can interfere with schema
-     changes). On Prisma Postgres these are the `pooled.db.prisma.io` and
-     `db.prisma.io` connection strings from Prisma Console respectively —
-     putting the direct one in `DATABASE_URL` is what produces "too many
-     connections for role" once real traffic hits, since that role's
-     connection cap is sized for a migration's brief burst. On Neon/Supabase/
-     plain Postgres with no separate pooled endpoint, both can be the same
-     value.
+   - Two Postgres connection strings, not interchangeable: `DATABASE_URL`
+     (**pooled** — what the running app queries through; a serverless
+     deployment opens one connection per concurrent function instance and
+     needs a pooler to survive that) and `DIRECT_URL` (**direct**, unpooled —
+     what `prisma migrate deploy`/`db push` use instead, since poolers don't
+     support the DDL statements migrations issue). On Prisma Postgres, take
+     both from Console → your database → **Connect to your database**, where
+     they're labelled by client rather than by pooling — match them by
+     protocol: the **"Prisma ORM"** string
+     (`prisma+postgres://accelerate.prisma-data.net/?api_key=…`) is the pooled
+     one, since Accelerate has pooling built in, and works natively with
+     `@prisma/client` 6.x with no extension to install; the **"Any Client"**
+     string (`postgres://…@db.prisma.io:5432/…`) is the direct one. Putting
+     the "Any Client" string in `DATABASE_URL` is what produces "too many
+     connections for role" once real traffic hits, since that role's cap is
+     sized for a migration's brief burst. On Neon/Supabase use their pooled
+     endpoint (Neon's `-pooler` host, Supabase's port 6543) for
+     `DATABASE_URL`; with no separate pooled endpoint at all, both can be the
+     same value.
    - An Auth0 "Regular Web Application" (`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`,
      `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET` — generate with `openssl rand -hex 32`)
      - In the Auth0 app settings, set Allowed Callback URLs to
@@ -630,21 +637,30 @@ npx -y @prisma/cli@latest database create preview --branch main
 npx -y @prisma/cli@latest database connection create <database-id>
 ```
 
-**Get both the pooled and direct connection strings, not just one.** A
-connection response carries them as two separate, separately-labeled fields
-— `endpoints.pooled.connectionString` and `endpoints.direct.connectionString`
-— each shown **once** at creation. The CLI's plain-text output and Prisma
-Console's UI can both surface only one of the two without it being obvious
-which; if unsure, request the CLI's JSON output (check `database connection
-create --help` for a `--json`/`-j` flag) or read both labeled fields in
-Console, rather than assuming the one string printed is the one you want.
-Pooled (`pooled.db.prisma.io`) goes in `DATABASE_URL`, direct
-(`db.prisma.io`) in `DIRECT_URL` — see the datasource comment in
-`prisma/schema.prisma` for why the split matters. **Putting the direct string
-in `DATABASE_URL` is what produces "too many connections for role" once real
-traffic hits it** — that role's connection cap is sized for a migration's
-brief burst, not sustained concurrent serverless traffic, and it will look
-fine in initial testing before failing under load.
+**Get both the pooled and direct connection strings, not just one.** Console
+(and the Management API) expose them as two separate values, each shown
+**once** at creation — Console labels them by client rather than by pooling,
+so match on protocol: **"Prisma ORM"** /
+`prisma+postgres://accelerate.prisma-data.net/?api_key=…` is the pooled one
+(Accelerate pools by default) and goes in `DATABASE_URL`; **"Any Client"** /
+`postgres://…@db.prisma.io:5432/…` is direct and goes in `DIRECT_URL`. See
+the datasource comment in `prisma/schema.prisma` for why the split matters.
+**Putting the "Any Client" string in `DATABASE_URL` is what produces "too
+many connections for role" once real traffic hits it** — that role's
+connection cap is sized for a migration's brief burst, not sustained
+concurrent serverless traffic, and it will look fine in initial testing
+before failing under load.
+
+Note that Vercel's Prisma Postgres marketplace integration provisions only
+**one** connection string per environment and binds it to `DATABASE_URL` as a
+[Sensitive environment variable](https://vercel.com/docs/environment-variables/sensitive-environment-variables)
+(write-only — its value can be replaced but never read back, by anyone). Its
+Storage view also says additional connection strings "must be manually added
+as environment variables". So `DIRECT_URL` is always a manual add under
+Settings → Environment Variables, and if the integration's default turns out
+to be the direct string, `DATABASE_URL` has to be overwritten there with the
+pooled one — editing a Sensitive variable's value is allowed even though
+reading it isn't.
 
 No baselining is needed for a fresh preview database: it starts empty, so the
 first preview build applies `0_init` and every later migration normally. (The
