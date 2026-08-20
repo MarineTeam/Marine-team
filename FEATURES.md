@@ -61,14 +61,12 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Related content** — series pages show "More like this" (same category,
   then shared tags); video pages show "More from this series" or "You might
   also like" for standalone videos.
-- **Background audio on Android** — minimizing the app was pausing playback
-  (reported behavior on real devices; Android's own media notification, with
-  working play/pause, already worked before this). The player now loads
-  Bunny's Player.js and, if it sees the video pause on its own while the
-  page is hidden, immediately calls play() again — once per background
-  period, so it doesn't fight the browser in a loop if that turns out to be
-  what's actually pausing it rather than the player itself. Experimental:
-  not verified beyond one round of device testing.
+- **Backgrounding on Android pauses playback** — minimizing the app stops
+  the audio; Android's media notification then resumes it with one tap, and
+  from there it keeps playing in the background. That resume notification
+  has always worked and isn't something this app implements — the browser
+  provides it for any playing media. Automatically resuming instead has
+  been tried and does not work; see the Technical notes.
 - **Cast to TV** — AirPlay needs no code from this app: Safari shows its own
   AirPlay control for any actively-playing `<video>`, including one inside
   Bunny's iframe, since that's a system-level media route. Chromecast is
@@ -750,10 +748,22 @@ link.
 
 - **Bunny's Stream iframe embed does support postMessage control**, via
   Player.js (`play()`/`pause()`/`seek()`, and `play`/`pause`/`timeupdate`/
-  `ended` events) — used so far only to fight an Android auto-pause on
-  backgrounding (see `video-player.tsx`). None of the items below have
-  been rewired to use it yet; each still works the way it did before that
-  was discovered.
+  `ended` events). Nothing in the app uses it yet — the items below still
+  work the way they did before it was found.
+- **Android pausing playback on minimize can't be fixed from outside the
+  iframe.** The attempt: listen via Player.js for a pause while
+  `document.hidden`, then call `play()` again. Tested on a real device —
+  playback still stops. The likeliest cause is the browser refusing a
+  `play()` that originates from a hidden document with no user activation,
+  which is squarely what its autoplay policy blocks. It also fails
+  silently, since Player.js's `play()` is a fire-and-forget postMessage and
+  any rejection inside the iframe never reaches the parent page. Anything
+  that could plausibly work has to own the media element rather than talk
+  to someone else's iframe — i.e. play Bunny's MP4 (the signed URL the
+  Downloads plugin already builds) through this app's own `<audio>`, which
+  is how web audio players get background playback. That's a real
+  architectural change and is still not guaranteed: the MP4 carries a video
+  track, so the browser may treat it as video and suspend it anyway.
 - **Watch progress** is a heartbeat-based approximation, not frame-accurate:
   progress is inferred from elapsed time while the page is open rather
   than a precise scrub position.

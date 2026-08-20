@@ -1,37 +1,30 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { formatTimestamp } from "@/lib/format";
 import { readDeviceSettings } from "@/lib/device-settings";
 
 type Chapter = { id: string; title: string; timestampSeconds: number };
 
 /**
- * Bunny Stream does support postMessage control of its embed — via
- * Player.js (https://bunny.net/blog/introducing-player-js-support-for-bunny-stream-...),
- * loaded from Bunny's own CDN. That's used below only to fight an
- * Android-only auto-pause on backgrounding; chapter-jumping still reloads
- * the iframe with a new `t=` rather than calling Player.js's seek(), to
- * keep that already-working behavior unchanged.
+ * Bunny Stream's embed does expose a postMessage API — Player.js
+ * (play/pause/seek, plus play/pause/timeupdate/ended events), loaded from
+ * Bunny's own CDN. Nothing here uses it yet.
+ *
+ * It was tried once, to fight Android pausing playback when the app is
+ * minimized: listen for a pause while `document.hidden`, then call `play()`
+ * again. That does not work — playback still stops. Most likely the browser
+ * is refusing a `play()` that originates from a hidden document with no user
+ * activation, which is exactly the case its autoplay policy blocks. It fails
+ * invisibly, too: Player.js's `play()` is a fire-and-forget postMessage, so a
+ * rejection inside the iframe never surfaces out here. Don't re-attempt this
+ * from outside the iframe; see the Technical notes in FEATURES.md.
  */
-declare global {
-  interface Window {
-    playerjs?: { Player: new (elementOrId: HTMLIFrameElement | string) => PlayerJsInstance };
-  }
-}
-
-interface PlayerJsInstance {
-  on(event: "play" | "pause", callback: () => void): void;
-  play(): void;
-}
-
-const PLAYERJS_SCRIPT_URL = "https://assets.mediadelivery.net/playerjs/player-0.1.0.min.js";
-let playerjsScriptRequested = false;
 
 /**
  * Jumping to a chapter re-points the iframe at a new `t=` start time rather
- * than seeking a live player: this reloads the iframe starting at the
- * chapter's timestamp instead of calling Player.js's seek() (see above).
+ * than seeking a live player. Player.js could seek instead, but reloading
+ * already works, so it stays as-is.
  */
 function withStart(embedUrl: string, seconds: number): string {
   const url = new URL(embedUrl);
@@ -50,9 +43,6 @@ export function VideoPlayer({ embedUrl, chapters }: { embedUrl: string; chapters
   const [src, setSrc] = useState(embedUrl);
   const [preferredSpeed, setPreferredSpeed] = useState(1);
   const [copiedChapterId, setCopiedChapterId] = useState<string | null>(null);
-  const iframeId = useId();
-  const wasPlayingRef = useRef(false);
-  const backgroundResumeAttemptedRef = useRef(false);
 
   async function copyChapterLink(id: string, seconds: number) {
     const url = `${window.location.origin}${window.location.pathname}?t=${Math.floor(seconds)}`;
@@ -75,70 +65,10 @@ export function VideoPlayer({ embedUrl, chapters }: { embedUrl: string; chapters
     if (settings.autoplay) setSrc(withAutoplay(embedUrl));
   }, [embedUrl]);
 
-  // Experimental, unverified against a real device: Android appears to
-  // auto-pause the embed when the app is minimized (reported behavior, not
-  // something Bunny documents a way to disable). This fights that by
-  // calling Player.js's play() again the moment an unexpected pause is
-  // seen while the page is hidden — but only once per background period,
-  // to avoid a retry loop if the browser itself is what's blocking
-  // playback rather than the player pausing on its own. A pause seen while
-  // the page is visible is a real tap and is never overridden.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    function onVisibilityChange() {
-      if (!document.hidden) backgroundResumeAttemptedRef.current = false;
-    }
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    let cancelled = false;
-    function attach() {
-      if (cancelled || !window.playerjs) return;
-      const player = new window.playerjs.Player(iframeId);
-      player.on("play", () => {
-        wasPlayingRef.current = true;
-      });
-      player.on("pause", () => {
-        const wasPlaying = wasPlayingRef.current;
-        wasPlayingRef.current = false;
-        if (document.hidden && wasPlaying && !backgroundResumeAttemptedRef.current) {
-          backgroundResumeAttemptedRef.current = true;
-          player.play();
-        }
-      });
-    }
-
-    let pollInterval: ReturnType<typeof setInterval> | undefined;
-    if (window.playerjs) {
-      attach();
-    } else {
-      if (!playerjsScriptRequested) {
-        playerjsScriptRequested = true;
-        const script = document.createElement("script");
-        script.src = PLAYERJS_SCRIPT_URL;
-        script.async = true;
-        document.head.appendChild(script);
-      }
-      pollInterval = setInterval(() => {
-        if (window.playerjs) {
-          clearInterval(pollInterval);
-          attach();
-        }
-      }, 200);
-    }
-
-    return () => {
-      cancelled = true;
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      if (pollInterval) clearInterval(pollInterval);
-    };
-  }, [iframeId]);
-
   return (
     <div className="space-y-3">
       <div className="aspect-video overflow-hidden rounded-lg bg-black">
         <iframe
-          id={iframeId}
           src={src}
           className="h-full w-full"
           allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture"

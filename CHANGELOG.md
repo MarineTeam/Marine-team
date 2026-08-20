@@ -227,14 +227,14 @@ All notable changes to this project are documented here. Format follows
   embed also turns out to support both natively via `chromecast=true` and
   `disableAirplay` query params, found after this was already built and
   not yet reconciled with it.)
-- **Experimental fix for Android pausing background audio**: minimizing the
-  app was pausing video playback outright (Android's own resumable media
-  notification already worked before this — that's the browser, not
-  anything built here). The player now loads Bunny's Player.js — which,
-  contrary to what several comments in this codebase claimed, Bunny Stream
-  does support — and calls `play()` again the moment it sees an unexpected
-  pause while the page is hidden, once per background period. Not verified
-  beyond one round of device testing.
+- Corrected a claim repeated throughout this codebase's comments and docs:
+  **Bunny Stream's embed does expose a postMessage API**, via Player.js.
+  Nothing uses it yet, so no behavior changed — watch progress, Up next,
+  chapters, and sermon-note timestamps all still work as they did. An
+  attempt to use it to stop Android pausing playback on minimize (catch
+  the pause while the page is hidden, call `play()` again) was tested on a
+  real device and **does not work**; it's been removed, with the reasoning
+  written up in FEATURES.md so it isn't tried again the same way.
 
 ### Changed
 
