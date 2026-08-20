@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
+import { truncateDescription, siteUrl } from "@/lib/seo";
+import { jsonLdScriptProps } from "@/lib/json-ld";
 import {
   getVideoBySlugIncludingPremiere,
   resolveVideoSlugAlias,
@@ -45,6 +48,47 @@ import { UpNextPanel } from "@/components/up-next-panel";
 import { PremiereCountdown } from "@/components/premiere-countdown";
 import { ViewEventBeacon } from "@/components/view-event-beacon";
 
+/**
+ * Mirrors the page body's own restraint: a video the current visitor can't
+ * view gets a generic title and no thumbnail here too, rather than letting
+ * link-preview metadata leak more than the page itself shows.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const [video, user] = await Promise.all([getVideoBySlugIncludingPremiere(slug), getCurrentUser()]);
+  if (!video) return {};
+
+  if (!(await canViewVideo(user, video))) {
+    return { title: "Members Only", description: "This video is for members only." };
+  }
+
+  const description = video.description
+    ? truncateDescription(video.description)
+    : `Watch ${video.title}${video.series ? ` from ${video.series.title}` : ""} on Marine Team.`;
+  const thumbnailUrl = bunnyStreamThumbnailUrl(video.bunnyVideoId, video.thumbnailFileName) || undefined;
+
+  return {
+    title: video.title,
+    description,
+    openGraph: {
+      title: video.title,
+      description,
+      type: "video.other",
+      images: thumbnailUrl ? [thumbnailUrl] : undefined,
+    },
+    twitter: {
+      card: thumbnailUrl ? "summary_large_image" : "summary",
+      title: video.title,
+      description,
+      images: thumbnailUrl ? [thumbnailUrl] : undefined,
+    },
+  };
+}
+
 export default async function VideoPage({
   params,
 }: {
@@ -78,6 +122,30 @@ export default async function VideoPage({
       </div>
     );
   }
+
+  // Built only after the access check above passes, so a video this viewer
+  // can't see never gets structured data emitted for it either.
+  const videoJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "VideoObject",
+    name: video.title,
+    description: video.description || `Watch ${video.title} on Marine Team.`,
+    thumbnailUrl: [bunnyStreamThumbnailUrl(video.bunnyVideoId, video.thumbnailFileName)],
+    uploadDate: video.createdAt.toISOString(),
+    ...(video.durationSeconds ? { duration: `PT${video.durationSeconds}S` } : {}),
+    ...(video.status === "READY" ? { embedUrl: bunnyStreamEmbedUrl(video.bunnyVideoId) } : {}),
+  };
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Marine Team", item: siteUrl() },
+      ...(video.series
+        ? [{ "@type": "ListItem", position: 2, name: video.series.title, item: siteUrl(`/series/${video.series.slug}`) }]
+        : []),
+      { "@type": "ListItem", position: video.series ? 3 : 2, name: video.title },
+    ],
+  };
 
   const isLoggedIn = Boolean(user);
   const categoryId = video.series?.categoryId ?? null;
@@ -168,6 +236,8 @@ export default async function VideoPage({
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-4">
+      <script {...jsonLdScriptProps(videoJsonLd)} />
+      <script {...jsonLdScriptProps(breadcrumbJsonLd)} />
       {!isPendingPremiere && viewCountsOn && <ViewEventBeacon type="video" id={video.id} />}
       {video.series && (
         <Link

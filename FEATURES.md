@@ -77,6 +77,18 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   "Members" badge.
 - **PWA** — installable (Add to Home Screen / desktop install prompt) with
   a minimal service worker; see the PWA section below.
+- **Per-page metadata** — video, series, category, and speaker pages set
+  their own title, description, and Open Graph/Twitter card image (video
+  thumbnail, series/category cover, or speaker photo) instead of sharing one
+  site-wide `<title>`, so links shared to chat apps and social media preview
+  with the real title and image. A member-only page a visitor can't view
+  gets a generic "Members Only" title and no image, matching what the page
+  body itself withholds from a non-viewer.
+- **Structured data (JSON-LD)** — video pages emit a schema.org `VideoObject`
+  (title, description, thumbnail, upload date, duration, embed URL) for
+  Google's video rich results; video, series, and category pages also emit a
+  `BreadcrumbList`. Both are skipped for content the current visitor can't
+  view, same restraint as the metadata above.
 
 ## Member features (optional plugins — see Plugins below)
 

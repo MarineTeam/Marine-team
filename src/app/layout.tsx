@@ -22,7 +22,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Marine Team",
+  // Lets per-page metadata (generateMetadata in videos/series/categories/
+  // speakers) hand back relative OG image paths and have Next resolve them
+  // to absolute URLs, instead of every page needing to know its own origin.
+  metadataBase: new URL(process.env.APP_BASE_URL ?? "http://localhost:3000"),
+  title: { default: "Marine Team", template: "%s | Marine Team" },
   description: "Watch sermons, series, and downloads.",
   manifest: "/manifest.json",
   appleWebApp: { capable: true, title: "Marine Team", statusBarStyle: "black-translucent" },

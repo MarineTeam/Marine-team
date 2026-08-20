@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { unstable_cache } from "next/cache";
 import { Prisma } from "@prisma/client";
@@ -200,7 +201,12 @@ export async function getRecentlyPlayed(userId: string, limit = 30) {
   });
 }
 
-export async function getCategoryBySlug(slug: string, isLoggedIn: boolean) {
+// Wrapped in React's cache() rather than a plain async function: this is
+// called once from the page component and again from generateMetadata (see
+// src/app/categories/[slug]/page.tsx) — cache() dedupes those into one query
+// per request instead of two, the same pattern getCurrentUser/getShareGrants
+// already use.
+export const getCategoryBySlug = cache(async function getCategoryBySlug(slug: string, isLoggedIn: boolean) {
   const where = { ...publishedNow(), ...guestFilter(isLoggedIn) };
   return prisma.category.findFirst({
     // No guestFilter on the category itself (mirrors getSeriesBySlug): a memberOnly category
@@ -225,7 +231,7 @@ export async function getCategoryBySlug(slug: string, isLoggedIn: boolean) {
       parent: true,
     },
   });
-}
+});
 
 export async function getUncategorizedSeries() {
   return prisma.series.findMany({
@@ -234,7 +240,12 @@ export async function getUncategorizedSeries() {
   });
 }
 
-export async function getSeriesBySlug(slug: string) {
+// Wrapped in React's cache() rather than a plain async function: this is
+// called once from the page component and again from generateMetadata (see
+// src/app/series/[slug]/page.tsx) — cache() dedupes those into one query per
+// request instead of two, the same pattern getCurrentUser/getShareGrants
+// already use.
+export const getSeriesBySlug = cache(async function getSeriesBySlug(slug: string) {
   return prisma.series.findFirst({
     where: { slug, ...publishedNow() },
     include: {
@@ -243,7 +254,7 @@ export async function getSeriesBySlug(slug: string) {
       files: { where: publishedNow(), orderBy: { position: "asc" } },
     },
   });
-}
+});
 
 /**
  * Other published series worth surfacing alongside the given one: same
@@ -1282,8 +1293,13 @@ export async function getSpeakers() {
   return prisma.speaker.findMany({ orderBy: { position: "asc" } });
 }
 
+// Wrapped in React's cache() rather than a plain async function: this is
+// called once from the page component and again from generateMetadata (see
+// src/app/speakers/[slug]/page.tsx) — cache() dedupes those into one query
+// per request instead of two, the same pattern getCurrentUser/getShareGrants
+// already use.
 /** A speaker plus their published, viewable videos, for /speakers/[slug]. */
-export async function getSpeakerBySlug(slug: string, isLoggedIn: boolean) {
+export const getSpeakerBySlug = cache(async function getSpeakerBySlug(slug: string, isLoggedIn: boolean) {
   const speaker = await prisma.speaker.findUnique({ where: { slug } });
   if (!speaker) return null;
   const videos = await prisma.video.findMany({
@@ -1292,7 +1308,7 @@ export async function getSpeakerBySlug(slug: string, isLoggedIn: boolean) {
     include: { series: true },
   });
   return { speaker, videos };
-}
+});
 
 // --- Scripture references -------------------------------------------------
 
@@ -1367,8 +1383,14 @@ export const getNextLiveStream = unstable_cache(getNextLiveStreamUncached, ["nex
  * A video marked as a premiere is visible (with a countdown) before its
  * publishAt time, unlike a normal scheduled video which stays fully hidden.
  * Falls back to the normal published lookup if it's not a pending premiere.
+ *
+ * Wrapped in React's cache() rather than a plain async function: this is
+ * called once from the page component and again from generateMetadata (see
+ * src/app/videos/[slug]/page.tsx) — cache() dedupes those into one query per
+ * request instead of two, the same pattern getCurrentUser/getShareGrants
+ * already use.
  */
-export async function getVideoBySlugIncludingPremiere(slug: string) {
+export const getVideoBySlugIncludingPremiere = cache(async function getVideoBySlugIncludingPremiere(slug: string) {
   const published = await prisma.video.findFirst({
     where: { slug, ...publishedNow() },
     include: { series: true },
@@ -1379,7 +1401,7 @@ export async function getVideoBySlugIncludingPremiere(slug: string) {
     where: { slug, published: true, hidden: false, isPremiere: true, publishAt: { gt: new Date() } },
     include: { series: true },
   });
-}
+});
 
 /** Upcoming premieres (published, isPremiere, publishAt in the future), soonest first. */
 async function getUpcomingPremieresUncached(isLoggedIn: boolean, limit = 10) {

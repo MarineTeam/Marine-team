@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
+import { truncateDescription, siteUrl } from "@/lib/seo";
+import { jsonLdScriptProps } from "@/lib/json-ld";
 import {
   getSeriesBySlug,
   resolveSeriesSlugAlias,
@@ -34,6 +37,49 @@ import { MenuTile } from "@/components/menu-tile";
 import { FileList } from "@/components/file-list";
 import { CommentSection } from "@/components/comment-section";
 import { ViewEventBeacon } from "@/components/view-event-beacon";
+
+/**
+ * Mirrors the page body's own restraint: a member-only series the current
+ * visitor can't view gets a generic title and no thumbnail here too, rather
+ * than letting link-preview metadata leak more than the page itself shows.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const [series, user] = await Promise.all([getSeriesBySlug(slug), getCurrentUser()]);
+  if (!series) return {};
+
+  if (!(await canViewSeries(user, series))) {
+    return { title: "Members Only", description: "This series is for members only." };
+  }
+
+  const description = series.description
+    ? truncateDescription(series.description)
+    : `Watch ${series.title} on Marine Team.`;
+  const firstVideo = series.videos[0];
+  const thumbnailUrl =
+    series.coverImageUrl ??
+    (firstVideo ? bunnyStreamThumbnailUrl(firstVideo.bunnyVideoId, firstVideo.thumbnailFileName) || undefined : undefined);
+
+  return {
+    title: series.title,
+    description,
+    openGraph: {
+      title: series.title,
+      description,
+      images: thumbnailUrl ? [thumbnailUrl] : undefined,
+    },
+    twitter: {
+      card: thumbnailUrl ? "summary_large_image" : "summary",
+      title: series.title,
+      description,
+      images: thumbnailUrl ? [thumbnailUrl] : undefined,
+    },
+  };
+}
 
 export default async function SeriesPage({
   params,
@@ -112,8 +158,23 @@ export default async function SeriesPage({
   // the members-only gate hasn't viewed the series.
   if (viewCountsOn && !seriesLocked) await incrementSeriesViewCount(series.id);
 
+  // Also gated by seriesLocked: a visitor who can't view the series doesn't
+  // get structured data describing it either, matching MemberGate's restraint.
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Marine Team", item: siteUrl() },
+      ...(series.category
+        ? [{ "@type": "ListItem", position: 2, name: series.category.name, item: siteUrl(`/categories/${series.category.slug}`) }]
+        : []),
+      { "@type": "ListItem", position: series.category ? 3 : 2, name: series.title },
+    ],
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-8">
+      {!seriesLocked && <script {...jsonLdScriptProps(breadcrumbJsonLd)} />}
       {viewCountsOn && !seriesLocked && <ViewEventBeacon type="series" id={series.id} />}
       <div>
         <div className="flex flex-wrap items-start justify-between gap-3">

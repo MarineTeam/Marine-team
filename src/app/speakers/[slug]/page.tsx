@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -5,6 +6,42 @@ import { MenuTile } from "@/components/menu-tile";
 import { getSpeakerBySlug } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
+import { truncateDescription } from "@/lib/seo";
+
+// Speaker bios and photos are public regardless of login state — the
+// videos list below badges member-only entries individually rather than
+// gating the whole page, so metadata needs no visibility check.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const user = await getCurrentUser();
+  const data = await getSpeakerBySlug(slug, Boolean(user));
+  if (!data) return {};
+  const { speaker } = data;
+
+  const description = speaker.bio
+    ? truncateDescription(speaker.bio)
+    : `Watch videos from ${speaker.name} on Marine Team.`;
+
+  return {
+    title: speaker.name,
+    description,
+    openGraph: {
+      title: speaker.name,
+      description,
+      images: speaker.photoUrl ? [speaker.photoUrl] : undefined,
+    },
+    twitter: {
+      card: speaker.photoUrl ? "summary_large_image" : "summary",
+      title: speaker.name,
+      description,
+      images: speaker.photoUrl ? [speaker.photoUrl] : undefined,
+    },
+  };
+}
 
 export default async function SpeakerPage({
   params,

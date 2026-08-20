@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { truncateDescription, siteUrl } from "@/lib/seo";
+import { jsonLdScriptProps } from "@/lib/json-ld";
 import { CategoryTile } from "@/components/category-tile";
 import { SeriesTile } from "@/components/series-tile";
 import { SubscribeButton } from "@/components/subscribe-button";
@@ -15,6 +18,55 @@ import {
 import { getCurrentUser } from "@/lib/current-user";
 import { getPluginStates } from "@/lib/plugins";
 import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
+
+/**
+ * Mirrors the page body's own restraint: a member-only category the current
+ * visitor can't view gets a generic title and no thumbnail here too, rather
+ * than letting link-preview metadata leak more than the page itself shows.
+ * Thumbnail fallback order matches CategoryTile: cover image, then a child
+ * series' cover, then the first direct video's thumbnail.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const user = await getCurrentUser();
+  const category = await getCategoryBySlug(slug, Boolean(user));
+  if (!category) return {};
+
+  if (!canAccess(category.memberOnly, Boolean(user))) {
+    return { title: "Members Only", description: "This category is for members only." };
+  }
+
+  const description = category.description
+    ? truncateDescription(category.description)
+    : `Browse ${category.name} on Marine Team.`;
+  const seriesThumbnail = category.series.find((s) => s.coverImageUrl)?.coverImageUrl ?? null;
+  const firstVideo = category.videos[0];
+  const thumbnailUrl =
+    category.coverImageUrl ??
+    seriesThumbnail ??
+    (firstVideo ? bunnyStreamThumbnailUrl(firstVideo.bunnyVideoId, firstVideo.thumbnailFileName) || null : null) ??
+    undefined;
+
+  return {
+    title: category.name,
+    description,
+    openGraph: {
+      title: category.name,
+      description,
+      images: thumbnailUrl ? [thumbnailUrl] : undefined,
+    },
+    twitter: {
+      card: thumbnailUrl ? "summary_large_image" : "summary",
+      title: category.name,
+      description,
+      images: thumbnailUrl ? [thumbnailUrl] : undefined,
+    },
+  };
+}
 
 export default async function CategoryPage({
   params,
@@ -39,6 +91,20 @@ export default async function CategoryPage({
 
   const backHref = category.parent ? `/categories/${category.parent.slug}` : "/";
   const backLabel = category.parent ? category.parent.name : "Browse";
+
+  // Gated by locked, matching MemberGate below: a visitor who can't view the
+  // category doesn't get structured data describing it either.
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Marine Team", item: siteUrl() },
+      ...(category.parent
+        ? [{ "@type": "ListItem", position: 2, name: category.parent.name, item: siteUrl(`/categories/${category.parent.slug}`) }]
+        : []),
+      { "@type": "ListItem", position: category.parent ? 3 : 2, name: category.name },
+    ],
+  };
   const isEmpty =
     category.series.length === 0 &&
     category.children.length === 0 &&
@@ -47,6 +113,7 @@ export default async function CategoryPage({
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
+      {!locked && <script {...jsonLdScriptProps(breadcrumbJsonLd)} />}
       <div>
         <Link href={backHref} className="text-sm text-zinc-500 hover:underline">
           ← {backLabel}
