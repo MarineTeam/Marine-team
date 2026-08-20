@@ -18,25 +18,27 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
 ## Setup
 
 1. Copy `.env.example` to `.env` and fill in real values:
-   - Two Postgres connection strings, not interchangeable: `DATABASE_URL`
-     (**pooled** — what the running app queries through; a serverless
-     deployment opens one connection per concurrent function instance and
-     needs a pooler to survive that) and `DIRECT_URL` (**direct**, unpooled —
-     what `prisma migrate deploy`/`db push` use instead, since poolers don't
-     support the DDL statements migrations issue). On Prisma Postgres, take
-     both from Console → your database → **Connect to your database**, where
-     they're labelled by client rather than by pooling — match them by
-     protocol: the **"Prisma ORM"** string
+   - Two Postgres connection strings, not interchangeable:
+     **`POOLED_DATABASE_URL`** (what the running app queries through; a
+     serverless deployment opens one connection per concurrent function
+     instance and needs a pooler to survive that) and **`DATABASE_URL`**
+     (direct, unpooled — what `prisma migrate deploy`/`db push` use, since
+     poolers don't support the DDL statements migrations issue). The
+     direct-one-is-`DATABASE_URL` asymmetry is deliberate; see
+     [Deployment](#deployment) for why. On Prisma Postgres, take both from
+     Console → your database → **Connect to your database**, where they're
+     labelled by client rather than by pooling — match them by protocol: the
+     **"Prisma ORM"** string
      (`prisma+postgres://accelerate.prisma-data.net/?api_key=…`) is the pooled
      one, since Accelerate has pooling built in, and works natively with
      `@prisma/client` 6.x with no extension to install; the **"Any Client"**
-     string (`postgres://…@db.prisma.io:5432/…`) is the direct one. Putting
-     the "Any Client" string in `DATABASE_URL` is what produces "too many
+     string (`postgres://…@db.prisma.io:5432/…`) is the direct one. Pointing
+     runtime queries at the direct string is what produces "too many
      connections for role" once real traffic hits, since that role's cap is
      sized for a migration's brief burst. On Neon/Supabase use their pooled
      endpoint (Neon's `-pooler` host, Supabase's port 6543) for
-     `DATABASE_URL`; with no separate pooled endpoint at all, both can be the
-     same value.
+     `POOLED_DATABASE_URL`; with no separate pooled endpoint at all, both can
+     be the same value.
    - An Auth0 "Regular Web Application" (`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`,
      `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET` — generate with `openssl rand -hex 32`)
      - In the Auth0 app settings, set Allowed Callback URLs to
@@ -566,8 +568,8 @@ environment variables.
 `main`: type check (`tsc --noEmit`), lint (`eslint .`), `npm test`, then
 `prisma validate` and `prisma format --check`. That last check is why an
 unformatted schema fails CI — run `npx prisma format` after editing
-`prisma/schema.prisma`. CI installs with placeholder `DATABASE_URL` and
-`DIRECT_URL` values — `postinstall` runs `prisma generate`, and `prisma
+`prisma/schema.prisma`. CI installs with placeholder `POOLED_DATABASE_URL`
+and `DATABASE_URL` values — `postinstall` runs `prisma generate`, and `prisma
 validate` resolves the whole datasource block including `directUrl`, but
 neither ever connects; CI never needs real credentials.
 
@@ -617,17 +619,18 @@ bearer-token check (Vercel Cron attaches it automatically):
 ### Preview deployments need their own database
 
 Vercel exposes one value per env var to every environment unless you scope
-it, so an unscoped `DATABASE_URL`/`DIRECT_URL` means **preview builds run
+it, so an unscoped `DATABASE_URL`/`POOLED_DATABASE_URL` means **preview builds run
 `migrate deploy` against production** — a migration in an unmerged PR would
 hit real data before anyone reviewed it.
 
 In Vercel → Settings → Environment Variables:
 
 - Scope the production connection strings to **Production** only.
-- Add a second `DATABASE_URL` **and** a second `DIRECT_URL`, both scoped to
-  **Preview**, pointing at a separate database. Scoping only `DATABASE_URL`
-  and leaving one global `DIRECT_URL` still runs preview migrations against
-  whatever database `DIRECT_URL` happens to point at — usually production.
+- Add Preview-scoped values for **both** `DATABASE_URL` and
+  `POOLED_DATABASE_URL`, pointing at a separate database. Scoping only one of
+  them still leaves the other global — and since `DATABASE_URL` is the one
+  migrations run through, leaving *it* global means preview builds migrate
+  production.
 
 For Prisma Postgres, create that second database in
 [Prisma Console](https://console.prisma.io) or with the Platform CLI:
@@ -643,7 +646,7 @@ npx -y @prisma/cli@latest database connection create <database-id>
 so match on protocol: **"Prisma ORM"** /
 `prisma+postgres://accelerate.prisma-data.net/?api_key=…` is the pooled one
 (Accelerate pools by default) and goes in `DATABASE_URL`; **"Any Client"** /
-`postgres://…@db.prisma.io:5432/…` is direct and goes in `DIRECT_URL`. See
+`postgres://…@db.prisma.io:5432/…` is direct and goes in `DATABASE_URL`. See
 the datasource comment in `prisma/schema.prisma` for why the split matters.
 **Putting the "Any Client" string in `DATABASE_URL` is what produces "too
 many connections for role" once real traffic hits it** — that role's
@@ -651,16 +654,24 @@ connection cap is sized for a migration's brief burst, not sustained
 concurrent serverless traffic, and it will look fine in initial testing
 before failing under load.
 
-Note that Vercel's Prisma Postgres marketplace integration provisions only
-**one** connection string per environment and binds it to `DATABASE_URL` as a
-[Sensitive environment variable](https://vercel.com/docs/environment-variables/sensitive-environment-variables)
-(write-only — its value can be replaced but never read back, by anyone). Its
-Storage view also says additional connection strings "must be manually added
-as environment variables". So `DIRECT_URL` is always a manual add under
-Settings → Environment Variables, and if the integration's default turns out
-to be the direct string, `DATABASE_URL` has to be overwritten there with the
-pooled one — editing a Sensitive variable's value is allowed even though
-reading it isn't.
+**Why `DATABASE_URL` holds the *direct* string.** Vercel's Prisma Postgres
+marketplace integration provisions one connection string per environment,
+binds it to `DATABASE_URL`, and marks it integration-managed — which makes it
+read-only in the dashboard: there's no Edit, only "Rotate Integration
+Secrets", which reissues the same kind of connection with new credentials.
+Marketplace integrations own their variables' credential lifecycle by design,
+so that's not a setting to hunt for. What the integration injects is the
+direct connection, so rather than fight it, `prisma/schema.prisma` reads it
+as `directUrl` — where a direct connection is exactly what's wanted — and
+takes the pooled string from `POOLED_DATABASE_URL`, which you add by hand.
+Vercel's own Storage note says additional connection strings "must be
+manually added as environment variables", so adding one is the supported
+path even when editing isn't.
+
+That means the setup on Vercel is: leave `DATABASE_URL` alone, and add
+`POOLED_DATABASE_URL` (Settings → Environment Variables → Add New, marked
+Sensitive) with the "Prisma ORM" `prisma+postgres://accelerate…` string, once
+per environment.
 
 No baselining is needed for a fresh preview database: it starts empty, so the
 first preview build applies `0_init` and every later migration normally. (The

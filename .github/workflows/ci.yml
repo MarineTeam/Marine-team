@@ -10,12 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # prisma generate (via postinstall) reads the datasource block but never
-      # connects, so a syntactically valid placeholder is enough — CI must not
-      # need real database credentials. DIRECT_URL is required too: `prisma
-      # validate` below resolves the whole datasource block, `directUrl`
-      # included, even though nothing here ever opens a connection with it.
+      # connects, so syntactically valid placeholders are enough — CI must not
+      # need real database credentials. Both are required: `prisma validate`
+      # below resolves the whole datasource block, `directUrl` included, even
+      # though nothing here ever opens a connection with either.
+      POOLED_DATABASE_URL: postgresql://user:password@localhost:5432/placeholder
       DATABASE_URL: postgresql://user:password@localhost:5432/placeholder
-      DIRECT_URL: postgresql://user:password@localhost:5432/placeholder
 
     steps:
       - uses: actions/checkout@v4

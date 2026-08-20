@@ -4,23 +4,39 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// `directUrl` is Prisma's own mechanism for exactly this split: `url` is what
-// the generated PrismaClient uses at runtime and must be the *pooled*
-// connection string (Prisma Postgres: the `prisma+postgres://accelerate…`
-// string Console labels "Prisma ORM", which has pooling built in; or any
-// PgBouncer-style pooler elsewhere) — a serverless deployment spins up many
-// concurrent function instances, each opening its own connection, and only a
-// pooler survives that. `directUrl` is what `prisma migrate deploy`/`db push`
-// use instead — a direct TCP connection (Prisma Postgres: the
-// `postgres://…@db.prisma.io` string Console labels "Any Client"), since
-// poolers don't support the DDL statements migrations issue. Pointing
-// `DATABASE_URL` itself at the direct connection is what produces "too many
-// connections for role" in production: that role's connection cap is sized
-// for a migration's brief burst, not sustained concurrent app traffic.
+// Two connection strings, deliberately not interchangeable.
+//
+// `url` is what the generated PrismaClient uses for every runtime query, and
+// must be POOLED: a serverless deployment spins up many concurrent function
+// instances, each opening its own connection, and only a pooler survives
+// that. On Prisma Postgres that's the `prisma+postgres://accelerate…` string
+// Console labels "Prisma ORM" (Accelerate pools by default, and the protocol
+// works natively with @prisma/client — no extension to install).
+//
+// `directUrl` is what `prisma migrate deploy`/`db push` use instead, and must
+// be a DIRECT TCP connection, since poolers don't support the DDL statements
+// migrations issue. On Prisma Postgres that's the `postgres://…@db.prisma.io`
+// string Console labels "Any Client".
+//
+// Why the names are asymmetric: Vercel's Prisma Postgres marketplace
+// integration injects `DATABASE_URL` itself and marks it integration-managed,
+// which makes it read-only in the dashboard — "Rotate Integration Secrets" is
+// the only control offered, and that just reissues the same kind of
+// connection. Since what it injects is the direct connection, it's read here
+// as `directUrl`, where a direct connection is exactly what's wanted, and the
+// pooled string is supplied separately as `POOLED_DATABASE_URL` — a variable
+// added by hand, which Vercel does allow. Pointing runtime queries at the
+// direct connection is what produced "too many connections for role
+// prisma_migration" (P2037) in production: that role's cap is sized for a
+// migration's brief burst, not sustained concurrent app traffic.
+//
+// On a host with no such constraint, set both to whatever that provider calls
+// its pooled and direct endpoints; `POOLED_DATABASE_URL` and `DATABASE_URL`
+// may even be the same value where no separate pooled endpoint exists.
 datasource db {
   provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  url       = env("POOLED_DATABASE_URL")
+  directUrl = env("DATABASE_URL")
 }
 
 enum Role {
