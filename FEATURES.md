@@ -426,6 +426,21 @@ on the allowlist skip the organization check"); the exempt flag answers
 the flag waives the organization check, not the allowlist's own ACTIVE
 status.
 
+A guest has to sign in through **`/auth/guest`** rather than the normal Log
+in button, and this is not optional: when an organization is required and
+configured, `/auth/login` names it on the authorization request, so Auth0
+turns a non-member away at the identity provider — before the callback, and
+so before the allowlist (and their exempt row) is ever consulted. The guest
+route starts the identical login with the `organization` parameter omitted,
+which is the only way their request survives long enough to be judged on the
+exempt row. It grants nothing on its own: `authorizeIdentity` still decides,
+and an address without an ACTIVE exempt row is refused exactly as before. It
+404s when no organization is required, since the normal login already omits
+the parameter in that case. Like `EITHER` mode, it needs the Auth0
+Application's "Type of Users" set to "Both" (Login Experience tab).
+`/access-denied` offers the link, so a guest who tried the normal button
+isn't stranded with no way forward.
+
 - **Organization** — `AUTH0_ORGANIZATION_ID` is a comma-separated list of
   accepted organization ids, so a deployment isn't limited to one. With
   exactly one configured (and `BOTH`/`ORGANIZATION`/`EITHER` mode), the app

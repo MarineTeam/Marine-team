@@ -124,6 +124,21 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   row changes it for one address an admin named. Toggle it per row with the
   "Make guest" / "Require organization" button on `/admin/authorized-emails`.
 
+  **A guest must sign in via `/auth/guest`, not the normal Log in button.**
+  When an organization is required and configured, `/auth/login` names it on
+  the authorization request, so Auth0 refuses a non-member at the identity
+  provider — before the callback, and so before the allowlist is ever
+  consulted. `/auth/guest` (`src/app/auth/guest/route.ts`) starts the same
+  login with the `organization` parameter omitted, which is the only way a
+  guest's request gets far enough to be judged on their exempt row. The route
+  grants nothing by itself: `authorizeIdentity` still decides, and someone
+  without an ACTIVE exempt row is refused exactly as before. It 404s when no
+  organization is required, since the normal login already omits the
+  parameter then. This also needs the Auth0 Application's "Type of Users" set
+  to "Both" (Login Experience tab), or Auth0 insists on an organization even
+  when we stop asking for one. `/access-denied` links to it, so a guest who
+  tried the normal button isn't stranded.
+
   Both run inside `getCurrentUser()` — the choke point every server-rendered
   page and API already goes through — so **revocation applies to existing
   sessions**: remove an email and that person is refused on their very next

@@ -230,6 +230,14 @@ export default function AuthorizedEmailsAdminPage() {
           />
           Guest — let this address in without organization membership
         </label>
+        {/* A guest can't use the normal Log in button: it names the
+            organization, so Auth0 turns them away before this list is ever
+            consulted. Send them /auth/guest instead. */}
+        <p className="text-xs text-zinc-500">
+          Send a guest the <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">/auth/guest</code>{" "}
+          link to sign in — the normal Log in button asks Auth0 for the organization, which turns a
+          non-member away before this list is checked.
+        </p>
         <p className="text-xs text-zinc-500">
           Case and spacing don&apos;t matter — addresses are stored lowercase and trimmed.
         </p>
