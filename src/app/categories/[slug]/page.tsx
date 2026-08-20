@@ -88,7 +88,11 @@ export default async function CategoryPage({
     user ? isCategorySubscribed(user.id, category.id) : Promise.resolve(false),
     user ? isCategoryInWatchLater(user.id, category.id) : Promise.resolve(false),
   ]);
-  const { subscriptions: subscriptionsOn, "watch-later": watchLaterOn } = plugins;
+  const {
+    subscriptions: subscriptionsOn,
+    "watch-later": watchLaterOn,
+    "book-reader": readerOn,
+  } = plugins;
 
   const backHref = category.parent ? `/categories/${category.parent.slug}` : "/";
   const backLabel = category.parent ? category.parent.name : "Browse";
@@ -186,7 +190,7 @@ export default async function CategoryPage({
           {category.files.length > 0 && (
             <section className="space-y-3">
               <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Files</h2>
-              <FileList files={category.files} isLoggedIn={isLoggedIn} />
+              <FileList files={category.files} isLoggedIn={isLoggedIn} readerOn={readerOn} />
             </section>
           )}
         </>

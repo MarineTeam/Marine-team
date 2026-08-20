@@ -130,6 +130,7 @@ export default async function SeriesPage({
     subscriptions: subscriptionsOn,
     "likes-dislikes": likesOn,
     "share-links": shareLinksOn,
+    "book-reader": readerOn,
   } = plugins;
 
   const [ratingSummary, myRating, reactionSummary, myReaction, related, comments, shareOptions] = await Promise.all([
@@ -294,7 +295,7 @@ export default async function SeriesPage({
           {series.files.length > 0 && (
             <section className="space-y-3">
               <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Files</h2>
-              <FileList files={series.files} isLoggedIn={isLoggedIn} />
+              <FileList files={series.files} isLoggedIn={isLoggedIn} readerOn={readerOn} />
             </section>
           )}
 

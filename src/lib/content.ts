@@ -1500,7 +1500,10 @@ export const getReadableFile = cache(async function getReadableFile(id: string) 
   return prisma.fileAsset.findFirst({
     where: { id, ...publishedNow() },
     include: {
-      series: { select: { id: true, title: true, slug: true, memberOnly: true } },
+      // categoryId comes along so callers can scope a plugin check to the
+      // section a file sits in — a file on a series inherits that series'
+      // category, which is the level plugin overrides are set at.
+      series: { select: { id: true, title: true, slug: true, memberOnly: true, categoryId: true } },
       category: { select: { id: true, name: true, slug: true, memberOnly: true } },
     },
   });
