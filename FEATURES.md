@@ -61,19 +61,34 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Related content** — series pages show "More like this" (same category,
   then shared tags); video pages show "More from this series" or "You might
   also like" for standalone videos.
-- **Audio-only mode** — a "🎧 Audio only" toggle on the video player visually
-  hides the video (a 1x1 clipped box, not `display:none`, so the iframe
-  keeps playing rather than being paused or torn down) while leaving audio
-  running; "Show video" brings the frame back. Because there's no
-  postMessage API into Bunny's embed, hiding the frame also hides Bunny's
-  own play/pause/seek controls — there's currently no way to pause or seek
-  while in audio-only mode short of switching back to video. Best-effort
-  sets lock-screen/notification "Now playing" info (title, series,
-  thumbnail) via the Media Session API, but **does not keep playing once the
-  screen locks or the app is backgrounded** — that would need a real
-  `<video>`/`<audio>` element under this app's own control (e.g. playing
-  Bunny's direct HLS or MP4 stream instead of the iframe embed), which is a
-  separate, bigger change from today's iframe-embed architecture.
+- **Two players, member's choice** — a video page normally plays through
+  Bunny's own iframe embed (adaptive quality, captions, native controls),
+  but for a video with a downloadable MP4 (same one the Downloads plugin
+  uses), a **"Bunny player" / "Direct player"** switch appears above it. The
+  direct player is a plain `<video>` this app owns, playing that same MP4 at
+  a single fixed resolution instead of adaptive quality — the trade for
+  actually controlling the element: real play/pause/seek, a working
+  playback-speed setting (the Bunny embed only ever showed the preferred
+  speed as a reminder — there's no parameter to set it), and working
+  Media Session lock-screen/notification controls. The choice is remembered
+  per device for next time, but only applied when the direct player is
+  available for that particular video.
+  - **Audio-only mode**, in either player, is a "🎧 Audio only" toggle that
+    visually hides the video (a 1x1 clipped box, not `display:none`, so
+    playback isn't paused or torn down) while audio keeps running. On the
+    Bunny player this also hides its on-screen controls, since there's no
+    postMessage API to reach them otherwise — pausing or seeking means
+    switching back to video first. On the direct player, controls stay
+    fully working (play/pause and a seek bar) since there's a real element
+    to drive.
+  - Best-effort sets lock-screen/notification "Now playing" info (title,
+    series, thumbnail) on both players via the Media Session API, but only
+    the direct player's play/pause/seek buttons actually do anything there.
+    Neither player is guaranteed to **keep playing once the screen locks or
+    the app is backgrounded** — that's down to the browser's own policy for
+    a playing `<video>`/iframe, not something this app controls, though the
+    direct player (a real element the app owns) has a materially better
+    chance than a cross-origin iframe ever did.
 - **Cast to TV** — AirPlay needs no code from this app: Safari shows its own
   AirPlay control for any actively-playing `<video>`, including one inside
   Bunny's iframe, since that's a system-level media route rather than

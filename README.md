@@ -508,33 +508,57 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   `canViewVideo`/`canViewSeries`/`canAccess` check the page body itself
   uses, rather than trusting that whatever's in the database is safe to
   publish as metadata. Video pages also emit a schema.org `VideoObject` and,
-  alongside series/category pages, a `BreadcrumbList`
-  (`src/lib/json-ld.ts`), gated the same way.
+  alongside series/category pages, a `BreadcrumbList` (`src/lib/json-ld.ts`)
+  — gated the same way, and paired with a real, visible `<Breadcrumbs>` nav
+  (`src/components/breadcrumbs.tsx`) built from the same items, replacing
+  the old bare "← back" link on video and (when unlocked) category pages.
+  The JSON-LD script tag itself renders nothing — it's invisible metadata
+  for search engines, not the visible trail.
 - **Timestamp/clip sharing**: the video page reads a `?t=<seconds>` search
-  param and feeds it into the same `resumeAt`/`bunnyStreamEmbedUrl` path
-  used for resume-on-return, taking priority over the viewer's own watch
-  progress. `TimestampShareLink` (mm:ss input, `parseTimestamp` from
-  `src/lib/format.ts`) builds that link, and each chapter row in
-  `VideoPlayer` (`src/components/video-player.tsx`) got its own copy-link
-  button using its own `timestampSeconds`.
-- **Audio-only mode**: a toggle in `VideoPlayer` swaps the iframe's
-  container from `aspect-video` to a fixed small height rather than hiding
-  it — Bunny's embed exposes no postMessage API to drive playback
-  ourselves (see Continue watching above), so its own on-screen controls
-  have to stay usable. While on, it also best-effort sets
-  `navigator.mediaSession.metadata` (title/artist/artwork) for lock-screen
-  "Now playing" info; there are no action handlers, since we can't actually
-  control playback from outside the iframe either way.
+  param into `resumeAt`, which both players seed their start position from
+  (the Bunny embed via `bunnyStreamEmbedUrl`'s `t=` param, the direct player
+  below via `video.currentTime`), taking priority over the viewer's own
+  watch progress. `TimestampShareLink` (mm:ss input, `parseTimestamp` from
+  `src/lib/format.ts`) builds that link, and each chapter row in both
+  players gets its own copy-link button using its own `timestampSeconds`.
+- **Two players**: `PlayerSwitcher` (`src/components/player-switcher.tsx`)
+  picks between `VideoPlayer` (Bunny's iframe embed, as above) and
+  `DirectVideoPlayer` (`src/components/direct-video-player.tsx`, a plain
+  `<video>` this app owns, playing the same signed MP4 URL already built for
+  Downloads at a single fixed resolution). The switch only appears when that
+  MP4 exists for the given video — `directPlayerAvailable`, the same
+  `getDownloadAvailability` gate as the Download/Cast buttons below — and
+  the choice is remembered via `preferredPlayer` in
+  `src/lib/device-settings.ts`. Owning the `<video>` element is what makes
+  the direct player able to do things the iframe embed can't: a real
+  `playbackRate` (the Bunny embed only ever showed the preferred speed as a
+  reminder — there's no parameter to set it), real seeking on chapter click
+  instead of reloading the iframe with a new `t=`, and working
+  `navigator.mediaSession` action handlers (play/pause/seek) rather than
+  metadata-only.
+- **Audio-only mode**: a "🎧 Audio only" toggle in both players visually
+  hides the video (a 1x1 clipped box, not `display:none`, so playback isn't
+  paused or torn down) while audio keeps running. In `VideoPlayer` this also
+  hides Bunny's own on-screen controls, since there's no postMessage API to
+  reach them otherwise — pausing or seeking means switching back to video
+  first. In `DirectVideoPlayer`, a small custom play/pause button and seek
+  bar stay available, since there's a real element to drive. Both
+  best-effort set `navigator.mediaSession.metadata` (title/artist/artwork)
+  for lock-screen "Now playing" info; only the direct player's action
+  handlers actually do anything when pressed. **Neither player is
+  guaranteed to keep playing once the screen locks or the app is
+  backgrounded** — that's the browser's own policy for a playing
+  `<video>`/iframe, not something either implementation controls.
 - **Cast to TV**: `CastButton` (`src/components/cast-button.tsx`) integrates
   Google's Cast Web Sender SDK (loaded at runtime, no npm types package —
-  see the file's local ambient types) and reuses the signed MP4 URL already
-  built for the Downloads plugin (`/api/downloads/[videoId]`) as its cast
-  source, since the default Chromecast receiver needs a direct file rather
-  than an iframe embed; shown next to the download button, under the same
-  `getDownloadAvailability` gate. AirPlay needs no equivalent code — Safari
-  shows its own AirPlay control for any actively-playing `<video>`,
-  including one inside a cross-origin iframe, since that's a system-level
-  media route rather than something the missing postMessage API blocks.
+  see the file's local ambient types) and reuses the same signed MP4 URL as
+  the direct player above, since the default Chromecast receiver needs a
+  direct file rather than an iframe embed; shown next to the download
+  button, under the same `getDownloadAvailability` gate. AirPlay needs no
+  equivalent code — Safari shows its own AirPlay control for any
+  actively-playing `<video>`, including one inside a cross-origin iframe,
+  since that's a system-level media route rather than something the
+  missing postMessage API blocks.
 - **PWA**: `public/manifest.json` + `public/sw.js` make the site installable
   (Add to Home Screen / desktop install prompt) and able to receive Web Push.
   The service worker deliberately does **not** cache pages or API responses —

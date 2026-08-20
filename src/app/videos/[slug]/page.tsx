@@ -31,7 +31,7 @@ import { getDownloadAvailability } from "@/lib/downloads";
 import { getPluginStates } from "@/lib/plugins";
 import { bunnyStreamEmbedUrl, bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { WatchProgressTracker } from "@/components/watch-progress-tracker";
-import { VideoPlayer } from "@/components/video-player";
+import { PlayerSwitcher } from "@/components/player-switcher";
 import { FavoriteButton } from "@/components/favorite-button";
 import { MarkWatchedButton } from "@/components/mark-watched-button";
 import { WatchLaterButton } from "@/components/watch-later-button";
@@ -329,22 +329,20 @@ export default async function VideoPage({
           )}
         </div>
       ) : video.status === "READY" ? (
-        <VideoPlayer
+        <PlayerSwitcher
+          videoId={video.id}
           embedUrl={bunnyStreamEmbedUrl(video.bunnyVideoId, resumeAt)}
           chapters={chaptersOn ? chapters : []}
           title={video.title}
           artist={video.series?.title}
           artworkUrl={bunnyStreamThumbnailUrl(video.bunnyVideoId, video.thumbnailFileName) || undefined}
+          startSeconds={resumeAt}
+          directPlayerAvailable={downloadAvailability.allowed}
         />
       ) : (
         <div className="aspect-video flex items-center justify-center rounded-lg bg-zinc-100 text-zinc-500 dark:bg-zinc-800">
           This video is still processing. Please check back soon.
         </div>
-      )}
-      {!isPendingPremiere && video.status === "READY" && !sequenceLocked && (
-        <p className="text-xs text-zinc-400">
-          Tip: use the player&apos;s ⚙️ settings icon to change playback speed.
-        </p>
       )}
 
       {video.description && <p className="text-zinc-600 dark:text-zinc-400">{video.description}</p>}

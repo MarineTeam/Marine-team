@@ -205,25 +205,43 @@ All notable changes to this project are documented here. Format follows
   visitor can't view (member-only) falls back to a generic "Members Only"
   title and no image, matching what the page body itself already withholds
   from a non-viewer.
-- **Structured data (JSON-LD)**: video pages emit a schema.org `VideoObject`
-  (title, description, thumbnail, upload date, duration, embed URL) for
-  Google's video rich results; video, series, and category pages also emit a
-  `BreadcrumbList`. Same visibility gating as the metadata above.
+- **Breadcrumbs and structured data (JSON-LD)**: video, series, and category
+  pages show a visible Home / parent / current-page breadcrumb trail
+  (replacing the old bare "← back" link on video and, when unlocked,
+  category pages), built from the same items that also feed an invisible
+  `BreadcrumbList` for search engines. Video pages additionally emit a
+  schema.org `VideoObject` (title, description, thumbnail, upload date,
+  duration, embed URL) for Google's video rich results. All skipped for
+  content the current visitor can't view.
 - **Timestamp/clip sharing**: video pages read `?t=<seconds>` and start
   playback there — taking priority over the viewer's own resume position —
   and a new "Share at" mm:ss field builds that link. Each chapter also gets
   its own 🔗 copy-link button using its own known timestamp.
-- **Audio-only playback mode**: a "🎧 Audio only" toggle on the video player
-  shrinks it to a small strip instead of hiding it, so Bunny's own
-  play/pause/seek controls stay usable while freeing up screen space to read
-  or scroll. Best-effort sets Media Session lock-screen/notification metadata
-  (title, series, artwork); there's no way to wire play/pause/seek to those
-  controls, since there's no postMessage API into Bunny's embed to drive
-  playback from outside it.
+- **A second, direct video player, member's choice**: a video with a
+  downloadable MP4 (the same file the Downloads plugin already builds) now
+  offers a "Bunny player" / "Direct player" switch. The direct player is a
+  plain `<video>` this app owns instead of Bunny's iframe embed — a single
+  fixed resolution rather than Bunny's adaptive quality, traded for real
+  play/pause/seek, a playback-speed setting that actually applies (the
+  Bunny embed has no parameter for it), and working Media Session
+  lock-screen controls. Remembered per device, applied only when available
+  for that particular video.
+- **Audio-only playback mode**: a "🎧 Audio only" toggle on either player
+  visually hides the video (not `display:none`, so playback keeps running)
+  while audio continues. On the Bunny player this also hides its on-screen
+  controls — there's no postMessage API into the embed to reach them
+  otherwise, so pausing or seeking means switching back to video; on the
+  direct player, a small play/pause button and seek bar stay fully working.
+  Both best-effort set Media Session lock-screen/notification metadata
+  (title, series, artwork), though only the direct player's controls
+  actually respond to lock-screen buttons. **Neither is guaranteed to keep
+  playing once the screen locks or the app is backgrounded** — that's the
+  browser's own policy for a playing video, not something either
+  implementation controls.
 - **Cast to TV**: a Chromecast button next to Download, gated the same way,
-  reuses the signed MP4 endpoint already built for the Downloads plugin as
-  its cast source — the default Chromecast receiver needs a direct file, not
-  an iframe embed. AirPlay needed no code: Safari already shows its own
+  reuses the same signed MP4 URL as the direct player above as its cast
+  source — the default Chromecast receiver needs a direct file, not an
+  iframe embed. AirPlay needed no code: Safari already shows its own
   AirPlay control for any actively-playing `<video>`, iframe or not. (The
   Chromecast piece hasn't been checked against a real Chromecast device yet
   — worth confirming on a preview deploy before relying on it.)
