@@ -74,11 +74,20 @@ export const auth0 = new Auth0Client({
 
     if (error) {
       // No identity to attribute this to: Auth0 refused before we saw one.
+      // `error.code`/`error.message` are the SDK's own classification of what
+      // went wrong (e.g. "authorization_error: user is not a member of the
+      // requested organization", or a missing/invalid state cookie) — never a
+      // token, code, or secret, just enough for an administrator to tell "not
+      // an org member" apart from "stale login link" apart from "misconfigured
+      // callback URL" instead of every case reading identically.
+      const detail = `${error.code}: ${error.message}`;
+      console.error("Auth0 callback error:", detail);
       await recordAccessAttempt({
         attemptType: "LOGIN",
         organizationMember: false,
         emailAuthorized: false,
         reason: "AUTH0_CALLBACK_ERROR",
+        detail,
       });
       return NextResponse.redirect(new URL("/access-denied?reason=login_failed", appBaseUrl));
     }

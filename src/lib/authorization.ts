@@ -363,6 +363,12 @@ export async function recordAccessAttempt(attempt: {
   organizationMember: boolean;
   emailAuthorized: boolean;
   reason: AccessDenialReason;
+  /**
+   * The Auth0 SDK's own error code/message for an AUTH0_CALLBACK_ERROR —
+   * e.g. "authorization_error: user does not belong to organization". Never
+   * a token, code, or secret; see the column comment in schema.prisma.
+   */
+  detail?: string | null;
   ipAddress?: string | null;
   userAgent?: string | null;
   /**
@@ -392,10 +398,19 @@ export async function recordAccessAttempt(attempt: {
         organizationMember: attempt.organizationMember,
         emailAuthorized: attempt.emailAuthorized,
         reason: attempt.reason,
+        detail: sanitizeForRecord(attempt.detail, 300),
         ipAddress: sanitizeForRecord(attempt.ipAddress, 64),
         userAgent: sanitizeForRecord(attempt.userAgent, 256),
       },
-      select: { id: true, email: true, provider: true, attemptType: true, reason: true, createdAt: true },
+      select: {
+        id: true,
+        email: true,
+        provider: true,
+        attemptType: true,
+        reason: true,
+        detail: true,
+        createdAt: true,
+      },
     });
     await maybeNotifyAdmins(row);
   } catch (error) {
@@ -430,6 +445,7 @@ async function maybeNotifyAdmins(attempt: {
   provider: string | null;
   attemptType: AccessAttemptType;
   reason: AccessDenialReason;
+  detail: string | null;
   createdAt: Date;
 }): Promise<void> {
   const cooldownStart = new Date(Date.now() - NOTIFY_COOLDOWN_MINUTES * 60 * 1000);
@@ -455,9 +471,10 @@ async function maybeNotifyAdmins(attempt: {
     `Email: ${attempt.email ?? "(not provided by Auth0)"}`,
     `Provider: ${attempt.provider ?? "unknown"}`,
     `Attempt: ${attempt.attemptType}`,
-    `Marine Team member: ${DENIAL_EXPLANATIONS[attempt.reason].organization}`,
+    `Organization member: ${DENIAL_EXPLANATIONS[attempt.reason].organization}`,
     `Email authorized: ${DENIAL_EXPLANATIONS[attempt.reason].allowlist}`,
     `Reason: ${DENIAL_EXPLANATIONS[attempt.reason].summary}`,
+    ...(attempt.detail ? [`Detail: ${attempt.detail}`] : []),
     "",
     "Review recent attempts in the admin area under Access attempts.",
   ].join("\n");

@@ -12,6 +12,7 @@ type Attempt = {
   organizationMember: boolean;
   emailAuthorized: boolean;
   reason: string;
+  detail: string | null;
   ipAddress: string | null;
   userAgent: string | null;
   notifiedAt: string | null;
@@ -20,7 +21,7 @@ type Attempt = {
 };
 
 const REASON_LABELS: Record<string, string> = {
-  NOT_ORG_MEMBER: "Not a Marine Team member",
+  NOT_ORG_MEMBER: "Not an organization member",
   EMAIL_NOT_AUTHORIZED: "Email not authorized",
   NOT_ORG_MEMBER_AND_EMAIL_NOT_AUTHORIZED: "Neither check passed",
   AUTH0_CALLBACK_ERROR: "Auth0 refused the login",
@@ -176,7 +177,10 @@ export default function AccessAttemptsAdminPage() {
                   <td className="p-2">{row.attemptType}</td>
                   <td className="p-2">{row.organizationMember ? "✓" : "✗"}</td>
                   <td className="p-2">{row.emailAuthorized ? "✓" : "✗"}</td>
-                  <td className="p-2">{REASON_LABELS[row.reason] ?? row.reason}</td>
+                  <td className="max-w-[16rem] truncate p-2" title={row.detail ?? undefined}>
+                    {REASON_LABELS[row.reason] ?? row.reason}
+                    {row.detail && <span className="ml-1 text-xs text-zinc-400">({row.detail})</span>}
+                  </td>
                   <td className="whitespace-nowrap p-2 text-right">
                     {row.reviewedAt ? (
                       <span className="text-xs">Reviewed</span>

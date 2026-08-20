@@ -1082,6 +1082,13 @@ model UnauthorizedAccessAttempt {
   organizationMember Boolean            @default(false)
   emailAuthorized    Boolean            @default(false)
   reason             AccessDenialReason
+  // The Auth0 SDK's own error code/message for an AUTH0_CALLBACK_ERROR row —
+  // e.g. "authorization_error: user does not belong to organization". Null
+  // for every other reason, which is already fully explained by `reason`
+  // itself. Never contains a token, code, or secret: the SDK's callback
+  // errors are error classifications and human-readable descriptions, not
+  // credential material — see SdkError in the Auth0 SDK.
+  detail             String?
   ipAddress          String?
   userAgent          String?
   // Set once an administrator has been emailed about this attempt, which is
