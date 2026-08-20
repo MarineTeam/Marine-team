@@ -163,6 +163,8 @@ model User {
   shareLinks            ShareLink[]
   notifications         Notification[]
   downloadGrants        DownloadPolicyUser[]
+  readingProgress       ReadingProgress[]
+  readingMarks          ReadingMark[]
   authorizedEmailsAdded AuthorizedEmail[]     @relation("AuthorizedEmailAddedBy")
 }
 
@@ -499,8 +501,74 @@ model FileAsset {
   categoryId  String?
   createdAt   DateTime  @default(now())
 
+  readingProgress ReadingProgress[]
+  readingMarks    ReadingMark[]
+
   @@index([seriesId])
   @@index([categoryId])
+}
+
+// What a ReadingMark is. Kept as one table rather than three because all
+// three anchor to a location in the same way and are listed together in the
+// reader's sidebar; only the UI treatment differs.
+enum ReadingMarkKind {
+  HIGHLIGHT
+  BOOKMARK
+  NOTE
+}
+
+/**
+ * Where a member last was in a book, so the reader can reopen there.
+ * `location` is deliberately an opaque string rather than a page number:
+ * a PDF's position is a page index ("12"), an EPUB's is a CFI
+ * ("epubcfi(/6/14[chap]!/4/2/1:0)"), and only the reader that wrote it
+ * needs to understand it. `percent` is the format-independent copy, for
+ * showing progress without parsing either.
+ */
+model ReadingProgress {
+  id        String    @id @default(cuid())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  file      FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileId    String
+  location  String
+  percent   Int       @default(0)
+  updatedAt DateTime  @updatedAt
+
+  @@unique([userId, fileId])
+  @@index([userId])
+}
+
+/**
+ * A highlight, bookmark, or note a member left in a book. `location` follows
+ * the same opaque-string rule as ReadingProgress; `endLocation` is set only
+ * for a range (a highlight), null for a point (a bookmark).
+ * `excerpt` stores the selected text as it read at the time. That's
+ * deliberate duplication: it keeps the marks sidebar readable without
+ * re-parsing the book, and keeps a highlight legible even if the underlying
+ * file is later replaced with a re-paginated edition whose locations no
+ * longer resolve.
+ */
+model ReadingMark {
+  id          String          @id @default(cuid())
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  file        FileAsset       @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileId      String
+  kind        ReadingMarkKind @default(HIGHLIGHT)
+  location    String
+  endLocation String?
+  excerpt     String?
+  note        String?
+  /**
+   * Tailwind-ish colour key resolved in the UI, not a raw CSS colour.
+   */
+  color       String          @default("yellow")
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([userId, fileId])
+  @@index([fileId])
 }
 
 // Append-only record of admin/editor actions, kept even if the acting user
