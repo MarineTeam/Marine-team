@@ -438,8 +438,17 @@ and an address without an ACTIVE exempt row is refused exactly as before. It
 404s when no organization is required, since the normal login already omits
 the parameter in that case. Like `EITHER` mode, it needs the Auth0
 Application's "Type of Users" set to "Both" (Login Experience tab).
-`/access-denied` offers the link, so a guest who tried the normal button
-isn't stranded with no way forward.
+
+The route also has its own master switch, **closed by default**: the "Guest
+sign-in link" toggle at the top of `/admin/authorized-emails`, backed by a
+one-row `AuthSettings` singleton (`isGuestLoginEnabled()` /
+`setGuestLoginEnabled()`) rather than an env var, so opening it for an
+invited guest and closing it again once they're done needs no redeploy —
+just a click. Closed, `/auth/guest` 404s identically to the "no organization
+required" case, so the response itself never reveals that a guest path
+exists; `/access-denied` only offers the link once it's actually open, so a
+guest who tried the normal button and lands there isn't pointed at a dead
+link.
 
 - **Organization** — `AUTH0_ORGANIZATION_ID` is a comma-separated list of
   accepted organization ids, so a deployment isn't limited to one. With

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { allowedOrganizationIds, organizationRequired } from "@/lib/authorization";
+import { allowedOrganizationIds, isGuestLoginEnabled, organizationRequired } from "@/lib/authorization";
 
 /**
  * Where every refused login lands. Deliberately says the same thing whatever
@@ -19,7 +19,8 @@ export default async function AccessDeniedPage({
   // refused" in logs and analytics without leaking it to the visitor.
   await searchParams;
 
-  const showGuestOption = organizationRequired() && allowedOrganizationIds().length > 0;
+  const showGuestOption =
+    organizationRequired() && allowedOrganizationIds().length > 0 && (await isGuestLoginEnabled());
 
   return (
     <div className="max-w-lg mx-auto px-4 py-16 text-center space-y-4">
@@ -46,12 +47,14 @@ export default async function AccessDeniedPage({
         </Link>
       </div>
 
-      {/* Shown only where the normal login demands an organization, because
-          that is the one configuration in which an invited guest gets stuck
-          here through no fault of their own: Auth0 refuses them at the
-          identity provider before their allowlist entry is ever consulted.
-          The link grants nothing — it only starts a login that doesn't name
-          an organization, after which the same allowlist check decides. */}
+      {/* Shown only where the normal login demands an organization (the one
+          configuration in which an invited guest gets stuck here through no
+          fault of their own — Auth0 refuses them at the identity provider
+          before their allowlist entry is ever consulted) and only while an
+          admin has actually opened /auth/guest at /admin/authorized-emails.
+          The link grants nothing on its own — it only starts a login that
+          doesn't name an organization, after which the same allowlist check
+          decides. */}
       {showGuestOption && (
         <p className="pt-2 text-sm text-zinc-500">
           Invited as a guest, without being part of the organization?{" "}

@@ -1026,6 +1026,20 @@ model DownloadPolicyUser {
   @@index([userId])
 }
 
+// Whether /auth/guest — the login path that skips the organization
+// requirement for an organizationExempt AuthorizedEmail row — is reachable at
+// all. Defaults closed: an admin has to deliberately turn it on, rather than
+// the route being live from the moment a single row happens to be flagged
+// exempt. Off, it 404s indistinguishably from "no organization is required
+// here in the first place" — see src/app/auth/guest/route.ts. A DB-backed
+// singleton rather than an env var, so switching it off again after a guest's
+// visit is over needs no redeploy — see src/lib/authorization.ts.
+model AuthSettings {
+  id                String   @id @default("singleton")
+  guestLoginEnabled Boolean  @default(false)
+  updatedAt         DateTime @updatedAt
+}
+
 // The email allowlist: half of the security model, the other half being
 // membership of the Auth0 organization. Both must pass — see
 // src/lib/authorization.ts. A row here is not a user account and grants

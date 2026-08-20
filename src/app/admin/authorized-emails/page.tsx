@@ -64,6 +64,8 @@ export default function AuthorizedEmailsAdminPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [guestLoginEnabled, setGuestLoginEnabledState] = useState<boolean | null>(null);
+  const [guestLoginBusy, setGuestLoginBusy] = useState(false);
 
   const load = useCallback(async () => {
     const params = new URLSearchParams({ page: String(page) });
@@ -79,10 +81,38 @@ export default function AuthorizedEmailsAdminPage() {
     }
   }, [page, search]);
 
+  const loadGuestLogin = useCallback(async () => {
+    const res = await fetch("/api/admin/guest-login");
+    if (res.ok) setGuestLoginEnabledState((await res.json()).enabled);
+  }, []);
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
-  }, [load]);
+    loadGuestLogin();
+  }, [load, loadGuestLogin]);
+
+  async function toggleGuestLogin() {
+    if (guestLoginEnabled === null) return;
+    setError(null);
+    setStatus(null);
+    setGuestLoginBusy(true);
+    try {
+      const next = !guestLoginEnabled;
+      const res = await fetch("/api/admin/guest-login", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: next }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed to update");
+      setGuestLoginEnabledState(next);
+      setStatus(next ? "/auth/guest is open." : "/auth/guest is closed.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update");
+    } finally {
+      setGuestLoginBusy(false);
+    }
+  }
 
   async function add(event: React.FormEvent) {
     event.preventDefault();
@@ -194,6 +224,32 @@ export default function AuthorizedEmailsAdminPage() {
         </p>
       )}
 
+      {/* The master switch for the guest sign-in path below. Closed by
+          default: an alternate login that skips the organization requirement
+          is worth having reachable only while an invited guest actually needs
+          it, not permanently live on the strength of one exempt row. */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+        <div>
+          <h2 className="text-sm font-medium">Guest sign-in link</h2>
+          <p className="mt-1 text-xs text-zinc-500">
+            {guestLoginEnabled
+              ? "Open — /auth/guest works. Close it once your guest is done."
+              : "Closed — /auth/guest 404s, whether or not any address below is marked Guest."}
+          </p>
+        </div>
+        <button
+          onClick={toggleGuestLogin}
+          disabled={guestLoginEnabled === null || guestLoginBusy}
+          className={`shrink-0 rounded-md border px-3 py-1.5 text-sm disabled:opacity-50 ${
+            guestLoginEnabled
+              ? "border-red-300 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+              : "border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          }`}
+        >
+          {guestLoginEnabled === null ? "…" : guestLoginBusy ? "Working…" : guestLoginEnabled ? "Close it" : "Open it"}
+        </button>
+      </div>
+
       <form onSubmit={add} className="space-y-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
         <h2 className="text-sm font-medium">Add an email</h2>
         <div className="flex flex-wrap gap-2">
@@ -236,7 +292,7 @@ export default function AuthorizedEmailsAdminPage() {
         <p className="text-xs text-zinc-500">
           Send a guest the <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">/auth/guest</code>{" "}
           link to sign in — the normal Log in button asks Auth0 for the organization, which turns a
-          non-member away before this list is checked.
+          non-member away before this list is checked. Open it with the switch above first, or it 404s.
         </p>
         <p className="text-xs text-zinc-500">
           Case and spacing don&apos;t matter — addresses are stored lowercase and trimmed.

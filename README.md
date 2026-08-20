@@ -136,8 +136,19 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   organization is required, since the normal login already omits the
   parameter then. This also needs the Auth0 Application's "Type of Users" set
   to "Both" (Login Experience tab), or Auth0 insists on an organization even
-  when we stop asking for one. `/access-denied` links to it, so a guest who
-  tried the normal button isn't stranded.
+  when we stop asking for one.
+
+  **`/auth/guest` also has its own master switch**, closed by default: the
+  "Guest sign-in link" toggle at the top of `/admin/authorized-emails`
+  (backed by the `AuthSettings` singleton, `isGuestLoginEnabled()` /
+  `setGuestLoginEnabled()` — a database row rather than an env var, so opening
+  or closing it takes effect immediately with no redeploy). Closed, the route
+  404s identically to the "no organization required" case, so its response
+  doesn't reveal that a guest path exists at all; `/access-denied` only shows
+  the guest link once it's open, so a stuck guest isn't pointed at a dead
+  link. There's no reason to leave an org-skipping login path reachable once
+  the guest who needed it is done — open it while inviting someone, close it
+  after.
 
   Both run inside `getCurrentUser()` — the choke point every server-rendered
   page and API already goes through — so **revocation applies to existing

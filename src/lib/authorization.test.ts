@@ -2,12 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const findUniqueMock = vi.fn();
 const upsertMock = vi.fn();
+const authSettingsUpsertMock = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   prisma: {
     authorizedEmail: {
       findUnique: (...args: unknown[]) => findUniqueMock(...args),
       upsert: (...args: unknown[]) => upsertMock(...args),
+    },
+    authSettings: {
+      upsert: (...args: unknown[]) => authSettingsUpsertMock(...args),
     },
   },
 }));
@@ -20,9 +24,11 @@ const {
   denialReasonFor,
   isAuthorized,
   isEmailAuthorized,
+  isGuestLoginEnabled,
   isOrganizationMember,
   isValidEmail,
   normalizeEmail,
+  setGuestLoginEnabled,
 } = await import("./authorization");
 
 const ORG = "org_marineteam";
@@ -30,6 +36,7 @@ const ORG = "org_marineteam";
 beforeEach(() => {
   findUniqueMock.mockReset().mockResolvedValue(null);
   upsertMock.mockReset().mockResolvedValue({});
+  authSettingsUpsertMock.mockReset().mockResolvedValue({ guestLoginEnabled: false });
   process.env.AUTH0_ORGANIZATION_ID = ORG;
   process.env.ADMIN_EMAILS = "";
   delete process.env.AUTHORIZATION_MODE;
@@ -404,5 +411,38 @@ describe("authorizeIdentity — per-address organization exemption", () => {
     // Adopted with an allowlist row, but org membership is still required
     // under BOTH — a bootstrap admin doesn't get a free pass around it.
     expect(result.allowed).toBe(false);
+  });
+});
+
+describe("isGuestLoginEnabled / setGuestLoginEnabled", () => {
+  it("defaults closed on a never-touched deployment", async () => {
+    authSettingsUpsertMock.mockResolvedValue({ guestLoginEnabled: false });
+    expect(await isGuestLoginEnabled()).toBe(false);
+    // Self-seeding, same as the download policy and plugin rows — no
+    // separate migration-time seed script needed.
+    expect(authSettingsUpsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "singleton" }, create: {} }),
+    );
+  });
+
+  it("reflects true once an admin has opened it", async () => {
+    authSettingsUpsertMock.mockResolvedValue({ guestLoginEnabled: true });
+    expect(await isGuestLoginEnabled()).toBe(true);
+  });
+
+  it("setGuestLoginEnabled writes both create and update with the same value", async () => {
+    await setGuestLoginEnabled(true);
+    expect(authSettingsUpsertMock).toHaveBeenCalledWith({
+      where: { id: "singleton" },
+      create: { guestLoginEnabled: true },
+      update: { guestLoginEnabled: true },
+    });
+
+    await setGuestLoginEnabled(false);
+    expect(authSettingsUpsertMock).toHaveBeenCalledWith({
+      where: { id: "singleton" },
+      create: { guestLoginEnabled: false },
+      update: { guestLoginEnabled: false },
+    });
   });
 });

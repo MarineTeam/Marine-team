@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0";
-import { allowedOrganizationIds, organizationRequired } from "@/lib/authorization";
+import { allowedOrganizationIds, isGuestLoginEnabled, organizationRequired } from "@/lib/authorization";
 
 /**
  * Starts a login that deliberately does *not* name an organization, for
@@ -29,12 +29,23 @@ import { allowedOrganizationIds, organizationRequired } from "@/lib/authorizatio
  * Requires the Auth0 Application's "Type of Users" to be "Both" (Login
  * Experience tab) — otherwise Auth0 insists on an organization even when we
  * stop asking for one, and this route fails the same way the normal one does.
+ *
+ * Also gated on `isGuestLoginEnabled()` (toggled at /admin/authorized-emails,
+ * off by default): there's no reason to leave an alternate, org-skipping
+ * login path live once the guest who needed it is done, and every additional
+ * always-on entry point is something to have to reason about. Closed, this
+ * 404s the same as the "no organization required" case below, so the
+ * response itself doesn't advertise that a guest path exists at all.
  */
 export async function GET(request: NextRequest) {
   // Pointless when no organization is being demanded in the first place: the
   // normal login already omits `organization`, so this would be a second
   // identical entry point. 404 rather than silently duplicating it.
   if (!organizationRequired() || allowedOrganizationIds().length === 0) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (!(await isGuestLoginEnabled())) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

@@ -127,6 +127,35 @@ export function isOrganizationMember(orgIdFromToken: string | null | undefined):
   return allowed.includes(orgIdFromToken);
 }
 
+/**
+ * Whether `/auth/guest` (the login path that skips the organization
+ * requirement for an `organizationExempt` row) is currently reachable.
+ *
+ * A database read rather than an env var, so an admin can open it for one
+ * guest and close it again afterward with no redeploy — see the
+ * `AuthSettings` model comment in schema.prisma. Defaults closed on first
+ * read the same way the download policy and plugin rows self-seed, which is
+ * what makes "off" the state of a deployment that has never touched this.
+ */
+export async function isGuestLoginEnabled(): Promise<boolean> {
+  const row = await prisma.authSettings.upsert({
+    where: { id: "singleton" },
+    create: {},
+    update: {},
+    select: { guestLoginEnabled: true },
+  });
+  return row.guestLoginEnabled;
+}
+
+/** Opens or closes `/auth/guest`. The one write path, so every toggle goes through the same self-seeding upsert. */
+export async function setGuestLoginEnabled(enabled: boolean): Promise<void> {
+  await prisma.authSettings.upsert({
+    where: { id: "singleton" },
+    create: { guestLoginEnabled: enabled },
+    update: { guestLoginEnabled: enabled },
+  });
+}
+
 export type EmailAuthorization = {
   authorized: boolean;
   /**
