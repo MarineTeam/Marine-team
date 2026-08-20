@@ -576,7 +576,16 @@ link.
   for the question it answers, to keep it distinct from **Members & roles**
   (`/admin/users`) beside it — that page is accounts, roles, editor grants,
   and pending login attempts, and its Grant/Revoke buttons write to this
-  list, which is the one the app actually checks.
+  list, which is the one the app actually checks. Also shows the active
+  `AUTHORIZATION_MODE` and its banner when relaxed or reshaped from the
+  default `BOTH`.
+  - Any address can be flagged **Guest** (`organizationExempt`), letting that
+    one person in on an ACTIVE entry alone, without organization membership —
+    a "Make guest" / "Require organization" button per row. See Auth above.
+  - A **"Guest sign-in link"** card at the top toggles `/auth/guest` open or
+    closed, off by default. It has to be open before a guest link is any use
+    to anyone: the normal Log in button still names the organization and
+    turns a non-member away before this list is ever checked.
 
 - **Access attempts** (`/admin/access-attempts`, needs `view_audit_log`) —
   refused logins, signups, and requests from revoked sessions: when, email,
