@@ -493,6 +493,48 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   sign a short-lived `token`/`expires` pair per Bunny's token authentication
   formula (`sha256_hex(tokenAuthKey + videoId + expires)`); if it's unset,
   plain unsigned URLs are used instead.
+- **Per-page metadata, OG images, and JSON-LD**: video/series/category/
+  speaker pages export `generateMetadata` (title, description, an
+  OpenGraph/Twitter image from the content's own thumbnail/cover/photo)
+  instead of relying on the one static `metadata` in `src/app/layout.tsx`
+  (which now also sets `metadataBase` from `APP_BASE_URL` so relative image
+  paths resolve). The four slug lookups it shares with the page component
+  (`getCategoryBySlug`/`getSeriesBySlug`/`getSpeakerBySlug`/
+  `getVideoBySlugIncludingPremiere` in `src/lib/content.ts`) are wrapped in
+  React's `cache()`, the same per-request-dedup pattern `getCurrentUser`
+  already uses, so both callers share one query instead of two. A page for
+  content the current viewer can't see returns a generic title/no image
+  rather than the real ones — `generateMetadata` re-runs the same
+  `canViewVideo`/`canViewSeries`/`canAccess` check the page body itself
+  uses, rather than trusting that whatever's in the database is safe to
+  publish as metadata. Video pages also emit a schema.org `VideoObject` and,
+  alongside series/category pages, a `BreadcrumbList`
+  (`src/lib/json-ld.ts`), gated the same way.
+- **Timestamp/clip sharing**: the video page reads a `?t=<seconds>` search
+  param and feeds it into the same `resumeAt`/`bunnyStreamEmbedUrl` path
+  used for resume-on-return, taking priority over the viewer's own watch
+  progress. `TimestampShareLink` (mm:ss input, `parseTimestamp` from
+  `src/lib/format.ts`) builds that link, and each chapter row in
+  `VideoPlayer` (`src/components/video-player.tsx`) got its own copy-link
+  button using its own `timestampSeconds`.
+- **Audio-only mode**: a toggle in `VideoPlayer` swaps the iframe's
+  container from `aspect-video` to a fixed small height rather than hiding
+  it — Bunny's embed exposes no postMessage API to drive playback
+  ourselves (see Continue watching above), so its own on-screen controls
+  have to stay usable. While on, it also best-effort sets
+  `navigator.mediaSession.metadata` (title/artist/artwork) for lock-screen
+  "Now playing" info; there are no action handlers, since we can't actually
+  control playback from outside the iframe either way.
+- **Cast to TV**: `CastButton` (`src/components/cast-button.tsx`) integrates
+  Google's Cast Web Sender SDK (loaded at runtime, no npm types package —
+  see the file's local ambient types) and reuses the signed MP4 URL already
+  built for the Downloads plugin (`/api/downloads/[videoId]`) as its cast
+  source, since the default Chromecast receiver needs a direct file rather
+  than an iframe embed; shown next to the download button, under the same
+  `getDownloadAvailability` gate. AirPlay needs no equivalent code — Safari
+  shows its own AirPlay control for any actively-playing `<video>`,
+  including one inside a cross-origin iframe, since that's a system-level
+  media route rather than something the missing postMessage API blocks.
 - **PWA**: `public/manifest.json` + `public/sw.js` make the site installable
   (Add to Home Screen / desktop install prompt) and able to receive Web Push.
   The service worker deliberately does **not** cache pages or API responses —

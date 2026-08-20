@@ -197,6 +197,36 @@ All notable changes to this project are documented here. Format follows
   flash of the wrong theme) and kept in step with the OS and other tabs while
   the page is open. The `prefers-color-scheme` media query remains as the
   no-JS fallback.
+- **Per-page metadata and Open Graph images**: video, series, category, and
+  speaker pages now set their own title, description, and social-preview
+  image (the content's own thumbnail/cover/photo) instead of sharing one
+  static site-wide `<title>`, so links shared to chat apps and social media
+  preview with the real title and image. A page for content the current
+  visitor can't view (member-only) falls back to a generic "Members Only"
+  title and no image, matching what the page body itself already withholds
+  from a non-viewer.
+- **Structured data (JSON-LD)**: video pages emit a schema.org `VideoObject`
+  (title, description, thumbnail, upload date, duration, embed URL) for
+  Google's video rich results; video, series, and category pages also emit a
+  `BreadcrumbList`. Same visibility gating as the metadata above.
+- **Timestamp/clip sharing**: video pages read `?t=<seconds>` and start
+  playback there — taking priority over the viewer's own resume position —
+  and a new "Share at" mm:ss field builds that link. Each chapter also gets
+  its own 🔗 copy-link button using its own known timestamp.
+- **Audio-only playback mode**: a "🎧 Audio only" toggle on the video player
+  shrinks it to a small strip instead of hiding it, so Bunny's own
+  play/pause/seek controls stay usable while freeing up screen space to read
+  or scroll. Best-effort sets Media Session lock-screen/notification metadata
+  (title, series, artwork); there's no way to wire play/pause/seek to those
+  controls, since there's no postMessage API into Bunny's embed to drive
+  playback from outside it.
+- **Cast to TV**: a Chromecast button next to Download, gated the same way,
+  reuses the signed MP4 endpoint already built for the Downloads plugin as
+  its cast source — the default Chromecast receiver needs a direct file, not
+  an iframe embed. AirPlay needed no code: Safari already shows its own
+  AirPlay control for any actively-playing `<video>`, iframe or not. (The
+  Chromecast piece hasn't been checked against a real Chromecast device yet
+  — worth confirming on a preview deploy before relying on it.)
 
 ### Changed
 
@@ -211,6 +241,21 @@ All notable changes to this project are documented here. Format follows
 - The **Profile** nav link no longer depends on the Profiles plugin — that
   plugin still governs display names, but the profile area itself now holds
   the inbox, shared links, and account settings, which a member always needs.
+
+### Fixed
+
+- **Fixed a production `P2037` "too many connections" error** caused by
+  runtime traffic sharing a direct database connection sized for a
+  migration's brief burst, not sustained serverless concurrency.
+  `prisma/schema.prisma`'s `datasource` block now splits `url` (pooled, used
+  by every runtime query) from `directUrl` (direct, used only by
+  `prisma migrate deploy`/`db push`) — read from `POOLED_DATABASE_URL` and
+  `DATABASE_URL` respectively. That naming is asymmetric on purpose: Vercel's
+  Prisma Postgres marketplace integration injects `DATABASE_URL` itself and
+  marks it read-only in the dashboard, so rather than fight that,
+  `DATABASE_URL` is read as the direct connection Vercel already provides,
+  and the pooled string is supplied by hand as the new `POOLED_DATABASE_URL`.
+  See the README's Deployment section for the exact values to use.
 
 ## [1.5.0] - 2026-07-30
 
