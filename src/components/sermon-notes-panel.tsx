@@ -8,9 +8,9 @@ type Note = { id: string; timestampSeconds: number; body: string };
 /**
  * A member's private notes on a video, each stamped with a timestamp.
  * `startPositionSeconds` only prefills the timestamp field once, as a
- * starting point to adjust from — it isn't kept in sync with real playback,
- * since Bunny's embed has no postMessage API to read that from (the same
- * limitation noted throughout this codebase: Chapters, watch progress, Up next).
+ * starting point to adjust from — it isn't kept in sync with real playback.
+ * Bunny's embed does support reading live position via Player.js (see
+ * video-player.tsx), just not wired up here yet.
  */
 export function SermonNotesPanel({
   videoId,

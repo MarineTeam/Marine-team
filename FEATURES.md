@@ -61,16 +61,25 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Related content** — series pages show "More like this" (same category,
   then shared tags); video pages show "More from this series" or "You might
   also like" for standalone videos.
+- **Background audio on Android** — minimizing the app was pausing playback
+  (reported behavior on real devices; Android's own media notification, with
+  working play/pause, already worked before this). The player now loads
+  Bunny's Player.js and, if it sees the video pause on its own while the
+  page is hidden, immediately calls play() again — once per background
+  period, so it doesn't fight the browser in a loop if that turns out to be
+  what's actually pausing it rather than the player itself. Experimental:
+  not verified beyond one round of device testing.
 - **Cast to TV** — AirPlay needs no code from this app: Safari shows its own
   AirPlay control for any actively-playing `<video>`, including one inside
-  Bunny's iframe, since that's a system-level media route rather than
-  something the missing postMessage API blocks. Chromecast is different —
-  the default receiver needs a direct, castable file rather than an iframe
-  — so a cast button (next to Download, same gate) uses Google's Cast Web
-  Sender SDK and reuses the signed MP4 endpoint built for Downloads as its
-  media source. **Not verified against a real Chromecast device** — there
-  isn't one available in the environment this was built in; check it on a
-  preview deploy with an actual receiver.
+  Bunny's iframe, since that's a system-level media route. Chromecast is
+  different — the default receiver needs a direct, castable file rather
+  than an iframe — so a cast button (next to Download, same gate) uses
+  Google's Cast Web Sender SDK and reuses the signed MP4 endpoint built for
+  Downloads as its media source. **Not verified against a real Chromecast
+  device** — there isn't one available in the environment this was built
+  in; check it on a preview deploy with an actual receiver. (Bunny's own
+  embed turns out to support both natively — `chromecast=true` and
+  `disableAirplay` — discovered after this was already built.)
 - **Sequential unlock** — a per-series "require watching in order" toggle
   locks a video until the previous one (by position) is marked completed in
   the viewer's watch history. Anonymous viewers are never locked out (no
@@ -123,8 +132,9 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   (`?t=<seconds>`, read on load to seed the player's start time — takes
   priority over the viewer's own resume position), and each chapter in the
   player gets its own 🔗 copy-link button using that chapter's timestamp.
-  There's no "share from where I'm currently watching": Bunny's embed
-  exposes no postMessage API to read the iframe's live playback position.
+  There's no "share from where I'm currently watching" yet — Bunny's embed
+  does support reading live playback position via Player.js, just not
+  wired up for this.
 - **Announcements** — a dismissible (per browser session) site-wide banner,
   optionally scheduled (start/expiry time) and targeted to guests, members,
   or everyone.
@@ -222,8 +232,8 @@ Notes on the device settings:
   the toggle in the Up next panel is the same preference, not a second one.
 - **Default playback speed** is stored and shown as a reminder under the
   player, but can't be applied automatically: Bunny's embed takes no
-  playback-rate parameter and exposes no postMessage API, the same limitation
-  as chapters and watch progress (see the technical notes).
+  playback-rate parameter, and Player.js's documented methods don't cover
+  setting one either (see the technical notes).
 - **Delete account** requires typing the account's own email address, then
   hard-deletes the `User` row — every relation cascades (comments, notes,
   playlists, favorites, watch progress, push subscriptions, share links they
@@ -738,18 +748,21 @@ link.
 
 ## Technical notes
 
+- **Bunny's Stream iframe embed does support postMessage control**, via
+  Player.js (`play()`/`pause()`/`seek()`, and `play`/`pause`/`timeupdate`/
+  `ended` events) — used so far only to fight an Android auto-pause on
+  backgrounding (see `video-player.tsx`). None of the items below have
+  been rewired to use it yet; each still works the way it did before that
+  was discovered.
 - **Watch progress** is a heartbeat-based approximation, not frame-accurate:
-  Bunny's Stream iframe embed has no documented postMessage API for exact
-  play/pause/seek events, so progress is inferred from elapsed time while
-  the page is open rather than a precise scrub position.
-- **Up next autoplay** has the same limitation: there's no "video ended"
-  event to hook, so autoplay fires a timer based on the video's known
-  duration rather than a real end-of-playback signal.
-- **Chapters** have the same root cause too: since the embed has no seek
-  API, clicking a chapter reloads the iframe with a new `t=` start-time
-  query param instead of seeking a live player.
+  progress is inferred from elapsed time while the page is open rather
+  than a precise scrub position.
+- **Up next autoplay** has the same shape: autoplay fires a timer based on
+  the video's known duration rather than hooking a real "ended" event.
+- **Chapters** too: clicking one reloads the iframe with a new `t=`
+  start-time query param instead of calling Player.js's seek.
 - **Sermon notes'** timestamp field is manually entered for the same
-  reason (no real playback position to read) — it's prefilled once from the
+  reason (no live playback position read) — it's prefilled once from the
   heartbeat's elapsed-time approximation as a starting point to adjust from,
   not kept in sync afterward.
 - **The heartbeat never un-marks a video as watched**: `/api/watch-progress`

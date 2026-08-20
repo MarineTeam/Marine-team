@@ -223,7 +223,18 @@ All notable changes to this project are documented here. Format follows
   an iframe embed. AirPlay needed no code: Safari already shows its own
   AirPlay control for any actively-playing `<video>`, iframe or not. (The
   Chromecast piece hasn't been checked against a real Chromecast device yet
-  — worth confirming on a preview deploy before relying on it.)
+  — worth confirming on a preview deploy before relying on it. Bunny's own
+  embed also turns out to support both natively via `chromecast=true` and
+  `disableAirplay` query params, found after this was already built and
+  not yet reconciled with it.)
+- **Experimental fix for Android pausing background audio**: minimizing the
+  app was pausing video playback outright (Android's own resumable media
+  notification already worked before this — that's the browser, not
+  anything built here). The player now loads Bunny's Player.js — which,
+  contrary to what several comments in this codebase claimed, Bunny Stream
+  does support — and calls `play()` again the moment it sees an unexpected
+  pause while the page is hidden, once per background period. Not verified
+  beyond one round of device testing.
 
 ### Changed
 

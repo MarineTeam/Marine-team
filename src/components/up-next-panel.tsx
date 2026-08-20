@@ -6,10 +6,11 @@ import { useRouter } from "next/navigation";
 import { readDeviceSettings, writeDeviceSettings } from "@/lib/device-settings";
 
 /**
- * Shows the next video in the series with an autoplay toggle. Since Bunny's
- * iframe embed has no documented postMessage API for an exact "ended" event
- * (same limitation noted for watch progress), autoplay is a best-effort
- * timer keyed off the video's known duration rather than a real end event.
+ * Shows the next video in the series with an autoplay toggle. Bunny's embed
+ * does support postMessage control via Player.js (see video-player.tsx),
+ * including an "ended" event — not wired up here yet, so autoplay stays a
+ * best-effort timer keyed off the video's known duration rather than that
+ * real end event.
  *
  * The toggle is the same per-device autoplay setting as the one in
  * /profile/settings — flipping it here is a shortcut to that preference, not a

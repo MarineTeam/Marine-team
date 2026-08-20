@@ -438,9 +438,10 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   settings and account deletion sit below them on `/profile/settings`.
 - **Continue watching / recently added**: logged-in users get a periodic
   heartbeat (`src/components/watch-progress-tracker.tsx`) that approximates
-  watch position (Bunny's iframe embed has no documented postMessage API
-  for exact play/pause/seek events, so this is elapsed-time based, not a
-  precise scrub position) — the homepage shows a "Continue watching" row
+  watch position (elapsed-time based, not a precise scrub position — Bunny's
+  embed does support postMessage control via Player.js, see
+  `video-player.tsx`, just not wired up here yet) — the homepage shows a
+  "Continue watching" row
   from that, resuming playback near where you left off via Bunny's `t=`
   embed parameter, plus a "Recently added" row of newest published series. A
   "Mark as watched" toggle on the video page (`MarkWatchedButton`) sets or
@@ -529,9 +530,12 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   than an iframe embed; shown next to the download button, under the same
   `getDownloadAvailability` gate. AirPlay needs no equivalent code — Safari
   shows its own AirPlay control for any actively-playing `<video>`,
-  including one inside a cross-origin iframe,
-  since that's a system-level media route rather than something the
-  missing postMessage API blocks.
+  including one inside a cross-origin iframe, since that's a system-level
+  media route. **Note**: Bunny's embed turns out to have both of these
+  built in already — a `chromecast=true` query param puts a native Cast
+  button in Bunny's own player UI, and AirPlay is on by default
+  (`disableAirplay` turns it off) — discovered after `CastButton` was
+  already built; the two haven't been reconciled.
 - **PWA**: `public/manifest.json` + `public/sw.js` make the site installable
   (Add to Home Screen / desktop install prompt) and able to receive Web Push.
   The service worker deliberately does **not** cache pages or API responses —

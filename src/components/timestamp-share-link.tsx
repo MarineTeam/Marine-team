@@ -6,9 +6,9 @@ import { parseTimestamp } from "@/lib/format";
 /**
  * Copies a link back to this video at a chosen mm:ss mark (?t=<seconds>,
  * read by the video page to seed the player's start time). Manual entry
- * rather than "share from here": Bunny's embed exposes no postMessage API
- * to read the iframe's live playback position (see video-player.tsx), so
- * there's no current time to grab automatically.
+ * rather than "share from here": Bunny's embed does support reading live
+ * playback position via Player.js (see video-player.tsx), but that isn't
+ * wired up here yet, so there's no current time to grab automatically.
  */
 export function TimestampShareLink({ path }: { path: string }) {
   const [value, setValue] = useState("0:00");
