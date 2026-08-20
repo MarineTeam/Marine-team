@@ -1491,6 +1491,45 @@ export async function canViewVideo(
 }
 
 /**
+ * A published file plus whatever it hangs off, for the reader and the
+ * content route. Returns null for a file that's unpublished, scheduled,
+ * expired, or trashed — the same `publishedNow()` gate every public listing
+ * applies, so a direct link can't reach one either.
+ */
+export const getReadableFile = cache(async function getReadableFile(id: string) {
+  return prisma.fileAsset.findFirst({
+    where: { id, ...publishedNow() },
+    include: {
+      series: { select: { id: true, title: true, slug: true, memberOnly: true } },
+      category: { select: { id: true, name: true, slug: true, memberOnly: true } },
+    },
+  });
+});
+
+export type ReadableFile = NonNullable<Awaited<ReturnType<typeof getReadableFile>>>;
+
+/**
+ * Whether this viewer may read a file's *bytes*.
+ *
+ * Deliberately stricter than the `canAccess(file.memberOnly, ...)` check
+ * FileList does. That one runs on a page which is itself already gated, so a
+ * file sitting inside a members-only series inherits that page's protection
+ * without needing its own flag. A direct URL has no such page in front of it,
+ * so the parent has to be re-checked here — otherwise every file in a
+ * members-only series would be readable by anyone holding the id.
+ */
+export async function canViewFile(user: ViewerUser | null, file: ReadableFile): Promise<boolean> {
+  if (user?.role === "ADMIN") return true;
+  if (!canAccess(file.memberOnly, Boolean(user))) return false;
+  // A file on a series defers to that series' full grant logic (share links
+  // and per-viewer grants included); one straight on a category only has the
+  // category's own member-only flag to answer to, matching the category page.
+  if (file.series) return canViewSeries(user, file.series);
+  if (file.category) return canAccess(file.category.memberOnly, Boolean(user));
+  return true;
+}
+
+/**
  * Batched version of canViewVideo for a whole list of videos (e.g. a
  * series' episode list) — avoids the N+1 query pattern of calling
  * canViewVideo once per video, which for a restriction check meant up to
