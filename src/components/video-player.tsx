@@ -25,13 +25,6 @@ function withAutoplay(embedUrl: string): string {
   return url.toString();
 }
 
-// Roughly the smallest height Bunny's own on-screen controls (play/pause,
-// seek bar, volume) stay usable at — audio-only mode shrinks to this rather
-// than hiding the iframe outright, since there's no postMessage API to
-// drive playback ourselves (see withStart below), so Bunny's built-in
-// controls are the only way to pause/seek once the video is out of the way.
-const AUDIO_ONLY_HEIGHT = 180;
-
 export function VideoPlayer({
   embedUrl,
   chapters,
@@ -101,13 +94,15 @@ export function VideoPlayer({
           {audioOnly ? "🎬 Show video" : "🎧 Audio only"}
         </button>
       </div>
+      {/* Visually hidden rather than unmounted or display:none when
+          audio-only: those would tear down or suspend the iframe, cutting
+          playback. A 1x1 clipped box keeps the same iframe element on the
+          page (audio keeps playing) without showing a frame of video —
+          which does mean Bunny's own play/pause/seek controls are also out
+          of reach until "Show video" brings the frame back. */}
       <div
-        className={
-          audioOnly
-            ? "overflow-hidden rounded-lg bg-black"
-            : "aspect-video overflow-hidden rounded-lg bg-black"
-        }
-        style={audioOnly ? { height: AUDIO_ONLY_HEIGHT } : undefined}
+        className={audioOnly ? "overflow-hidden rounded-lg bg-black" : "aspect-video overflow-hidden rounded-lg bg-black"}
+        style={audioOnly ? { width: 1, height: 1, clip: "rect(0,0,0,0)" } : undefined}
       >
         <iframe
           src={src}
@@ -116,6 +111,19 @@ export function VideoPlayer({
           allowFullScreen
         />
       </div>
+      {audioOnly && (
+        <div className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+          <span className="text-2xl" aria-hidden>
+            🎧
+          </span>
+          <div className="text-sm">
+            <p className="font-medium">{title}</p>
+            <p className="text-xs text-zinc-500">
+              Audio only — tap &quot;Show video&quot; above for play/pause and seek controls.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Bunny's embed takes no playback-rate parameter and exposes no
           postMessage API to set one, so the saved default can only be a

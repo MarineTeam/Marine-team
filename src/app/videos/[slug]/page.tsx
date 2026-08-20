@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { truncateDescription, siteUrl } from "@/lib/seo";
-import { jsonLdScriptProps } from "@/lib/json-ld";
+import { jsonLdScriptProps, breadcrumbListJsonLd, type BreadcrumbItem } from "@/lib/json-ld";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import {
   getVideoBySlugIncludingPremiere,
   resolveVideoSlugAlias,
@@ -145,17 +146,12 @@ export default async function VideoPage({
     ...(video.durationSeconds ? { duration: `PT${video.durationSeconds}S` } : {}),
     ...(video.status === "READY" ? { embedUrl: bunnyStreamEmbedUrl(video.bunnyVideoId) } : {}),
   };
-  const breadcrumbJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Marine Team", item: siteUrl() },
-      ...(video.series
-        ? [{ "@type": "ListItem", position: 2, name: video.series.title, item: siteUrl(`/series/${video.series.slug}`) }]
-        : []),
-      { "@type": "ListItem", position: video.series ? 3 : 2, name: video.title },
-    ],
-  };
+  const breadcrumbItems: BreadcrumbItem[] = [
+    { label: "Home", href: "/" },
+    ...(video.series ? [{ label: video.series.title, href: `/series/${video.series.slug}` }] : []),
+    { label: video.title },
+  ];
+  const breadcrumbJsonLd = breadcrumbListJsonLd(breadcrumbItems, siteUrl);
 
   const isLoggedIn = Boolean(user);
   const categoryId = video.series?.categoryId ?? null;
@@ -248,15 +244,8 @@ export default async function VideoPage({
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-4">
       <script {...jsonLdScriptProps(videoJsonLd)} />
       <script {...jsonLdScriptProps(breadcrumbJsonLd)} />
+      <Breadcrumbs items={breadcrumbItems} />
       {!isPendingPremiere && viewCountsOn && <ViewEventBeacon type="video" id={video.id} />}
-      {video.series && (
-        <Link
-          href={`/series/${video.series.slug}`}
-          className="text-sm text-zinc-500 hover:underline"
-        >
-          ← {video.series.title}
-        </Link>
-      )}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">{video.title}</h1>
         <div className="flex flex-wrap items-center gap-2">

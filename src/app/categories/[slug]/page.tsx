@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { truncateDescription, siteUrl } from "@/lib/seo";
-import { jsonLdScriptProps } from "@/lib/json-ld";
+import { jsonLdScriptProps, breadcrumbListJsonLd, type BreadcrumbItem } from "@/lib/json-ld";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import { CategoryTile } from "@/components/category-tile";
 import { SeriesTile } from "@/components/series-tile";
 import { SubscribeButton } from "@/components/subscribe-button";
@@ -93,18 +94,15 @@ export default async function CategoryPage({
   const backLabel = category.parent ? category.parent.name : "Browse";
 
   // Gated by locked, matching MemberGate below: a visitor who can't view the
-  // category doesn't get structured data describing it either.
-  const breadcrumbJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Marine Team", item: siteUrl() },
-      ...(category.parent
-        ? [{ "@type": "ListItem", position: 2, name: category.parent.name, item: siteUrl(`/categories/${category.parent.slug}`) }]
-        : []),
-      { "@type": "ListItem", position: category.parent ? 3 : 2, name: category.name },
-    ],
-  };
+  // category doesn't get structured data (or the visible breadcrumb below)
+  // describing it either — the plain back-link stays available regardless,
+  // since a locked visitor still needs a way out.
+  const breadcrumbItems: BreadcrumbItem[] = [
+    { label: "Home", href: "/" },
+    ...(category.parent ? [{ label: category.parent.name, href: `/categories/${category.parent.slug}` }] : []),
+    { label: category.name },
+  ];
+  const breadcrumbJsonLd = breadcrumbListJsonLd(breadcrumbItems, siteUrl);
   const isEmpty =
     category.series.length === 0 &&
     category.children.length === 0 &&
@@ -115,9 +113,13 @@ export default async function CategoryPage({
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
       {!locked && <script {...jsonLdScriptProps(breadcrumbJsonLd)} />}
       <div>
-        <Link href={backHref} className="text-sm text-zinc-500 hover:underline">
-          ← {backLabel}
-        </Link>
+        {locked ? (
+          <Link href={backHref} className="text-sm text-zinc-500 hover:underline">
+            ← {backLabel}
+          </Link>
+        ) : (
+          <Breadcrumbs items={breadcrumbItems} />
+        )}
         <div className="flex flex-wrap items-start justify-between gap-3 mt-1">
           <h1 className="text-2xl font-semibold tracking-tight">{category.name}</h1>
           {!locked && user && (

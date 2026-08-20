@@ -61,13 +61,19 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Related content** — series pages show "More like this" (same category,
   then shared tags); video pages show "More from this series" or "You might
   also like" for standalone videos.
-- **Audio-only mode** — a "🎧 Audio only" toggle on the video player shrinks
-  it to a small strip (rather than hiding it) so Bunny's own play/pause/seek
-  controls stay usable while freeing up screen space to read or scroll.
-  Best-effort sets lock-screen/notification "Now playing" info (title,
-  series, thumbnail) via the Media Session API; there's no way to wire play/
-  pause/seek to those controls, since (as elsewhere on this page) Bunny's
-  embed exposes no postMessage API to control the video from outside it.
+- **Audio-only mode** — a "🎧 Audio only" toggle on the video player visually
+  hides the video (a 1x1 clipped box, not `display:none`, so the iframe
+  keeps playing rather than being paused or torn down) while leaving audio
+  running; "Show video" brings the frame back. Because there's no
+  postMessage API into Bunny's embed, hiding the frame also hides Bunny's
+  own play/pause/seek controls — there's currently no way to pause or seek
+  while in audio-only mode short of switching back to video. Best-effort
+  sets lock-screen/notification "Now playing" info (title, series,
+  thumbnail) via the Media Session API, but **does not keep playing once the
+  screen locks or the app is backgrounded** — that would need a real
+  `<video>`/`<audio>` element under this app's own control (e.g. playing
+  Bunny's direct HLS or MP4 stream instead of the iframe embed), which is a
+  separate, bigger change from today's iframe-embed architecture.
 - **Cast to TV** — AirPlay needs no code from this app: Safari shows its own
   AirPlay control for any actively-playing `<video>`, including one inside
   Bunny's iframe, since that's a system-level media route rather than
@@ -101,11 +107,16 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   with the real title and image. A member-only page a visitor can't view
   gets a generic "Members Only" title and no image, matching what the page
   body itself withholds from a non-viewer.
-- **Structured data (JSON-LD)** — video pages emit a schema.org `VideoObject`
-  (title, description, thumbnail, upload date, duration, embed URL) for
-  Google's video rich results; video, series, and category pages also emit a
-  `BreadcrumbList`. Both are skipped for content the current visitor can't
-  view, same restraint as the metadata above.
+- **Breadcrumbs** — video, series, and category pages show a visible
+  Home / parent / current-page trail at the top (replacing the old bare "←
+  back" link on video and, when unlocked, category pages). The same items
+  also build a schema.org `BreadcrumbList`, an invisible `<script
+  type="application/ld+json">` tag search engines read for rich-result
+  breadcrumbs — it's not shown on the page itself, the visible trail is.
+- **Structured data (JSON-LD)** — video pages also emit a schema.org
+  `VideoObject` (title, description, thumbnail, upload date, duration,
+  embed URL) for Google's video rich results. Skipped, like the breadcrumbs
+  above, for content the current visitor can't view.
 
 ## Member features (optional plugins — see Plugins below)
 

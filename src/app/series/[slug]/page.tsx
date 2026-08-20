@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { truncateDescription, siteUrl } from "@/lib/seo";
-import { jsonLdScriptProps } from "@/lib/json-ld";
+import { jsonLdScriptProps, breadcrumbListJsonLd, type BreadcrumbItem } from "@/lib/json-ld";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import {
   getSeriesBySlug,
   resolveSeriesSlugAlias,
@@ -159,22 +160,19 @@ export default async function SeriesPage({
   if (viewCountsOn && !seriesLocked) await incrementSeriesViewCount(series.id);
 
   // Also gated by seriesLocked: a visitor who can't view the series doesn't
-  // get structured data describing it either, matching MemberGate's restraint.
-  const breadcrumbJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Marine Team", item: siteUrl() },
-      ...(series.category
-        ? [{ "@type": "ListItem", position: 2, name: series.category.name, item: siteUrl(`/categories/${series.category.slug}`) }]
-        : []),
-      { "@type": "ListItem", position: series.category ? 3 : 2, name: series.title },
-    ],
-  };
+  // get structured data (or the visible breadcrumb below) describing it
+  // either, matching MemberGate's restraint.
+  const breadcrumbItems: BreadcrumbItem[] = [
+    { label: "Home", href: "/" },
+    ...(series.category ? [{ label: series.category.name, href: `/categories/${series.category.slug}` }] : []),
+    { label: series.title },
+  ];
+  const breadcrumbJsonLd = breadcrumbListJsonLd(breadcrumbItems, siteUrl);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-8">
       {!seriesLocked && <script {...jsonLdScriptProps(breadcrumbJsonLd)} />}
+      {!seriesLocked && <Breadcrumbs items={breadcrumbItems} />}
       {viewCountsOn && !seriesLocked && <ViewEventBeacon type="series" id={series.id} />}
       <div>
         <div className="flex flex-wrap items-start justify-between gap-3">
