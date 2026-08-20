@@ -18,7 +18,18 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
 ## Setup
 
 1. Copy `.env.example` to `.env` and fill in real values:
-   - A Postgres connection string (`DATABASE_URL`)
+   - Two Postgres connection strings: `DATABASE_URL` (**pooled** — this is
+     what the running app uses, and a serverless deployment needs pooling
+     since every concurrent function instance opens its own connection) and
+     `DIRECT_URL` (**direct**, unpooled — this is what `prisma migrate
+     deploy`/`db push` use instead, since a pooler can interfere with schema
+     changes). On Prisma Postgres these are the `pooled.db.prisma.io` and
+     `db.prisma.io` connection strings from Prisma Console respectively —
+     putting the direct one in `DATABASE_URL` is what produces "too many
+     connections for role" once real traffic hits, since that role's
+     connection cap is sized for a migration's brief burst. On Neon/Supabase/
+     plain Postgres with no separate pooled endpoint, both can be the same
+     value.
    - An Auth0 "Regular Web Application" (`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`,
      `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET` — generate with `openssl rand -hex 32`)
      - In the Auth0 app settings, set Allowed Callback URLs to
@@ -548,9 +559,10 @@ environment variables.
 `main`: type check (`tsc --noEmit`), lint (`eslint .`), `npm test`, then
 `prisma validate` and `prisma format --check`. That last check is why an
 unformatted schema fails CI — run `npx prisma format` after editing
-`prisma/schema.prisma`. CI installs with a placeholder `DATABASE_URL`
-because `postinstall` runs `prisma generate`, which reads the datasource
-block but never connects; CI never needs real credentials.
+`prisma/schema.prisma`. CI installs with placeholder `DATABASE_URL` and
+`DIRECT_URL` values — `postinstall` runs `prisma generate`, and `prisma
+validate` resolves the whole datasource block including `directUrl`, but
+neither ever connects; CI never needs real credentials.
 
 ## Deployment
 
@@ -597,16 +609,18 @@ bearer-token check (Vercel Cron attaches it automatically):
 
 ### Preview deployments need their own database
 
-Vercel exposes one `DATABASE_URL` to every environment unless you scope it,
-so an unscoped value means **preview builds run `migrate deploy` against
-production** — a migration in an unmerged PR would hit real data before
-anyone reviewed it.
+Vercel exposes one value per env var to every environment unless you scope
+it, so an unscoped `DATABASE_URL`/`DIRECT_URL` means **preview builds run
+`migrate deploy` against production** — a migration in an unmerged PR would
+hit real data before anyone reviewed it.
 
 In Vercel → Settings → Environment Variables:
 
-- Scope the production connection string to **Production** only.
-- Add a second `DATABASE_URL`, scoped to **Preview**, pointing at a separate
-  database.
+- Scope the production connection strings to **Production** only.
+- Add a second `DATABASE_URL` **and** a second `DIRECT_URL`, both scoped to
+  **Preview**, pointing at a separate database. Scoping only `DATABASE_URL`
+  and leaving one global `DIRECT_URL` still runs preview migrations against
+  whatever database `DIRECT_URL` happens to point at — usually production.
 
 For Prisma Postgres, create that second database in
 [Prisma Console](https://console.prisma.io) or with the Platform CLI:
@@ -616,9 +630,21 @@ npx -y @prisma/cli@latest database create preview --branch main
 npx -y @prisma/cli@latest database connection create <database-id>
 ```
 
-The connection URL is shown **once** at creation — copy it straight into
-Vercel. It looks like
-`postgres://<id>:<key>@db.prisma.io:5432/postgres?sslmode=require`.
+**Get both the pooled and direct connection strings, not just one.** A
+connection response carries them as two separate, separately-labeled fields
+— `endpoints.pooled.connectionString` and `endpoints.direct.connectionString`
+— each shown **once** at creation. The CLI's plain-text output and Prisma
+Console's UI can both surface only one of the two without it being obvious
+which; if unsure, request the CLI's JSON output (check `database connection
+create --help` for a `--json`/`-j` flag) or read both labeled fields in
+Console, rather than assuming the one string printed is the one you want.
+Pooled (`pooled.db.prisma.io`) goes in `DATABASE_URL`, direct
+(`db.prisma.io`) in `DIRECT_URL` — see the datasource comment in
+`prisma/schema.prisma` for why the split matters. **Putting the direct string
+in `DATABASE_URL` is what produces "too many connections for role" once real
+traffic hits it** — that role's connection cap is sized for a migration's
+brief burst, not sustained concurrent serverless traffic, and it will look
+fine in initial testing before failing under load.
 
 No baselining is needed for a fresh preview database: it starts empty, so the
 first preview build applies `0_init` and every later migration normally. (The

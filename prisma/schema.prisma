@@ -4,9 +4,21 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// `directUrl` is Prisma's own mechanism for exactly this split: `url` is what
+// the generated PrismaClient uses at runtime and should be the *pooled*
+// connection string (Prisma Postgres: `pooled.db.prisma.io`, or any
+// PgBouncer-style pooler) — a serverless deployment spins up many concurrent
+// function instances, each opening its own connection, and only a pooler
+// survives that. `directUrl` is what `prisma migrate deploy`/`db push` use
+// instead — a direct, unmediated connection (Prisma Postgres:
+// `db.prisma.io`), since a pooler can interfere with schema changes. Pointing
+// `DATABASE_URL` itself at the direct connection is what produces "too many
+// connections for role" in production: the direct role's connection cap is
+// sized for a migration's brief burst, not sustained concurrent app traffic.
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum Role {
