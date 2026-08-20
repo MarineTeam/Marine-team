@@ -27,6 +27,27 @@ import {
  * send is a request and the claim is the proof — a picker choice made in the
  * browser is never trusted on its own.
  */
+
+/**
+ * Pulls "code: message" out of an SDK error's `cause`, when there is one and
+ * it looks like the SDK's own OAuth2Error shape (`{ code, message }`) —
+ * checked structurally rather than with `instanceof`, since the SDK doesn't
+ * export that class for us to import. Several `onCallback` error types
+ * (AuthorizationError, AuthorizationCodeGrantError) wrap Auth0's actual
+ * `error`/`error_description` redirect params this way while leaving their
+ * own top-level `.message` at a generic default; others (a missing state
+ * cookie, a discovery failure) have no `cause` at all, and this returns null
+ * for those rather than guessing.
+ */
+function getErrorCause(error: Error): string | null {
+  const cause = (error as { cause?: unknown }).cause;
+  if (!cause || typeof cause !== "object") return null;
+  if (!("code" in cause) || !("message" in cause)) return null;
+  const { code, message } = cause as { code: unknown; message: unknown };
+  if (typeof code !== "string" || typeof message !== "string") return null;
+  return `${code}: ${message}`;
+}
+
 export const auth0 = new Auth0Client({
   authorizationParameters: {
     // Withheld in ALLOWLIST and EITHER mode, and that's the point of the
@@ -75,12 +96,16 @@ export const auth0 = new Auth0Client({
     if (error) {
       // No identity to attribute this to: Auth0 refused before we saw one.
       // `error.code`/`error.message` are the SDK's own classification of what
-      // went wrong (e.g. "authorization_error: user is not a member of the
-      // requested organization", or a missing/invalid state cookie) — never a
-      // token, code, or secret, just enough for an administrator to tell "not
-      // an org member" apart from "stale login link" apart from "misconfigured
-      // callback URL" instead of every case reading identically.
-      const detail = `${error.code}: ${error.message}`;
+      // went wrong, but the specific reason usually isn't there — for the
+      // organization-rejection case (and most others) the SDK wraps Auth0's
+      // actual `error`/`error_description` redirect params in `error.cause`
+      // (an OAuth2Error) and leaves `error.message` at a generic default like
+      // "An error occurred during the authorization flow." `cause` is what
+      // actually says "access_denied: user is not a member of organization
+      // org_xxx" — never a token, code, or secret, just Auth0's own
+      // human-readable reason for the refusal.
+      const cause = getErrorCause(error);
+      const detail = cause ? `${error.code}: ${error.message} (${cause})` : `${error.code}: ${error.message}`;
       console.error("Auth0 callback error:", detail);
       await recordAccessAttempt({
         attemptType: "LOGIN",
