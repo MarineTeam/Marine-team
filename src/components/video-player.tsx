@@ -28,6 +28,18 @@ function withAutoplay(embedUrl: string): string {
 export function VideoPlayer({ embedUrl, chapters }: { embedUrl: string; chapters: Chapter[] }) {
   const [src, setSrc] = useState(embedUrl);
   const [preferredSpeed, setPreferredSpeed] = useState(1);
+  const [copiedChapterId, setCopiedChapterId] = useState<string | null>(null);
+
+  async function copyChapterLink(id: string, seconds: number) {
+    const url = `${window.location.origin}${window.location.pathname}?t=${Math.floor(seconds)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedChapterId(id);
+      setTimeout(() => setCopiedChapterId((current) => (current === id ? null : current)), 2000);
+    } catch {
+      // Clipboard API can be unavailable (e.g. insecure context); silently ignore.
+    }
+  }
 
   // Both settings are per-device, so they're only readable on the client —
   // hence an effect rather than props. Autoplay swaps the iframe src, which
@@ -62,15 +74,22 @@ export function VideoPlayer({ embedUrl, chapters }: { embedUrl: string; chapters
       {chapters.length > 0 && (
         <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 text-sm dark:divide-zinc-800 dark:border-zinc-800">
           {chapters.map((c) => (
-            <li key={c.id}>
+            <li key={c.id} className="flex items-center">
               <button
                 onClick={() => setSrc(withStart(embedUrl, c.timestampSeconds))}
-                className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                className="flex flex-1 items-center gap-3 px-3 py-2 text-left hover:bg-zinc-50 dark:hover:bg-zinc-900"
               >
                 <span className="w-16 shrink-0 tabular-nums text-zinc-500">
                   {formatTimestamp(c.timestampSeconds)}
                 </span>
                 <span>{c.title}</span>
+              </button>
+              <button
+                onClick={() => copyChapterLink(c.id, c.timestampSeconds)}
+                title="Copy link to this chapter"
+                className="shrink-0 px-3 py-2 text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+              >
+                {copiedChapterId === c.id ? "Copied!" : "🔗"}
               </button>
             </li>
           ))}

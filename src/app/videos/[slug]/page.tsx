@@ -39,6 +39,7 @@ import { AddToPlaylistButton } from "@/components/add-to-playlist-button";
 import { StarRating } from "@/components/star-rating";
 import { ReactionButtons } from "@/components/reaction-buttons";
 import { ShareButtons } from "@/components/share-buttons";
+import { TimestampShareLink } from "@/components/timestamp-share-link";
 import { ShareLinkPanel } from "@/components/share-link-panel";
 import { DownloadButton } from "@/components/download-button";
 import { MenuTile } from "@/components/menu-tile";
@@ -91,10 +92,18 @@ export async function generateMetadata({
 
 export default async function VideoPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ t?: string }>;
 }) {
   const { slug } = await params;
+  const { t } = await searchParams;
+  // A shared timestamp link (?t=123, seconds) always wins over the viewer's
+  // own resume position — clicking a link someone sent you should jump to
+  // the moment they meant, not silently continue from where you left off.
+  const sharedStart = Number(t);
+  const sharedTimestamp = t && Number.isFinite(sharedStart) && sharedStart >= 0 ? Math.floor(sharedStart) : null;
   const [video, user] = await Promise.all([getVideoBySlugIncludingPremiere(slug), getCurrentUser()]);
 
   if (!video) {
@@ -186,7 +195,7 @@ export default async function VideoPage({
     "share-links": shareLinksOn,
     downloads: downloadsOn,
   } = plugins;
-  const resumeAt = progress && !progress.completed ? progress.positionSeconds : 0;
+  const resumeAt = sharedTimestamp ?? (progress && !progress.completed ? progress.positionSeconds : 0);
 
   const [
     ratingSummary,
@@ -288,6 +297,9 @@ export default async function VideoPage({
         </div>
       )}
       {socialShareOn && <ShareButtons title={video.title} path={`/videos/${video.slug}`} />}
+      {socialShareOn && !isPendingPremiere && video.status === "READY" && !sequenceLocked && (
+        <TimestampShareLink path={`/videos/${video.slug}`} />
+      )}
       {/* Not while sequence-locked: the member can't watch this episode yet,
           so handing out a link to it would be odd — matches the series page,
           which hides the panel behind the same gate. */}

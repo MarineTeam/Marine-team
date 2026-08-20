@@ -103,7 +103,13 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Ratings** — a 1-5 star rating on a series or video; average and count
   shown to everyone, the stars are only clickable when logged in.
 - **View counts** — a simple counter shown on series/video pages.
-- **Social share** — copy-link and share-to-X/Facebook buttons.
+- **Social share** — copy-link and share-to-X/Facebook buttons. Video pages
+  also get a "Share at" mm:ss field that copies a link back to that moment
+  (`?t=<seconds>`, read on load to seed the player's start time — takes
+  priority over the viewer's own resume position), and each chapter in the
+  player gets its own 🔗 copy-link button using that chapter's timestamp.
+  There's no "share from where I'm currently watching": Bunny's embed
+  exposes no postMessage API to read the iframe's live playback position.
 - **Announcements** — a dismissible (per browser session) site-wide banner,
   optionally scheduled (start/expiry time) and targeted to guests, members,
   or everyone.
