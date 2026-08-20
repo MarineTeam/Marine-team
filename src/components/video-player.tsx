@@ -25,10 +25,31 @@ function withAutoplay(embedUrl: string): string {
   return url.toString();
 }
 
-export function VideoPlayer({ embedUrl, chapters }: { embedUrl: string; chapters: Chapter[] }) {
+// Roughly the smallest height Bunny's own on-screen controls (play/pause,
+// seek bar, volume) stay usable at — audio-only mode shrinks to this rather
+// than hiding the iframe outright, since there's no postMessage API to
+// drive playback ourselves (see withStart below), so Bunny's built-in
+// controls are the only way to pause/seek once the video is out of the way.
+const AUDIO_ONLY_HEIGHT = 180;
+
+export function VideoPlayer({
+  embedUrl,
+  chapters,
+  title,
+  artist,
+  artworkUrl,
+}: {
+  embedUrl: string;
+  chapters: Chapter[];
+  /** For the lock-screen/notification "Now playing" info in audio-only mode. */
+  title: string;
+  artist?: string;
+  artworkUrl?: string;
+}) {
   const [src, setSrc] = useState(embedUrl);
   const [preferredSpeed, setPreferredSpeed] = useState(1);
   const [copiedChapterId, setCopiedChapterId] = useState<string | null>(null);
+  const [audioOnly, setAudioOnly] = useState(false);
 
   async function copyChapterLink(id: string, seconds: number) {
     const url = `${window.location.origin}${window.location.pathname}?t=${Math.floor(seconds)}`;
@@ -51,9 +72,43 @@ export function VideoPlayer({ embedUrl, chapters }: { embedUrl: string; chapters
     if (settings.autoplay) setSrc(withAutoplay(embedUrl));
   }, [embedUrl]);
 
+  // Best-effort only: this sets what a lock-screen/notification "Now
+  // playing" card shows (title, artist, artwork), but there are no action
+  // handlers for play/pause/seek — wiring those would need control over the
+  // iframe's actual <video> element, which the missing postMessage API
+  // rules out (see withStart above). Browsers that show media controls for
+  // audio playing in a background/cross-origin iframe at all will show
+  // this info; ones that don't, won't — there's no way to detect which from here.
+  useEffect(() => {
+    if (!audioOnly || typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title,
+      artist: artist ?? "Marine Team",
+      artwork: artworkUrl ? [{ src: artworkUrl }] : [],
+    });
+    return () => {
+      navigator.mediaSession.metadata = null;
+    };
+  }, [audioOnly, title, artist, artworkUrl]);
+
   return (
     <div className="space-y-3">
-      <div className="aspect-video overflow-hidden rounded-lg bg-black">
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => setAudioOnly((v) => !v)}
+          className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+        >
+          {audioOnly ? "🎬 Show video" : "🎧 Audio only"}
+        </button>
+      </div>
+      <div
+        className={
+          audioOnly
+            ? "overflow-hidden rounded-lg bg-black"
+            : "aspect-video overflow-hidden rounded-lg bg-black"
+        }
+        style={audioOnly ? { height: AUDIO_ONLY_HEIGHT } : undefined}
+      >
         <iframe
           src={src}
           className="h-full w-full"

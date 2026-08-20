@@ -332,6 +332,9 @@ export default async function VideoPage({
         <VideoPlayer
           embedUrl={bunnyStreamEmbedUrl(video.bunnyVideoId, resumeAt)}
           chapters={chaptersOn ? chapters : []}
+          title={video.title}
+          artist={video.series?.title}
+          artworkUrl={bunnyStreamThumbnailUrl(video.bunnyVideoId, video.thumbnailFileName) || undefined}
         />
       ) : (
         <div className="aspect-video flex items-center justify-center rounded-lg bg-zinc-100 text-zinc-500 dark:bg-zinc-800">

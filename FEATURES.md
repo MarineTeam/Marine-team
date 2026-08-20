@@ -61,6 +61,13 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Related content** — series pages show "More like this" (same category,
   then shared tags); video pages show "More from this series" or "You might
   also like" for standalone videos.
+- **Audio-only mode** — a "🎧 Audio only" toggle on the video player shrinks
+  it to a small strip (rather than hiding it) so Bunny's own play/pause/seek
+  controls stay usable while freeing up screen space to read or scroll.
+  Best-effort sets lock-screen/notification "Now playing" info (title,
+  series, thumbnail) via the Media Session API; there's no way to wire play/
+  pause/seek to those controls, since (as elsewhere on this page) Bunny's
+  embed exposes no postMessage API to control the video from outside it.
 - **Sequential unlock** — a per-series "require watching in order" toggle
   locks a video until the previous one (by position) is marked completed in
   the viewer's watch history. Anonymous viewers are never locked out (no
