@@ -15,6 +15,12 @@ import type { AccessAttemptType, AccessDenialReason } from "@prisma/client";
  * SDK has already verified — never by anything the browser sends us — and the
  * allowlist half is a database read, so removing an email takes effect on the
  * next request rather than whenever a token happens to expire.
+ *
+ * A single `AuthorizedEmail` row can also be flagged `organizationExempt`,
+ * which lets that one address in without organization membership regardless
+ * of mode — see authorizeIdentity. That's the difference between "invite a
+ * guest" and EITHER mode: EITHER changes the rule for everyone on the
+ * allowlist, an exempt row changes it for one address an admin named.
  */
 
 /**
@@ -121,19 +127,36 @@ export function isOrganizationMember(orgIdFromToken: string | null | undefined):
   return allowed.includes(orgIdFromToken);
 }
 
-/** Whether this email is on the allowlist and active. Takes any casing; normalizes before the lookup. */
-export async function isEmailAuthorized(email: string | null | undefined): Promise<boolean> {
-  if (!email) return false;
+export type EmailAuthorization = {
+  authorized: boolean;
+  /**
+   * Whether this specific address is let in on `authorized` alone, with no
+   * organization check — the targeted "invite a guest" escape hatch from
+   * BOTH mode, set per row rather than by relaxing the mode for everyone.
+   * Always false for a bootstrap-adopted address; a guest exemption is
+   * something an administrator has to grant deliberately.
+   */
+  organizationExempt: boolean;
+};
+
+/** The allowlist's full verdict on this address: whether it's active, and whether it's exempt from the organization check. */
+async function lookupEmailAuthorization(email: string | null | undefined): Promise<EmailAuthorization> {
+  if (!email) return { authorized: false, organizationExempt: false };
   const normalized = normalizeEmail(email);
-  if (!isValidEmail(normalized)) return false;
+  if (!isValidEmail(normalized)) return { authorized: false, organizationExempt: false };
 
   const row = await prisma.authorizedEmail.findUnique({
     where: { email: normalized },
-    select: { status: true },
+    select: { status: true, organizationExempt: true },
   });
-  if (row) return row.status === "ACTIVE";
+  if (row) return { authorized: row.status === "ACTIVE", organizationExempt: row.organizationExempt };
 
-  return adoptBootstrapAdmin(normalized);
+  return { authorized: await adoptBootstrapAdmin(normalized), organizationExempt: false };
+}
+
+/** Whether this email is on the allowlist and active. Takes any casing; normalizes before the lookup. */
+export async function isEmailAuthorized(email: string | null | undefined): Promise<boolean> {
+  return (await lookupEmailAuthorization(email)).authorized;
 }
 
 /**
@@ -279,6 +302,14 @@ export function denialReasonFor(
  * administrator reviewing a refusal under ORGANIZATION mode can still see
  * whether that person was on the allowlist, which is exactly what they need
  * before tightening the mode back up.
+ *
+ * A row flagged `organizationExempt` is a deliberate, per-address exception
+ * to whatever `mode` says: an ACTIVE exempt row is enough on its own,
+ * organization or not, checked before `isAuthorized` rather than folded into
+ * its truth table. This is what "invite a guest" means under BOTH mode
+ * without switching the whole deployment to EITHER — everyone else still
+ * needs both checks; only the specific addresses an admin has opted out stop
+ * needing the organization half.
  */
 export async function authorizeIdentity(identity: {
   email: string | null | undefined;
@@ -286,7 +317,12 @@ export async function authorizeIdentity(identity: {
 }): Promise<AuthorizationResult> {
   const mode = authorizationMode();
   const organizationMember = isOrganizationMember(identity.orgId);
-  const emailAuthorized = await isEmailAuthorized(identity.email);
+  const emailAuth = await lookupEmailAuthorization(identity.email);
+  const emailAuthorized = emailAuth.authorized;
+
+  if (emailAuthorized && emailAuth.organizationExempt) {
+    return { allowed: true, organizationMember, emailAuthorized };
+  }
 
   if (isAuthorized(mode, organizationMember, emailAuthorized)) {
     return { allowed: true, organizationMember, emailAuthorized };

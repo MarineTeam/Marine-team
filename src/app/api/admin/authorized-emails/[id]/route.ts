@@ -5,13 +5,24 @@ import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureCapability } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 
-const patchSchema = z.object({ status: z.enum(["ACTIVE", "SUSPENDED"]) });
+const patchSchema = z
+  .object({
+    status: z.enum(["ACTIVE", "SUSPENDED"]).optional(),
+    // Toggles whether this address is let in without organization membership
+    // — see authorizeIdentity in src/lib/authorization.ts. Separate from
+    // `status`: an admin can flip this on an already-active row (or off one)
+    // without touching whether the address is authorized at all.
+    organizationExempt: z.boolean().optional(),
+  })
+  .refine((body) => body.status !== undefined || body.organizationExempt !== undefined, {
+    message: "Nothing to update",
+  });
 
 /**
- * Suspends or reinstates an authorized email without losing the record of who
- * added it and when. Suspending takes effect on that member's next request —
- * see getCurrentUser, which re-checks the allowlist rather than trusting the
- * session cookie.
+ * Suspends/reinstates an authorized email, or flips its organization
+ * exemption, without losing the record of who added it and when. A status
+ * change takes effect on that member's next request — see getCurrentUser,
+ * which re-checks the allowlist rather than trusting the session cookie.
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -19,12 +30,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     await ensureCapability(user, "manage_users");
 
     const { id } = await params;
-    const { status } = patchSchema.parse(await request.json());
+    const { status, organizationExempt } = patchSchema.parse(await request.json());
 
     const row = await prisma.authorizedEmail.update({
       where: { id },
-      data: { status },
-      select: { id: true, email: true, status: true },
+      data: {
+        ...(status !== undefined ? { status } : {}),
+        ...(organizationExempt !== undefined ? { organizationExempt } : {}),
+      },
+      select: { id: true, email: true, status: true, organizationExempt: true },
     });
     // Keep the member row in step immediately, so the fan-out queries that
     // read `authorized` don't keep including someone just suspended.
@@ -32,7 +46,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       await prisma.user.updateMany({ where: { email: row.email }, data: { authorized: false } });
     }
 
-    await logAudit(user.email, status === "ACTIVE" ? "authorize" : "suspend", "email", row.id, row.email);
+    if (status !== undefined) {
+      await logAudit(user.email, status === "ACTIVE" ? "authorize" : "suspend", "email", row.id, row.email);
+    }
+    if (organizationExempt !== undefined) {
+      await logAudit(
+        user.email,
+        organizationExempt ? "exempt-from-organization" : "require-organization",
+        "email",
+        row.id,
+        row.email,
+      );
+    }
     return NextResponse.json(row);
   } catch (error) {
     return errorResponse(error);

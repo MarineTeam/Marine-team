@@ -365,3 +365,44 @@ describe("authorizeIdentity — the whole truth table", () => {
     expect(findUniqueMock).toHaveBeenCalled();
   });
 });
+
+describe("authorizeIdentity — per-address organization exemption", () => {
+  // The "invite a guest" mechanism: unlike EITHER mode, this is scoped to one
+  // address at a time rather than relaxing the requirement for everyone on
+  // the allowlist. Defaults to BOTH mode (the describe block's beforeEach
+  // clears AUTHORIZATION_MODE), which is the case this exists for.
+
+  it("an exempt, ACTIVE address gets in under BOTH mode with no organization at all", async () => {
+    findUniqueMock.mockResolvedValue({ status: "ACTIVE", organizationExempt: true });
+    const result = await authorizeIdentity({ email: "guest@example.com", orgId: null });
+    expect(result.allowed).toBe(true);
+    expect(result).toMatchObject({ organizationMember: false, emailAuthorized: true });
+  });
+
+  it("a non-exempt address still needs both checks under BOTH mode", async () => {
+    findUniqueMock.mockResolvedValue({ status: "ACTIVE", organizationExempt: false });
+    const result = await authorizeIdentity({ email: "alice@example.com", orgId: null });
+    expect(result.allowed).toBe(false);
+  });
+
+  it("an exempt but SUSPENDED address is still refused — exemption isn't a bypass of status", async () => {
+    findUniqueMock.mockResolvedValue({ status: "SUSPENDED", organizationExempt: true });
+    const result = await authorizeIdentity({ email: "guest@example.com", orgId: null });
+    expect(result.allowed).toBe(false);
+  });
+
+  it("exemption is a no-op for someone who's also an organization member — they'd have gotten in anyway", async () => {
+    findUniqueMock.mockResolvedValue({ status: "ACTIVE", organizationExempt: true });
+    const result = await authorizeIdentity({ email: "guest@example.com", orgId: ORG });
+    expect(result.allowed).toBe(true);
+    expect(result).toMatchObject({ organizationMember: true, emailAuthorized: true });
+  });
+
+  it("a bootstrap-adopted ADMIN_EMAILS address is never exempt", async () => {
+    process.env.ADMIN_EMAILS = "boss@example.com";
+    const result = await authorizeIdentity({ email: "boss@example.com", orgId: null });
+    // Adopted with an allowlist row, but org membership is still required
+    // under BOTH — a bootstrap admin doesn't get a free pass around it.
+    expect(result.allowed).toBe(false);
+  });
+});

@@ -413,6 +413,19 @@ Experience** — without it, Auth0 itself still insists on an organization even
 when the app stops asking for one, and the personal-account path never
 becomes reachable.
 
+**Inviting a single guest without relaxing the mode for everyone** — an
+`AuthorizedEmail` row can be individually flagged **`organizationExempt`**
+("Guest" in `/admin/authorized-emails`, toggled with the "Make guest" /
+"Require organization" button). An ACTIVE, exempt row is checked before
+`AUTHORIZATION_MODE`'s own rule and always lets that one address in,
+organization or not. This is the narrower fix for "I want `BOTH` for
+everyone, but need to let in one guest speaker who isn't in our
+organization" — `EITHER` mode answers a different question ("should anyone
+on the allowlist skip the organization check"); the exempt flag answers
+"should *this specific person*." A suspended exempt row is still refused —
+the flag waives the organization check, not the allowlist's own ACTIVE
+status.
+
 - **Organization** — `AUTH0_ORGANIZATION_ID` is a comma-separated list of
   accepted organization ids, so a deployment isn't limited to one. With
   exactly one configured (and `BOTH`/`ORGANIZATION`/`EITHER` mode), the app

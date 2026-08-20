@@ -7,12 +7,13 @@ type Row = {
   email: string;
   status: "ACTIVE" | "SUSPENDED";
   note: string | null;
+  organizationExempt: boolean;
   addedByEmail: string | null;
   createdAt: string;
 };
 
 const MODE_COPY: Record<string, string> = {
-  BOTH: "Signing in needs both halves: membership of an approved organization in Auth0, and an active entry here. Adding an address on its own doesn't let a personal account in.",
+  BOTH: "Signing in needs both halves: membership of an approved organization in Auth0, and an active entry here. Adding an address on its own doesn't let a personal account in — check \"Guest\" below to invite one specific person without that requirement, while everyone else still needs both.",
   ORGANIZATION:
     "This deployment currently authorizes on Auth0 organization membership alone. Entries here are kept but not enforced.",
   ALLOWLIST:
@@ -59,6 +60,7 @@ export default function AuthorizedEmailsAdminPage() {
   const [search, setSearch] = useState("");
   const [email, setEmail] = useState("");
   const [note, setNote] = useState("");
+  const [guest, setGuest] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -91,13 +93,18 @@ export default function AuthorizedEmailsAdminPage() {
       const res = await fetch("/api/admin/authorized-emails", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, note: note.trim() || null }),
+        body: JSON.stringify({ email, note: note.trim() || null, organizationExempt: guest }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to add");
-      setStatus(`${data.email} can now sign in, once they're a member of an approved organization.`);
+      setStatus(
+        guest
+          ? `${data.email} can now sign in as a guest — no organization membership needed.`
+          : `${data.email} can now sign in, once they're a member of an approved organization.`,
+      );
       setEmail("");
       setNote("");
+      setGuest(false);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add");
@@ -116,6 +123,26 @@ export default function AuthorizedEmailsAdminPage() {
     });
     if (res.ok) {
       setStatus(next === "ACTIVE" ? `${row.email} reinstated.` : `${row.email} suspended.`);
+      await load();
+    } else {
+      setError((await res.json()).error ?? "Failed to update");
+    }
+  }
+
+  async function setRowGuest(row: Row, next: boolean) {
+    setError(null);
+    setStatus(null);
+    const res = await fetch(`/api/admin/authorized-emails/${row.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ organizationExempt: next }),
+    });
+    if (res.ok) {
+      setStatus(
+        next
+          ? `${row.email} no longer needs organization membership.`
+          : `${row.email} now needs organization membership again, like everyone else.`,
+      );
       await load();
     } else {
       setError((await res.json()).error ?? "Failed to update");
@@ -194,6 +221,15 @@ export default function AuthorizedEmailsAdminPage() {
             {busy ? "Adding…" : "Add"}
           </button>
         </div>
+        <label className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+          <input
+            type="checkbox"
+            checked={guest}
+            onChange={(e) => setGuest(e.target.checked)}
+            className="rounded border-zinc-300 dark:border-zinc-700"
+          />
+          Guest — let this address in without organization membership
+        </label>
         <p className="text-xs text-zinc-500">
           Case and spacing don&apos;t matter — addresses are stored lowercase and trimmed.
         </p>
@@ -230,6 +266,14 @@ export default function AuthorizedEmailsAdminPage() {
                       Suspended
                     </span>
                   )}
+                  {row.organizationExempt && (
+                    <span
+                      className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] text-sky-800 dark:bg-sky-900/40 dark:text-sky-300"
+                      title="Signs in without organization membership"
+                    >
+                      Guest
+                    </span>
+                  )}
                 </div>
                 {row.note && <p className="truncate text-xs text-zinc-600 dark:text-zinc-300">{row.note}</p>}
                 <p className="text-xs text-zinc-500">
@@ -247,6 +291,13 @@ export default function AuthorizedEmailsAdminPage() {
                   className="rounded-md border border-zinc-300 px-3 py-1 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
                 >
                   {row.status === "ACTIVE" ? "Suspend" : "Reinstate"}
+                </button>
+                <button
+                  onClick={() => setRowGuest(row, !row.organizationExempt)}
+                  title="Whether this address needs organization membership too"
+                  className="rounded-md border border-zinc-300 px-3 py-1 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                >
+                  {row.organizationExempt ? "Require organization" : "Make guest"}
                 </button>
                 <button
                   onClick={() => remove(row)}

@@ -115,6 +115,15 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   the mode, and a relaxed or reshaped mode shows as a banner on
   `/admin/authorized-emails`.
 
+  For a one-off guest rather than a deployment-wide policy change, an
+  individual `AuthorizedEmail` row can be flagged **`organizationExempt`**
+  ("Guest" in the UI): that one address gets in on an ACTIVE allowlist entry
+  alone, with `AUTHORIZATION_MODE` staying at `BOTH` and everyone else still
+  needing both checks. This is the narrower alternative to `EITHER` mode —
+  `EITHER` changes the rule for every allowlisted address at once, an exempt
+  row changes it for one address an admin named. Toggle it per row with the
+  "Make guest" / "Require organization" button on `/admin/authorized-emails`.
+
   Both run inside `getCurrentUser()` — the choke point every server-rendered
   page and API already goes through — so **revocation applies to existing
   sessions**: remove an email and that person is refused on their very next

@@ -1037,20 +1037,27 @@ model DownloadPolicyUser {
 // " alice@example.com " cannot both exist, and neither can be used to slip
 // past a lookup. Never write to this table without normalizeEmail().
 model AuthorizedEmail {
-  id           String                @id @default(cuid())
-  email        String                @unique
-  status       AuthorizedEmailStatus @default(ACTIVE)
+  id                 String                @id @default(cuid())
+  email              String                @unique
+  status             AuthorizedEmailStatus @default(ACTIVE)
+  // When true, this specific address gets in on this row alone — organization
+  // membership is not required of them, even under BOTH mode. The targeted
+  // alternative to switching the whole deployment to EITHER mode: the default
+  // stays "you must be an organization member," and an admin opts a named
+  // guest out of that one check for that one address, rather than opting
+  // every allowlisted address out of it at once.
+  organizationExempt Boolean               @default(false)
   // Free-text reminder of why this person is on the list ("2026 elders").
-  note         String?
+  note               String?
   // Who added it. The relation is nullable and SetNull on delete so removing
   // an admin's account doesn't cascade away the access they granted, while
   // `addedByEmail` keeps the record legible after that relation is gone —
   // the same denormalization AuditLog uses.
-  addedBy      User?                 @relation("AuthorizedEmailAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
-  addedById    String?
-  addedByEmail String?
-  createdAt    DateTime              @default(now())
-  updatedAt    DateTime              @updatedAt
+  addedBy            User?                 @relation("AuthorizedEmailAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+  addedById          String?
+  addedByEmail       String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 
   @@index([createdAt])
 }

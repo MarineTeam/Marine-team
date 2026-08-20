@@ -9,6 +9,12 @@ import { authorizationMode, isValidEmail, normalizeEmail } from "@/lib/authoriza
 const createSchema = z.object({
   email: z.string().min(3).max(254),
   note: z.string().max(200).nullable().optional(),
+  // Lets this one address in without organization membership. Only applied on
+  // create, not on a re-add of an existing address — see the PATCH route for
+  // toggling it afterward — so resubmitting the form to reinstate someone
+  // (checkbox unchecked by default) can never silently revoke an existing
+  // guest's exemption.
+  organizationExempt: z.boolean().optional(),
 });
 
 /** Page size for the list; the admin UI pages rather than loading every row. */
@@ -43,6 +49,7 @@ export async function GET(request: NextRequest) {
           email: true,
           status: true,
           note: true,
+          organizationExempt: true,
           addedByEmail: true,
           createdAt: true,
         },
@@ -86,6 +93,7 @@ export async function POST(request: NextRequest) {
       create: {
         email,
         note: body.note?.trim() || null,
+        organizationExempt: body.organizationExempt ?? false,
         addedById: user.id,
         addedByEmail: user.email,
       },
@@ -93,7 +101,15 @@ export async function POST(request: NextRequest) {
         status: "ACTIVE",
         ...(body.note?.trim() ? { note: body.note.trim() } : {}),
       },
-      select: { id: true, email: true, status: true, note: true, addedByEmail: true, createdAt: true },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        note: true,
+        organizationExempt: true,
+        addedByEmail: true,
+        createdAt: true,
+      },
     });
 
     await logAudit(user.email, "authorize", "email", row.id, email);
