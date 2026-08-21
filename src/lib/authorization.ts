@@ -577,6 +577,18 @@ export async function pruneAccessAttempts(retentionDays = ACCESS_ATTEMPT_RETENTI
   return count;
 }
 
+/**
+ * How many refusals landed in the last `days` days, for the admin overview.
+ *
+ * The window is worked out here rather than in the page because reading the
+ * clock while a component renders isn't allowed — the count a server
+ * component asks for should already be a finished question.
+ */
+export async function countRecentAccessAttempts(days = 7): Promise<number> {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  return prisma.unauthorizedAccessAttempt.count({ where: { createdAt: { gte: since } } });
+}
+
 /** The client's IP as far as the platform reports it. Only ever used for the attempt record. */
 export function clientIpFrom(headers: Headers): string | null {
   const forwarded = headers.get("x-forwarded-for");

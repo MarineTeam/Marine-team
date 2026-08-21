@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { adminGroupsFor } from "@/lib/admin-nav";
+import { countRecentAccessAttempts } from "@/lib/authorization";
 
 /**
  * The admin's landing screen: what needs looking at, how much there is, and
@@ -23,9 +24,7 @@ export default async function AdminOverview() {
       prisma.video.count({ where: { deletedAt: null } }),
       prisma.fileAsset.count({ where: { deletedAt: null } }),
       prisma.commentReport.count(),
-      prisma.unauthorizedAccessAttempt.count({
-        where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
-      }),
+      countRecentAccessAttempts(7),
       prisma.series.count({ where: { deletedAt: null, published: false } }),
     ]);
 
