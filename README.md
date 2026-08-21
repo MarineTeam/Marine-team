@@ -492,15 +492,10 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   PDF page number from an EPUB CFI. That's also why `ReadingProgress.location`
   and `ReadingMark.location` are opaque strings: only the engine that wrote
   one parses it.
-  - Bytes are served by `/api/files/[id]/content`, not from
-    `bunnyStoragePublicUrl`. Two reasons: that URL is genuinely public, so
-    pointing a reader at it would have published every members-only book to
-    anyone holding the path (`canViewFile` now runs per request, re-checking
-    the parent series or category, since files inherit protection from the
-    page they sit on rather than carrying their own flag); and Bunny's pull
-    zone is a separate origin, so serving from ours avoids depending on a
-    CORS setting that's invisible from the codebase. Range requests are
-    forwarded so pdf.js can chunk large documents.
+  - Bytes are served by `/api/files/[id]/content` — the single route every
+    file link now goes through, readers and downloads alike. See **File
+    access** below for why. Range requests are forwarded so pdf.js can chunk
+    large documents.
   - pdf.js's worker is resolved via `new URL(..., import.meta.url)` so it
     stays version-locked instead of needing a copy in `/public`; the build
     emits it to `.next/static/media`.
@@ -509,6 +504,26 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     bundled typings are also wrong in places (`Section.find()` is declared
     `Array<Element>` but returns `{cfi, excerpt}`), so that shape is declared
     locally.
+- **File access**: `/api/files/[id]/content` is the only URL the app hands
+  out for an uploaded file. It runs `canViewFile` against the live session
+  per request, streams from Bunny with `bunnyStorageSignedUrl` (which signs
+  when `BUNNY_STORAGE_TOKEN_AUTH_KEY` is set and passes through unsigned when
+  it isn't), and forwards Range requests. `?download=1` switches
+  Content-Disposition to `attachment`.
+  - `bunnyStoragePublicUrl` still exists but nothing user-facing calls it.
+    A pull-zone URL needs no login, can't be revoked, and can't express the
+    rule this app actually has — a file's visibility follows its series'
+    mutable `memberOnly` flag, so a static CDN path is the wrong shape for it.
+  - **Locking the pull zone is a dashboard step, not a code one.** Enable
+    Token Authentication (Pull Zone -> Security) and set the key; until then
+    URLs already in circulation keep working even though the app has stopped
+    producing them.
+  - `BUNNY_STORAGE_PUBLIC_PULL_ZONE_HOSTNAME` is optional and off by default.
+    It routes podcast enclosures to a second, unauthenticated zone for CDN
+    bandwidth. Unset, enclosures use the app route, which serves anonymous
+    podcast apps for public series and stops for members-only ones. If set,
+    that zone must be restricted to podcast audio — unrestricted over the
+    same storage zone it undoes the token auth entirely.
 - **Feeds**: `/feed.xml` is a site-wide RSS feed of recently added series;
   `/series/[slug]/podcast.xml` is an iTunes-compatible podcast feed of a
   series' published audio files (skipped for `memberOnly` series, since

@@ -8,6 +8,35 @@ All notable changes to this project are documented here. Format follows
 
 ### Security
 
+- **Uploaded files are no longer served by permanent, unauthenticated CDN
+  links.** Every file the app links — the Download button, audio players, the
+  book reader, podcast enclosures — now goes through
+  `/api/files/[id]/content`, which resolves `canViewFile` against the live
+  session on each request.
+  - Previously the app linked Bunny's storage pull zone directly. Those URLs
+    need no login, can't be revoked, and keep working for anyone they were
+    ever sent to — so a file's **members-only flag protected the page it was
+    listed on, not the bytes**. The check also re-tests the parent series or
+    category, since a file inside a members-only series inherits that
+    protection rather than carrying its own flag.
+  - This matters beyond convenience: whether a file is public depends on its
+    series' `memberOnly` flag, which an admin can change at any time. A
+    static CDN path can't express a mutable rule; an app route re-evaluates
+    it on every request.
+  - **Two dashboard steps are still required, because code can't do them.**
+    Enable Token Authentication on the storage pull zone and set
+    `BUNNY_STORAGE_TOKEN_AUTH_KEY` — until then the zone still answers any
+    URL already in circulation. And if you set the new optional
+    `BUNNY_STORAGE_PUBLIC_PULL_ZONE_HOSTNAME`, that second zone must be
+    restricted (edge rule or its own storage zone) to podcast audio, or it
+    re-opens everything the token auth just closed.
+  - Podcast enclosures default to the app route rather than a CDN URL. They
+    stay anonymous-readable for public series — podcast apps can't log in —
+    and stop the moment a series is marked members-only, which a permanent
+    CDN link never would.
+  - Download filenames are built from the file's title with CR/LF, quotes
+    and backslashes stripped: that title is admin-entered free text going
+    into an HTTP header, so it's a header-injection vector left unchecked.
 - **Two-factor authorization: Auth0 organization membership AND a PostgreSQL
   email allowlist.** Access is decided from two independent checks — being a
   member of an approved Auth0 organization, and having an ACTIVE
@@ -228,12 +257,8 @@ All notable changes to this project are documented here. Format follows
   - **Your place is kept per account**, not per device, so a book picks up
     where you left off across phone and desktop. Signed-out readers can
     still open a public book; nothing is stored for them.
-  - **Closes a real gap while it's at it**: file bytes now serve through
-    `/api/files/[id]/content`, which checks access on every request. The
-    Bunny Storage URL used until now is genuinely public, so a file's
-    members-only flag had only ever hidden the download button — and files
-    inherit protection from the page they sit on, so the check re-tests the
-    parent series or category rather than the file's own flag alone.
+  - Reader bytes serve through `/api/files/[id]/content`, which checks
+    access on every request — see the file-access change below.
   - Two limits stated up front: **read-aloud stops when the app is
     minimised** (browsers suspend speech for a backgrounded page — the same
     class of limit as video background playback), and **highlighting

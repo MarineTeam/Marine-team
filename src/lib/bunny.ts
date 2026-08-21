@@ -446,6 +446,35 @@ export function bunnyStoragePublicUrl(path: string): string {
 }
 
 /**
+ * A URL on a *second*, deliberately unauthenticated pull zone, for the one
+ * case that genuinely can't use an authenticated one: podcast enclosures.
+ * Podcast apps don't carry a session, and an enclosure URL has to keep
+ * working for years.
+ *
+ * Returns null when `BUNNY_STORAGE_PUBLIC_PULL_ZONE_HOSTNAME` is unset,
+ * which is the default — the podcast feed then serves audio through the
+ * app's own gated route instead. That default is the safe one, so opting
+ * into CDN bandwidth is an explicit decision.
+ *
+ * **This zone must be restricted to the audio it's meant to serve.** It has
+ * no token check, so if it's pointed at the same storage zone with no edge
+ * rule, it re-opens every file the main zone was just locked down — the
+ * exact hole this whole change closes. Restrict it in Bunny (Pull Zone ->
+ * Edge Rules) to the path prefix holding podcast audio, or give it its own
+ * storage zone. Nothing in this codebase can check that for you.
+ *
+ * Note the asymmetry with the app route: a URL on this zone can't be
+ * revoked. Flip a series to members-only and the app route stops serving it
+ * immediately, while a CDN URL someone already has keeps working until the
+ * file is moved or deleted.
+ */
+export function bunnyStoragePublicPullZoneUrl(path: string): string | null {
+  const rawHost = process.env.BUNNY_STORAGE_PUBLIC_PULL_ZONE_HOSTNAME;
+  if (!rawHost) return null;
+  return `https://${normalizeHostname(rawHost)}/${path.replace(/^\/+/, "")}`;
+}
+
+/**
  * A time-limited, signed variant of bunnyStoragePublicUrl(), for the one
  * case where something needs to fetch a Storage file *right now* rather than
  * store the link: handing a freshly-uploaded thumbnail image to Bunny

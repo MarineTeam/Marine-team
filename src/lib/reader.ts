@@ -98,6 +98,33 @@ export function findMatches(text: string, query: string): number[] {
   return positions;
 }
 
+/**
+ * The `filename` part of a Content-Disposition header for a download.
+ *
+ * A file's title is admin-entered free text going straight into an HTTP
+ * header, so it is stripped of CR/LF (header injection) and quotes (which
+ * would end the quoted string early) rather than interpolated as-is. The
+ * extension is taken from the stored path, not the title, so a download
+ * still opens in the right application when someone names a file "Psalms"
+ * with no extension.
+ *
+ * Both forms are emitted: a plain ASCII `filename` every client
+ * understands, and RFC 5987 `filename*` carrying the real UTF-8 title, so
+ * non-ASCII names survive on clients that support it.
+ */
+export function contentDispositionFilename(title: string, path: string): string {
+  const extension = path.toLowerCase().split("?")[0].split("#")[0].split(".").pop() ?? "";
+  const suffix = extension && extension.length <= 8 && /^[a-z0-9]+$/.test(extension) ? `.${extension}` : "";
+
+  const cleaned = title.replace(/[\r\n"\\]/g, " ").trim() || "download";
+  const withExtension = cleaned.toLowerCase().endsWith(suffix.toLowerCase()) ? cleaned : `${cleaned}${suffix}`;
+
+  // The ASCII fallback drops anything outside printable ASCII rather than
+  // transliterating it; filename* below carries the accurate version.
+  const ascii = withExtension.replace(/[^\x20-\x7E]/g, "_");
+  return `filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(withExtension)}`;
+}
+
 /** A short bit of context around a search hit, for the results list. */
 export function excerptAround(text: string, at: number, length: number, radius = 60): string {
   const start = Math.max(0, at - radius);

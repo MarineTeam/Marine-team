@@ -1,5 +1,5 @@
 import { getSeriesBySlug } from "@/lib/content";
-import { bunnyStoragePublicUrl } from "@/lib/bunny";
+import { bunnyStoragePublicPullZoneUrl } from "@/lib/bunny";
 
 function escapeXml(value: string): string {
   return value
@@ -24,10 +24,22 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
   const items = episodes
     .map((f) => {
       // The enclosure URL is computed fresh (never a stored value) so a
-      // corrected Bunny hostname takes effect immediately; the guid is the
-      // file's own stable id, decoupled from that URL, so podcast apps
-      // never see an episode as "new" just because a hostname changed.
-      const url = bunnyStoragePublicUrl(f.bunnyPath);
+      // corrected hostname takes effect immediately; the guid is the file's
+      // own stable id, decoupled from that URL, so podcast apps never see an
+      // episode as "new" just because a hostname changed.
+      //
+      // By default this is the app's own content route, not a CDN link.
+      // Podcast apps can't authenticate, so that route has to answer them
+      // anonymously — and it does, because canViewFile() returns true for a
+      // public file in a public series for exactly that reason. The payoff
+      // is that it stops answering the moment this series is marked
+      // members-only, which a permanent CDN URL never would.
+      //
+      // A church that wants CDN bandwidth for podcast audio can set
+      // BUNNY_STORAGE_PUBLIC_PULL_ZONE_HOSTNAME to opt into a separate
+      // unauthenticated pull zone; see bunnyStoragePublicPullZoneUrl for the
+      // restriction that zone needs, and the revocation it gives up.
+      const url = bunnyStoragePublicPullZoneUrl(f.bunnyPath) ?? `${baseUrl}/api/files/${f.id}/content`;
       return `
     <item>
       <title>${escapeXml(f.title)}</title>

@@ -433,6 +433,35 @@ own section like any other.
   stored per account (not per device), so it follows you between phone and
   desktop. Signed-out readers can still open a public book; nothing is saved.
 
+### How file access actually works
+
+Every file the app links — the reader, the Download button, audio players,
+podcast enclosures — is served by `/api/files/[id]/content`, which checks
+access on **every request** against the live session. Nothing links Bunny's
+CDN directly any more.
+
+That matters because a CDN URL is permanent and unauthenticated. It can't be
+revoked, it works for anyone who has ever been sent it, and it can't express
+a rule this app relies on: whether a file is public depends on its series'
+`memberOnly` flag, which an admin can change at any time. Serving through the
+app means flipping that flag takes effect on the next request rather than
+never.
+
+Two things still need doing in the Bunny dashboard, because code can't do
+them:
+
+1. **Turn on Token Authentication** for the storage pull zone (Pull Zone ->
+   Security) and put the key in `BUNNY_STORAGE_TOKEN_AUTH_KEY`. Until then
+   the pull zone still answers anyone who knows a file's URL — the app has
+   stopped handing those URLs out, but ones already shared keep working.
+2. **Only set `BUNNY_STORAGE_PUBLIC_PULL_ZONE_HOSTNAME` if you restrict that
+   zone.** It's an optional second, unauthenticated pull zone for podcast
+   enclosures (podcast apps can't log in). Left unset — the default — the
+   podcast feed uses the app route, which serves anonymous listeners for
+   public series and stops for members-only ones. Set it without an edge
+   rule scoping it to podcast audio and it re-exposes every file the token
+   auth above just protected.
+
 Limits worth knowing: a **highlight of selected text only works in a PDF**.
 An EPUB's pages live in an iframe the reader library owns, and the selection
 inside it isn't readable from the surrounding page — so marking in an EPUB

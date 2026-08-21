@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { clampPercent, excerptAround, findMatches, readerFormat, toSpeechChunks } from "./reader";
+import {
+  clampPercent,
+  contentDispositionFilename,
+  excerptAround,
+  findMatches,
+  readerFormat,
+  toSpeechChunks,
+} from "./reader";
 
 describe("readerFormat", () => {
   it("recognizes the correct mime types", () => {
@@ -87,6 +94,42 @@ describe("findMatches", () => {
 
   it("returns nothing when there's no hit", () => {
     expect(findMatches("psalms", "proverbs")).toEqual([]);
+  });
+});
+
+describe("contentDispositionFilename", () => {
+  it("takes the extension from the path, not the title", () => {
+    expect(contentDispositionFilename("Psalms", "files/abc.pdf")).toContain('filename="Psalms.pdf"');
+  });
+
+  it("doesn't double up an extension the title already has", () => {
+    expect(contentDispositionFilename("Psalms.pdf", "files/abc.pdf")).toContain('filename="Psalms.pdf"');
+  });
+
+  it("strips CR/LF so an admin-entered title can't inject a header", () => {
+    const header = contentDispositionFilename("evil\r\nSet-Cookie: x=1", "files/a.pdf");
+    expect(header).not.toContain("\r");
+    expect(header).not.toContain("\n");
+  });
+
+  it("strips quotes and backslashes that would end the quoted string early", () => {
+    const header = contentDispositionFilename('a"b\\c', "files/a.pdf");
+    // Exactly two quotes: the ones this function opens and closes with.
+    expect(header.match(/"/g)).toHaveLength(2);
+  });
+
+  it("keeps non-ASCII in filename* while falling back to ASCII in filename", () => {
+    const header = contentDispositionFilename("Café", "files/a.pdf");
+    expect(header).toContain('filename="Caf_.pdf"');
+    expect(header).toContain(`filename*=UTF-8''${encodeURIComponent("Café.pdf")}`);
+  });
+
+  it("falls back to a usable name when the title is blank", () => {
+    expect(contentDispositionFilename("   ", "files/a.pdf")).toContain('filename="download.pdf"');
+  });
+
+  it("ignores a junk extension rather than appending it", () => {
+    expect(contentDispositionFilename("Notes", "files/no-extension")).toContain('filename="Notes"');
   });
 });
 
