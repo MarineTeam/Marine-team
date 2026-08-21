@@ -19,7 +19,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
   }
 
   const baseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
-  const episodes = series.files.filter((f) => f.mimeType?.startsWith("audio/"));
+  // memberOnly is filtered here explicitly: publishedNow() (which is what
+  // loaded these files) only gates published/hidden/scheduled/trashed, never
+  // audience. Without this line a members-only audio file inside an
+  // otherwise-public series is listed as an episode in a world-readable RSS
+  // feed — its title leaking even though the enclosure URL itself now 403s
+  // for an anonymous listener.
+  const episodes = series.files.filter((f) => f.mimeType?.startsWith("audio/") && !f.memberOnly);
 
   const items = episodes
     .map((f) => {
