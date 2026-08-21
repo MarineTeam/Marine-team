@@ -30,6 +30,23 @@ export function fileContentUrl(fileId: string): string {
 }
 
 /**
+ * Opens a book to read *about* it — a cover, a contents list — rather than
+ * to read it.
+ *
+ * `disableAutoFetch` is the point. Left at its default, pdf.js keeps
+ * streaming the rest of the document in the background once it has what was
+ * asked for, which is right for a reader someone is paging through and
+ * badly wrong for a grid of thumbnails: a dozen book cards would quietly
+ * pull a dozen whole PDFs to show a dozen first pages. With it off, only
+ * the byte ranges actually needed cross the wire, over the range requests
+ * the content route already supports.
+ */
+export async function openPdfMetadataTask(fileUrl: string) {
+  const pdfjs = await getPdfjs();
+  return pdfjs.getDocument({ url: fileUrl, withCredentials: true, disableAutoFetch: true });
+}
+
+/**
  * Resolves a pdf.js outline (bookmarks) tree into a flat, depth-tagged list.
  * Shared by PdfReader's in-book Contents panel (which already has a loaded
  * document open) and loadPdfOutline below (which opens one just to read
@@ -57,17 +74,22 @@ export async function resolvePdfOutline(
 }
 
 /**
- * How many hymns a book's outline describes: its *leaf* entries that point
- * at a page. Counting every entry would inflate the total for a book whose
- * bookmarks nest hymns under topical sections, since those section headings
- * are entries too.
+ * How many hymns a book's outline describes, counted straight off the raw
+ * bookmark tree.
+ *
+ * Deliberately does not resolve destinations. A count needs only the shape
+ * of the tree, and resolving is the expensive half: getPageIndex pulls
+ * page-tree objects over the wire *per bookmark*, so a 94-hymn book would
+ * fetch its way through the whole page tree to produce a number, then throw
+ * every page number away. Counts leaves only, so section headings in a
+ * nested outline aren't mistaken for hymns.
  */
-export function countHymns(entries: TocEntry[]): number {
-  return entries.filter((entry, i) => {
-    if (!entry.location) return false;
-    const next = entries[i + 1];
-    return !next || next.depth <= entry.depth;
-  }).length;
+export function countOutlineLeaves(items: PdfOutlineItems): number {
+  let count = 0;
+  for (const item of items ?? []) {
+    count += item.items?.length ? countOutlineLeaves(item.items) : 1;
+  }
+  return count;
 }
 
 /**
@@ -76,13 +98,12 @@ export function countHymns(entries: TocEntry[]): number {
  * book's contents list shown before the full reader is opened.
  */
 export async function loadPdfOutline(fileUrl: string): Promise<TocEntry[]> {
-  const pdfjs = await getPdfjs();
   // Teardown belongs to the loading task, not the document proxy — the
   // proxy only exposes cleanup() (frees page resources but leaves the
   // worker running). Destroying the task is what stops the worker and
   // aborts in-flight range requests — the same distinction PdfReader's own
   // load effect draws.
-  const task = pdfjs.getDocument({ url: fileUrl, withCredentials: true });
+  const task = await openPdfMetadataTask(fileUrl);
   try {
     const doc = await task.promise;
     const outline = await doc.getOutline();

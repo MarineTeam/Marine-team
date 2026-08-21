@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { countHymns, fileContentUrl, getPdfjs, resolvePdfOutline } from "@/lib/pdf-client";
+import { countOutlineLeaves, fileContentUrl, openPdfMetadataTask } from "@/lib/pdf-client";
 
 export type BookCardData = {
   href: string;
@@ -95,8 +95,7 @@ export function BookCard({ book }: { book: BookCardData }) {
 
     (async () => {
       try {
-        const pdfjs = await getPdfjs();
-        const loadingTask = pdfjs.getDocument({ url: fileContentUrl(fileId), withCredentials: true });
+        const loadingTask = await openPdfMetadataTask(fileContentUrl(fileId));
         task = loadingTask;
         const doc = await loadingTask.promise;
         if (cancelled) return;
@@ -122,11 +121,11 @@ export function BookCard({ book }: { book: BookCardData }) {
         }
 
         if (needsCount && !cancelled) {
+          // Counted off the raw outline rather than the resolved one: a
+          // card needs the number, not the page each hymn is on, and
+          // resolving destinations is what costs the round trips.
           const outline = await doc.getOutline();
-          // Awaited before the finally below destroys the worker — see
-          // loadPdfOutline's note on why returning it unsettled hangs.
-          const entries = outline ? await resolvePdfOutline(doc, outline) : [];
-          const count = countHymns(entries);
+          const count = outline ? countOutlineLeaves(outline) : 0;
           if (!cancelled && count > 0) setHymnCount(count);
         }
       } catch {
