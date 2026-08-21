@@ -2,9 +2,9 @@
  * Auth0 Action — Post Login (account linking)
  *
  * Merges identities so one person is one Auth0 user. Without this, signing in
- * with Google and later with Microsoft on the same address produces two
- * separate Auth0 users with two different `sub` values, and the application
- * has to reconcile them by email afterwards.
+ * with Google and later with GitHub on the same address produces two separate
+ * Auth0 users with two different `sub` values, and the application has to
+ * reconcile them by email afterwards.
  *
  * Paste this into Auth0 (Actions -> Library -> Build from scratch, trigger
  * "Login / Post Login") and add it to the Login flow. It must run BEFORE any
@@ -16,7 +16,11 @@
  *   AUTH0_M2M_CLIENT_ID
  *   AUTH0_M2M_CLIENT_SECRET
  *
- * Required npm dependency (Action -> Modules): auth0
+ * No npm modules to add: this calls the Management API over plain `fetch`,
+ * the same way pre-user-registration.js calls the app. The `auth0` SDK would
+ * do the same work, but its availability in the Actions runtime isn't
+ * dependable and its v3 and v4 APIs differ enough that pasting the wrong one
+ * fails at runtime rather than in the editor.
  *
  * Fails OPEN, unlike the pre-user-registration Action, and the difference is
  * deliberate. That one guards the door, so an outage must deny. This one only
@@ -26,12 +30,21 @@
  * would trade a cosmetic problem for a lockout.
  */
 
-// Auth0 Actions run in their own CommonJS sandbox, not in this app's bundle —
-// `require` is the only module syntax available there.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { ManagementClient } = require("auth0");
+const TIMEOUT_MS = 5000;
 
-exports.onExecutePostLogin = async (event, api) => {
+async function api(url, options, timeoutMs = TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    if (!res.ok) throw new Error(`${options.method || "GET"} ${url} -> ${res.status}`);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+exports.onExecutePostLogin = async (event, api_) => {
   const { AUTH0_DOMAIN, AUTH0_M2M_CLIENT_ID, AUTH0_M2M_CLIENT_SECRET } = event.secrets;
   if (!AUTH0_DOMAIN || !AUTH0_M2M_CLIENT_ID || !AUTH0_M2M_CLIENT_SECRET) return;
 
@@ -42,18 +55,33 @@ exports.onExecutePostLogin = async (event, api) => {
   // same rule enforced one layer earlier.
   if (!event.user.email || event.user.email_verified !== true) return;
 
-  // Already the result of a previous merge: nothing to do, and re-linking
-  // would be a no-op API call on every single login.
+  // Already the result of a previous merge: nothing to do, and re-checking
+  // would mean two Management API calls on every single login.
   if (Array.isArray(event.user.identities) && event.user.identities.length > 1) return;
 
   try {
-    const management = new ManagementClient({
-      domain: AUTH0_DOMAIN,
-      clientId: AUTH0_M2M_CLIENT_ID,
-      clientSecret: AUTH0_M2M_CLIENT_SECRET,
+    const base = `https://${AUTH0_DOMAIN}`;
+
+    const token = await api(`${base}/oauth/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        grant_type: "client_credentials",
+        client_id: AUTH0_M2M_CLIENT_ID,
+        client_secret: AUTH0_M2M_CLIENT_SECRET,
+        audience: `${base}/api/v2/`,
+      }),
     });
 
-    const { data: matches } = await management.usersByEmail.getByEmail({ email: event.user.email });
+    const authHeaders = {
+      Authorization: `Bearer ${token.access_token}`,
+      "Content-Type": "application/json",
+    };
+
+    const matches = await api(
+      `${base}/api/v2/users-by-email?email=${encodeURIComponent(event.user.email)}`,
+      { headers: authHeaders },
+    );
 
     const candidates = (matches || []).filter(
       (candidate) =>
@@ -69,17 +97,21 @@ exports.onExecutePostLogin = async (event, api) => {
     // outcome — it resolves by sub — but a stable primary means the `sub` in
     // existing sessions and logs keeps meaning the same person.
     candidates.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-    const primary = candidates[0];
+    const oldest = candidates[0];
 
-    const isPrimaryOlder = new Date(primary.created_at) <= new Date(event.user.created_at);
-    const [target, source] = isPrimaryOlder ? [primary, event.user] : [event.user, primary];
+    const oldestIsOlder = new Date(oldest.created_at) <= new Date(event.user.created_at);
+    const [target, source] = oldestIsOlder ? [oldest, event.user] : [event.user, oldest];
 
     const sourceIdentity = (source.identities || [])[0];
     if (!sourceIdentity) return;
 
-    await management.users.link({ id: target.user_id }, {
-      provider: sourceIdentity.provider,
-      user_id: String(sourceIdentity.user_id),
+    await api(`${base}/api/v2/users/${encodeURIComponent(target.user_id)}/identities`, {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({
+        provider: sourceIdentity.provider,
+        user_id: String(sourceIdentity.user_id),
+      }),
     });
 
     // When the account that just logged in is the one merged away, its sub no
@@ -89,9 +121,9 @@ exports.onExecutePostLogin = async (event, api) => {
     //
     // Safe precisely here and not before: the API requires the authenticating
     // identity to already be among the primary user's secondary identities,
-    // which the link() call above has just made true.
+    // which the link call above has just made true.
     if (target.user_id !== event.user.user_id) {
-      api.authentication.setPrimaryUser(target.user_id);
+      api_.authentication.setPrimaryUser(target.user_id);
     }
   } catch (error) {
     // Logged for the Action's own log stream only; never surfaced to the

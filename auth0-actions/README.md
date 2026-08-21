@@ -63,14 +63,22 @@ two Auth0 users with two different `sub` values.
 1. Auth0 Dashboard → **Actions → Library → Build from scratch**
 2. Name: `Marine Team account linking`, Trigger: **Login / Post Login**
 3. Paste `link-accounts.js`
-4. Add the `auth0` npm module (the **Modules** panel in the editor)
-5. Add three **Secrets**, from a Machine-to-Machine application authorized for
+4. Add three **Secrets**, from a Machine-to-Machine application authorized for
    the Management API with the `read:users` and `update:users` scopes:
    - `AUTH0_DOMAIN` — `your-tenant.eu.auth0.com`
    - `AUTH0_M2M_CLIENT_ID`
    - `AUTH0_M2M_CLIENT_SECRET`
-6. **Deploy**, then drag it into **Actions → Triggers → post-login**, above any
+5. **Deploy**, then drag it into **Actions → Triggers → post-login**, above any
    Action that reads the user's identities
+
+**No npm modules to add.** The editor's Modules panel is a fixed list — if it
+says everything available is already bound, that's expected and there is
+nothing to do there. This Action calls the Management API over plain `fetch`,
+the same way `pre-user-registration.js` calls the app. The `auth0` SDK would
+do the same work, but its availability in the Actions runtime isn't dependable
+(the "cannot find module 'auth0'" reports are common) and its v3 and v4 APIs
+differ enough that pasting the wrong one fails at runtime rather than in the
+editor.
 
 It only links when **both** accounts have a verified email. Linking on an
 unverified address is the account-takeover path this feature is known for:
