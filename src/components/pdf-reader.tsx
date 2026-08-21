@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { excerptAround, findMatches } from "@/lib/reader";
+import { resolvePdfOutline } from "@/lib/pdf-outline-client";
 import type { ReaderHandle, SearchHit, TocEntry } from "@/components/reader-types";
 
 /**
@@ -154,37 +155,12 @@ export function PdfReader({
       const doc = docRef.current;
       if (!doc) return [];
       const outline = await doc.getOutline();
-      if (!outline) return [];
-
       // An outline item's destination is a reference that has to be resolved
       // to a page index; a named destination needs one more hop first. Either
       // can fail on a malformed PDF, so each entry resolves independently and
-      // a bad one is dropped rather than emptying the whole contents list.
-      async function toEntries(
-        items: Awaited<ReturnType<NonNullable<PdfDocument>["getOutline"]>>,
-        depth: number,
-      ): Promise<TocEntry[]> {
-        const entries: TocEntry[] = [];
-        for (const item of items ?? []) {
-          let target: number | null = null;
-          try {
-            const dest = typeof item.dest === "string" ? await doc!.getDestination(item.dest) : item.dest;
-            const ref = Array.isArray(dest) ? dest[0] : null;
-            if (ref && typeof ref === "object") target = (await doc!.getPageIndex(ref)) + 1;
-          } catch {
-            target = null;
-          }
-          entries.push({
-            label: item.title,
-            location: target === null ? null : String(target),
-            depth,
-          });
-          if (item.items?.length) entries.push(...(await toEntries(item.items, depth + 1)));
-        }
-        return entries;
-      }
-
-      return toEntries(outline, 0);
+      // a bad one is dropped rather than emptying the whole contents list —
+      // see resolvePdfOutline, shared with the standalone book-contents view.
+      return outline ? resolvePdfOutline(doc, outline) : [];
     }
 
     async function search(query: string): Promise<SearchHit[]> {

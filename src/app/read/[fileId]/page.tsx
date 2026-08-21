@@ -26,8 +26,15 @@ export async function generateMetadata({
   return { title: file.title, description: `Read ${file.title} on Marine Team.` };
 }
 
-export default async function ReadPage({ params }: { params: Promise<{ fileId: string }> }) {
+export default async function ReadPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ fileId: string }>;
+  searchParams: Promise<{ page?: string }>;
+}) {
   const { fileId } = await params;
+  const { page } = await searchParams;
   const [file, user] = await Promise.all([getReadableFile(fileId), getCurrentUser()]);
   if (!file) notFound();
 
@@ -64,6 +71,10 @@ export default async function ReadPage({ params }: { params: Promise<{ fileId: s
         select: { location: true },
       })
     : null;
+  // A page linked from a book's contents list (?page=12) always wins over
+  // the viewer's own resume position — tapping a specific hymn should open
+  // to that hymn, not silently continue from wherever they last stopped.
+  const requestedPage = page && Number.isFinite(Number(page)) && Number(page) >= 1 ? page : null;
 
   const backHref = file.series
     ? `/series/${file.series.slug}`
@@ -79,7 +90,7 @@ export default async function ReadPage({ params }: { params: Promise<{ fileId: s
       format={format}
       backHref={backHref}
       backLabel={backLabel}
-      initialLocation={progress?.location ?? null}
+      initialLocation={requestedPage ?? progress?.location ?? null}
       canSaveProgress={Boolean(user)}
     />
   );

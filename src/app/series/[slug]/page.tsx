@@ -37,6 +37,8 @@ import { SeriesTile } from "@/components/series-tile";
 import { MenuTile } from "@/components/menu-tile";
 import { FileList } from "@/components/file-list";
 import { HymnList } from "@/components/hymn-list";
+import { BookContents } from "@/components/book-contents";
+import { readerFormat } from "@/lib/reader";
 import { CommentSection } from "@/components/comment-section";
 import { ViewEventBeacon } from "@/components/view-event-beacon";
 
@@ -99,6 +101,14 @@ export default async function SeriesPage({
 
   const isLoggedIn = Boolean(user);
   const hasAudio = series.files.some((f) => f.mimeType?.startsWith("audio/"));
+  // A hymnalStyle book's first PDF is treated as the whole book (its own
+  // embedded bookmarks become the hymn list — see BookContents); any other
+  // files in the series still show underneath as plain downloads. Locked the
+  // same way FileList/HymnList lock an individual row: a member-only file
+  // inside an otherwise-public series stays hidden from a guest.
+  const primaryPdf = series.files.find((f) => readerFormat(f.mimeType, f.bunnyPath) === "pdf") ?? null;
+  const primaryPdfLocked = Boolean(primaryPdf?.memberOnly) && !isLoggedIn;
+  const otherFiles = primaryPdf ? series.files.filter((f) => f.id !== primaryPdf.id) : series.files;
   const [
     favorited,
     queued,
@@ -295,13 +305,33 @@ export default async function SeriesPage({
 
           {series.files.length > 0 && (
             <section className="space-y-3">
-              {!series.category?.hymnalStyle && (
-                <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Files</h2>
-              )}
               {series.category?.hymnalStyle ? (
-                <HymnList hymns={series.files} isLoggedIn={isLoggedIn} />
+                <>
+                  {primaryPdf ? (
+                    primaryPdfLocked ? (
+                      <p className="text-sm text-zinc-500">This book is for members only.</p>
+                    ) : (
+                      <BookContents
+                        fileId={primaryPdf.id}
+                        fileUrl={`/api/files/${primaryPdf.id}/content`}
+                        readerOn={readerOn}
+                      />
+                    )
+                  ) : (
+                    <HymnList hymns={series.files} isLoggedIn={isLoggedIn} />
+                  )}
+                  {primaryPdf && otherFiles.length > 0 && (
+                    <>
+                      <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Other files</h2>
+                      <FileList files={otherFiles} isLoggedIn={isLoggedIn} readerOn={readerOn} />
+                    </>
+                  )}
+                </>
               ) : (
-                <FileList files={series.files} isLoggedIn={isLoggedIn} readerOn={readerOn} />
+                <>
+                  <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Files</h2>
+                  <FileList files={series.files} isLoggedIn={isLoggedIn} readerOn={readerOn} />
+                </>
               )}
             </section>
           )}
