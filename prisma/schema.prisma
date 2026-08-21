@@ -479,27 +479,39 @@ model WatchProgress {
 }
 
 model FileAsset {
-  id          String    @id @default(cuid())
-  title       String
-  bunnyPath   String
-  url         String
-  sizeBytes   Int?
-  mimeType    String?
-  memberOnly  Boolean   @default(false)
-  hidden      Boolean   @default(false)
-  published   Boolean   @default(true)
-  publishAt   DateTime?
-  unpublishAt DateTime?
+  id               String    @id @default(cuid())
+  title            String
+  bunnyPath        String
+  url              String
+  sizeBytes        Int?
+  mimeType         String?
+  memberOnly       Boolean   @default(false)
+  hidden           Boolean   @default(false)
+  published        Boolean   @default(true)
+  publishAt        DateTime?
+  unpublishAt      DateTime?
   // Soft delete — see Category.deletedAt. The Bunny Storage object itself
   // isn't removed until the trash entry is permanently purged.
-  deletedAt   DateTime?
-  position    Int       @default(0)
-  series      Series?   @relation(fields: [seriesId], references: [id], onDelete: SetNull)
-  seriesId    String?
+  deletedAt        DateTime?
+  position         Int       @default(0)
+  // The admin's *intent* to publish this as a podcast episode, set from the
+  // admin file list. Deliberately separate from publicPath below, which is
+  // the *state*: a file can be intended for the podcast while temporarily
+  // not mirrored (its series was flipped members-only, it was unpublished),
+  // and flipping that back restores it without the admin re-ticking anything.
+  podcastPublished Boolean   @default(false)
+  // Where this file's public copy lives in the separate public storage zone,
+  // or null when it isn't mirrored. Never derived from bunnyPath — a
+  // podcast enclosure URL is only ever built from a value actually written
+  // here after a successful copy, so a file that failed to mirror is absent
+  // from the feed rather than advertised at a URL that 404s.
+  publicPath       String?
+  series           Series?   @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  seriesId         String?
   // Set only when seriesId is null: a file attached straight to a category (see Video.categoryId).
-  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  categoryId  String?
-  createdAt   DateTime  @default(now())
+  category         Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId       String?
+  createdAt        DateTime  @default(now())
 
   readingProgress ReadingProgress[]
   readingMarks    ReadingMark[]

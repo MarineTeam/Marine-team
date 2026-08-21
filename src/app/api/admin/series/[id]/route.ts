@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureSeriesAccess, ensureCategoryAccess } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
+import { syncSeriesPodcastMirror } from "@/lib/podcast-mirror";
 import { fireWebhooks } from "@/lib/webhooks";
 import { recordSlugAlias } from "@/lib/content";
 
@@ -84,6 +85,10 @@ export async function PATCH(
     }
     const series = await prisma.series.update({ where: { id }, data: normalizeSeriesData(body) });
     await logAudit(user.email, "update", "series", series.id, JSON.stringify(body));
+    // A series' audience governs its episodes': flipping it members-only,
+    // unpublishing or hiding it has to pull every mirrored episode out of
+    // the public zone, not just whichever file was last edited.
+    await syncSeriesPodcastMirror(series.id);
     revalidateTag("series", { expire: 0 });
     if (body.slug) await recordSlugAlias("SERIES", existing.slug, body.slug, series.id);
 
@@ -114,6 +119,7 @@ export async function DELETE(
     await ensureSeriesAccess(user, existing);
     await prisma.series.update({ where: { id }, data: { deletedAt: new Date() } });
     await logAudit(user.email, "trash", "series", id, existing.title);
+    await syncSeriesPodcastMirror(id);
     revalidateTag("series", { expire: 0 });
     return NextResponse.json({ ok: true });
   } catch (error) {

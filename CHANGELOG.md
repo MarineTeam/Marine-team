@@ -34,6 +34,20 @@ All notable changes to this project are documented here. Format follows
     stay anonymous-readable for public series — podcast apps can't log in —
     and stop the moment a series is marked members-only, which a permanent
     CDN link never would.
+  - **A members-only audio file inside a public series was being listed in
+    the public podcast feed.** `publishedNow()` gates
+    published/hidden/scheduled/trashed but never audience, and the feed
+    filtered only on mime type. Now excluded outright.
+  - **Publishing to the podcast feed is now per-file and opt-in**
+    ("In podcast" in `/admin/files`), where before every audio file in a
+    public series became a public episode with nobody consenting. Opted-in
+    audio is copied to an optional **separate public storage zone** — a
+    distinct zone rather than an edge rule on the private one, so a private
+    file simply isn't there to be found. The feed lists an episode only
+    after that copy lands, so it can't advertise a URL that 404s, and the
+    copy is removed automatically when a file or its series stops
+    qualifying. Existing audio was deliberately not back-filled: publishing
+    to a permanent public URL should be a decision someone makes on purpose.
   - Download filenames are built from the file's title with CR/LF, quotes
     and backslashes stripped: that title is admin-entered free text going
     into an HTTP header, so it's a header-injection vector left unchecked.

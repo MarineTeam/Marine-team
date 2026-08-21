@@ -518,12 +518,28 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     Token Authentication (Pull Zone -> Security) and set the key; until then
     URLs already in circulation keep working even though the app has stopped
     producing them.
-  - `BUNNY_STORAGE_PUBLIC_PULL_ZONE_HOSTNAME` is optional and off by default.
-    It routes podcast enclosures to a second, unauthenticated zone for CDN
-    bandwidth. Unset, enclosures use the app route, which serves anonymous
-    podcast apps for public series and stops for members-only ones. If set,
-    that zone must be restricted to podcast audio — unrestricted over the
-    same storage zone it undoes the token auth entirely.
+  - **Public podcast zone** (optional, off by default): a *separate* Bunny
+    storage zone plus its own unauthenticated pull zone, holding only audio
+    an admin explicitly published. `src/lib/podcast-mirror.ts` owns the
+    lifecycle — `isMirrorEligible` is a pure, unit-tested predicate
+    (`podcastPublished` is necessary but never sufficient; file and series
+    audience, publish state and schedule all re-checked), and
+    `syncPodcastMirror` reconciles the zone to it. It's called from every
+    path that can change eligibility: `applyFileUpdate` (which the bulk
+    route also goes through), `removeFile`, the series update and trash
+    routes, and trash restore. Permanent deletion calls
+    `purgePodcastMirror`, since deleting the private object doesn't touch
+    the other zone.
+  - `publicPath` is written only *after* a successful copy and cleared
+    *before* deletion, so the two failure modes are "absent from the feed"
+    rather than "advertised but missing" or "public but forgotten". Enclosure
+    URLs are built from `publicPath`, never from `bunnyPath`, so a private
+    object's path isn't derivable from a public one. `syncPodcastMirror`
+    never throws — a Bunny outage shouldn't fail an admin's edit.
+  - The copy streams rather than buffers (sermon audio is routinely
+    hundreds of MB), but still passes through the function, so a large
+    enough file can hit the request timeout. That's reported as a failed
+    copy and leaves the file unmirrored.
 - **Feeds**: `/feed.xml` is a site-wide RSS feed of recently added series;
   `/series/[slug]/podcast.xml` is an iTunes-compatible podcast feed of a
   series' published audio files (skipped for `memberOnly` series, since

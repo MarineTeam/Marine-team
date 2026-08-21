@@ -32,6 +32,89 @@ function storageHost(): string {
 }
 
 /**
+ * The second, deliberately public storage zone — the only place a file is
+ * ever reachable without a session. Podcast enclosures live here and
+ * nothing else does.
+ *
+ * A separate *storage* zone rather than an edge rule on the private one is
+ * the point: a private file simply isn't in this zone, so there is no path
+ * to guess and no rule that can be silently removed later. The invariant is
+ * "present in this zone == meant to be public", which is checkable by
+ * looking rather than by trusting configuration.
+ *
+ * Returns null when unconfigured, which is the default — the podcast feed
+ * then serves through the app's own gated route instead.
+ */
+function publicStorageConfig(): { zone: string; apiKey: string; host: string } | null {
+  const zone = process.env.BUNNY_PUBLIC_STORAGE_ZONE?.trim();
+  const apiKey = process.env.BUNNY_PUBLIC_STORAGE_API_KEY?.trim();
+  if (!zone || !apiKey) return null;
+  const region = process.env.BUNNY_PUBLIC_STORAGE_REGION?.trim();
+  return { zone, apiKey, host: region ? `${region}.storage.bunnycdn.com` : "storage.bunnycdn.com" };
+}
+
+/**
+ * Whether public mirroring is available at all. Both the storage zone (to
+ * write to) and its pull zone hostname (to serve from) are needed — a
+ * half-configured setup would copy files somewhere nothing can read them.
+ */
+export function bunnyPublicStorageConfigured(): boolean {
+  return publicStorageConfig() !== null && Boolean(process.env.BUNNY_STORAGE_PUBLIC_PULL_ZONE_HOSTNAME?.trim());
+}
+
+/**
+ * Streams an object from the private storage zone into the public one.
+ *
+ * Streamed rather than buffered: a sermon recording is routinely tens or
+ * hundreds of megabytes, and holding one in a serverless function's memory
+ * is how this falls over. Note that it still has to pass through the
+ * function, so a large enough file can exhaust the request timeout — the
+ * copy is reported as failed in that case and the file is simply left
+ * unmirrored, never recorded as published.
+ */
+export async function bunnyPublicStorageCopyFrom(sourceUrl: string, path: string, contentType?: string): Promise<void> {
+  const config = publicStorageConfig();
+  if (!config) throw new Error("Public storage zone is not configured");
+
+  const source = await fetch(sourceUrl, { cache: "no-store" });
+  if (!source.ok || !source.body) {
+    throw new Error(`Could not read the source file (${source.status})`);
+  }
+
+  const cleanPath = path.replace(/^\/+/, "");
+  const res = await fetch(`https://${config.host}/${config.zone}/${cleanPath}`, {
+    method: "PUT",
+    headers: {
+      AccessKey: config.apiKey,
+      "Content-Type": contentType ?? source.headers.get("content-type") ?? "application/octet-stream",
+    },
+    body: source.body,
+    // Required by undici to send a streaming request body; without it the
+    // fetch throws before a byte moves.
+    duplex: "half",
+  } as RequestInit & { duplex: "half" });
+
+  if (!res.ok) {
+    throw new Error(`Bunny public storage upload failed: ${res.status} ${await res.text()}`);
+  }
+}
+
+/** Removes an object from the public zone. A 404 counts as success — the goal is "not public any more". */
+export async function bunnyPublicStorageDelete(path: string): Promise<void> {
+  const config = publicStorageConfig();
+  if (!config) throw new Error("Public storage zone is not configured");
+
+  const cleanPath = path.replace(/^\/+/, "");
+  const res = await fetch(`https://${config.host}/${config.zone}/${cleanPath}`, {
+    method: "DELETE",
+    headers: { AccessKey: config.apiKey },
+  });
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`Bunny public storage delete failed: ${res.status} ${await res.text()}`);
+  }
+}
+
+/**
  * CDN hostname env vars are documented as a bare hostname (e.g.
  * "xxxxxxxx.b-cdn.net"), but it's an easy mistake to paste the full URL
  * copied from the Bunny dashboard instead — this strips any protocol

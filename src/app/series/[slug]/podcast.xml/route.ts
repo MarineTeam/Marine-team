@@ -1,5 +1,5 @@
 import { getSeriesBySlug } from "@/lib/content";
-import { bunnyStoragePublicPullZoneUrl } from "@/lib/bunny";
+import { bunnyPublicStorageConfigured, bunnyStoragePublicPullZoneUrl } from "@/lib/bunny";
 
 function escapeXml(value: string): string {
   return value
@@ -19,13 +19,20 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
   }
 
   const baseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
-  // memberOnly is filtered here explicitly: publishedNow() (which is what
-  // loaded these files) only gates published/hidden/scheduled/trashed, never
-  // audience. Without this line a members-only audio file inside an
-  // otherwise-public series is listed as an episode in a world-readable RSS
-  // feed — its title leaking even though the enclosure URL itself now 403s
-  // for an anonymous listener.
-  const episodes = series.files.filter((f) => f.mimeType?.startsWith("audio/") && !f.memberOnly);
+  // memberOnly is filtered explicitly: publishedNow() (which is what loaded
+  // these files) only gates published/hidden/scheduled/trashed, never
+  // audience. Without it a members-only audio file inside an otherwise-public
+  // series is listed as an episode in a world-readable RSS feed.
+  //
+  // The publicPath condition is the real gate when a public storage zone is
+  // configured: an episode appears only once its bytes have actually been
+  // copied there, so the feed can never advertise a URL that isn't live.
+  // Where no public zone is set up, publicPath is always null and the feed
+  // falls back to the app's own gated route below.
+  const publicZone = bunnyPublicStorageConfigured();
+  const episodes = series.files.filter(
+    (f) => f.mimeType?.startsWith("audio/") && !f.memberOnly && (!publicZone || f.publicPath),
+  );
 
   const items = episodes
     .map((f) => {
@@ -34,18 +41,21 @@ export async function GET(_request: Request, { params }: { params: Promise<{ slu
       // own stable id, decoupled from that URL, so podcast apps never see an
       // episode as "new" just because a hostname changed.
       //
-      // By default this is the app's own content route, not a CDN link.
-      // Podcast apps can't authenticate, so that route has to answer them
-      // anonymously — and it does, because canViewFile() returns true for a
-      // public file in a public series for exactly that reason. The payoff
-      // is that it stops answering the moment this series is marked
-      // members-only, which a permanent CDN URL never would.
+      // With a public zone configured, this is a CDN URL built from
+      // publicPath — a location proven to hold bytes — and never from
+      // bunnyPath, so a private object's path is never guessable from a
+      // public one.
       //
-      // A church that wants CDN bandwidth for podcast audio can set
-      // BUNNY_STORAGE_PUBLIC_PULL_ZONE_HOSTNAME to opt into a separate
-      // unauthenticated pull zone; see bunnyStoragePublicPullZoneUrl for the
-      // restriction that zone needs, and the revocation it gives up.
-      const url = bunnyStoragePublicPullZoneUrl(f.bunnyPath) ?? `${baseUrl}/api/files/${f.id}/content`;
+      // Without one, it falls back to the app's own gated route. Podcast
+      // apps can't authenticate, so that route has to answer them
+      // anonymously, and it does: canViewFile() returns true for a public
+      // file in a public series precisely so this works. The trade is that
+      // the app route stops serving the moment a series is marked
+      // members-only, where a CDN URL keeps working until the mirror is
+      // deleted — and even then, only for new listeners.
+      const url =
+        (f.publicPath ? bunnyStoragePublicPullZoneUrl(f.publicPath) : null) ??
+        `${baseUrl}/api/files/${f.id}/content`;
       return `
     <item>
       <title>${escapeXml(f.title)}</title>

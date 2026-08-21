@@ -19,6 +19,9 @@ type FileAsset = {
   hidden: boolean;
   published: boolean;
   unpublishAt: string | null;
+  mimeType: string | null;
+  podcastPublished: boolean;
+  publicPath: string | null;
   series: { id: string; title: string } | null;
   category: { id: string; name: string } | null;
 };
@@ -100,7 +103,7 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
     await load();
   }
 
-  async function toggle(f: FileAsset, field: "published" | "memberOnly" | "hidden") {
+  async function toggle(f: FileAsset, field: "published" | "memberOnly" | "hidden" | "podcastPublished") {
     await fetch(`/api/admin/files/${f.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -357,6 +360,21 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
               >
                 {f.memberOnly ? "Members only" : "Public"}
               </button>
+              {/* Audio only: this publishes the file to a permanently public
+                  URL for podcast apps, which makes no sense for a handout.
+                  The label reports the mirror's real state, not just the
+                  intent — "Pending" means the copy hasn't landed yet, or
+                  something (members-only, unpublished, a members-only
+                  series) currently disqualifies it. */}
+              {f.mimeType?.startsWith("audio/") && (
+                <button
+                  onClick={() => toggle(f, "podcastPublished")}
+                  className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${f.podcastPublished ? "border-sky-400 text-sky-700 dark:text-sky-400" : "border-zinc-300"}`}
+                  title="Publish this episode to the public podcast feed. It is copied to a separate public storage zone and becomes readable without a login."
+                >
+                  {f.podcastPublished ? (f.publicPath ? "In podcast" : "Podcast pending") : "Not in podcast"}
+                </button>
+              )}
               <button
                 onClick={() => toggle(f, "hidden")}
                 className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${f.hidden ? "border-red-400 text-red-600 dark:text-red-400" : "border-zinc-300"}`}

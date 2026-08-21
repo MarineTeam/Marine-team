@@ -5,6 +5,7 @@ import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, hasCapability } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { bunnyDeleteStreamVideo, bunnyStorageDelete } from "@/lib/bunny";
+import { purgePodcastMirror, syncPodcastMirror, syncSeriesPodcastMirror } from "@/lib/podcast-mirror";
 import type { CapabilityKey } from "@/lib/capabilities";
 import type { User } from "@prisma/client";
 
@@ -38,12 +39,16 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
         break;
       case "series":
         name = (await prisma.series.update({ where: { id }, data: { deletedAt: null } })).title;
+        // Restoring can make episodes eligible again, so re-sync rather
+        // than leaving them absent from the feed until the next edit.
+        await syncSeriesPodcastMirror(id);
         break;
       case "video":
         name = (await prisma.video.update({ where: { id }, data: { deletedAt: null } })).title;
         break;
       case "file":
         name = (await prisma.fileAsset.update({ where: { id }, data: { deletedAt: null } })).title;
+        await syncPodcastMirror(id);
         break;
     }
     await logAudit(user.email, "restore", type, id, name);
@@ -85,6 +90,10 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
       case "file": {
         const file = await prisma.fileAsset.findUniqueOrThrow({ where: { id } });
         await bunnyStorageDelete(file.bunnyPath);
+        // The public copy lives in a different storage zone, so deleting the
+        // private object doesn't touch it. Missing this is how a file ends
+        // up permanently public with no row left pointing at it.
+        await purgePodcastMirror(file.publicPath);
         await prisma.fileAsset.delete({ where: { id } });
         name = file.title;
         break;

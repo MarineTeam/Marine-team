@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureContentAccess } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
+import { syncPodcastMirror } from "@/lib/podcast-mirror";
 import type { User } from "@prisma/client";
 
 export const updateSchema = z
@@ -17,6 +18,7 @@ export const updateSchema = z
     publishAt: z.string().nullable().optional(),
     unpublishAt: z.string().nullable().optional(),
     position: z.number().int().optional(),
+    podcastPublished: z.boolean().optional(),
   })
   .refine((body) => !(body.seriesId && body.categoryId), {
     message: "Choose either a series or a category, not both",
@@ -48,6 +50,10 @@ export async function applyFileUpdate(user: User, id: string, body: z.infer<type
   }
   const file = await prisma.fileAsset.update({ where: { id }, data: normalizeData(body) });
   await logAudit(user.email, "update", "file", file.id, JSON.stringify(body));
+  // Runs after every file edit, not just a podcastPublished toggle: making a
+  // file members-only, unpublishing it, moving it to another series or
+  // scheduling it out all change whether its public copy may exist.
+  await syncPodcastMirror(file.id);
   return file;
 }
 
@@ -61,6 +67,10 @@ export async function removeFile(user: User, id: string) {
   await ensureContentAccess(user, { seriesId: file.seriesId, categoryId: file.categoryId });
   await prisma.fileAsset.update({ where: { id }, data: { deletedAt: new Date() } });
   await logAudit(user.email, "trash", "file", id, file.title);
+  // Trashing is a soft delete, but it must still pull the public copy: a
+  // trashed episode is gone from the site and has no business staying
+  // readable on an unauthenticated URL until someone purges the trash.
+  await syncPodcastMirror(id);
 }
 
 export async function PATCH(

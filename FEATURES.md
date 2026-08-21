@@ -454,13 +454,42 @@ them:
    Security) and put the key in `BUNNY_STORAGE_TOKEN_AUTH_KEY`. Until then
    the pull zone still answers anyone who knows a file's URL — the app has
    stopped handing those URLs out, but ones already shared keep working.
-2. **Only set `BUNNY_STORAGE_PUBLIC_PULL_ZONE_HOSTNAME` if you restrict that
-   zone.** It's an optional second, unauthenticated pull zone for podcast
-   enclosures (podcast apps can't log in). Left unset — the default — the
-   podcast feed uses the app route, which serves anonymous listeners for
-   public series and stops for members-only ones. Set it without an edge
-   rule scoping it to podcast audio and it re-exposes every file the token
-   auth above just protected.
+2. **Optionally, set up the public podcast zone** (all four
+   `BUNNY_PUBLIC_STORAGE_*` / `BUNNY_STORAGE_PUBLIC_PULL_ZONE_HOSTNAME`
+   vars). This is a **separate storage zone**, not an edge rule on the
+   private one: a private file simply isn't in it, so there's no path to
+   guess and no rule that can be quietly deleted later. Never point it at
+   the same storage zone. Left unset — the default — podcast audio streams
+   through the app route instead, which is safer but uses your app's
+   bandwidth rather than Bunny's edge.
+
+### Publishing a podcast episode
+
+Publishing to the podcast feed is **per file and opt-in**: a "Not in
+podcast" / "In podcast" button on audio files in `/admin/files`. Ticking it
+copies that file into the public zone; the feed lists an episode only once
+that copy has actually landed, so it can never advertise a URL that 404s.
+The button reads "Podcast pending" when the intent is set but the file isn't
+mirrored — either the copy hasn't finished, or something currently
+disqualifies it.
+
+A file leaves the public zone automatically when it stops qualifying:
+marked members-only, unpublished, hidden, scheduled out, expired, trashed,
+or moved into a series that is itself members-only, unpublished, hidden or
+trashed. Flipping the cause back restores it without re-ticking anything,
+because the admin's intent is stored separately from the mirror's state.
+
+Two things to be clear about:
+
+- **Publishing a podcast episode isn't reversible the way the rest of this
+  app's access control is.** Un-publishing removes it from the feed and
+  deletes the public copy, which stops *new* downloads — but listeners'
+  apps have already fetched the file, and nothing can recall that. This is
+  inherent to podcasting, which is exactly why it's opt-in per file.
+- Existing audio was **not** back-filled when this was introduced. Before,
+  every audio file in a public series was implicitly a public episode with
+  nobody opting in; those feeds will be empty until someone ticks the
+  episodes they actually want published.
 
 Limits worth knowing: a **highlight of selected text only works in a PDF**.
 An EPUB's pages live in an iframe the reader library owns, and the selection
