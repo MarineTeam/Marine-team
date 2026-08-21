@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { PdfReader } from "@/components/pdf-reader";
+import { EpubReader } from "@/components/epub-reader";
 import type { ReaderFormat } from "@/lib/reader";
 import type { ReaderHandle, SearchHit, TocEntry } from "@/components/reader-types";
 
@@ -194,9 +195,12 @@ export function BookReader({
               onLocationChange={onLocationChange}
             />
           ) : (
-            <div className="flex h-full items-center justify-center p-8 text-sm text-zinc-500">
-              EPUB reading isn&apos;t wired up yet.
-            </div>
+            <EpubReader
+              fileUrl={`/api/files/${fileId}/content`}
+              initialLocation={initialLocation}
+              onReady={onReady}
+              onLocationChange={onLocationChange}
+            />
           )}
         </main>
       </div>
