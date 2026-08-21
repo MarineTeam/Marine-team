@@ -48,11 +48,17 @@ export async function loadPdfOutline(fileUrl: string): Promise<TocEntry[]> {
     import.meta.url,
   ).toString();
 
-  const doc = await pdfjs.getDocument({ url: fileUrl, withCredentials: true }).promise;
+  // Teardown belongs to the loading task, not the document proxy — the
+  // proxy only exposes cleanup() (frees page resources but leaves the
+  // worker running). Destroying the task is what stops the worker and
+  // aborts in-flight range requests — same distinction PdfReader's own
+  // load effect draws.
+  const task = pdfjs.getDocument({ url: fileUrl, withCredentials: true });
   try {
+    const doc = await task.promise;
     const outline = await doc.getOutline();
     return outline ? resolvePdfOutline(doc, outline) : [];
   } finally {
-    void doc.destroy();
+    void task.destroy();
   }
 }
