@@ -1,34 +1,9 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
+import type { User } from "@prisma/client";
+import { AdminNav } from "@/components/admin-nav";
 import { getCurrentUser, getSessionIdentity } from "@/lib/current-user";
 import { isStaff, hasCapability, getCapabilityScope } from "@/lib/permissions";
-
-const adminLinks = [
-  { href: "/admin", label: "Overview" },
-  { href: "/admin/categories", label: "Categories" },
-  { href: "/admin/series", label: "Series" },
-  { href: "/admin/videos", label: "Videos" },
-  { href: "/admin/speakers", label: "Speakers" },
-  { href: "/admin/live", label: "Live streaming" },
-  { href: "/admin/files", label: "Files" },
-  { href: "/admin/comments", label: "Comment moderation" },
-  { href: "/admin/share-links", label: "Share links" },
-  { href: "/admin/trash", label: "Trash" },
-  { href: "/admin/media-check", label: "Media check" },
-  { href: "/admin/users", label: "Members & roles" },
-  { href: "/admin/authorized-emails", label: "Who can sign in" },
-  { href: "/admin/access-attempts", label: "Access attempts" },
-  { href: "/admin/permissions", label: "Permissions" },
-  { href: "/admin/branding", label: "Branding" },
-  { href: "/admin/plugins", label: "Plugins" },
-  { href: "/admin/downloads", label: "Downloads" },
-  { href: "/admin/home-rows", label: "Homepage" },
-  { href: "/admin/announcements", label: "Announcements" },
-  { href: "/admin/webhooks", label: "Webhooks" },
-  { href: "/admin/audit", label: "Audit log" },
-  { href: "/admin/analytics", label: "Analytics" },
-  { href: "/admin/query-monitor", label: "Query Monitor" },
-];
+import { adminGroupsFor, type AdminAccess } from "@/lib/admin-nav";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const [user, identity] = await Promise.all([getCurrentUser(), getSessionIdentity()]);
@@ -37,7 +12,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const staff = user ? await isStaff(user) : false;
   if (!user || !staff) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-16 text-center space-y-4">
+      <div className="mx-auto max-w-3xl space-y-4 px-4 py-16 text-center">
         <p className="font-medium">You don&apos;t have access to the admin dashboard.</p>
         {!user && (
           <a
@@ -51,96 +26,80 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     );
   }
 
-  let links = adminLinks;
-  if (user.role !== "ADMIN") {
-    const [
-      canManageUsers,
-      canManagePermissions,
-      canManagePlugins,
-      canViewAuditLog,
-      canViewAnalytics,
-      canManageVideosSiteWide,
-      canManageCategories,
-      canManageSeries,
-      canManageFiles,
-      canShareContent,
-      moderateScope,
-    ] = await Promise.all([
-      hasCapability(user, "manage_users"),
-      hasCapability(user, "manage_permissions"),
-      hasCapability(user, "manage_plugins"),
-      hasCapability(user, "view_audit_log"),
-      hasCapability(user, "view_analytics"),
-      hasCapability(user, "manage_videos"),
-      hasCapability(user, "manage_categories"),
-      hasCapability(user, "manage_series"),
-      hasCapability(user, "manage_files"),
-      hasCapability(user, "share_content"),
-      getCapabilityScope(user, "moderate_comments"),
-    ]);
-    const canModerateComments =
-      moderateScope.isAdmin || moderateScope.categoryIds.length > 0 || moderateScope.seriesIds.length > 0;
-    const canSeeTrash = canManageCategories || canManageSeries || canManageVideosSiteWide || canManageFiles;
-    links = [
-      { href: "/admin/series", label: "Series" },
-      { href: "/admin/videos", label: "Videos" },
-      ...(canManageVideosSiteWide
-        ? [
-            { href: "/admin/speakers", label: "Speakers" },
-            { href: "/admin/live", label: "Live streaming" },
-          ]
-        : []),
-      { href: "/admin/files", label: "Files" },
-      ...(canModerateComments ? [{ href: "/admin/comments", label: "Comment moderation" }] : []),
-      ...(canShareContent ? [{ href: "/admin/share-links", label: "Share links" }] : []),
-      ...(canSeeTrash ? [{ href: "/admin/trash", label: "Trash" }] : []),
-      // Gated on manage_files to match the audit route: it reconciles the
-      // whole library, so a partial view would mislead rather than help.
-      ...(canManageFiles ? [{ href: "/admin/media-check", label: "Media check" }] : []),
-      ...(canManageUsers
-        ? [
-            { href: "/admin/users", label: "Members & roles" },
-            { href: "/admin/authorized-emails", label: "Who can sign in" },
-          ]
-        : []),
-      ...(canManagePermissions ? [{ href: "/admin/permissions", label: "Permissions" }] : []),
-      ...(canManagePlugins
-        ? [
-            { href: "/admin/branding", label: "Branding" },
-            { href: "/admin/plugins", label: "Plugins" },
-            { href: "/admin/downloads", label: "Downloads" },
-            { href: "/admin/home-rows", label: "Homepage" },
-            { href: "/admin/announcements", label: "Announcements" },
-            { href: "/admin/webhooks", label: "Webhooks" },
-            { href: "/admin/query-monitor", label: "Query Monitor" },
-          ]
-        : []),
-      ...(canViewAuditLog
-        ? [
-            { href: "/admin/audit", label: "Audit log" },
-            { href: "/admin/access-attempts", label: "Access attempts" },
-          ]
-        : []),
-      ...(canViewAnalytics ? [{ href: "/admin/analytics", label: "Analytics" }] : []),
-    ];
-  }
+  const groups = adminGroupsFor(await resolveAdminAccess(user));
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8 flex flex-col sm:flex-row gap-4 sm:gap-8">
-      <aside className="sm:w-48 sm:shrink-0 -mx-4 px-4 sm:mx-0 sm:px-0 border-b border-zinc-200 pb-2 sm:border-none sm:pb-0 dark:border-zinc-800">
-        <nav className="flex gap-1 overflow-x-auto sm:flex-col sm:space-y-1 sm:overflow-visible text-sm">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="block whitespace-nowrap rounded-md px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-      </aside>
-      <div className="flex-1 min-w-0">{children}</div>
+    <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 sm:flex-row sm:gap-8 sm:py-8">
+      <AdminNav groups={groups} />
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
+}
+
+/**
+ * Resolves every capability the nav's rules ask about, in one round rather
+ * than one lookup per link. An admin short-circuits — adminGroupsFor gives
+ * them every section, so the individual grants are moot.
+ */
+async function resolveAdminAccess(user: User): Promise<AdminAccess> {
+  if (user.role === "ADMIN") {
+    return {
+      isAdmin: true,
+      canManageUsers: true,
+      canManagePermissions: true,
+      canManagePlugins: true,
+      canViewAuditLog: true,
+      canViewAnalytics: true,
+      canManageVideosSiteWide: true,
+      canManageFiles: true,
+      canModerateComments: true,
+      canShareContent: true,
+      canSeeTrash: true,
+    };
+  }
+
+  const [
+    canManageUsers,
+    canManagePermissions,
+    canManagePlugins,
+    canViewAuditLog,
+    canViewAnalytics,
+    canManageVideosSiteWide,
+    canManageCategories,
+    canManageSeries,
+    canManageFiles,
+    canShareContent,
+    moderateScope,
+  ] = await Promise.all([
+    hasCapability(user, "manage_users"),
+    hasCapability(user, "manage_permissions"),
+    hasCapability(user, "manage_plugins"),
+    hasCapability(user, "view_audit_log"),
+    hasCapability(user, "view_analytics"),
+    hasCapability(user, "manage_videos"),
+    hasCapability(user, "manage_categories"),
+    hasCapability(user, "manage_series"),
+    hasCapability(user, "manage_files"),
+    hasCapability(user, "share_content"),
+    getCapabilityScope(user, "moderate_comments"),
+  ]);
+
+  return {
+    isAdmin: false,
+    canManageUsers,
+    canManagePermissions,
+    canManagePlugins,
+    canViewAuditLog,
+    canViewAnalytics,
+    canManageVideosSiteWide,
+    canManageFiles,
+    canShareContent,
+    // Scoped rather than site-wide: moderating one category's comments is
+    // enough to need the queue.
+    canModerateComments:
+      moderateScope.isAdmin ||
+      moderateScope.categoryIds.length > 0 ||
+      moderateScope.seriesIds.length > 0,
+    canSeeTrash: canManageCategories || canManageSeries || canManageVideosSiteWide || canManageFiles,
+  };
 }
