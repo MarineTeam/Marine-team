@@ -33,15 +33,20 @@ export function useBulkSelect(ids: string[]) {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   // The last row ticked, for shift-click range selection.
   const anchorRef = useRef<string | null>(null);
-  // Read through a ref inside the key handler so it binds once instead of
+  // Read through refs inside the key handler so it binds once instead of
   // on every render — `ids` is a fresh array each time.
   const idsRef = useRef(ids);
-  idsRef.current = ids;
   const countRef = useRef(0);
 
   const selected = ids.filter((id) => picked.has(id));
   const allSelected = ids.length > 0 && selected.length === ids.length;
-  countRef.current = selected.length;
+
+  // Synced after the commit rather than during render: both are only ever
+  // read from a handler, which runs later still.
+  useEffect(() => {
+    idsRef.current = ids;
+    countRef.current = selected.length;
+  });
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {

@@ -59,20 +59,28 @@ function EntryRow({ entry, fileId, readerOn }: { entry: TocEntry; fileId: string
  * scrolled straight to that page.
  */
 export function BookContents({ fileId, readerOn }: { fileId: string; readerOn: boolean }) {
-  const [entries, setEntries] = useState<TocEntry[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Tagged with the book it was read from, so switching books shows the
+  // loading state on the very first render rather than the outline of the
+  // book just navigated away from.
+  const [outline, setOutline] = useState<{
+    fileId: string;
+    entries: TocEntry[] | null;
+    error: string | null;
+  }>({ fileId, entries: null, error: null });
   const [sort, setSort] = useState<SortMode>("page");
+
+  const { entries, error } =
+    outline.fileId === fileId ? outline : { entries: null, error: null };
 
   useEffect(() => {
     let cancelled = false;
-    setEntries(null);
-    setError(null);
     loadPdfOutline(fileContentUrl(fileId))
       .then((result) => {
-        if (!cancelled) setEntries(result);
+        if (!cancelled) setOutline({ fileId, entries: result, error: null });
       })
       .catch(() => {
-        if (!cancelled) setError("Couldn't read this PDF's contents.");
+        if (!cancelled)
+          setOutline({ fileId, entries: null, error: "Couldn't read this PDF's contents." });
       });
     return () => {
       cancelled = true;
