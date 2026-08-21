@@ -563,7 +563,17 @@ const STORAGE_LIST_MAX_OBJECTS = 2000;
  * own 4MB serverless upload limit) adoptable: the objects are already
  * there, they just have no FileAsset row pointing at them.
  */
-export async function bunnyListStorageFiles(): Promise<BunnyStorageObject[]> {
+export async function bunnyListStorageFiles(): Promise<{
+  objects: BunnyStorageObject[];
+  /**
+   * The walk stopped at one of the caps below rather than reaching the end.
+   * Callers that treat "absent from this list" as meaningful — the storage
+   * audit, which offers to delete rows whose file is missing — must not do
+   * so when this is set, or a zone larger than the cap would look like mass
+   * data loss.
+   */
+  truncated: boolean;
+}> {
   const zone = storageZone();
   const key = storageApiKey();
   const host = storageHost();
@@ -583,6 +593,7 @@ export async function bunnyListStorageFiles(): Promise<BunnyStorageObject[]> {
   }
 
   const objects: BunnyStorageObject[] = [];
+  let truncated = false;
   // Iterative rather than recursive so the object cap can stop the walk
   // partway through a deep tree instead of only between levels.
   const queue: { prefix: string; depth: number }[] = [{ prefix: "", depth: 0 }];
@@ -593,10 +604,15 @@ export async function bunnyListStorageFiles(): Promise<BunnyStorageObject[]> {
       if (item.IsDirectory) {
         if (depth < STORAGE_LIST_MAX_DEPTH) {
           queue.push({ prefix: `${prefix ? `${prefix}/` : ""}${item.ObjectName}`, depth: depth + 1 });
+        } else {
+          truncated = true;
         }
         continue;
       }
-      if (objects.length >= STORAGE_LIST_MAX_OBJECTS) break;
+      if (objects.length >= STORAGE_LIST_MAX_OBJECTS) {
+        truncated = true;
+        break;
+      }
       objects.push({
         path: `${prefix ? `${prefix}/` : ""}${item.ObjectName}`,
         name: item.ObjectName,
@@ -607,7 +623,9 @@ export async function bunnyListStorageFiles(): Promise<BunnyStorageObject[]> {
     }
   }
 
-  return objects;
+  // Directories still queued when the object cap stopped the loop are
+  // unvisited, so their contents are unknown too.
+  return { objects, truncated: truncated || queue.length > 0 };
 }
 
 /**

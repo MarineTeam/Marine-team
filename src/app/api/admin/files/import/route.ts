@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     // the request: it both keeps a typo'd or stale path from becoming a row
     // that points at nothing, and is where the real size and content type
     // come from, instead of letting the client assert them.
-    const objects = await bunnyListStorageFiles();
+    const { objects } = await bunnyListStorageFiles();
     const byPath = new Map(objects.map((object) => [object.path, object]));
 
     const known = new Set(

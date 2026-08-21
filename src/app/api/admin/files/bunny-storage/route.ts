@@ -12,7 +12,7 @@ import { bunnyListStorageFiles } from "@/lib/bunny";
 export async function GET() {
   try {
     await ensureStaff();
-    const [objects, existing] = await Promise.all([
+    const [{ objects }, existing] = await Promise.all([
       bunnyListStorageFiles(),
       // Deliberately unfiltered, trashed rows included: a soft-deleted
       // file's storage object survives until the trash is purged, so

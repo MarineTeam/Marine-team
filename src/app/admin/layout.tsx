@@ -14,6 +14,7 @@ const adminLinks = [
   { href: "/admin/comments", label: "Comment moderation" },
   { href: "/admin/share-links", label: "Share links" },
   { href: "/admin/trash", label: "Trash" },
+  { href: "/admin/media-check", label: "Media check" },
   { href: "/admin/users", label: "Members & roles" },
   { href: "/admin/authorized-emails", label: "Who can sign in" },
   { href: "/admin/access-attempts", label: "Access attempts" },
@@ -92,6 +93,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       ...(canModerateComments ? [{ href: "/admin/comments", label: "Comment moderation" }] : []),
       ...(canShareContent ? [{ href: "/admin/share-links", label: "Share links" }] : []),
       ...(canSeeTrash ? [{ href: "/admin/trash", label: "Trash" }] : []),
+      // Gated on manage_files to match the audit route: it reconciles the
+      // whole library, so a partial view would mislead rather than help.
+      ...(canManageFiles ? [{ href: "/admin/media-check", label: "Media check" }] : []),
       ...(canManageUsers
         ? [
             { href: "/admin/users", label: "Members & roles" },
