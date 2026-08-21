@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { DownloadOverrideSelect } from "@/components/download-override-select";
 
-type Category = { id: string; name: string };
+type Category = { id: string; name: string; hymnalStyle: boolean };
 type Series = {
   id: string;
   title: string;
@@ -54,6 +54,10 @@ export function SeriesEditForm({
   const [abbreviation, setAbbreviation] = useState(series.abbreviation ?? "");
   const [hymnPerFile, setHymnPerFile] = useState(series.hymnPerFile);
   const [categoryId, setCategoryId] = useState(series.categoryId ?? "");
+  // The hymnal fields below are read only by a hymnalStyle category's book
+  // grid, so outside one they save fine and do nothing — which looks like a
+  // bug from the admin's side unless it's said out loud.
+  const inHymnalCategory = categories.some((c) => c.id === categoryId && c.hymnalStyle);
   const [memberOnly, setMemberOnly] = useState(series.memberOnly);
   const [downloadEnabled, setDownloadEnabled] = useState(series.downloadEnabled);
   const [hidden, setHidden] = useState(series.hidden);
@@ -229,17 +233,44 @@ export function SeriesEditForm({
         />
       </label>
 
-      <label className="text-sm space-y-1 block">
-        <span className="text-zinc-500">
-          Abbreviation (badge on this book&apos;s cover in a hymnal grid, e.g. &quot;GSFH1&quot;)
-        </span>
-        <input
-          value={abbreviation}
-          onChange={(e) => setAbbreviation(e.target.value)}
-          placeholder="GSFH1"
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-        />
-      </label>
+      <div className="space-y-3 rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            Hymnal book
+          </span>
+          {!inHymnalCategory && (
+            <span className="text-xs text-amber-700 dark:text-amber-400">
+              Inactive — these only apply once this series is in a category with &ldquo;Hymnal grid
+              style&rdquo; turned on.
+            </span>
+          )}
+        </div>
+
+        <label className="text-sm space-y-1 block">
+          <span className="text-zinc-500">
+            Abbreviation (badge on this book&apos;s cover, e.g. &quot;GSFH1&quot;)
+          </span>
+          <input
+            value={abbreviation}
+            onChange={(e) => setAbbreviation(e.target.value)}
+            placeholder="GSFH1"
+            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          />
+        </label>
+
+        <label className="flex items-start gap-1.5 text-sm">
+          <input
+            type="checkbox"
+            checked={hymnPerFile}
+            onChange={(e) => setHymnPerFile(e.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            One hymn per file — this series is a single book and its files are its hymns. Leave off
+            when its files are whole book PDFs instead.
+          </span>
+        </label>
+      </div>
 
       <label className="text-sm space-y-1 block">
         <span className="text-zinc-500">Tags (comma-separated)</span>
@@ -281,7 +312,9 @@ export function SeriesEditForm({
           <option value="">No category</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name}
+              {/* Flagged so the category that switches on the hymnal layout
+                  is findable from here, where that choice is made. */}
+              {c.hymnalStyle ? `${c.name} (hymnal grid)` : c.name}
             </option>
           ))}
         </select>
@@ -322,14 +355,6 @@ export function SeriesEditForm({
         <label className="flex items-center gap-1.5 text-sm">
           <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
           Pinned (shown first)
-        </label>
-        <label className="flex items-center gap-1.5 text-sm">
-          <input
-            type="checkbox"
-            checked={hymnPerFile}
-            onChange={(e) => setHymnPerFile(e.target.checked)}
-          />
-          One hymn per file (this series is a single book; its files are its hymns, not whole books)
         </label>
         <label className="flex items-center gap-1.5 text-sm">
           <input
