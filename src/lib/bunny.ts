@@ -512,6 +512,104 @@ export async function bunnyStorageDelete(path: string): Promise<void> {
   }
 }
 
+export type BunnyStorageObject = {
+  /** Path within the zone ("files/abc-Song.pdf") — exactly what FileAsset.bunnyPath stores. */
+  path: string;
+  name: string;
+  sizeBytes: number;
+  contentType: string | null;
+  lastChanged: string | null;
+};
+
+type BunnyStorageListItem = {
+  ObjectName: string;
+  Path: string;
+  Length: number;
+  IsDirectory: boolean;
+  ContentType: string;
+  LastChanged: string | null;
+};
+
+/**
+ * Content type for a storage object Bunny reports no type for, which it
+ * routinely does for files uploaded through its own dashboard. Guessed from
+ * the extension and deliberately narrow: only types this app actually
+ * branches on (readers, audio players, images) are worth naming, and
+ * anything else is better left null than labelled wrongly.
+ */
+function guessContentType(name: string): string | null {
+  const extension = name.toLowerCase().split(".").pop() ?? "";
+  const types: Record<string, string> = {
+    pdf: "application/pdf",
+    epub: "application/epub+zip",
+    mp3: "audio/mpeg",
+    m4a: "audio/mp4",
+    wav: "audio/wav",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+  };
+  return types[extension] ?? null;
+}
+
+/** How deep to walk, and how many objects to gather, before giving up — a guard against a pathologically large zone, not an expected limit. */
+const STORAGE_LIST_MAX_DEPTH = 4;
+const STORAGE_LIST_MAX_OBJECTS = 2000;
+
+/**
+ * Every file in the private storage zone, walking subdirectories.
+ *
+ * This is what makes files uploaded straight to Bunny (bypassing the app's
+ * own 4MB serverless upload limit) adoptable: the objects are already
+ * there, they just have no FileAsset row pointing at them.
+ */
+export async function bunnyListStorageFiles(): Promise<BunnyStorageObject[]> {
+  const zone = storageZone();
+  const key = storageApiKey();
+  const host = storageHost();
+
+  async function listDirectory(prefix: string): Promise<BunnyStorageListItem[]> {
+    const clean = prefix ? `${prefix.replace(/^\/+|\/+$/g, "")}/` : "";
+    const res = await fetch(`https://${host}/${zone}/${clean}`, {
+      headers: { AccessKey: key },
+      // Per-request and admin-facing; a cached listing would hide a file
+      // someone just uploaded, which is the whole point of looking.
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      throw new Error(`Bunny Storage list failed: ${res.status} ${await res.text()}`);
+    }
+    return res.json();
+  }
+
+  const objects: BunnyStorageObject[] = [];
+  // Iterative rather than recursive so the object cap can stop the walk
+  // partway through a deep tree instead of only between levels.
+  const queue: { prefix: string; depth: number }[] = [{ prefix: "", depth: 0 }];
+
+  while (queue.length > 0 && objects.length < STORAGE_LIST_MAX_OBJECTS) {
+    const { prefix, depth } = queue.shift()!;
+    for (const item of await listDirectory(prefix)) {
+      if (item.IsDirectory) {
+        if (depth < STORAGE_LIST_MAX_DEPTH) {
+          queue.push({ prefix: `${prefix ? `${prefix}/` : ""}${item.ObjectName}`, depth: depth + 1 });
+        }
+        continue;
+      }
+      if (objects.length >= STORAGE_LIST_MAX_OBJECTS) break;
+      objects.push({
+        path: `${prefix ? `${prefix}/` : ""}${item.ObjectName}`,
+        name: item.ObjectName,
+        sizeBytes: item.Length,
+        contentType: item.ContentType?.trim() || guessContentType(item.ObjectName),
+        lastChanged: item.LastChanged,
+      });
+    }
+  }
+
+  return objects;
+}
+
 /**
  * The stable, unsigned public URL for a Storage file. This is stored
  * long-term (FileAsset.url) and embedded in the podcast RSS feed's

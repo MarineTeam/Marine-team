@@ -11,6 +11,7 @@ import {
   type SeriesOption,
   type CategoryOption,
 } from "@/components/content-target-picker";
+import { BunnyStorageImport } from "@/components/bunny-storage-import";
 
 type UploadStatus = "pending" | "uploading" | "done" | "failed";
 
@@ -62,6 +63,7 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
   // edited in a per-row panel rather than as more buttons in the row above:
   // they're free text, and only meaningful inside a hymnPerFile series.
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
   const [editPageNumber, setEditPageNumber] = useState("");
   const [editGroupLabel, setEditGroupLabel] = useState("");
   const [editLyricsText, setEditLyricsText] = useState("");
@@ -185,6 +187,7 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
 
   function startEditingDetails(f: FileAsset) {
     setEditingId(f.id);
+    setEditTitle(f.title);
     setEditPageNumber(f.pageNumber != null ? String(f.pageNumber) : "");
     setEditGroupLabel(f.groupLabel ?? "");
     setEditLyricsText(f.lyricsText ?? "");
@@ -198,6 +201,9 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          // Omitted rather than sent blank: the API requires a non-empty
+          // title, and clearing the box shouldn't fail the whole save.
+          ...(editTitle.trim() ? { title: editTitle.trim() } : {}),
           pageNumber: trimmedPage ? Number(trimmedPage) : null,
           groupLabel: editGroupLabel.trim() || null,
           lyricsText: editLyricsText.trim() || null,
@@ -391,9 +397,17 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
         <p className="text-xs text-zinc-500">
           Titles default to each file&apos;s name and can be edited before uploading. Max 4MB per file
           (server upload limit) — files upload one at a time, so one rejection doesn&apos;t stop the
-          rest. For larger files, upload via the Bunny dashboard and link the URL directly.
+          rest. For anything larger, upload it straight to Bunny Storage and add it below.
         </p>
       </form>
+
+      <BunnyStorageImport
+        seriesId={seriesId}
+        categoryId={categoryId}
+        seriesList={seriesList}
+        categoryList={categoryList}
+        onImported={load}
+      />
 
       {!scoped && (
         <input
@@ -530,9 +544,9 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
               <button
                 onClick={() => (editingId === f.id ? setEditingId(null) : startEditingDetails(f))}
                 className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${f.pageNumber != null || f.groupLabel || f.lyricsText ? "border-sky-400 text-sky-700 dark:text-sky-400" : "border-zinc-300"}`}
-                title="Page number, category grouping and lyrics — used when this file is one hymn in a 'one hymn per file' series."
+                title="Rename this file. Page number, category grouping and lyrics apply when it's one hymn in a 'one hymn per file' series."
               >
-                {editingId === f.id ? "Close" : "Hymn details"}
+                {editingId === f.id ? "Close" : "Details"}
               </button>
               <button onClick={() => remove(f.id)} className="text-red-600 hover:underline">
                 Delete
@@ -540,6 +554,14 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
             </div>
             {editingId === f.id && (
               <div className="w-full space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
+                <label className="block space-y-1 text-xs">
+                  <span className="text-zinc-500">Title</span>
+                  <input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+                  />
+                </label>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <label className="space-y-1 text-xs">
                     <span className="text-zinc-500">Page number (printed page in the book)</span>
