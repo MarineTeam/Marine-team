@@ -217,6 +217,29 @@ All notable changes to this project are documented here. Format follows
   playback there — taking priority over the viewer's own resume position —
   and a new "Share at" mm:ss field builds that link. Each chapter also gets
   its own 🔗 copy-link button using its own known timestamp.
+- **Book reader** (new plugin): PDF and EPUB files now open in an in-app
+  reader at `/read/[fileId]` instead of only being downloadable, with a
+  **Read** button beside Download wherever files are listed.
+  - **Contents** from the PDF outline or EPUB navigation document, nested
+    and clickable; **search across the whole book** with surrounding
+    context; **read-aloud** with a voice and speed picker that advances
+    through the book on its own; and **marks** — highlights, bookmarks and
+    notes, listed in a sidebar that jumps back to each one.
+  - **Your place is kept per account**, not per device, so a book picks up
+    where you left off across phone and desktop. Signed-out readers can
+    still open a public book; nothing is stored for them.
+  - **Closes a real gap while it's at it**: file bytes now serve through
+    `/api/files/[id]/content`, which checks access on every request. The
+    Bunny Storage URL used until now is genuinely public, so a file's
+    members-only flag had only ever hidden the download button — and files
+    inherit protection from the page they sit on, so the check re-tests the
+    parent series or category rather than the file's own flag alone.
+  - Two limits stated up front: **read-aloud stops when the app is
+    minimised** (browsers suspend speech for a backgrounded page — the same
+    class of limit as video background playback), and **highlighting
+    selected text works in PDFs only**, since an EPUB's pages sit in an
+    iframe whose selection the surrounding page can't read; marking an EPUB
+    saves a bookmark at the current position instead.
 - **Cast to TV**: a Chromecast button next to Download, gated the same way,
   reuses the signed MP4 endpoint already built for the Downloads plugin as
   its cast source — the default Chromecast receiver needs a direct file, not

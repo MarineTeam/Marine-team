@@ -484,6 +484,31 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   `/videos/[slug]` pages fall back to resolving one when the direct lookup
   finds nothing, then `permanentRedirect()` to the current slug — so a link
   shared before a rename still works instead of 404ing.
+- **Book reader**: `/read/[fileId]` opens a PDF (pdf.js) or EPUB (epub.js)
+  in-app, with contents, in-book search, read-aloud and marking. Both engines
+  are dynamically imported inside an effect — each is large and touches
+  browser globals on load — and sit behind one `ReaderHandle` interface
+  (`src/components/reader-types.ts`), so `BookReader` never needs to know a
+  PDF page number from an EPUB CFI. That's also why `ReadingProgress.location`
+  and `ReadingMark.location` are opaque strings: only the engine that wrote
+  one parses it.
+  - Bytes are served by `/api/files/[id]/content`, not from
+    `bunnyStoragePublicUrl`. Two reasons: that URL is genuinely public, so
+    pointing a reader at it would have published every members-only book to
+    anyone holding the path (`canViewFile` now runs per request, re-checking
+    the parent series or category, since files inherit protection from the
+    page they sit on rather than carrying their own flag); and Bunny's pull
+    zone is a separate origin, so serving from ours avoids depending on a
+    CORS setting that's invisible from the codebase. Range requests are
+    forwarded so pdf.js can chunk large documents.
+  - pdf.js's worker is resolved via `new URL(..., import.meta.url)` so it
+    stays version-locked instead of needing a copy in `/public`; the build
+    emits it to `.next/static/media`.
+  - epub.js is opened with `openAs: "epub"` because it otherwise infers
+    format from the URL extension, and the content route has none. Its
+    bundled typings are also wrong in places (`Section.find()` is declared
+    `Array<Element>` but returns `{cfi, excerpt}`), so that shape is declared
+    locally.
 - **Feeds**: `/feed.xml` is a site-wide RSS feed of recently added series;
   `/series/[slug]/podcast.xml` is an iTunes-compatible podcast feed of a
   series' published audio files (skipped for `memberOnly` series, since

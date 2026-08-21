@@ -167,6 +167,8 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   video, either public or emailed to named people. See Share links below.
 - **Downloads** — lets members save videos to their device and watch them
   with no connection. See Downloads below.
+- **Book reader** — opens PDF and EPUB files in an in-app reader rather than
+  only offering them as downloads. See Book reader below.
 - **Chapters** — an admin-managed, ordered list of named timestamps on a
   video; the video page shows a jump-to-section list underneath the player.
   Clicking a chapter reloads the embed starting at that timestamp (Bunny's
@@ -402,6 +404,41 @@ can't be read, downloads go ahead rather than being blocked everywhere. The
 storage cap is advisory (the browser's own quota is the real limit) and never
 interrupts a download in progress. And downloads are MP4 files in a normal
 browser cache: this is offline convenience, not DRM.
+
+## Book reader
+
+PDF and EPUB files open in an in-app reader at `/read/[fileId]` instead of
+only being downloadable. A **Read** button appears next to Download on any
+file the reader can open, wherever files are listed (a series or a category).
+Gated by the **Book reader** plugin, which a category can turn off for its
+own section like any other.
+
+- **Reading** — PDFs render page by page with zoom and a page jump box;
+  EPUBs reflow as a scrolling document, which reads better on a phone.
+- **Contents** — the PDF outline or the EPUB navigation document, nested,
+  each entry jumping straight to its place. A contents entry whose
+  destination doesn't resolve is shown greyed rather than dropped, so a
+  half-broken outline doesn't look like an empty one.
+- **Search in the book** — matches across every page (PDF) or spine section
+  (EPUB), listed with a snippet of surrounding text.
+- **Read aloud** — speaks the current page or section with a voice and speed
+  picker, advancing through the book on its own. **It stops when the app is
+  minimised**: browsers suspend speech for a backgrounded page, and no
+  setting here can override that. A scanned PDF with no text layer has
+  nothing to read and will simply do nothing.
+- **Marks** — highlight selected text, bookmark a spot, and attach a note to
+  either, all listed in a sidebar that jumps back to where each was made.
+  Marks are per member and private to them.
+- **Your place is kept** — reopening a book returns to where you stopped,
+  stored per account (not per device), so it follows you between phone and
+  desktop. Signed-out readers can still open a public book; nothing is saved.
+
+Limits worth knowing: a **highlight of selected text only works in a PDF**.
+An EPUB's pages live in an iframe the reader library owns, and the selection
+inside it isn't readable from the surrounding page — so marking in an EPUB
+saves a bookmark at the current position rather than pretending to capture
+text it can't see. Reading also needs a connection: unlike video downloads,
+books aren't cached for offline use.
 
 ## Auth
 
