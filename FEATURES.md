@@ -639,6 +639,17 @@ link.
   series, videos (direct upload via TUS + import from an existing Bunny
   Stream library), and files (small uploads or link-by-URL for larger
   files hosted directly in Bunny).
+  - **Files can be picked in bulk.** Each one gets its own title box,
+    pre-filled with the filename minus its extension and editable before
+    uploading — only the extension is stripped, since reformatting
+    underscores or capitalisation is guessing at what someone meant to call
+    it. Rows can be removed before starting, and more files added to a queue
+    already listed.
+  - They upload **one at a time, not as one batch**: the server's size cap
+    is per request, so batching would make the limit worse, not better. A
+    file the server rejects reports against its own row and the rest carry
+    on; successful rows clear and failures stay put with the reason, so a
+    partly-failed batch is retried without re-picking everything.
 - **Bulk actions & filtering** — multi-select Publish/Unpublish/Delete and
   a title filter box on the series/video/file lists; series can be
   recategorized individually or in bulk. "Schedule publish…" sets a

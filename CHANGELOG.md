@@ -300,6 +300,13 @@ All notable changes to this project are documented here. Format follows
 
 ### Changed
 
+- **Files can be uploaded in bulk**, each with its own title box pre-filled
+  from the filename (extension stripped, and nothing else rewritten — the
+  admin can see and edit it before uploading). Files go up one at a time
+  rather than as a single batch, because the upload size cap is per request:
+  batching would tighten the limit rather than raise it, and this way a file
+  the server rejects reports against its own row while the rest continue.
+  Successful rows clear, failures stay listed with the reason.
 - Shared links can now be **deleted** as well as revoked, in both the member's
   own list and the admin panel. Revoking keeps the record and marks it dead;
   deleting removes the row. Either way the link stops working, since the token

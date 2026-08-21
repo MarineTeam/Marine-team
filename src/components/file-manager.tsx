@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { titleFromFilename } from "@/lib/filename";
 import { DragHandle, PositionInput, useDragReorder } from "@/components/reorder-controls";
 import { reorderArray } from "@/lib/reorder";
 import {
@@ -10,6 +11,16 @@ import {
   type SeriesOption,
   type CategoryOption,
 } from "@/components/content-target-picker";
+
+type UploadStatus = "pending" | "uploading" | "done" | "failed";
+
+type PendingUpload = {
+  key: string;
+  file: File;
+  title: string;
+  status: UploadStatus;
+  error: string | null;
+};
 
 type FileAsset = {
   id: string;
@@ -37,11 +48,11 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
   const [files, setFiles] = useState<FileAsset[]>([]);
   const [seriesList, setSeriesList] = useState<SeriesOption[]>([]);
   const [categoryList, setCategoryList] = useState<CategoryOption[]>([]);
-  const [title, setTitle] = useState("");
   const [pickedTarget, setPickedTarget] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  // One row per picked file. Titles default to the filename (extension
+  // stripped) and stay editable until the moment each row is uploaded.
+  const [queue, setQueue] = useState<PendingUpload[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -61,28 +72,71 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
     load();
   }, []);
 
-  async function uploadFile(e: React.FormEvent) {
+  function addToQueue(picked: FileList | null) {
+    if (!picked?.length) return;
+    setQueue((current) => [
+      ...current,
+      ...Array.from(picked).map((file) => ({
+        // Stable across re-renders and unique per row, so editing one title
+        // can't be attributed to a different row after a removal.
+        key: `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`,
+        file,
+        title: titleFromFilename(file.name),
+        status: "pending" as UploadStatus,
+        error: null as string | null,
+      })),
+    ]);
+  }
+
+  /**
+   * Uploads the queue one file per request, rather than batching them into a
+   * single one. The server cap is per *request*, so batching would make the
+   * size limit worse rather than better — and one file at a time means a
+   * rejected file reports against its own row instead of failing the rest.
+   */
+  async function uploadQueue(e: React.FormEvent) {
     e.preventDefault();
-    if (!file) return;
-    setError(null);
+    const target = scoped
+      ? { seriesId: seriesId ?? null, categoryId: categoryId ?? null }
+      : parseTarget(pickedTarget);
+
     setUploading(true);
+    let anySucceeded = false;
     try {
-      const target = scoped
-        ? { seriesId: seriesId ?? null, categoryId: categoryId ?? null }
-        : parseTarget(pickedTarget);
-      const form = new FormData();
-      form.append("file", file);
-      form.append("title", title);
-      if (target.seriesId) form.append("seriesId", target.seriesId);
-      if (target.categoryId) form.append("categoryId", target.categoryId);
-      const res = await fetch("/api/admin/files", { method: "POST", body: form });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Upload failed");
-      setTitle("");
-      setPickedTarget("");
-      setFile(null);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      for (const item of queue) {
+        if (item.status === "done") continue;
+        setQueue((current) =>
+          current.map((row) => (row.key === item.key ? { ...row, status: "uploading", error: null } : row)),
+        );
+        try {
+          const form = new FormData();
+          form.append("file", item.file);
+          form.append("title", item.title.trim() || titleFromFilename(item.file.name));
+          if (target.seriesId) form.append("seriesId", target.seriesId);
+          if (target.categoryId) form.append("categoryId", target.categoryId);
+          const res = await fetch("/api/admin/files", { method: "POST", body: form });
+          if (!res.ok) throw new Error((await res.json()).error ?? "Upload failed");
+          anySucceeded = true;
+          setQueue((current) =>
+            current.map((row) => (row.key === item.key ? { ...row, status: "done" } : row)),
+          );
+        } catch (err) {
+          setQueue((current) =>
+            current.map((row) =>
+              row.key === item.key
+                ? { ...row, status: "failed", error: err instanceof Error ? err.message : "Upload failed" }
+                : row,
+            ),
+          );
+        }
+      }
+      // Successful rows are cleared; failures stay put with their reason, so
+      // a partly-failed batch can be retried without re-picking everything.
+      setQueue((current) => current.filter((row) => row.status !== "done"));
+      if (anySucceeded) {
+        setPickedTarget("");
+        await load();
+      }
     } finally {
       setUploading(false);
     }
@@ -214,40 +268,94 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
       </h2>
 
       <form
-        onSubmit={uploadFile}
-        className="space-y-2 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4"
+        onSubmit={uploadQueue}
+        className="space-y-3 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4"
       >
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="File title"
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-          required
-        />
         <div className="flex flex-wrap items-center gap-3">
           {!scoped && (
             <TargetSelect value={pickedTarget} onChange={setPickedTarget} seriesList={seriesList} categoryList={categoryList} />
           )}
           <input
             type="file"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            multiple
+            onChange={(e) => {
+              addToQueue(e.target.files);
+              // Cleared so picking the same file again after removing it
+              // still fires a change event.
+              e.target.value = "";
+            }}
             className="text-sm max-w-full"
-            required
           />
           <button
             type="submit"
-            disabled={uploading}
+            disabled={uploading || queue.length === 0}
             className="sm:ml-auto rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
           >
-            Upload
+            {uploading
+              ? "Uploading…"
+              : queue.length > 1
+                ? `Upload ${queue.length} files`
+                : "Upload"}
           </button>
         </div>
+
+        {queue.length > 0 && (
+          <ul className="space-y-2">
+            {queue.map((item) => (
+              <li key={item.key} className="flex flex-wrap items-center gap-2">
+                <input
+                  value={item.title}
+                  onChange={(e) =>
+                    setQueue((current) =>
+                      current.map((row) => (row.key === item.key ? { ...row, title: e.target.value } : row)),
+                    )
+                  }
+                  aria-label={`Title for ${item.file.name}`}
+                  placeholder={titleFromFilename(item.file.name)}
+                  disabled={uploading}
+                  className="min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900"
+                />
+                <span className="w-28 shrink-0 truncate text-xs text-zinc-500" title={item.file.name}>
+                  {item.file.name}
+                </span>
+                {item.status === "uploading" && <span className="text-xs text-zinc-500">Uploading…</span>}
+                {item.status === "failed" && (
+                  <span className="text-xs text-red-600" title={item.error ?? undefined}>
+                    Failed
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setQueue((current) => current.filter((row) => row.key !== item.key))}
+                  disabled={uploading}
+                  aria-label={`Remove ${item.file.name}`}
+                  className="shrink-0 px-1 text-xs text-zinc-400 hover:text-red-600 disabled:opacity-50"
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {queue.some((row) => row.status === "failed") && (
+          <ul className="space-y-1 text-xs text-red-600">
+            {queue
+              .filter((row) => row.status === "failed")
+              .map((row) => (
+                <li key={`${row.key}-error`}>
+                  {row.file.name}: {row.error}
+                </li>
+              ))}
+          </ul>
+        )}
+
         <p className="text-xs text-zinc-500">
-          Max 4MB (server upload limit). For larger files, upload via the Bunny dashboard and link
-          the URL directly.
+          Titles default to each file&apos;s name and can be edited before uploading. Max 4MB per file
+          (server upload limit) — files upload one at a time, so one rejection doesn&apos;t stop the
+          rest. For larger files, upload via the Bunny dashboard and link the URL directly.
         </p>
       </form>
-      {error && <p className="text-sm text-red-600">{error}</p>}
 
       {!scoped && (
         <input
