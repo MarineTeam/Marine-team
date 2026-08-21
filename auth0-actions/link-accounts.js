@@ -82,11 +82,16 @@ exports.onExecutePostLogin = async (event, api) => {
       user_id: String(sourceIdentity.user_id),
     });
 
-    // When the account just merged away is the one that logged in, the
-    // session's sub now points at a user that no longer exists on its own.
-    // Sending them back through login lands them on the surviving account.
+    // When the account that just logged in is the one merged away, its sub no
+    // longer exists as a user of its own — it's now a secondary identity of
+    // `target`. Auth0 does not switch the transaction over on its own, so
+    // without this the login finishes as a user that isn't there any more.
+    //
+    // Safe precisely here and not before: the API requires the authenticating
+    // identity to already be among the primary user's secondary identities,
+    // which the link() call above has just made true.
     if (target.user_id !== event.user.user_id) {
-      api.access.deny("Your accounts have been linked. Please sign in again.");
+      api.authentication.setPrimaryUser(target.user_id);
     }
   } catch (error) {
     // Logged for the Action's own log stream only; never surfaced to the

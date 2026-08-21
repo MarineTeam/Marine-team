@@ -84,10 +84,36 @@ door, so an outage must deny; this one only tidies identities, and the app's
 sub-first resolution keeps people on the right member row without it. Blocking
 a login because a merge failed would trade a cosmetic problem for a lockout.
 
+When the account that just logged in is the one merged away, the Action calls
+`api.authentication.setPrimaryUser()` so the login continues as the surviving
+account. Auth0 does not switch the transaction over by itself, and without it
+the login finishes as a user that no longer exists on its own. It's called
+only *after* `users.link()`, because the API requires the authenticating
+identity to already be one of the primary user's secondary identities.
+
 > **The app does not require this Action.** Skip it and members still get one
 > account per person, because `getCurrentUser()` links verified identities by
 > email itself. What the Action adds is a single stable `sub` per person at the
 > Auth0 layer, which keeps sessions and logs consistent across providers.
+
+### Check `email_verified` before relying on any of this
+
+Both the Action and the app refuse to link an identity whose email the
+provider hasn't verified, so a connection that doesn't assert the claim
+doesn't just skip linking — it means someone signing in that way is **denied
+access** if their address already belongs to a member. That is the correct
+outcome (it's exactly the takeover case), but it looks like a broken login if
+you weren't expecting it.
+
+Auth0 sets `email_verified` to whatever the provider returns, and to `false`
+when the provider returns nothing. **GitHub is a known case of this** — Auth0
+publishes a support article on `email_verified=False` for GitHub logins, and
+the connection generally needs the `user:email` scope before verified address
+information is available at all.
+
+Before enabling a second connection, sign in with it once and check that
+user's profile in **User Management → Users** shows `email_verified: true`.
+If it doesn't, fix the connection's scopes rather than relaxing the rule.
 
 ## Dashboard checklist
 
