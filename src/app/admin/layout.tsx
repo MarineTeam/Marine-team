@@ -19,6 +19,7 @@ const adminLinks = [
   { href: "/admin/authorized-emails", label: "Who can sign in" },
   { href: "/admin/access-attempts", label: "Access attempts" },
   { href: "/admin/permissions", label: "Permissions" },
+  { href: "/admin/branding", label: "Branding" },
   { href: "/admin/plugins", label: "Plugins" },
   { href: "/admin/downloads", label: "Downloads" },
   { href: "/admin/home-rows", label: "Homepage" },
@@ -105,6 +106,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       ...(canManagePermissions ? [{ href: "/admin/permissions", label: "Permissions" }] : []),
       ...(canManagePlugins
         ? [
+            { href: "/admin/branding", label: "Branding" },
             { href: "/admin/plugins", label: "Plugins" },
             { href: "/admin/downloads", label: "Downloads" },
             { href: "/admin/home-rows", label: "Homepage" },

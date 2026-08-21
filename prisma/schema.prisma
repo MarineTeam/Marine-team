@@ -1329,3 +1329,25 @@ model Notification {
 
   @@index([userId, createdAt])
 }
+
+// The deployment's own skin: the name shown in the header and the three accent
+// colours everything else is derived from. A singleton, like AuthSettings.
+//
+// This lives in the database rather than in code or an env var because
+// re-skinning is an admin's job, not a deploy: a congregation renaming itself
+// or adopting new colours shouldn't need a developer. Only three colours are
+// stored — every other token (hover tints, gradients, the dark-mode accent) is
+// derived from them in src/lib/branding.ts, so the admin form stays three
+// swatches rather than thirty.
+model BrandSettings {
+  id         String   @id @default("singleton")
+  name       String   @default("Marine Team")
+  shortName  String   @default("Marine Team")
+  // Stored as #rrggbb. Validated on write; validated again on read, since a
+  // bad value here would paint the whole site.
+  brand      String   @default("#1a8fd1")
+  brandDeep  String   @default("#0288d1")
+  brandLight String   @default("#4fc3f7")
+  logoUrl    String?
+  updatedAt  DateTime @updatedAt
+}

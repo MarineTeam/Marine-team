@@ -1,104 +1,100 @@
-import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { ListGroup, ListRow } from "@/components/list-group";
+import {
+  DownloadIcon,
+  InboxIcon,
+  LinkIcon,
+  PlaylistIcon,
+  SettingsIcon,
+  SparkleIcon,
+  StarIcon,
+} from "@/components/icons";
 import { getCurrentUser } from "@/lib/current-user";
 import { getUnreadNotificationCount } from "@/lib/inbox";
 import { getDownloadAccessSummary } from "@/lib/downloads";
+import { getBranding } from "@/lib/branding";
 
 /**
- * The profile's landing card: what's waiting for the member, and the way in
- * to each section. Deliberately a summary rather than a settings form — the
- * settings live on their own tab so this stays readable on a phone.
+ * The account hub: what's waiting, and the way into each section.
+ *
+ * Grouped rows rather than a grid of cards, because this screen is the
+ * installed app's whole account area and settings screens are a shape people
+ * already know how to read — see components/list-group.tsx. Still a summary,
+ * not a form; the settings themselves live on their own tab.
  */
 export default async function ProfileOverviewPage() {
   const user = await getCurrentUser();
   if (!user) return null; // The layout already gates on login.
 
-  const [unreadCount, activeShareLinks, favoriteCount, playlistCount, downloadAccess] = await Promise.all([
-    getUnreadNotificationCount(user.id),
-    prisma.shareLink.count({
-      where: {
-        createdById: user.id,
-        revokedAt: null,
-        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-      },
-    }),
-    prisma.videoFavorite.count({ where: { userId: user.id } }),
-    prisma.playlist.count({ where: { userId: user.id } }),
-    getDownloadAccessSummary(user),
-  ]);
-
-  const cards = [
-    {
-      href: "/profile/inbox",
-      label: "Inbox",
-      value: unreadCount > 0 ? `${unreadCount} unread` : "All caught up",
-      detail: "New content, announcements, and links shared with you.",
-    },
-    {
-      href: "/profile/shared-links",
-      label: "Shared links",
-      value: `${activeShareLinks} active`,
-      detail: "Links you've handed out, and the switch to revoke them.",
-    },
-    {
-      href: "/profile/downloads",
-      label: "Downloads",
-      value: downloadAccess.pluginOn && downloadAccess.permitted ? "Available" : "Off",
-      detail: "Videos saved to this device, and when they may use mobile data.",
-    },
-    {
-      href: "/profile/settings",
-      label: "Settings",
-      value: "This device",
-      detail: "Theme, playback, and your account.",
-    },
-  ];
+  const [unreadCount, activeShareLinks, favoriteCount, playlistCount, downloadAccess, branding] =
+    await Promise.all([
+      getUnreadNotificationCount(user.id),
+      prisma.shareLink.count({
+        where: {
+          createdById: user.id,
+          revokedAt: null,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+      }),
+      prisma.videoFavorite.count({ where: { userId: user.id } }),
+      prisma.playlist.count({ where: { userId: user.id } }),
+      getDownloadAccessSummary(user),
+      getBranding(),
+    ]);
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-2">
-        {cards.map((card) => (
-          <Link
-            key={card.href}
-            href={card.href}
-            className="rounded-lg border border-zinc-200 p-4 hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-900"
-          >
-            <p className="text-sm text-zinc-500">{card.label}</p>
-            <p className="mt-0.5 font-medium">{card.value}</p>
-            <p className="mt-1 text-xs text-zinc-500">{card.detail}</p>
-          </Link>
-        ))}
-      </div>
+      <ListGroup label="This device">
+        <ListRow
+          href="/profile/inbox"
+          icon={<InboxIcon className="h-5 w-5" />}
+          label="Inbox"
+          value={unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
+        />
+        <ListRow
+          href="/profile/downloads"
+          icon={<DownloadIcon className="h-5 w-5" />}
+          label="Downloads"
+          value={downloadAccess.pluginOn && downloadAccess.permitted ? "Available" : "Off"}
+        />
+        <ListRow
+          href="/profile/shared-links"
+          icon={<LinkIcon className="h-5 w-5" />}
+          label="Shared links"
+          value={`${activeShareLinks} active`}
+        />
+      </ListGroup>
 
-      <section className="space-y-2">
-        <h2 className="text-sm font-medium">Your library</h2>
-        <div className="flex flex-wrap gap-2 text-sm">
-          <Link
-            href="/favorites"
-            className="rounded-md border border-zinc-300 px-3 py-1.5 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
-          >
-            Favorites ({favoriteCount})
-          </Link>
-          <Link
-            href="/playlists"
-            className="rounded-md border border-zinc-300 px-3 py-1.5 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
-          >
-            Playlists ({playlistCount})
-          </Link>
-          <Link
-            href="/watch-later"
-            className="rounded-md border border-zinc-300 px-3 py-1.5 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
-          >
-            Watch later
-          </Link>
-          <Link
-            href="/recently-played"
-            className="rounded-md border border-zinc-300 px-3 py-1.5 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
-          >
-            Recently played
-          </Link>
-        </div>
-      </section>
+      <ListGroup label="Your library">
+        <ListRow
+          href="/favorites"
+          icon={<StarIcon className="h-5 w-5" />}
+          label="Favorites"
+          value={`${favoriteCount}`}
+        />
+        <ListRow
+          href="/playlists"
+          icon={<PlaylistIcon className="h-5 w-5" />}
+          label="Playlists"
+          value={`${playlistCount}`}
+        />
+        <ListRow
+          href="/watch-later"
+          icon={<SparkleIcon className="h-5 w-5" />}
+          label="Watch later"
+        />
+      </ListGroup>
+
+      <ListGroup label="App settings">
+        <ListRow
+          href="/profile/settings"
+          icon={<SettingsIcon className="h-5 w-5" />}
+          label="Settings"
+          detail="Theme, playback, and your account."
+        />
+      </ListGroup>
+
+      <p className="px-1 text-center text-xs text-ter">{branding.name}</p>
     </div>
   );
 }
