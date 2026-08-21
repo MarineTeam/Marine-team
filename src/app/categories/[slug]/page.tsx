@@ -7,6 +7,7 @@ import { Breadcrumbs } from "@/components/breadcrumbs";
 import { CategoryTile } from "@/components/category-tile";
 import { SeriesTile } from "@/components/series-tile";
 import { HymnalBookGrid } from "@/components/hymnal-book-grid";
+import { readerFormat } from "@/lib/reader";
 import { SubscribeButton } from "@/components/subscribe-button";
 import { WatchLaterButton } from "@/components/watch-later-button";
 import { MenuTile } from "@/components/menu-tile";
@@ -114,6 +115,20 @@ export default async function CategoryPage({
     category.videos.length === 0 &&
     category.files.length === 0;
 
+  // A hymnalStyle category shows every book it holds as one cover grid,
+  // whether the PDF hangs off the category directly or off one of its
+  // series — the series layer is a filing detail, not something a reader
+  // browsing for a hymnal should have to click through. Files that aren't
+  // PDFs fall through to the normal file list below.
+  const bookFiles = category.hymnalStyle
+    ? [...category.series.flatMap((s) => s.files), ...category.files].filter(
+        (f) => readerFormat(f.mimeType, f.bunnyPath) === "pdf",
+      )
+    : [];
+  const looseFiles = category.hymnalStyle
+    ? category.files.filter((f) => !bookFiles.some((book) => book.id === f.id))
+    : category.files;
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
       {!locked && <script {...jsonLdScriptProps(breadcrumbJsonLd)} />}
@@ -175,7 +190,7 @@ export default async function CategoryPage({
                   ))}
                 </div>
               )}
-              {category.series.length > 0 && <HymnalBookGrid books={category.series} />}
+              {bookFiles.length > 0 && <HymnalBookGrid books={bookFiles} isLoggedIn={isLoggedIn} />}
             </>
           ) : (
             (category.children.length > 0 || category.series.length > 0) && (
@@ -208,10 +223,12 @@ export default async function CategoryPage({
             </section>
           )}
 
-          {category.files.length > 0 && (
+          {looseFiles.length > 0 && (
             <section className="space-y-3">
-              <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Files</h2>
-              <FileList files={category.files} isLoggedIn={isLoggedIn} readerOn={readerOn} />
+              <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+                {category.hymnalStyle && bookFiles.length > 0 ? "Other files" : "Files"}
+              </h2>
+              <FileList files={looseFiles} isLoggedIn={isLoggedIn} readerOn={readerOn} />
             </section>
           )}
         </>

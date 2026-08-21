@@ -6,6 +6,30 @@ import type { TocEntry } from "@/components/reader-types";
 type PdfOutlineItems = Awaited<ReturnType<PDFDocumentProxy["getOutline"]>>;
 
 /**
+ * pdf.js, loaded on demand with its worker wired up.
+ *
+ * The import is dynamic rather than at module scope: pdf.js is ~2MB and
+ * reaches for browser globals on load, so a static import would both bloat
+ * every bundle that touches this file and break server rendering. The
+ * worker path is resolved through the bundler rather than hardcoded to a
+ * public path, so it stays version-locked to the library and doesn't need
+ * copying into /public on every upgrade.
+ */
+export async function getPdfjs() {
+  const pdfjs = await import("pdfjs-dist");
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.mjs",
+    import.meta.url,
+  ).toString();
+  return pdfjs;
+}
+
+/** The app's own URL for a file's bytes — never a direct CDN link; see the content route. */
+export function fileContentUrl(fileId: string): string {
+  return `/api/files/${fileId}/content`;
+}
+
+/**
  * Resolves a pdf.js outline (bookmarks) tree into a flat, depth-tagged list.
  * Shared by PdfReader's in-book Contents panel (which already has a loaded
  * document open) and loadPdfOutline below (which opens one just to read
@@ -35,23 +59,14 @@ export async function resolvePdfOutline(
 /**
  * Opens a PDF purely to read its embedded outline/bookmarks — its own
  * short-lived document instance, not shared with any open reader — for a
- * book's contents list shown before the full reader is opened (e.g. a
- * hymnal book's table of contents). Client-only: pdf.js is dynamically
- * imported because it reaches for browser globals on load and would break
- * server rendering / bloat every bundle that touches this file otherwise
- * (see PdfReader's own note on the same import).
+ * book's contents list shown before the full reader is opened.
  */
 export async function loadPdfOutline(fileUrl: string): Promise<TocEntry[]> {
-  const pdfjs = await import("pdfjs-dist");
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/build/pdf.worker.mjs",
-    import.meta.url,
-  ).toString();
-
+  const pdfjs = await getPdfjs();
   // Teardown belongs to the loading task, not the document proxy — the
   // proxy only exposes cleanup() (frees page resources but leaves the
   // worker running). Destroying the task is what stops the worker and
-  // aborts in-flight range requests — same distinction PdfReader's own
+  // aborts in-flight range requests — the same distinction PdfReader's own
   // load effect draws.
   const task = pdfjs.getDocument({ url: fileUrl, withCredentials: true });
   try {

@@ -3,17 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { excerptAround, findMatches } from "@/lib/reader";
-import { resolvePdfOutline } from "@/lib/pdf-outline-client";
+import { getPdfjs, resolvePdfOutline } from "@/lib/pdf-client";
 import type { ReaderHandle, SearchHit, TocEntry } from "@/components/reader-types";
 
 /**
- * PDF half of the reader, using pdf.js.
- *
- * pdf.js is imported dynamically inside an effect rather than at module
- * scope: it's ~2MB and reaches for browser globals on load, so a static
- * import would both bloat every bundle that touches this file and break
- * server rendering. That also keeps the worker setup — which needs
- * `import.meta.url` resolution the bundler can see — in one place.
+ * PDF half of the reader, using pdf.js — loaded on demand through
+ * getPdfjs(), which also wires up the worker (see lib/pdf-client.ts for why
+ * that import can't happen at module scope).
  */
 type PdfDocument = PDFDocumentProxy;
 
@@ -54,15 +50,7 @@ export function PdfReader({
 
     (async () => {
       try {
-        const pdfjs = await import("pdfjs-dist");
-        // Resolved through the bundler rather than hardcoded to a public
-        // path, so the worker stays version-locked to the library and
-        // doesn't need copying into /public on every upgrade.
-        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/build/pdf.worker.mjs",
-          import.meta.url,
-        ).toString();
-
+        const pdfjs = await getPdfjs();
         const task = pdfjs.getDocument({ url: fileUrl, withCredentials: true });
         loadingTask = task;
         const doc = await task.promise;

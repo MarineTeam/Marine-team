@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { loadPdfOutline } from "@/lib/pdf-outline-client";
+import { fileContentUrl, loadPdfOutline } from "@/lib/pdf-client";
 import type { TocEntry } from "@/components/reader-types";
 
 type SortMode = "page" | "az" | "category";
@@ -55,18 +55,10 @@ function EntryRow({ entry, fileId, readerOn }: { entry: TocEntry; fileId: string
 /**
  * A hymnal book's contents, read straight from its PDF's own embedded
  * outline/bookmarks rather than typed in by an admin — see
- * lib/pdf-outline-client.ts. Tapping an entry opens the book reader
+ * lib/pdf-client.ts. Tapping an entry opens the book reader
  * scrolled straight to that page.
  */
-export function BookContents({
-  fileId,
-  fileUrl,
-  readerOn,
-}: {
-  fileId: string;
-  fileUrl: string;
-  readerOn: boolean;
-}) {
+export function BookContents({ fileId, readerOn }: { fileId: string; readerOn: boolean }) {
   const [entries, setEntries] = useState<TocEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sort, setSort] = useState<SortMode>("page");
@@ -75,7 +67,7 @@ export function BookContents({
     let cancelled = false;
     setEntries(null);
     setError(null);
-    loadPdfOutline(fileUrl)
+    loadPdfOutline(fileContentUrl(fileId))
       .then((result) => {
         if (!cancelled) setEntries(result);
       })
@@ -85,7 +77,7 @@ export function BookContents({
     return () => {
       cancelled = true;
     };
-  }, [fileUrl]);
+  }, [fileId]);
 
   const groups = useMemo<Group[]>(() => {
     if (!entries) return [];
