@@ -54,6 +54,41 @@ answers anything but `{"allowed": true}`, registration is denied.
 > allowlist check in `getCurrentUser()` are what refuse access, which is why
 > the allowlist is enforced on every request rather than only at signup.
 
+## `link-accounts.js`
+
+Optional. Merges identities so one person is one Auth0 user — without it,
+signing in with Google and later with Microsoft on the same address creates
+two Auth0 users with two different `sub` values.
+
+1. Auth0 Dashboard → **Actions → Library → Build from scratch**
+2. Name: `Marine Team account linking`, Trigger: **Login / Post Login**
+3. Paste `link-accounts.js`
+4. Add the `auth0` npm module (the **Modules** panel in the editor)
+5. Add three **Secrets**, from a Machine-to-Machine application authorized for
+   the Management API with the `read:users` and `update:users` scopes:
+   - `AUTH0_DOMAIN` — `your-tenant.eu.auth0.com`
+   - `AUTH0_M2M_CLIENT_ID`
+   - `AUTH0_M2M_CLIENT_SECRET`
+6. **Deploy**, then drag it into **Actions → Triggers → post-login**, above any
+   Action that reads the user's identities
+
+It only links when **both** accounts have a verified email. Linking on an
+unverified address is the account-takeover path this feature is known for:
+anyone able to sign up asserting an existing member's address would be merged
+into their account. The application refuses the same case independently
+(`decideLinking` in `src/lib/identity-linking.ts`), so this is defence in
+depth, not the only guard.
+
+Unlike the registration check, this Action **fails open**. That one guards the
+door, so an outage must deny; this one only tidies identities, and the app's
+sub-first resolution keeps people on the right member row without it. Blocking
+a login because a merge failed would trade a cosmetic problem for a lockout.
+
+> **The app does not require this Action.** Skip it and members still get one
+> account per person, because `getCurrentUser()` links verified identities by
+> email itself. What the Action adds is a single stable `sub` per person at the
+> Auth0 layer, which keeps sessions and logs consistent across providers.
+
 ## Dashboard checklist
 
 - Organizations enabled; **Marine Team** exists and its id is in the app's
@@ -62,7 +97,11 @@ answers anything but `{"allowed": true}`, registration is denied.
   and the Google connection is enabled **for the organization**.
 - Allowed Callback URLs: `https://<your-domain>/auth/callback`.
   Allowed Logout URLs: `https://<your-domain>`.
-- The Action above is deployed and attached to the pre-user-registration flow.
+- The registration check Action is deployed and attached to the
+  pre-user-registration flow.
+- Optionally, the account-linking Action is deployed and attached to the
+  post-login flow, with its M2M application authorized for `read:users` and
+  `update:users`.
 
 ## A note on the callback errors
 
