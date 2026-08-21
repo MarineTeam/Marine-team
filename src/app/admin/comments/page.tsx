@@ -109,7 +109,7 @@ export default function CommentsAdminPage() {
               <div className="flex items-center gap-2 text-sm">
                 <BulkCheckbox
                   checked={bulk.isSelected(c.id)}
-                  onChange={() => bulk.toggle(c.id)}
+                  onToggle={(shift) => bulk.toggle(c.id, shift)}
                   label={`comment by ${getDisplayName(c.user)}`}
                 />
                 <span className="font-medium">{getDisplayName(c.user)}</span>{" "}

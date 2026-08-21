@@ -172,7 +172,7 @@ export default function LiveAdminPage() {
             <div className="flex min-w-0 items-center gap-2">
               <BulkCheckbox
                 checked={bulk.isSelected(s.id)}
-                onChange={() => bulk.toggle(s.id)}
+                onToggle={(shift) => bulk.toggle(s.id, shift)}
                 label={s.title}
               />
               <div className="min-w-0">

@@ -3,6 +3,15 @@
 import { useEffect, useState } from "react";
 import { DragHandle, useDragReorder } from "@/components/reorder-controls";
 import { reorderArray } from "@/lib/reorder";
+import {
+  BulkBar,
+  BulkButton,
+  BulkCheckbox,
+  BulkSelectAll,
+  bulkFetch,
+  runBulk,
+  useBulkSelect,
+} from "@/components/bulk-select";
 
 type HomeRowType = "CONTINUE_WATCHING" | "RECOMMENDATIONS" | "TRENDING" | "RECENTLY_ADDED" | "CATEGORY" | "TAG";
 type HomeRow = {
@@ -33,6 +42,31 @@ export default function HomeRowsAdminPage() {
   const [newTag, setNewTag] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const bulk = useBulkSelect(rows.map((r) => r.id));
+
+  async function bulkPatch(body: Record<string, unknown>) {
+    setBusy(true);
+    await runBulk(bulk.selected, (id) =>
+      bulkFetch(`/api/admin/home-rows/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    );
+    bulk.clear();
+    setBusy(false);
+    await load();
+  }
+
+  async function bulkDelete() {
+    if (!confirm(`Remove ${bulk.count} row${bulk.count === 1 ? "" : "s"} from the homepage?`)) return;
+    setBusy(true);
+    await runBulk(bulk.selected, (id) => bulkFetch(`/api/admin/home-rows/${id}`, { method: "DELETE" }));
+    bulk.clear();
+    setBusy(false);
+    await load();
+  }
 
   async function load() {
     const [rowsRes, categoriesRes] = await Promise.all([
@@ -173,6 +207,18 @@ export default function HomeRowsAdminPage() {
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
 
+      {rows.length > 0 && (
+        <BulkSelectAll allSelected={bulk.allSelected} onToggle={bulk.toggleAll} disabled={busy} />
+      )}
+
+      <BulkBar count={bulk.count} onClear={bulk.clear} busy={busy}>
+        <BulkButton onClick={() => bulkPatch({ enabled: true })}>Enable</BulkButton>
+        <BulkButton onClick={() => bulkPatch({ enabled: false })}>Disable</BulkButton>
+        <BulkButton danger onClick={bulkDelete}>
+          Remove
+        </BulkButton>
+      </BulkBar>
+
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
         {rows.map((row, index) => (
           <li
@@ -180,6 +226,11 @@ export default function HomeRowsAdminPage() {
             className={`p-4 flex flex-wrap items-center gap-3 ${draggingIndex === index ? "opacity-40" : ""}`}
             {...dropZoneProps(index)}
           >
+            <BulkCheckbox
+              checked={bulk.isSelected(row.id)}
+              onToggle={(shift) => bulk.toggle(row.id, shift)}
+              label={row.title ?? DEFAULT_LABEL[row.type]}
+            />
             <DragHandle {...handleProps(index)} />
             <div className="min-w-0 flex-1">
               <input

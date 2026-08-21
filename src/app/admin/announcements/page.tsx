@@ -200,7 +200,7 @@ export default function AnnouncementsAdminPage() {
             <div className="flex min-w-0 items-center gap-2">
               <BulkCheckbox
                 checked={bulk.isSelected(a.id)}
-                onChange={() => bulk.toggle(a.id)}
+                onToggle={(shift) => bulk.toggle(a.id, shift)}
                 label={a.message}
               />
               <div className="min-w-0">

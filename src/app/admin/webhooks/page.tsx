@@ -144,7 +144,7 @@ export default function WebhooksAdminPage() {
             <div className="flex min-w-0 items-center gap-2">
               <BulkCheckbox
                 checked={bulk.isSelected(w.id)}
-                onChange={() => bulk.toggle(w.id)}
+                onToggle={(shift) => bulk.toggle(w.id, shift)}
                 label={w.url}
               />
               <div className="min-w-0">

@@ -162,7 +162,7 @@ export default function SpeakersAdminPage() {
           >
             <BulkCheckbox
               checked={bulk.isSelected(s.id)}
-              onChange={() => bulk.toggle(s.id)}
+              onToggle={(shift) => bulk.toggle(s.id, shift)}
               label={s.name}
             />
             <DragHandle {...handleProps(index)} />

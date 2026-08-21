@@ -1,6 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import {
+  BulkBar,
+  BulkButton,
+  BulkCheckbox,
+  BulkSelectAll,
+  bulkFetch,
+  runBulk,
+  useBulkSelect,
+} from "@/components/bulk-select";
 
 export type ShareLinkRow = {
   id: string;
@@ -55,6 +64,30 @@ export function ShareLinkList({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const bulk = useBulkSelect(links.map((link) => link.id));
+
+  async function actOnSelected(action: "revoke" | "delete") {
+    const confirmed =
+      action === "revoke"
+        ? confirm(
+            `Revoke ${bulk.count} link${bulk.count === 1 ? "" : "s"}? Anyone holding them loses access immediately.`,
+          )
+        : confirm(
+            `Delete ${bulk.count} link${bulk.count === 1 ? "" : "s"}? They stop working and disappear from this list.`,
+          );
+    if (!confirmed) return;
+
+    setBulkBusy(true);
+    setError(null);
+    const { failed } = await runBulk(bulk.selected, (id) =>
+      bulkFetch(`${revokeEndpoint}/${id}`, { method: action === "revoke" ? "PATCH" : "DELETE" }),
+    );
+    if (failed > 0) setError(`${failed} couldn't be ${action}d.`);
+    bulk.clear();
+    setBulkBusy(false);
+    onChange();
+  }
 
   /**
    * Revoke (PATCH) keeps the row, marked dead, so the sharer can still see
@@ -105,6 +138,18 @@ export function ShareLinkList({
   return (
     <div className="space-y-2">
       {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {links.length > 0 && (
+        <BulkSelectAll allSelected={bulk.allSelected} onToggle={bulk.toggleAll} disabled={bulkBusy} />
+      )}
+
+      <BulkBar count={bulk.count} onClear={bulk.clear} busy={bulkBusy}>
+        <BulkButton onClick={() => actOnSelected("revoke")}>Revoke</BulkButton>
+        <BulkButton danger onClick={() => actOnSelected("delete")}>
+          Delete
+        </BulkButton>
+      </BulkBar>
+
       <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
         {links.map((link) => {
           const status = statusOf(link);
@@ -112,6 +157,13 @@ export function ShareLinkList({
           const href = link.video ? `/videos/${link.video.slug}` : link.series ? `/series/${link.series.slug}` : null;
           return (
             <li key={link.id} className="flex flex-wrap items-start justify-between gap-3 p-3">
+              <div className="mt-1 shrink-0">
+                <BulkCheckbox
+                  checked={bulk.isSelected(link.id)}
+                  onToggle={(shift) => bulk.toggle(link.id, shift)}
+                  label={target?.title ?? "share link"}
+                />
+              </div>
               <div className="min-w-0 flex-1 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   {href ? (

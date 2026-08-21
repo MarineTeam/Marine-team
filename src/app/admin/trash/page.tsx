@@ -99,7 +99,7 @@ function Section<T extends { id: string; deletedAt: string }>({
             <div className="flex min-w-0 items-center gap-2">
               <BulkCheckbox
                 checked={bulk.isSelected(item.id)}
-                onChange={() => bulk.toggle(item.id)}
+                onToggle={(shift) => bulk.toggle(item.id, shift)}
                 label={label(item)}
               />
               <div className="min-w-0">

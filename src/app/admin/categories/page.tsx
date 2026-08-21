@@ -221,7 +221,7 @@ export default function CategoriesPage() {
         <div className="min-w-0 flex items-center gap-2">
           <BulkCheckbox
             checked={bulk.isSelected(node.id)}
-            onChange={() => bulk.toggle(node.id)}
+            onToggle={(shift) => bulk.toggle(node.id, shift)}
             label={node.name}
           />
           <DragHandle
