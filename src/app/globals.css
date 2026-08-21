@@ -92,8 +92,47 @@ body {
   display: none !important;
 }
 
-:root[data-standalone="true"] .only-web {
+/*
+ * Width decides the layout; being installed decides the trim. Below `lg` there
+ * is no room for the rail, so an installed app gets the app bar and the tab
+ * strip. From `lg` up — a PWA installed on a desktop — the website layout is
+ * the right one: a tab strip stretched across 1400px is a phone layout in a
+ * desktop window.
+ */
+@media (max-width: 63.999rem) {
+  :root[data-standalone="true"] .only-web {
+    display: none !important;
+  }
+}
+
+@media (min-width: 64rem) {
+  :root[data-standalone="true"] .only-app {
+    display: none !important;
+  }
+}
+
+/*
+ * Trim, as opposed to layout: hidden whenever the app is installed, at any
+ * width. The footer is the case this exists for — an installed app ends at its
+ * own chrome, and a copyright line is something a website has.
+ */
+:root[data-standalone="true"] .only-browser {
   display: none !important;
+}
+
+/*
+ * How far down the page the sticky chrome reaches, for anything that has to
+ * stick below it — see BulkBar. The app bar is shorter than the website
+ * header, and sits under the status bar.
+ */
+:root {
+  --header-h: 4rem;
+}
+
+@media (max-width: 63.999rem) {
+  :root[data-standalone="true"] {
+    --header-h: calc(3.5rem + env(safe-area-inset-top));
+  }
 }
 
 /*
@@ -110,17 +149,19 @@ body {
 }
 
 /*
- * Installed, the tab strip is the only navigation there is, so it stays put at
- * every width — `sm:hidden` is right for the website (where the rail takes
- * over) and wrong for the app.
+ * Installed below `lg`, the tab strip is the only navigation there is, so it
+ * stays put past the `sm` breakpoint where the website would hand over to the
+ * rail. From `lg` up the rail is back, and the strip stands down with it.
  */
-:root[data-standalone="true"] .app-tabbar {
-  display: flex;
-}
+@media (max-width: 63.999rem) {
+  :root[data-standalone="true"] .app-tabbar {
+    display: flex;
+  }
 
-/* ...and the content above it has to clear it at every width too. */
-:root[data-standalone="true"] .app-main {
-  padding-bottom: 4rem;
+  /* ...and the content above it has to clear it at those widths too. */
+  :root[data-standalone="true"] .app-main {
+    padding-bottom: 4rem;
+  }
 }
 
 /*

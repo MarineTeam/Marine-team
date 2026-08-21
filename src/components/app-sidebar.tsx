@@ -50,9 +50,10 @@ export const NAV_ICONS: Record<NavIcon, (props: { className?: string }) => React
  * The website's persistent left rail — the desktop counterpart to the tab
  * strip the installed app gets.
  *
- * Marked `only-web` and hidden below lg: an installed app navigates with its
- * bottom tabs and app bar, and a rail on a phone would eat a third of the
- * screen. See the mode rules in globals.css.
+ * Hidden below lg in both shells: at those widths an installed app navigates
+ * with its bottom tabs and app bar, and a rail on a phone would eat a third of
+ * the screen. Installed on a desktop it keeps the rail — width decides the
+ * layout, and only the trim depends on being installed. See globals.css.
  */
 export function AppSidebar({
   branding,
@@ -69,7 +70,7 @@ export function AppSidebar({
   const pathname = usePathname();
 
   return (
-    <aside className="only-web hidden w-60 shrink-0 lg:block">
+    <aside className="hidden w-60 shrink-0 lg:block">
       <nav
         aria-label="Sections"
         className="sticky top-0 flex h-screen flex-col gap-0.5 overflow-y-auto border-r border-sep bg-panel px-3 py-5"

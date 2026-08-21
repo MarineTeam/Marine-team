@@ -191,7 +191,12 @@ export function BulkBar({
 }) {
   if (count === 0) return null;
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-sep bg-chip p-3 text-sm">
+    // Sticky, and offset by the header: a selection made near the bottom of a
+    // long admin list is useless once its actions have scrolled off the top.
+    <div
+      className="sticky z-20 flex flex-wrap items-center gap-2 rounded-lg border border-sep bg-chip p-3 text-sm shadow-sm"
+      style={{ top: "var(--header-h)" }}
+    >
       <span>
         {count} selected{busy ? " — working…" : ""}
       </span>
