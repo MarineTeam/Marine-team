@@ -190,52 +190,52 @@ export function SeriesEditForm({
       )}
     <form
       onSubmit={save}
-      className="space-y-3 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4"
+      className="space-y-3 rounded-lg border border-sep p-4"
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="text-sm space-y-1">
-          <span className="text-zinc-500">Title</span>
+          <span className="text-sec">Title</span>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded-md border border-sep px-3 py-2 text-sm"
             required
           />
         </label>
         <label className="text-sm space-y-1">
-          <span className="text-zinc-500">Slug</span>
+          <span className="text-sec">Slug</span>
           <input
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
-            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded-md border border-sep px-3 py-2 text-sm"
             required
           />
         </label>
       </div>
 
       <label className="text-sm space-y-1 block">
-        <span className="text-zinc-500">Description</span>
+        <span className="text-sec">Description</span>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-full rounded-md border border-sep px-3 py-2 text-sm"
         />
       </label>
 
       <label className="text-sm space-y-1 block">
-        <span className="text-zinc-500">Cover image URL</span>
+        <span className="text-sec">Cover image URL</span>
         <input
           value={coverImageUrl}
           onChange={(e) => setCoverImageUrl(e.target.value)}
           placeholder="https://…"
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-full rounded-md border border-sep px-3 py-2 text-sm"
         />
       </label>
 
-      <div className="space-y-3 rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
+      <div className="space-y-3 rounded-md border border-sep p-3">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+          <span className="text-xs font-medium uppercase tracking-wide text-sec">
             Hymnal book
           </span>
           {!inHymnalCategory && (
@@ -247,14 +247,14 @@ export function SeriesEditForm({
         </div>
 
         <label className="text-sm space-y-1 block">
-          <span className="text-zinc-500">
+          <span className="text-sec">
             Abbreviation (badge on this book&apos;s cover, e.g. &quot;GSFH1&quot;)
           </span>
           <input
             value={abbreviation}
             onChange={(e) => setAbbreviation(e.target.value)}
             placeholder="GSFH1"
-            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded-md border border-sep px-3 py-2 text-sm"
           />
         </label>
 
@@ -273,32 +273,32 @@ export function SeriesEditForm({
       </div>
 
       <label className="text-sm space-y-1 block">
-        <span className="text-zinc-500">Tags (comma-separated)</span>
+        <span className="text-sec">Tags (comma-separated)</span>
         <input
           value={tags}
           onChange={(e) => setTags(e.target.value)}
           placeholder="worship, easter, youth"
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-full rounded-md border border-sep px-3 py-2 text-sm"
         />
       </label>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="text-sm space-y-1 block">
-          <span className="text-zinc-500">Publish at (leave blank to publish immediately)</span>
+          <span className="text-sec">Publish at (leave blank to publish immediately)</span>
           <input
             type="datetime-local"
             value={publishAt}
             onChange={(e) => setPublishAt(e.target.value)}
-            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded-md border border-sep px-3 py-2 text-sm"
           />
         </label>
         <label className="text-sm space-y-1 block">
-          <span className="text-zinc-500">Unpublish at (leave blank to never expire)</span>
+          <span className="text-sec">Unpublish at (leave blank to never expire)</span>
           <input
             type="datetime-local"
             value={unpublishAt}
             onChange={(e) => setUnpublishAt(e.target.value)}
-            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded-md border border-sep px-3 py-2 text-sm"
           />
         </label>
       </div>
@@ -307,7 +307,7 @@ export function SeriesEditForm({
         <select
           value={categoryId}
           onChange={(e) => setCategoryId(e.target.value)}
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded-md border border-sep px-3 py-2 text-sm"
         >
           <option value="">No category</option>
           {categories.map((c) => (
@@ -368,14 +368,14 @@ export function SeriesEditForm({
           type="button"
           onClick={saveAsDraft}
           disabled={savingDraft}
-          className="sm:ml-auto rounded-md border border-zinc-300 px-4 py-2 text-sm disabled:opacity-50 dark:border-zinc-700"
+          className="sm:ml-auto rounded-md border border-sep px-4 py-2 text-sm disabled:opacity-50"
         >
           {savingDraft ? "Saving draft…" : "Save as draft"}
         </button>
         <button
           type="submit"
           disabled={saving}
-          className="rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+          className="rounded-md btn-primary text-white px-4 py-2 text-sm disabled:opacity-50"
         >
           {saving ? "Publishing…" : "Publish now"}
         </button>

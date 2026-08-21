@@ -48,21 +48,21 @@ export default async function BookPage({ params }: { params: Promise<{ fileId: s
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-10">
-      <Link href={backHref} className="text-sm text-zinc-500 hover:underline">
+      <Link href={backHref} className="text-sm text-sec hover:underline">
         ← {backLabel}
       </Link>
 
-      <h1 className="text-2xl font-semibold tracking-tight">{file.title}</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-ink">{file.title}</h1>
 
       {locked ? (
-        <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
+        <div className="rounded-lg border border-dashed border-sep p-8 text-center">
           <p className="font-medium">
             {user ? "You don't have access to this book." : "This book is for members only."}
           </p>
           {!user && (
             <a
               href="/auth/login"
-              className="mt-4 inline-block rounded-md bg-zinc-900 px-4 py-2 text-sm text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+              className="mt-4 inline-block rounded-md btn-primary px-4 py-2 text-sm text-white"
             >
               Log in to view
             </a>

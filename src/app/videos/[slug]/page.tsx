@@ -125,7 +125,7 @@ export default async function VideoPage({
         {!user && (
           <a
             href="/auth/login"
-            className="mt-4 inline-block rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+            className="mt-4 inline-block rounded-md btn-primary text-white px-4 py-2 text-sm"
           >
             Log in to watch
           </a>
@@ -247,7 +247,7 @@ export default async function VideoPage({
       <Breadcrumbs items={breadcrumbItems} />
       {!isPendingPremiere && viewCountsOn && <ViewEventBeacon type="video" id={video.id} />}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">{video.title}</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-ink">{video.title}</h1>
         <div className="flex flex-wrap items-center gap-2">
           {user && favoritesOn && <FavoriteButton type="video" id={video.id} initialFavorited={favorited} />}
           {user && watchLaterOn && <WatchLaterButton type="video" id={video.id} initialQueued={queued} />}
@@ -280,7 +280,7 @@ export default async function VideoPage({
             />
           )}
           {viewCountsOn && (
-            <span className="text-sm text-zinc-500">
+            <span className="text-sm text-sec">
               {video.viewCount + 1} view{video.viewCount === 0 ? "" : "s"}
             </span>
           )}
@@ -320,7 +320,7 @@ export default async function VideoPage({
       {isPendingPremiere && video.publishAt ? (
         <PremiereCountdown premiereAt={video.publishAt.toISOString()} />
       ) : sequenceLocked ? (
-        <div className="aspect-video flex flex-col items-center justify-center gap-2 rounded-lg bg-zinc-100 text-zinc-500 dark:bg-zinc-800">
+        <div className="aspect-video flex flex-col items-center justify-center gap-2 rounded-lg bg-chip text-sec">
           <p>🔒 Watch the previous episode in this series first.</p>
           {video.series && (
             <Link href={`/series/${video.series.slug}`} className="text-sm underline">
@@ -334,22 +334,22 @@ export default async function VideoPage({
           chapters={chaptersOn ? chapters : []}
         />
       ) : (
-        <div className="aspect-video flex items-center justify-center rounded-lg bg-zinc-100 text-zinc-500 dark:bg-zinc-800">
+        <div className="aspect-video flex items-center justify-center rounded-lg bg-chip text-sec">
           This video is still processing. Please check back soon.
         </div>
       )}
       {!isPendingPremiere && video.status === "READY" && !sequenceLocked && (
-        <p className="text-xs text-zinc-400">
+        <p className="text-xs text-ter">
           Tip: use the player&apos;s ⚙️ settings icon to change playback speed.
         </p>
       )}
 
-      {video.description && <p className="text-zinc-600 dark:text-zinc-400">{video.description}</p>}
+      {video.description && <p className="text-sec">{video.description}</p>}
 
       {transcriptsOn && video.transcript && (
-        <details className="rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
+        <details className="rounded-lg border border-sep p-3 text-sm">
           <summary className="cursor-pointer font-medium">Transcript</summary>
-          <p className="mt-2 whitespace-pre-wrap text-zinc-600 dark:text-zinc-400">{video.transcript}</p>
+          <p className="mt-2 whitespace-pre-wrap text-sec">{video.transcript}</p>
         </details>
       )}
 
@@ -373,7 +373,7 @@ export default async function VideoPage({
 
       {relatedOn && related.length > 0 && (
         <section className="pt-4">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500 mb-3">
+          <h2 className="mb-3 text-[11px] font-bold tracking-[0.08em] text-ter uppercase">
             {video.series ? "More from this series" : "You might also like"}
           </h2>
           <div className="space-y-3">

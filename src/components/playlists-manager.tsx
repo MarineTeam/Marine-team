@@ -50,28 +50,28 @@ export function PlaylistsManager() {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="New playlist title…"
-          className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="flex-1 rounded-md border border-sep px-3 py-2 text-sm"
         />
         <button
           type="submit"
-          className="rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+          className="rounded-md btn-primary text-white px-4 py-2 text-sm"
         >
           Create
         </button>
       </form>
 
       {playlists.length === 0 && (
-        <p className="text-zinc-500">
+        <p className="text-sec">
           No playlists yet. Create one above, or use the + Playlist button on any video.
         </p>
       )}
 
-      <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
+      <ul className="divide-y divide-sep rounded-lg border border-sep">
         {playlists.map((p) => (
           <li key={p.id} className="p-4 flex items-center justify-between gap-4">
             <Link href={`/playlists/${p.id}`} className="min-w-0">
               <p className="font-medium hover:underline">{p.title}</p>
-              <p className="text-sm text-zinc-500">
+              <p className="text-sm text-sec">
                 {p.items.length} video{p.items.length === 1 ? "" : "s"}
               </p>
             </Link>

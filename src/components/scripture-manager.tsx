@@ -39,19 +39,19 @@ export function ScriptureManager({
   }
 
   return (
-    <div className="space-y-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+    <div className="space-y-2 rounded-lg border border-sep p-3">
       <input
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="John 3:16-18, Romans 8:28"
-        className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        className="w-full rounded-md border border-sep px-3 py-2 text-sm"
       />
-      <p className="text-xs text-zinc-500">Comma-separated references, e.g. &ldquo;John 3:16-18, Romans 8:28&rdquo;.</p>
+      <p className="text-xs text-sec">Comma-separated references, e.g. &ldquo;John 3:16-18, Romans 8:28&rdquo;.</p>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button
         onClick={save}
         disabled={saving}
-        className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm disabled:opacity-50 dark:border-zinc-700"
+        className="rounded-md border border-sep px-3 py-1.5 text-sm disabled:opacity-50"
       >
         {saving ? "Saving…" : "Save references"}
       </button>

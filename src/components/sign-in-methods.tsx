@@ -37,28 +37,28 @@ export type SignInMethod = {
  */
 export function SignInMethods({ methods }: { methods: SignInMethod[] }) {
   if (methods.length === 0) {
-    return <p className="text-sm text-zinc-500">No sign-in methods recorded yet.</p>;
+    return <p className="text-sm text-sec">No sign-in methods recorded yet.</p>;
   }
 
   return (
-    <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 text-sm dark:divide-zinc-800 dark:border-zinc-800">
+    <ul className="divide-y divide-sep rounded-lg border border-sep text-sm">
       {methods.map((method) => (
         <li key={method.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
           <div className="min-w-0">
             <p className="font-medium">
               {providerLabel(method.provider)}
               {method.isCurrent && (
-                <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-normal text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                <span className="ml-2 rounded bg-chip px-1.5 py-0.5 text-xs font-normal text-sec">
                   This session
                 </span>
               )}
             </p>
-            <p className="truncate text-xs text-zinc-500">
+            <p className="truncate text-xs text-sec">
               {method.email}
               {!method.emailVerified && " — unverified"}
             </p>
           </div>
-          <p className="text-xs text-zinc-400">
+          <p className="text-xs text-ter">
             Last used {method.lastLoginAt.toLocaleDateString()}
           </p>
         </li>

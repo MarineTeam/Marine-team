@@ -64,13 +64,13 @@ export function AddToPlaylistButton({ videoId }: { videoId: string }) {
     <div className="relative">
       <button
         onClick={toggleOpen}
-        className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+        className="rounded-md border border-sep px-3 py-1.5 text-sm hover:bg-hover"
       >
         + Playlist
       </button>
       {open && (
-        <div className="absolute right-0 z-20 mt-2 w-64 rounded-md border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="mb-2 text-xs font-medium uppercase text-zinc-500">Save to playlist</p>
+        <div className="absolute right-0 z-20 mt-2 w-64 rounded-md border border-sep bg-panel p-3 shadow-lg">
+          <p className="mb-2 text-xs font-medium uppercase text-sec">Save to playlist</p>
           <div className="max-h-48 space-y-1 overflow-y-auto">
             {playlists?.map((p) => (
               <label key={p.id} className="flex items-center gap-2 text-sm">
@@ -83,19 +83,19 @@ export function AddToPlaylistButton({ videoId }: { videoId: string }) {
                 <span className="truncate">{p.title}</span>
               </label>
             ))}
-            {playlists?.length === 0 && <p className="text-sm text-zinc-500">No playlists yet.</p>}
+            {playlists?.length === 0 && <p className="text-sm text-sec">No playlists yet.</p>}
           </div>
-          <form onSubmit={createAndAdd} className="mt-2 flex gap-1 border-t border-zinc-200 pt-2 dark:border-zinc-800">
+          <form onSubmit={createAndAdd} className="mt-2 flex gap-1 border-t border-sep pt-2">
             <input
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               placeholder="New playlist…"
-              className="min-w-0 flex-1 rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="min-w-0 flex-1 rounded-md border border-sep px-2 py-1 text-sm"
             />
             <button
               type="submit"
               disabled={pending}
-              className="rounded-md bg-zinc-900 px-2 py-1 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+              className="rounded-md btn-primary px-2 py-1 text-sm text-white disabled:opacity-50"
             >
               Add
             </button>

@@ -1,4 +1,4 @@
-import { MenuTile } from "@/components/menu-tile";
+import { MenuRow, MenuTile } from "@/components/menu-tile";
 import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
 
 type CategoryTileData = {
@@ -12,7 +12,14 @@ type CategoryTileData = {
   files: { id: string }[];
 };
 
-export function CategoryTile({ category }: { category: CategoryTileData }) {
+export function CategoryTile({
+  category,
+  variant = "card",
+}: {
+  category: CategoryTileData;
+  /** "row" flattens it for a grouped panel — see menu-tile.tsx. */
+  variant?: "card" | "row";
+}) {
   const seriesThumbnail = category.series.find((s) => s.coverImageUrl)?.coverImageUrl ?? null;
   const firstVideo = category.videos[0];
   const thumbnailUrl =
@@ -22,8 +29,10 @@ export function CategoryTile({ category }: { category: CategoryTileData }) {
   const itemCount =
     category.series.length + category.children.length + category.videos.length + category.files.length;
 
+  const Component = variant === "row" ? MenuRow : MenuTile;
+
   return (
-    <MenuTile
+    <Component
       href={`/categories/${category.slug}`}
       title={category.name}
       subtitle={itemCount > 0 ? `${itemCount} ${itemCount === 1 ? "item" : "items"}` : undefined}

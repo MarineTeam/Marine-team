@@ -17,14 +17,14 @@ export default async function ScriptureBookPage({
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
       <div>
-        <Link href="/scripture" className="text-sm text-zinc-500 hover:underline">
+        <Link href="/scripture" className="text-sm text-sec hover:underline">
           ← Browse by scripture
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight mt-1">{decoded}</h1>
+        <h1 className="mt-1 text-3xl font-bold tracking-tight text-ink">{decoded}</h1>
       </div>
 
       {videos.length === 0 ? (
-        <p className="text-zinc-500">No videos reference {decoded} yet.</p>
+        <p className="text-sec">No videos reference {decoded} yet.</p>
       ) : (
         <div className="space-y-3">
           {videos.map((v) => (

@@ -2,129 +2,58 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-const ALL_TABS = [
-  { href: "/", label: "Home", icon: HomeIcon, exact: true, slug: null, memberOnly: false },
-  { href: "/recently-played", label: "Recently Played", icon: ClockIcon, exact: false, slug: "watch-history", memberOnly: false },
-  { href: "/favorites", label: "Favourites", icon: StarIcon, exact: false, slug: null, memberOnly: false },
-  { href: "/recently-added", label: "Recently Added", icon: SparkleIcon, exact: false, slug: null, memberOnly: false },
-  // Last, and only when logged in: the profile hub is the account area of the
-  // installed app, where the inbox and settings live.
-  { href: "/profile", label: "Profile", icon: PersonIcon, exact: false, slug: null, memberOnly: true },
-] as const;
+import { NAV_ICONS } from "@/components/app-sidebar";
+import { isActivePath } from "@/lib/active-path";
+import type { NavItem } from "@/lib/nav";
 
 /**
- * `unreadCount` badges the Profile tab, so an installed PWA shows waiting
- * notifications the way a native app would — without it, a member would only
- * discover their inbox by opening it.
+ * The bottom tab strip.
+ *
+ * On the website it's the phone-width fallback for the left rail. In the
+ * installed app it's the primary navigation at every width, which is what the
+ * `app-tabbar` class buys: the rule in globals.css keeps it on past the `sm`
+ * breakpoint when the app is running standalone, where `sm:hidden` would
+ * otherwise take away the only way to get around.
+ *
+ * The Profile tab carries the unread badge so waiting notifications are
+ * visible the way a native app shows them — without it, a member would only
+ * find their inbox by going looking for it.
  */
-export function BottomNav({
-  watchHistoryOn = true,
-  loggedIn = false,
-  unreadCount = 0,
-}: {
-  watchHistoryOn?: boolean;
-  loggedIn?: boolean;
-  unreadCount?: number;
-}) {
+export function BottomNav({ tabs }: { tabs: NavItem[] }) {
   const pathname = usePathname();
-  const TABS = ALL_TABS.filter(
-    (tab) => (tab.slug !== "watch-history" || watchHistoryOn) && (!tab.memberOnly || loggedIn),
-  );
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-20 flex sm:hidden border-t border-zinc-200 bg-white/95 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="app-tabbar pad-bottom-safe fixed inset-x-0 bottom-0 z-30 flex border-t border-sep bg-panel/95 backdrop-blur sm:hidden"
       aria-label="Primary"
     >
-      {TABS.map(({ href, label, icon: Icon, exact }) => {
-        const active = exact ? pathname === href : pathname.startsWith(href);
+      {tabs.map((tab) => {
+        const Icon = NAV_ICONS[tab.icon];
+        const active = isActivePath(pathname, tab.href, tab.exact);
         return (
           <Link
-            key={href}
-            href={href}
-            className="flex flex-1 flex-col items-center gap-1 py-2 text-[11px]"
+            key={tab.href}
+            href={tab.href}
+            aria-current={active ? "page" : undefined}
+            className={`flex flex-1 flex-col items-center gap-1 py-2 text-[11px] ${
+              active ? "font-medium text-accent" : "text-sec"
+            }`}
           >
             <span className="relative">
-              <Icon
-                className={`h-6 w-6 ${
-                  active ? "text-zinc-900 dark:text-white" : "text-zinc-400 dark:text-zinc-500"
-                }`}
-              />
-              {href === "/profile" && unreadCount > 0 && (
+              <Icon className="h-6 w-6" />
+              {tab.badge ? (
                 <span
-                  aria-label={`${unreadCount} unread notifications`}
-                  className="absolute -right-1.5 -top-1 min-w-4 rounded-full bg-sky-600 px-1 text-center text-[10px] font-medium leading-4 text-white"
+                  aria-hidden
+                  className="absolute -top-1 -right-1.5 min-w-4 rounded-full bg-accent px-1 text-center text-[10px] leading-4 font-medium text-white"
                 >
-                  {unreadCount > 9 ? "9+" : unreadCount}
+                  {tab.badge > 9 ? "9+" : tab.badge}
                 </span>
-              )}
+              ) : null}
             </span>
-            <span
-              className={
-                active
-                  ? "font-medium text-zinc-900 dark:text-white"
-                  : "text-zinc-500 dark:text-zinc-500"
-              }
-            >
-              {label}
-            </span>
+            <span className="max-w-full truncate px-0.5">{tab.label}</span>
           </Link>
         );
       })}
     </nav>
-  );
-}
-
-function HomeIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className={className} aria-hidden>
-      <path d="M3 11.5 12 4l9 7.5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M5.5 9.5V19a1 1 0 0 0 1 1H9a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1h2.5a1 1 0 0 0 1-1V9.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function ClockIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className={className} aria-hidden>
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M12 7.5V12l3 2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function StarIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className={className} aria-hidden>
-      <path
-        d="M12 4.5l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4-3.9-3.8 5.4-.8L12 4.5z"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function PersonIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className={className} aria-hidden>
-      <circle cx="12" cy="8.5" r="3.5" />
-      <path d="M5 20c0-3.3 3.1-6 7-6s7 2.7 7 6" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function SparkleIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className={className} aria-hidden>
-      <path
-        d="M11 4l1.2 3.8L16 9l-3.8 1.2L11 14l-1.2-3.8L6 9l3.8-1.2L11 4z"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      <path d="M17.5 14.5l.7 2.1 2.1.7-2.1.7-.7 2.1-.7-2.1-2.1-.7 2.1-.7.7-2.1z" strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
   );
 }

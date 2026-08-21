@@ -1,11 +1,7 @@
 import { BottomNav } from "@/components/bottom-nav";
-import { isPluginEnabled } from "@/lib/plugins";
-import { getCurrentUser } from "@/lib/current-user";
-import { getUnreadNotificationCount } from "@/lib/inbox";
+import { getShellNav } from "@/lib/nav";
 
 export async function BottomNavServer() {
-  const [watchHistoryOn, user] = await Promise.all([isPluginEnabled("watch-history"), getCurrentUser()]);
-  const unreadCount = user ? await getUnreadNotificationCount(user.id) : 0;
-
-  return <BottomNav watchHistoryOn={watchHistoryOn} loggedIn={Boolean(user)} unreadCount={unreadCount} />;
+  const { tabs } = await getShellNav();
+  return <BottomNav tabs={tabs} />;
 }

@@ -67,13 +67,13 @@ export function CaptionsManager({ videoId }: { videoId: string }) {
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+    <div className="space-y-3 rounded-lg border border-sep p-3">
       {captions && captions.length > 0 && (
         <ul className="space-y-1 text-sm">
           {captions.map((c) => (
             <li key={c.srclang} className="flex items-center justify-between gap-2">
               <span>
-                {c.label ?? c.srclang} <span className="text-zinc-500">({c.srclang})</span>
+                {c.label ?? c.srclang} <span className="text-sec">({c.srclang})</span>
               </span>
               <button
                 onClick={() => remove(c.srclang)}
@@ -87,7 +87,7 @@ export function CaptionsManager({ videoId }: { videoId: string }) {
         </ul>
       )}
       {captions && captions.length === 0 && (
-        <p className="text-xs text-zinc-500">No captions yet.</p>
+        <p className="text-xs text-sec">No captions yet.</p>
       )}
 
       <form onSubmit={upload} className="flex flex-wrap items-center gap-2">
@@ -96,13 +96,13 @@ export function CaptionsManager({ videoId }: { videoId: string }) {
           onChange={(e) => setSrclang(e.target.value)}
           placeholder="en"
           maxLength={5}
-          className="w-16 rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-16 rounded-md border border-sep px-2 py-1 text-sm"
         />
         <input
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           placeholder="English"
-          className="flex-1 min-w-[8rem] rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="flex-1 min-w-[8rem] rounded-md border border-sep px-2 py-1 text-sm"
         />
         <input
           type="file"
@@ -113,7 +113,7 @@ export function CaptionsManager({ videoId }: { videoId: string }) {
         <button
           type="submit"
           disabled={saving || !file || !srclang.trim()}
-          className="rounded-md border border-zinc-300 px-2 py-1 text-sm disabled:opacity-50 dark:border-zinc-700"
+          className="rounded-md border border-sep px-2 py-1 text-sm disabled:opacity-50"
         >
           Upload
         </button>

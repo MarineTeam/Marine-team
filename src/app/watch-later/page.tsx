@@ -14,7 +14,7 @@ export default async function WatchLaterPage() {
         <p className="font-medium">Log in to see your Watch Later queue.</p>
         <a
           href="/auth/login"
-          className="mt-4 inline-block rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+          className="mt-4 inline-block rounded-md btn-primary text-white px-4 py-2 text-sm"
         >
           Log in
         </a>
@@ -26,17 +26,17 @@ export default async function WatchLaterPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-8">
-      <h1 className="text-2xl font-semibold tracking-tight">Watch Later</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-ink">Watch Later</h1>
 
       {seriesQueue.length === 0 && videoQueue.length === 0 && categoryQueue.length === 0 && (
-        <p className="text-zinc-500">
+        <p className="text-sec">
           Nothing queued yet — look for the Watch Later button on a category, series, or video.
         </p>
       )}
 
       {categoryQueue.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Categories</h2>
+          <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">Categories</h2>
           <div className="space-y-3">
             {categoryQueue.map((entry) => (
               <CategoryTile key={entry.id} category={entry.category} />
@@ -47,7 +47,7 @@ export default async function WatchLaterPage() {
 
       {seriesQueue.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Series</h2>
+          <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">Series</h2>
           <div className="space-y-3">
             {seriesQueue.map((entry) => (
               <SeriesTile key={entry.id} series={entry.series} />
@@ -58,7 +58,7 @@ export default async function WatchLaterPage() {
 
       {videoQueue.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Videos</h2>
+          <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">Videos</h2>
           <div className="space-y-3">
             {videoQueue.map((entry) => (
               <MenuTile

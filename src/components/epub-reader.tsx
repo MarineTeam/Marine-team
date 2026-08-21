@@ -217,23 +217,23 @@ export function EpubReader({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-center gap-2 border-b border-zinc-200 p-2 text-sm dark:border-zinc-800">
+      <div className="flex items-center justify-center gap-2 border-b border-sep p-2 text-sm">
         <button
           onClick={() => void renditionRef.current?.prev()}
-          className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+          className="rounded-md border border-sep px-2 py-1"
         >
           ‹ Prev
         </button>
         <button
           onClick={() => void renditionRef.current?.next()}
-          className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+          className="rounded-md border border-sep px-2 py-1"
         >
           Next ›
         </button>
       </div>
-      <div className="relative min-h-0 flex-1 bg-white dark:bg-zinc-900">
+      <div className="relative min-h-0 flex-1 bg-white">
         {loading && (
-          <p className="absolute inset-x-0 top-8 text-center text-sm text-zinc-500">Opening…</p>
+          <p className="absolute inset-x-0 top-8 text-center text-sm text-sec">Opening…</p>
         )}
         <div ref={containerRef} className="h-full w-full" />
       </div>

@@ -3,6 +3,7 @@ import { HeroBanner } from "@/components/hero-banner";
 import { CategoryTile } from "@/components/category-tile";
 import { SeriesTile } from "@/components/series-tile";
 import { MenuTile } from "@/components/menu-tile";
+import { getBranding } from "@/lib/branding";
 import { getCurrentUser } from "@/lib/current-user";
 import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { getPluginStates } from "@/lib/plugins";
@@ -20,15 +21,23 @@ import {
   getSeriesByTag,
 } from "@/lib/content";
 
+/** The small uppercase heading each admin-orderable row sits under. */
+function RowHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="px-1 text-[11px] font-bold tracking-[0.08em] text-ter uppercase">{children}</h2>
+  );
+}
+
 export default async function Home() {
   const user = await getCurrentUser();
   const isLoggedIn = Boolean(user);
-  const [featured, categories, uncategorized, plugins, homeRows] = await Promise.all([
+  const [featured, categories, uncategorized, plugins, homeRows, branding] = await Promise.all([
     getFeaturedSeries(),
     getPublishedCategoriesWithSeries(isLoggedIn),
     getUncategorizedSeries(),
     getPluginStates(),
     getHomeRows(),
+    getBranding(),
   ]);
   const viewCountsOn = plugins["view-counts"];
   const recommendationsOn = plugins.recommendations;
@@ -73,7 +82,7 @@ export default async function Home() {
           href="/live"
           className="flex items-center justify-center gap-2 bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
         >
-          <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
           Live now: {liveStream.title}
         </Link>
       )}
@@ -84,19 +93,25 @@ export default async function Home() {
         </div>
       )}
 
-      <div className="max-w-2xl mx-auto px-4 py-8 sm:py-10 space-y-8">
-        {!featured && (
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Marine Team</h1>
-            <p className="mt-2 text-zinc-500">Browse series, watch videos, and download files.</p>
-          </div>
-        )}
+      <div className="mx-auto max-w-2xl space-y-8 px-4 py-6 sm:py-10">
+        {/*
+          The page's own title. Present whether or not there's a hero, because
+          in the installed app the bar above shows only the wordmark — the
+          screen needs to say what it is, the way a native app's large title
+          does.
+        */}
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-ink">Home</h1>
+          {!featured && (
+            <p className="mt-2 text-sec">
+              Browse {branding.name} — series, videos, and downloads.
+            </p>
+          )}
+        </div>
 
         {continueWatching.length > 0 && (
-          <section className="hidden sm:block space-y-3">
-            <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-              Continue watching
-            </h2>
+          <section className="hidden space-y-2 sm:block">
+            <RowHeading>Continue watching</RowHeading>
             <div className="space-y-3">
               {continueWatching.map((entry) => (
                 <MenuTile
@@ -111,17 +126,20 @@ export default async function Home() {
           </section>
         )}
 
-        {!hasContent && (
-          <p className="text-zinc-500">Nothing has been published yet. Check back soon.</p>
-        )}
+        {!hasContent && <p className="text-sec">Nothing has been published yet. Check back soon.</p>}
 
+        {/*
+          The browse list is one panel of hairline-divided rows rather than a
+          stack of cards: it is the spine of the app, and a card each turns
+          six sections into six competing objects.
+        */}
         {hasContent && (
-          <div className="space-y-3">
+          <div className="divide-y divide-sep overflow-hidden rounded-xl border border-sep bg-panel">
             {categories.map((category) => (
-              <CategoryTile key={category.id} category={category} />
+              <CategoryTile key={category.id} category={category} variant="row" />
             ))}
             {uncategorized.map((series) => (
-              <SeriesTile key={series.id} series={series} />
+              <SeriesTile key={series.id} series={series} variant="row" />
             ))}
           </div>
         )}
@@ -130,10 +148,10 @@ export default async function Home() {
           switch (row.type) {
             case "RECOMMENDATIONS":
               return recommended ? (
-                <section key={row.id} className="space-y-3">
-                  <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+                <section key={row.id} className="space-y-2">
+                  <RowHeading>
                     {row.title || `Because you watched ${recommended.anchorTitle}`}
-                  </h2>
+                  </RowHeading>
                   <div className="space-y-3">
                     {recommended.series.map((series) => (
                       <SeriesTile key={series.id} series={series} />
@@ -144,10 +162,8 @@ export default async function Home() {
 
             case "TRENDING":
               return trending.length > 0 ? (
-                <section key={row.id} className="space-y-3">
-                  <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-                    {row.title || "🔥 Trending this week"}
-                  </h2>
+                <section key={row.id} className="space-y-2">
+                  <RowHeading>{row.title || "🔥 Trending this week"}</RowHeading>
                   <div className="space-y-3">
                     {trending.map((series) => (
                       <SeriesTile key={series.id} series={series} />
@@ -158,10 +174,8 @@ export default async function Home() {
 
             case "RECENTLY_ADDED":
               return recentlyAdded.length > 0 ? (
-                <section key={row.id} className="hidden sm:block space-y-3">
-                  <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-                    {row.title || "Recently added"}
-                  </h2>
+                <section key={row.id} className="hidden space-y-2 sm:block">
+                  <RowHeading>{row.title || "Recently added"}</RowHeading>
                   <div className="space-y-3">
                     {recentlyAdded.map((item) =>
                       item.kind === "category" ? (
@@ -177,10 +191,8 @@ export default async function Home() {
             case "CATEGORY": {
               const series = categoryRowSeriesByRowId.get(row.id) ?? [];
               return series.length > 0 ? (
-                <section key={row.id} className="space-y-3">
-                  <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-                    {row.title || row.category?.name || "Category"}
-                  </h2>
+                <section key={row.id} className="space-y-2">
+                  <RowHeading>{row.title || row.category?.name || "Category"}</RowHeading>
                   <div className="space-y-3">
                     {series.map((s) => (
                       <SeriesTile key={s.id} series={s} />
@@ -193,10 +205,8 @@ export default async function Home() {
             case "TAG": {
               const series = tagRowSeriesByRowId.get(row.id) ?? [];
               return series.length > 0 ? (
-                <section key={row.id} className="space-y-3">
-                  <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-                    {row.title || `#${row.tag}`}
-                  </h2>
+                <section key={row.id} className="space-y-2">
+                  <RowHeading>{row.title || `#${row.tag}`}</RowHeading>
                   <div className="space-y-3">
                     {series.map((s) => (
                       <SeriesTile key={s.id} series={s} />

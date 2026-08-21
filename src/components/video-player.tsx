@@ -81,20 +81,20 @@ export function VideoPlayer({ embedUrl, chapters }: { embedUrl: string; chapters
           default can only be a reminder of which speed to pick in the
           player's own settings. */}
       {preferredSpeed !== 1 && (
-        <p className="text-xs text-zinc-400">
+        <p className="text-xs text-ter">
           Your preferred speed is {preferredSpeed}× — set it with the player&apos;s ⚙️ settings icon.
         </p>
       )}
 
       {chapters.length > 0 && (
-        <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 text-sm dark:divide-zinc-800 dark:border-zinc-800">
+        <ul className="divide-y divide-sep rounded-lg border border-sep text-sm">
           {chapters.map((c) => (
             <li key={c.id} className="flex items-center">
               <button
                 onClick={() => setSrc(withStart(embedUrl, c.timestampSeconds))}
-                className="flex flex-1 items-center gap-3 px-3 py-2 text-left hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                className="flex flex-1 items-center gap-3 px-3 py-2 text-left hover:bg-hover"
               >
-                <span className="w-16 shrink-0 tabular-nums text-zinc-500">
+                <span className="w-16 shrink-0 tabular-nums text-sec">
                   {formatTimestamp(c.timestampSeconds)}
                 </span>
                 <span>{c.title}</span>
@@ -102,7 +102,7 @@ export function VideoPlayer({ embedUrl, chapters }: { embedUrl: string; chapters
               <button
                 onClick={() => copyChapterLink(c.id, c.timestampSeconds)}
                 title="Copy link to this chapter"
-                className="shrink-0 px-3 py-2 text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+                className="shrink-0 px-3 py-2 text-xs text-sec hover:text-ink"
               >
                 {copiedChapterId === c.id ? "Copied!" : "🔗"}
               </button>

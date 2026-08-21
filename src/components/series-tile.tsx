@@ -1,4 +1,4 @@
-import { MenuTile } from "@/components/menu-tile";
+import { MenuRow, MenuTile } from "@/components/menu-tile";
 
 type SeriesTileData = {
   slug: string;
@@ -9,9 +9,18 @@ type SeriesTileData = {
   tags?: string[];
 };
 
-export function SeriesTile({ series }: { series: SeriesTileData }) {
+export function SeriesTile({
+  series,
+  variant = "card",
+}: {
+  series: SeriesTileData;
+  /** "row" flattens it for a grouped panel — see menu-tile.tsx. */
+  variant?: "card" | "row";
+}) {
+  const Component = variant === "row" ? MenuRow : MenuTile;
+
   return (
-    <MenuTile
+    <Component
       href={`/series/${series.slug}`}
       title={series.title}
       subtitle={series.description}

@@ -9,16 +9,55 @@
  */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Fallback values for the branding tokens. The real ones are written into a
+ * <style> element in <head> from the BrandSettings row (see lib/branding.ts),
+ * which lands later in the cascade and wins. These exist so the app is still
+ * painted sensibly if that render fails or the database is unreachable.
+ */
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  --brand: #1a8fd1;
+  --brand-deep: #0288d1;
+  --brand-light: #4fc3f7;
+  --accent: #0288d1;
+  --accent-rgb: 2, 136, 209;
+  --bg: #f4f6f9;
+  --panel: #ffffff;
+  --text: #111418;
+  --sec: #6b7280;
+  --ter: #9aa1ab;
+  --sep: rgba(16, 24, 40, 0.08);
+  --hover: rgba(2, 136, 209, 0.07);
+  --accent-soft: rgba(2, 136, 209, 0.1);
+  --chip: #eef2f6;
+  --grad-brand: linear-gradient(135deg, #4fc3f7, #0288d1);
 }
 
+/*
+ * `inline` matters here: it makes the generated utilities reference the custom
+ * property rather than resolving it at build time, so `bg-panel` follows the
+ * theme switch and the admin's colour choice at runtime.
+ */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-brand: var(--brand);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-ink: var(--text);
+  --color-sec: var(--sec);
+  --color-ter: var(--ter);
+  --color-sep: var(--sep);
+  --color-chip: var(--chip);
+  --color-hover: var(--hover);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -34,7 +73,69 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans), -apple-system, "PingFang TC", system-ui, sans-serif;
+}
+
+/*
+ * Installed-app vs. website chrome. Both are rendered on the server — which
+ * of the two is shown is decided purely in CSS, so there is no hydration
+ * mismatch and no flash of the wrong shell.
+ *
+ * Note these only ever *hide*: an element's own display class stays
+ * authoritative in the mode it belongs to. `data-standalone` is stamped by
+ * STANDALONE_INIT_SCRIPT (lib/standalone.ts); when it is absent — no JS, or
+ * an ordinary browser tab — the website chrome is what shows.
+ */
+:root:not([data-standalone="true"]) .only-app {
+  display: none !important;
+}
+
+:root[data-standalone="true"] .only-web {
+  display: none !important;
+}
+
+/*
+ * The installed app runs edge to edge under the status bar (the layout sets
+ * viewport-fit=cover), so the app bar and tab strip pad themselves out of the
+ * way of the notch and the home indicator.
+ */
+.pad-top-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+.pad-bottom-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/*
+ * Installed, the tab strip is the only navigation there is, so it stays put at
+ * every width — `sm:hidden` is right for the website (where the rail takes
+ * over) and wrong for the app.
+ */
+:root[data-standalone="true"] .app-tabbar {
+  display: flex;
+}
+
+/* ...and the content above it has to clear it at every width too. */
+:root[data-standalone="true"] .app-main {
+  padding-bottom: 4rem;
+}
+
+/*
+ * The primary action. This used to be a near-black pill that inverted to
+ * white in dark mode; it is the brand gradient in both themes now, so the
+ * thing you are meant to press is the same colour as the app around it.
+ *
+ * Padding, radius and text size stay with the call sites — they differ from
+ * one button to the next, and only the colour was ever shared.
+ */
+.btn-primary {
+  background: var(--grad-brand);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
 }

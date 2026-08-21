@@ -26,7 +26,7 @@ export function ShareButtons({ title, path }: { title: string; path: string }) {
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <button
         onClick={copyLink}
-        className="rounded-md border border-zinc-300 px-3 py-1.5 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+        className="rounded-md border border-sep px-3 py-1.5 hover:bg-hover"
       >
         {copied ? "Copied!" : "Copy link"}
       </button>
@@ -34,7 +34,7 @@ export function ShareButtons({ title, path }: { title: string; path: string }) {
         href={`https://twitter.com/intent/tweet?text=${shareText}&url=${shareUrl}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="rounded-md border border-zinc-300 px-3 py-1.5 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+        className="rounded-md border border-sep px-3 py-1.5 hover:bg-hover"
       >
         Share on X
       </a>
@@ -42,7 +42,7 @@ export function ShareButtons({ title, path }: { title: string; path: string }) {
         href={`https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="rounded-md border border-zinc-300 px-3 py-1.5 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+        className="rounded-md border border-sep px-3 py-1.5 hover:bg-hover"
       >
         Share on Facebook
       </a>

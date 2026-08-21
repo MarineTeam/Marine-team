@@ -62,7 +62,7 @@ export function ThumbnailManager({
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+    <div className="space-y-3 rounded-lg border border-sep p-3">
       <div className="flex items-center gap-3">
         {currentUrl && (
           <Image
@@ -71,10 +71,10 @@ export function ThumbnailManager({
             width={96}
             height={56}
             unoptimized
-            className="h-14 w-24 rounded object-cover bg-zinc-100 dark:bg-zinc-800"
+            className="h-14 w-24 rounded object-cover bg-chip"
           />
         )}
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-sec">
           Bunny Stream generates this automatically from the video. Set a custom one below to
           override it.
         </p>
@@ -85,12 +85,12 @@ export function ThumbnailManager({
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://…"
-          className="flex-1 min-w-[12rem] rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="flex-1 min-w-[12rem] rounded-md border border-sep px-2 py-1 text-sm"
         />
         <button
           type="submit"
           disabled={saving || !url.trim()}
-          className="rounded-md border border-zinc-300 px-2 py-1 text-sm disabled:opacity-50 dark:border-zinc-700"
+          className="rounded-md border border-sep px-2 py-1 text-sm disabled:opacity-50"
         >
           Set from URL
         </button>
@@ -106,7 +106,7 @@ export function ThumbnailManager({
         <button
           onClick={uploadFile}
           disabled={saving || !file}
-          className="rounded-md border border-zinc-300 px-2 py-1 text-sm disabled:opacity-50 dark:border-zinc-700"
+          className="rounded-md border border-sep px-2 py-1 text-sm disabled:opacity-50"
         >
           Upload image
         </button>

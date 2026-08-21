@@ -39,9 +39,9 @@ export function PremiereCountdown({ premiereAt, label = "Premieres in" }: { prem
 
   return (
     <div className="aspect-video flex flex-col items-center justify-center gap-2 rounded-lg bg-zinc-900 text-white">
-      <p className="text-sm uppercase tracking-wide text-zinc-400">{label}</p>
+      <p className="text-sm uppercase tracking-wide text-ter">{label}</p>
       <p className="font-mono text-2xl">{format(remaining)}</p>
-      <p className="text-sm text-zinc-400">{new Date(premiereAt).toLocaleString()}</p>
+      <p className="text-sm text-ter">{new Date(premiereAt).toLocaleString()}</p>
     </div>
   );
 }

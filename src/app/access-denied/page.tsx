@@ -24,8 +24,8 @@ export default async function AccessDeniedPage({
 
   return (
     <div className="max-w-lg mx-auto px-4 py-16 text-center space-y-4">
-      <h1 className="text-xl font-semibold tracking-tight">You don&apos;t have access</h1>
-      <p className="text-sm text-zinc-500">
+      <h1 className="text-3xl font-bold tracking-tight text-ink">You don&apos;t have access</h1>
+      <p className="text-sm text-sec">
         You are not authorized to access this application. Please contact an administrator if you believe you
         should have access.
       </p>
@@ -35,13 +35,13 @@ export default async function AccessDeniedPage({
             send them straight back here on the next login attempt. */}
         <a
           href="/auth/logout"
-          className="rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+          className="rounded-md btn-primary text-white px-4 py-2 text-sm"
         >
           Sign out
         </a>
         <Link
           href="/"
-          className="rounded-md border border-zinc-300 px-4 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          className="rounded-md border border-sep px-4 py-2 text-sm hover:bg-hover"
         >
           Back to the site
         </Link>
@@ -56,7 +56,7 @@ export default async function AccessDeniedPage({
           doesn't name an organization, after which the same allowlist check
           decides. */}
       {showGuestOption && (
-        <p className="pt-2 text-sm text-zinc-500">
+        <p className="pt-2 text-sm text-sec">
           Invited as a guest, without being part of the organization?{" "}
           <a href="/auth/guest" className="underline">
             Sign in that way instead

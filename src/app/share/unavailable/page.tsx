@@ -39,19 +39,19 @@ export default async function ShareUnavailablePage({
 
   return (
     <div className="max-w-lg mx-auto px-4 py-16 text-center space-y-4">
-      <h1 className="text-xl font-semibold tracking-tight">{heading}</h1>
-      <p className="text-sm text-zinc-500">{detail}</p>
+      <h1 className="text-3xl font-bold tracking-tight text-ink">{heading}</h1>
+      <p className="text-sm text-sec">{detail}</p>
       <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
         <Link
           href="/"
-          className="rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+          className="rounded-md btn-primary text-white px-4 py-2 text-sm"
         >
           Browse the site
         </Link>
         {reason === "forbidden" && (
           <a
             href="/auth/logout"
-            className="rounded-md border border-zinc-300 px-4 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+            className="rounded-md border border-sep px-4 py-2 text-sm hover:bg-hover"
           >
             Log out
           </a>

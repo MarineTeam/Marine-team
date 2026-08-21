@@ -13,14 +13,14 @@ export default async function TagPage({
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
       <div>
-        <Link href="/" className="text-sm text-zinc-500 hover:underline">
+        <Link href="/" className="text-sm text-sec hover:underline">
           ← Browse
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight mt-1">#{decodeURIComponent(tag)}</h1>
+        <h1 className="mt-1 text-3xl font-bold tracking-tight text-ink">#{decodeURIComponent(tag)}</h1>
       </div>
 
       {series.length === 0 ? (
-        <p className="text-zinc-500">Nothing tagged &ldquo;{decodeURIComponent(tag)}&rdquo; yet.</p>
+        <p className="text-sec">Nothing tagged &ldquo;{decodeURIComponent(tag)}&rdquo; yet.</p>
       ) : (
         <div className="space-y-3">
           {series.map((s) => (

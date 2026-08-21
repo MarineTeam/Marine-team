@@ -19,21 +19,21 @@ function HymnRow({ hymn, isLoggedIn }: { hymn: HymnListItem; isLoggedIn: boolean
   const locked = hymn.memberOnly && !isLoggedIn;
   const content = (
     <>
-      <span className="w-8 shrink-0 text-right text-sm tabular-nums text-zinc-400">
+      <span className="w-8 shrink-0 text-right text-sm tabular-nums text-ter">
         {hymn.pageNumber ?? ""}
       </span>
       <span className="min-w-0 flex-1 truncate text-sm">{hymn.title}</span>
       {locked ? (
-        <span className="shrink-0 text-xs text-zinc-400">Members only</span>
+        <span className="shrink-0 text-xs text-ter">Members only</span>
       ) : (
-        <span aria-hidden className="shrink-0 text-zinc-300 dark:text-zinc-600">
+        <span aria-hidden className="shrink-0 text-ter">
           →
         </span>
       )}
     </>
   );
   const className =
-    "flex items-center gap-2 rounded-md px-3 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-900";
+    "flex items-center gap-2 rounded-md px-3 py-2.5 hover:bg-hover";
   return locked ? (
     <div className={className}>{content}</div>
   ) : (
@@ -72,7 +72,7 @@ export function HymnList({ hymns, isLoggedIn }: { hymns: HymnListItem[]; isLogge
 
   return (
     <div className="space-y-3">
-      <div className="inline-flex rounded-lg border border-zinc-200 p-0.5 text-sm dark:border-zinc-800">
+      <div className="inline-flex rounded-lg border border-sep p-0.5 text-sm">
         {(
           [
             ["page", "Page"],
@@ -85,8 +85,8 @@ export function HymnList({ hymns, isLoggedIn }: { hymns: HymnListItem[]; isLogge
             onClick={() => setSort(mode)}
             className={`rounded-md px-3 py-1.5 transition ${
               sort === mode
-                ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
-                : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+                ? "btn-primary text-white"
+                : "text-sec hover:text-ink"
             }`}
           >
             {label}
@@ -94,15 +94,15 @@ export function HymnList({ hymns, isLoggedIn }: { hymns: HymnListItem[]; isLogge
         ))}
       </div>
 
-      <div className="rounded-lg border border-zinc-200 dark:border-zinc-800">
+      <div className="rounded-lg border border-sep">
         {grouped.map((group, i) => (
           <div key={group.label ?? i}>
             {group.label && (
-              <h3 className="border-b border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+              <h3 className="border-b border-sep bg-chip px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-sec">
                 {group.label}
               </h3>
             )}
-            <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+            <div className="divide-y divide-sep">
               {group.hymns.map((hymn) => (
                 <HymnRow key={hymn.id} hymn={hymn} isLoggedIn={isLoggedIn} />
               ))}

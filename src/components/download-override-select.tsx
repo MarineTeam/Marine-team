@@ -32,13 +32,13 @@ export function DownloadOverrideSelect({
         id={id}
         value={value === null ? "inherit" : value ? "on" : "off"}
         onChange={(e) => onChange(e.target.value === "inherit" ? null : e.target.value === "on")}
-        className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        className="mt-1 w-full rounded-md border border-sep px-3 py-2 text-sm"
       >
         <option value="inherit">Inherit ({inheritedLabel})</option>
         <option value="on">Allow downloads</option>
         <option value="off">Block downloads</option>
       </select>
-      <p className="mt-1 text-xs text-zinc-500">
+      <p className="mt-1 text-xs text-sec">
         Only applies while the Downloads plugin is on, and never lets someone download what they can&apos;t watch.
       </p>
     </div>

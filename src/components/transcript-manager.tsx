@@ -35,19 +35,19 @@ export function TranscriptManager({
   }
 
   return (
-    <div className="space-y-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+    <div className="space-y-2 rounded-lg border border-sep p-3">
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Paste the video's transcript here…"
         rows={8}
-        className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        className="w-full rounded-md border border-sep px-3 py-2 text-sm"
       />
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button
         onClick={save}
         disabled={saving}
-        className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm disabled:opacity-50 dark:border-zinc-700"
+        className="rounded-md border border-sep px-3 py-1.5 text-sm disabled:opacity-50"
       >
         {saving ? "Saving…" : "Save transcript"}
       </button>

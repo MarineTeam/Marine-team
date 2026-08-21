@@ -40,7 +40,7 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
           <p className="font-medium">Log in to see this playlist.</p>
           <a
             href="/auth/login"
-            className="mt-4 inline-block rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+            className="mt-4 inline-block rounded-md btn-primary text-white px-4 py-2 text-sm"
           >
             Log in
           </a>
@@ -53,20 +53,20 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
       <div>
-        <Link href="/playlists" className="text-sm text-zinc-500 hover:underline">
+        <Link href="/playlists" className="text-sm text-sec hover:underline">
           ← Playlists
         </Link>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{publicPlaylist.title}</h1>
-            <p className="text-sm text-zinc-500">by {getDisplayName(publicPlaylist.user)}</p>
+            <h1 className="text-3xl font-bold tracking-tight text-ink">{publicPlaylist.title}</h1>
+            <p className="text-sm text-sec">by {getDisplayName(publicPlaylist.user)}</p>
           </div>
           <ShareButtons title={publicPlaylist.title} path={`/playlists/${publicPlaylist.id}`} />
         </div>
       </div>
 
       {publicPlaylist.items.length === 0 ? (
-        <p className="text-zinc-500">This playlist is empty.</p>
+        <p className="text-sec">This playlist is empty.</p>
       ) : (
         <div className="space-y-3">
           {publicPlaylist.items.map((item) => (

@@ -44,7 +44,7 @@ export function ReactionButtons({
         className={`rounded-md border px-2 py-1 disabled:cursor-default ${
           mine === "LIKE"
             ? "border-blue-400 text-blue-700 dark:text-blue-400"
-            : "border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            : "border-sep hover:bg-hover"
         }`}
       >
         👍 {likes}
@@ -56,7 +56,7 @@ export function ReactionButtons({
         className={`rounded-md border px-2 py-1 disabled:cursor-default ${
           mine === "DISLIKE"
             ? "border-red-400 text-red-700 dark:text-red-400"
-            : "border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            : "border-sep hover:bg-hover"
         }`}
       >
         👎 {dislikes}

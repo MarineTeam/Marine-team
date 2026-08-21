@@ -37,7 +37,7 @@ export function DragHandle(props: React.HTMLAttributes<HTMLSpanElement>) {
   return (
     <span
       {...props}
-      className="cursor-grab select-none px-1 text-zinc-400 active:cursor-grabbing"
+      className="cursor-grab select-none px-1 text-ter active:cursor-grabbing"
       aria-label="Drag to reorder"
       title="Drag to reorder"
     >
@@ -67,7 +67,7 @@ export function PositionInput({
         if (!Number.isFinite(value) || value < 1) return;
         onReorder(value - 1);
       }}
-      className="w-14 rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+      className="w-14 rounded-md border border-sep px-2 py-1 text-sm"
       aria-label="Position"
     />
   );

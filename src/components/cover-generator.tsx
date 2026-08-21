@@ -71,13 +71,13 @@ export function CoverGenerator({
   }
 
   return (
-    <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+    <div className="rounded-lg border border-sep p-4">
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={() => generate(missing)}
           disabled={running || missing.length === 0}
-          className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm disabled:opacity-50 dark:border-zinc-700"
+          className="rounded-md border border-sep px-3 py-1.5 text-sm disabled:opacity-50"
         >
           {running
             ? `Generating… ${done}/${missing.length}`
@@ -89,7 +89,7 @@ export function CoverGenerator({
           <button
             type="button"
             onClick={() => generate(files)}
-            className="text-sm text-zinc-500 hover:underline"
+            className="text-sm text-sec hover:underline"
           >
             Regenerate all {files.length}
           </button>
@@ -97,7 +97,7 @@ export function CoverGenerator({
         {result && <span className="text-sm text-green-600">{result}</span>}
       </div>
 
-      <p className="mt-2 text-xs text-zinc-500">
+      <p className="mt-2 text-xs text-sec">
         Draws each PDF&apos;s first page as its cover and counts its bookmarked hymns, so visitors
         get a thumbnail with the page instead of each browser opening the PDF to work it out.
       </p>

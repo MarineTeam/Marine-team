@@ -53,7 +53,7 @@ export function UpNextPanel({
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+    <div className="flex items-center gap-3 rounded-lg border border-sep p-3">
       {thumbnailUrl && (
         <Image
           src={thumbnailUrl}
@@ -65,14 +65,14 @@ export function UpNextPanel({
         />
       )}
       <div className="min-w-0 flex-1">
-        <p className="text-xs uppercase tracking-wide text-zinc-500">
+        <p className="text-xs uppercase tracking-wide text-sec">
           Up next{counting ? " · playing soon…" : ""}
         </p>
         <a href={href} className="block truncate font-medium hover:underline">
           {title}
         </a>
       </div>
-      <label className="flex shrink-0 items-center gap-1 text-xs text-zinc-500">
+      <label className="flex shrink-0 items-center gap-1 text-xs text-sec">
         <input type="checkbox" checked={autoplay} onChange={toggleAutoplay} />
         Autoplay
       </label>

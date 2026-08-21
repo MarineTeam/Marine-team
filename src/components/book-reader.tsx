@@ -144,29 +144,29 @@ export function BookReader({
 
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col">
-      <header className="flex flex-wrap items-center gap-3 border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
-        <Link href={backHref} className="text-sm text-zinc-500 hover:underline">
+      <header className="flex flex-wrap items-center gap-3 border-b border-sep px-4 py-2">
+        <Link href={backHref} className="text-sm text-sec hover:underline">
           ← {backLabel}
         </Link>
         <h1 className="flex-1 truncate text-sm font-medium">{fileTitle}</h1>
         <button
           onClick={openContents}
           aria-pressed={panel === "contents"}
-          className="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          className="rounded-md border border-sep px-2 py-1 text-xs hover:bg-hover"
         >
           Contents
         </button>
         <button
           onClick={() => setPanel((p) => (p === "search" ? null : "search"))}
           aria-pressed={panel === "search"}
-          className="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          className="rounded-md border border-sep px-2 py-1 text-xs hover:bg-hover"
         >
           Search
         </button>
         <button
           onClick={() => setPanel((p) => (p === "marks" ? null : "marks"))}
           aria-pressed={panel === "marks"}
-          className="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          className="rounded-md border border-sep px-2 py-1 text-xs hover:bg-hover"
         >
           Marks{marks.length > 0 ? ` (${marks.length})` : ""}
         </button>
@@ -175,7 +175,7 @@ export function BookReader({
             onClick={() => void addMark("HIGHLIGHT")}
             disabled={marking}
             title="Highlight the selected text, or save this spot"
-            className="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+            className="rounded-md border border-sep px-2 py-1 text-xs hover:bg-hover disabled:opacity-50"
           >
             🖍 Mark
           </button>
@@ -184,13 +184,13 @@ export function BookReader({
 
       <div className="flex min-h-0 flex-1">
         {panel && (
-          <aside className="w-72 shrink-0 overflow-auto border-r border-zinc-200 p-3 dark:border-zinc-800">
+          <aside className="w-72 shrink-0 overflow-auto border-r border-sep p-3">
             {panel === "contents" && (
               <>
-                <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">Contents</h2>
-                {tocLoading && <p className="text-sm text-zinc-500">Loading…</p>}
+                <h2 className="mb-2 text-[11px] font-bold tracking-[0.08em] text-ter uppercase">Contents</h2>
+                {tocLoading && <p className="text-sm text-sec">Loading…</p>}
                 {toc?.length === 0 && !tocLoading && (
-                  <p className="text-sm text-zinc-500">This book has no contents list.</p>
+                  <p className="text-sm text-sec">This book has no contents list.</p>
                 )}
                 <ul className="space-y-1 text-sm">
                   {toc?.map((entry, i) => (
@@ -203,7 +203,7 @@ export function BookReader({
                           {entry.label}
                         </button>
                       ) : (
-                        <span className="text-zinc-400">{entry.label}</span>
+                        <span className="text-ter">{entry.label}</span>
                       )}
                     </li>
                   ))}
@@ -213,30 +213,30 @@ export function BookReader({
 
             {panel === "search" && (
               <>
-                <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">Search</h2>
+                <h2 className="mb-2 text-[11px] font-bold tracking-[0.08em] text-ter uppercase">Search</h2>
                 <form onSubmit={runSearch} className="mb-3 flex gap-2">
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Find in book"
                     aria-label="Find in book"
-                    className="w-full rounded border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                    className="w-full rounded border border-sep px-2 py-1 text-sm"
                   />
                   <button
                     type="submit"
-                    className="rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700"
+                    className="rounded-md border border-sep px-2 py-1 text-sm"
                   >
                     Go
                   </button>
                 </form>
-                {searching && <p className="text-sm text-zinc-500">Searching…</p>}
-                {hits?.length === 0 && !searching && <p className="text-sm text-zinc-500">No matches.</p>}
+                {searching && <p className="text-sm text-sec">Searching…</p>}
+                {hits?.length === 0 && !searching && <p className="text-sm text-sec">No matches.</p>}
                 <ul className="space-y-2 text-sm">
                   {hits?.map((hit, i) => (
                     <li key={`${hit.location}-${i}`}>
-                      <button onClick={() => goTo(hit.location)} className="w-full text-left hover:bg-zinc-50 dark:hover:bg-zinc-900">
-                        <span className="block text-xs text-zinc-500">{hit.label}</span>
-                        <span className="block text-zinc-700 dark:text-zinc-300">{hit.excerpt}</span>
+                      <button onClick={() => goTo(hit.location)} className="w-full text-left hover:bg-hover">
+                        <span className="block text-xs text-sec">{hit.label}</span>
+                        <span className="block text-sec">{hit.excerpt}</span>
                       </button>
                     </li>
                   ))}
@@ -246,7 +246,7 @@ export function BookReader({
 
             {panel === "marks" && (
               <>
-                <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">Marks</h2>
+                <h2 className="mb-2 text-[11px] font-bold tracking-[0.08em] text-ter uppercase">Marks</h2>
                 <ReaderMarks
                   fileId={fileId}
                   marks={marks}

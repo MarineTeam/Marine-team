@@ -1635,3 +1635,25 @@ export async function getVideoViewerGroups(videoId: string) {
 export async function getVideoViewers(videoId: string) {
   return prisma.videoViewer.findMany({ where: { videoId }, include: { user: true }, orderBy: { createdAt: "asc" } });
 }
+
+/**
+ * The top-level categories, name and slug only, for the navigation chrome.
+ *
+ * Deliberately not getPublishedCategoriesWithSeries: that one pulls every
+ * series, child, video and file underneath each category for the homepage,
+ * and the sidebar renders on every single page. This is the same rows with
+ * none of the weight.
+ */
+async function getNavCategoriesUncached() {
+  return prisma.category.findMany({
+    where: { parentId: null, ...publishedNow() },
+    orderBy: categoryOrder,
+    select: { id: true, name: true, slug: true },
+  });
+}
+
+/** Cached: the same list for every visitor, on every page. */
+export const getNavCategories = unstable_cache(getNavCategoriesUncached, ["nav-categories"], {
+  revalidate: 300,
+  tags: ["categories"],
+});

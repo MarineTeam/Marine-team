@@ -299,13 +299,13 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold">
+      <h2 className="text-lg font-semibold text-ink">
         {seriesId ? "Files" : categoryId ? "Files in category" : "All files"}
       </h2>
 
       <form
         onSubmit={uploadQueue}
-        className="space-y-3 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4"
+        className="space-y-3 rounded-lg border border-sep p-4"
       >
         <div className="flex flex-wrap items-center gap-3">
           {!scoped && (
@@ -325,7 +325,7 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
           <button
             type="submit"
             disabled={uploading || queue.length === 0}
-            className="sm:ml-auto rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+            className="sm:ml-auto rounded-md btn-primary text-white px-4 py-2 text-sm disabled:opacity-50"
           >
             {uploading
               ? "Uploading…"
@@ -349,12 +349,12 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
                   aria-label={`Title for ${item.file.name}`}
                   placeholder={titleFromFilename(item.file.name)}
                   disabled={uploading}
-                  className="min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900"
+                  className="min-w-0 flex-1 rounded-md border border-sep px-3 py-2 text-sm disabled:opacity-60"
                 />
-                <span className="w-28 shrink-0 truncate text-xs text-zinc-500" title={item.file.name}>
+                <span className="w-28 shrink-0 truncate text-xs text-sec" title={item.file.name}>
                   {item.file.name}
                 </span>
-                {item.status === "uploading" && <span className="text-xs text-zinc-500">Uploading…</span>}
+                {item.status === "uploading" && <span className="text-xs text-sec">Uploading…</span>}
                 {item.status === "failed" && (
                   <span className="text-xs text-red-600" title={item.error ?? undefined}>
                     Failed
@@ -365,7 +365,7 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
                   onClick={() => setQueue((current) => current.filter((row) => row.key !== item.key))}
                   disabled={uploading}
                   aria-label={`Remove ${item.file.name}`}
-                  className="shrink-0 px-1 text-xs text-zinc-400 hover:text-red-600 disabled:opacity-50"
+                  className="shrink-0 px-1 text-xs text-ter hover:text-red-600 disabled:opacity-50"
                 >
                   ✕
                 </button>
@@ -386,7 +386,7 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
           </ul>
         )}
 
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-sec">
           Titles default to each file&apos;s name and can be edited before uploading. Max 4MB per file
           (server upload limit) — files upload one at a time, so one rejection doesn&apos;t stop the
           rest. For anything larger, upload it straight to Bunny Storage and add it below.
@@ -413,7 +413,7 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Filter files by title…"
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-full rounded-md border border-sep px-3 py-2 text-sm"
         />
       )}
 
@@ -430,7 +430,7 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
         </BulkButton>
       </BulkBar>
 
-      <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
+      <ul className="divide-y divide-sep rounded-lg border border-sep">
         {visibleFiles.map((f, index) => (
           <li
             key={f.id}
@@ -459,7 +459,7 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
                   <button
                     onClick={() => move(index, "up")}
                     disabled={index === 0}
-                    className="rounded-md border border-zinc-300 px-2 py-1 disabled:opacity-30 dark:border-zinc-700"
+                    className="rounded-md border border-sep px-2 py-1 disabled:opacity-30"
                     aria-label="Move up"
                   >
                     ↑
@@ -467,7 +467,7 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
                   <button
                     onClick={() => move(index, "down")}
                     disabled={index === visibleFiles.length - 1}
-                    className="rounded-md border border-zinc-300 px-2 py-1 disabled:opacity-30 dark:border-zinc-700"
+                    className="rounded-md border border-sep px-2 py-1 disabled:opacity-30"
                     aria-label="Move down"
                   >
                     ↓
@@ -484,20 +484,20 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
               )}
               <button
                 onClick={() => toggle(f, "published")}
-                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+                className="rounded-md border border-sep px-2 py-1"
               >
                 {f.published ? "Published" : "Draft"}
               </button>
               <button
                 onClick={() => setExpiry(f)}
-                className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${f.unpublishAt ? "border-amber-400 text-amber-700 dark:text-amber-400" : "border-zinc-300"}`}
+                className={`rounded-md border px-2 py-1 ${f.unpublishAt ? "border-amber-400 text-amber-700 dark:text-amber-400" : "border-sep"}`}
                 title={f.unpublishAt ? `Unpublishes ${new Date(f.unpublishAt).toLocaleString()}` : undefined}
               >
                 {f.unpublishAt ? "Expires" : "Set expiry"}
               </button>
               <button
                 onClick={() => toggle(f, "memberOnly")}
-                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+                className="rounded-md border border-sep px-2 py-1"
               >
                 {f.memberOnly ? "Members only" : "Public"}
               </button>
@@ -510,7 +510,7 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
               {f.mimeType?.startsWith("audio/") && (
                 <button
                   onClick={() => toggle(f, "podcastPublished")}
-                  className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${f.podcastPublished ? "border-sky-400 text-sky-700 dark:text-sky-400" : "border-zinc-300"}`}
+                  className={`rounded-md border px-2 py-1 ${f.podcastPublished ? "border-accent text-accent" : "border-sep"}`}
                   title="Publish this episode to the public podcast feed. It is copied to a separate public storage zone and becomes readable without a login."
                 >
                   {f.podcastPublished ? (f.publicPath ? "In podcast" : "Podcast pending") : "Not in podcast"}
@@ -518,13 +518,13 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
               )}
               <button
                 onClick={() => toggle(f, "hidden")}
-                className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${f.hidden ? "border-red-400 text-red-600 dark:text-red-400" : "border-zinc-300"}`}
+                className={`rounded-md border px-2 py-1 ${f.hidden ? "border-red-400 text-red-600 dark:text-red-400" : "border-sep"}`}
               >
                 {f.hidden ? "Hidden" : "Visible"}
               </button>
               <button
                 onClick={() => (editingId === f.id ? setEditingId(null) : startEditingDetails(f))}
-                className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${f.pageNumber != null || f.groupLabel || f.lyricsText ? "border-sky-400 text-sky-700 dark:text-sky-400" : "border-zinc-300"}`}
+                className={`rounded-md border px-2 py-1 ${f.pageNumber != null || f.groupLabel || f.lyricsText ? "border-accent text-accent" : "border-sep"}`}
                 title="Rename this file. Page number, category grouping and lyrics apply when it's one hymn in a 'one hymn per file' series."
               >
                 {editingId === f.id ? "Close" : "Details"}
@@ -534,49 +534,49 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
               </button>
             </div>
             {editingId === f.id && (
-              <div className="w-full space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
+              <div className="w-full space-y-2 rounded-md border border-sep bg-chip p-3">
                 <label className="block space-y-1 text-xs">
-                  <span className="text-zinc-500">Title</span>
+                  <span className="text-sec">Title</span>
                   <input
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
-                    className="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+                    className="w-full rounded-md border border-sep px-2 py-1.5 text-sm"
                   />
                 </label>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <label className="space-y-1 text-xs">
-                    <span className="text-zinc-500">Page number (printed page in the book)</span>
+                    <span className="text-sec">Page number (printed page in the book)</span>
                     <input
                       type="number"
                       value={editPageNumber}
                       onChange={(e) => setEditPageNumber(e.target.value)}
-                      className="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+                      className="w-full rounded-md border border-sep px-2 py-1.5 text-sm"
                     />
                   </label>
                   <label className="space-y-1 text-xs">
-                    <span className="text-zinc-500">Category grouping (e.g. &quot;Praise&quot;, &quot;Prayer&quot;)</span>
+                    <span className="text-sec">Category grouping (e.g. &quot;Praise&quot;, &quot;Prayer&quot;)</span>
                     <input
                       value={editGroupLabel}
                       onChange={(e) => setEditGroupLabel(e.target.value)}
-                      className="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+                      className="w-full rounded-md border border-sep px-2 py-1.5 text-sm"
                     />
                   </label>
                 </div>
                 <label className="block space-y-1 text-xs">
-                  <span className="text-zinc-500">
+                  <span className="text-sec">
                     Lyrics (shown on the hymn&apos;s page; leave blank to show the PDF instead)
                   </span>
                   <textarea
                     value={editLyricsText}
                     onChange={(e) => setEditLyricsText(e.target.value)}
                     rows={6}
-                    className="w-full rounded-md border border-zinc-300 px-2 py-1.5 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-950"
+                    className="w-full rounded-md border border-sep px-2 py-1.5 font-mono text-sm"
                   />
                 </label>
                 <button
                   onClick={() => saveDetails(f.id)}
                   disabled={savingDetails}
-                  className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+                  className="rounded-md btn-primary px-3 py-1.5 text-sm text-white disabled:opacity-50"
                 >
                   {savingDetails ? "Saving…" : "Save details"}
                 </button>
@@ -585,7 +585,7 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
           </li>
         ))}
         {visibleFiles.length === 0 && (
-          <li className="p-4 text-sm text-zinc-500">
+          <li className="p-4 text-sm text-sec">
             {seriesId ? "No files in this series yet." : categoryId ? "No files in this category yet." : "No files yet."}
           </li>
         )}
