@@ -1,6 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  BulkBar,
+  BulkButton,
+  BulkCheckbox,
+  BulkSelectAll,
+  bulkFetch,
+  runBulk,
+  useBulkSelect,
+} from "@/components/bulk-select";
 
 type LiveStream = {
   id: string;
@@ -19,6 +28,31 @@ export default function LiveAdminPage() {
   const [embedUrl, setEmbedUrl] = useState("");
   const [startAt, setStartAt] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const bulk = useBulkSelect(streams.map((s) => s.id));
+
+  async function bulkPatch(body: Record<string, unknown>) {
+    setBusy(true);
+    await runBulk(bulk.selected, (id) =>
+      bulkFetch(`/api/admin/live/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    );
+    bulk.clear();
+    setBusy(false);
+    await load();
+  }
+
+  async function bulkDelete() {
+    if (!confirm(`Delete ${bulk.count} stream${bulk.count === 1 ? "" : "s"}?`)) return;
+    setBusy(true);
+    await runBulk(bulk.selected, (id) => bulkFetch(`/api/admin/live/${id}`, { method: "DELETE" }));
+    bulk.clear();
+    setBusy(false);
+    await load();
+  }
 
   async function load() {
     const res = await fetch("/api/admin/live");
@@ -120,14 +154,33 @@ export default function LiveAdminPage() {
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
 
+      {streams.length > 0 && (
+        <BulkSelectAll allSelected={bulk.allSelected} onToggle={bulk.toggleAll} disabled={busy} />
+      )}
+
+      <BulkBar count={bulk.count} onClear={bulk.clear} busy={busy}>
+        <BulkButton onClick={() => bulkPatch({ published: true })}>Publish</BulkButton>
+        <BulkButton onClick={() => bulkPatch({ published: false })}>Unpublish</BulkButton>
+        <BulkButton danger onClick={bulkDelete}>
+          Delete
+        </BulkButton>
+      </BulkBar>
+
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
         {streams.map((s) => (
           <li key={s.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-            <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <BulkCheckbox
+                checked={bulk.isSelected(s.id)}
+                onChange={() => bulk.toggle(s.id)}
+                label={s.title}
+              />
+              <div className="min-w-0">
               <p className="font-medium">{s.title}</p>
               <p className="text-sm text-zinc-500">
                 {new Date(s.startAt).toLocaleString()} · {s.embedUrl}
               </p>
+              </div>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <button

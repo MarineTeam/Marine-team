@@ -4,6 +4,15 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DragHandle, PositionInput } from "@/components/reorder-controls";
 import { reorderArray } from "@/lib/reorder";
+import {
+  BulkBar,
+  BulkButton,
+  BulkCheckbox,
+  BulkSelectAll,
+  bulkFetch,
+  runBulk,
+  useBulkSelect,
+} from "@/components/bulk-select";
 
 type Category = {
   id: string;
@@ -64,6 +73,40 @@ export default function CategoriesPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  // Every category, at any nesting depth — the tree is rendered recursively
+  // but selection is flat, so "select all" means every row on screen.
+  const bulk = useBulkSelect(categories.map((c) => c.id));
+
+  async function bulkPatch(body: Record<string, unknown>) {
+    setBusy(true);
+    await runBulk(bulk.selected, (id) =>
+      bulkFetch(`/api/admin/categories/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    );
+    bulk.clear();
+    setBusy(false);
+    await load();
+  }
+
+  async function bulkDelete() {
+    if (
+      !confirm(
+        `Move ${bulk.count} categor${bulk.count === 1 ? "y" : "ies"} to Trash? Restorable from Admin > Trash.`,
+      )
+    )
+      return;
+    setBusy(true);
+    await runBulk(bulk.selected, (id) =>
+      bulkFetch(`/api/admin/categories/${id}`, { method: "DELETE" }),
+    );
+    bulk.clear();
+    setBusy(false);
+    await load();
+  }
 
   async function load() {
     const res = await fetch("/api/admin/categories");
@@ -176,6 +219,11 @@ export default function CategoriesPage() {
         }}
       >
         <div className="min-w-0 flex items-center gap-2">
+          <BulkCheckbox
+            checked={bulk.isSelected(node.id)}
+            onChange={() => bulk.toggle(node.id)}
+            label={node.name}
+          />
           <DragHandle
             draggable
             onDragStart={() => setDraggingId(node.id)}
@@ -307,6 +355,22 @@ export default function CategoriesPage() {
         </button>
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {categories.length > 0 && (
+        <BulkSelectAll allSelected={bulk.allSelected} onToggle={bulk.toggleAll} disabled={busy} />
+      )}
+
+      <BulkBar count={bulk.count} onClear={bulk.clear} busy={busy}>
+        <BulkButton onClick={() => bulkPatch({ published: true })}>Publish</BulkButton>
+        <BulkButton onClick={() => bulkPatch({ published: false })}>Unpublish</BulkButton>
+        <BulkButton onClick={() => bulkPatch({ hidden: true })}>Hide</BulkButton>
+        <BulkButton onClick={() => bulkPatch({ hidden: false })}>Show</BulkButton>
+        <BulkButton onClick={() => bulkPatch({ memberOnly: true })}>Members only</BulkButton>
+        <BulkButton onClick={() => bulkPatch({ memberOnly: false })}>Public</BulkButton>
+        <BulkButton danger onClick={bulkDelete}>
+          Delete
+        </BulkButton>
+      </BulkBar>
 
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
         {renderNodes(tree, 0)}

@@ -1,6 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  BulkBar,
+  BulkButton,
+  BulkCheckbox,
+  BulkSelectAll,
+  bulkFetch,
+  runBulk,
+  useBulkSelect,
+} from "@/components/bulk-select";
 
 type Announcement = {
   id: string;
@@ -25,6 +34,8 @@ export default function AnnouncementsAdminPage() {
   const [publishAt, setPublishAt] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const bulk = useBulkSelect(announcements.map((a) => a.id));
 
   async function load() {
     const res = await fetch("/api/admin/announcements");
@@ -68,6 +79,31 @@ export default function AnnouncementsAdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ active: !a.active }),
     });
+    await load();
+  }
+
+  async function bulkPatch(body: Record<string, unknown>) {
+    setBusy(true);
+    await runBulk(bulk.selected, (id) =>
+      bulkFetch(`/api/admin/announcements/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    );
+    bulk.clear();
+    setBusy(false);
+    await load();
+  }
+
+  async function bulkDelete() {
+    if (!confirm(`Delete ${bulk.count} announcement${bulk.count === 1 ? "" : "s"}?`)) return;
+    setBusy(true);
+    await runBulk(bulk.selected, (id) =>
+      bulkFetch(`/api/admin/announcements/${id}`, { method: "DELETE" }),
+    );
+    bulk.clear();
+    setBusy(false);
     await load();
   }
 
@@ -146,15 +182,34 @@ export default function AnnouncementsAdminPage() {
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
 
+      {announcements.length > 0 && (
+        <BulkSelectAll allSelected={bulk.allSelected} onToggle={bulk.toggleAll} disabled={busy} />
+      )}
+
+      <BulkBar count={bulk.count} onClear={bulk.clear} busy={busy}>
+        <BulkButton onClick={() => bulkPatch({ active: true })}>Activate</BulkButton>
+        <BulkButton onClick={() => bulkPatch({ active: false })}>Deactivate</BulkButton>
+        <BulkButton danger onClick={bulkDelete}>
+          Delete
+        </BulkButton>
+      </BulkBar>
+
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
         {announcements.map((a) => (
           <li key={a.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-            <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <BulkCheckbox
+                checked={bulk.isSelected(a.id)}
+                onChange={() => bulk.toggle(a.id)}
+                label={a.message}
+              />
+              <div className="min-w-0">
               <p>{a.message}</p>
               <p className="text-xs text-zinc-400">
                 {AUDIENCE_LABEL[a.audience]}
                 {schedule(a) && ` · ${schedule(a)}`} · posted {new Date(a.createdAt).toLocaleDateString()}
               </p>
+              </div>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <button

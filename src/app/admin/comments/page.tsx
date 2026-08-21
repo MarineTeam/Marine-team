@@ -2,6 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { getDisplayName } from "@/lib/profile";
+import {
+  BulkBar,
+  BulkButton,
+  BulkCheckbox,
+  BulkSelectAll,
+  bulkFetch,
+  runBulk,
+  useBulkSelect,
+} from "@/components/bulk-select";
 
 type ModeratedComment = {
   id: string;
@@ -17,6 +26,8 @@ type ModeratedComment = {
 export default function CommentsAdminPage() {
   const [comments, setComments] = useState<ModeratedComment[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const bulk = useBulkSelect((comments ?? []).map((c) => c.id));
 
   async function load() {
     const res = await fetch("/api/admin/comments");
@@ -44,6 +55,29 @@ export default function CommentsAdminPage() {
     await load();
   }
 
+  async function bulkSetHidden(hidden: boolean) {
+    setBusy(true);
+    await runBulk(bulk.selected, (id) =>
+      bulkFetch(`/api/admin/comments/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hidden }),
+      }),
+    );
+    bulk.clear();
+    setBusy(false);
+    await load();
+  }
+
+  async function bulkDelete() {
+    if (!confirm(`Delete ${bulk.count} comment${bulk.count === 1 ? "" : "s"} permanently?`)) return;
+    setBusy(true);
+    await runBulk(bulk.selected, (id) => bulkFetch(`/api/comments/${id}`, { method: "DELETE" }));
+    bulk.clear();
+    setBusy(false);
+    await load();
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -56,11 +90,28 @@ export default function CommentsAdminPage() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
+      {comments && comments.length > 0 && (
+        <BulkSelectAll allSelected={bulk.allSelected} onToggle={bulk.toggleAll} disabled={busy} />
+      )}
+
+      <BulkBar count={bulk.count} onClear={bulk.clear} busy={busy}>
+        <BulkButton onClick={() => bulkSetHidden(true)}>Hide</BulkButton>
+        <BulkButton onClick={() => bulkSetHidden(false)}>Unhide</BulkButton>
+        <BulkButton danger onClick={bulkDelete}>
+          Delete
+        </BulkButton>
+      </BulkBar>
+
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
         {comments?.map((c) => (
           <li key={c.id} className="p-4 space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="text-sm">
+              <div className="flex items-center gap-2 text-sm">
+                <BulkCheckbox
+                  checked={bulk.isSelected(c.id)}
+                  onChange={() => bulk.toggle(c.id)}
+                  label={`comment by ${getDisplayName(c.user)}`}
+                />
                 <span className="font-medium">{getDisplayName(c.user)}</span>{" "}
                 <span className="text-zinc-500">on </span>
                 <a

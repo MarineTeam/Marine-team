@@ -1,6 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  BulkBar,
+  BulkButton,
+  BulkCheckbox,
+  BulkSelectAll,
+  bulkFetch,
+  runBulk,
+  useBulkSelect,
+} from "@/components/bulk-select";
 
 type Trashed = {
   categories: { id: string; name: string; deletedAt: string }[];
@@ -11,44 +20,112 @@ type Trashed = {
 
 type ItemType = "category" | "series" | "video" | "file";
 
+/** What permanently deleting this kind of thing also takes with it, for the confirm prompt. */
+function purgeWarning(type: ItemType): string {
+  if (type === "video") return " and removes it from Bunny Stream";
+  if (type === "file") return " and removes it from Bunny Storage";
+  return "";
+}
+
 function Section<T extends { id: string; deletedAt: string }>({
   title,
   items,
   type,
   label,
   subtitle,
-  onRestore,
-  onPurge,
+  onChanged,
 }: {
   title: string;
   items: T[];
   type: ItemType;
   label: (item: T) => string;
   subtitle?: (item: T) => string | null;
-  onRestore: (type: ItemType, id: string) => void;
-  onPurge: (type: ItemType, id: string, label: string) => void;
+  onChanged: () => Promise<void>;
 }) {
+  // Per-section rather than one selection across the page: restoring and
+  // purging are per-type endpoints, and "select all" plainly means this
+  // list, not everything in the trash.
+  const bulk = useBulkSelect(items.map((item) => item.id));
+  const [busy, setBusy] = useState(false);
+
+  async function restore(ids: string[]) {
+    setBusy(true);
+    await runBulk(ids, (id) => bulkFetch(`/api/admin/trash/${type}/${id}`, { method: "POST" }));
+    bulk.clear();
+    setBusy(false);
+    await onChanged();
+  }
+
+  async function purge(ids: string[], prompt: string) {
+    if (!confirm(prompt)) return;
+    setBusy(true);
+    await runBulk(ids, (id) => bulkFetch(`/api/admin/trash/${type}/${id}`, { method: "DELETE" }));
+    bulk.clear();
+    setBusy(false);
+    await onChanged();
+  }
+
   return (
     <div>
-      <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">{title}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">{title}</h2>
+        {items.length > 0 && (
+          <BulkSelectAll allSelected={bulk.allSelected} onToggle={bulk.toggleAll} disabled={busy} />
+        )}
+      </div>
+
+      {bulk.count > 0 && (
+        <div className="mt-2">
+          <BulkBar count={bulk.count} onClear={bulk.clear} busy={busy}>
+            <BulkButton onClick={() => restore(bulk.selected)}>Restore</BulkButton>
+            <BulkButton
+              danger
+              onClick={() =>
+                purge(
+                  bulk.selected,
+                  `Permanently delete ${bulk.count} item${bulk.count === 1 ? "" : "s"}? This can't be undone${purgeWarning(type)}.`,
+                )
+              }
+            >
+              Delete permanently
+            </BulkButton>
+          </BulkBar>
+        </div>
+      )}
+
       <ul className="mt-2 divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
         {items.map((item) => (
           <li key={item.id} className="p-3 flex flex-wrap items-center justify-between gap-2 text-sm">
-            <div className="min-w-0">
-              <p className="font-medium">{label(item)}</p>
-              <p className="text-xs text-zinc-500">
-                {subtitle?.(item) ? `${subtitle(item)} · ` : ""}
-                Deleted {new Date(item.deletedAt).toLocaleString()}
-              </p>
+            <div className="flex min-w-0 items-center gap-2">
+              <BulkCheckbox
+                checked={bulk.isSelected(item.id)}
+                onChange={() => bulk.toggle(item.id)}
+                label={label(item)}
+              />
+              <div className="min-w-0">
+                <p className="font-medium">{label(item)}</p>
+                <p className="text-xs text-zinc-500">
+                  {subtitle?.(item) ? `${subtitle(item)} · ` : ""}
+                  Deleted {new Date(item.deletedAt).toLocaleString()}
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => onRestore(type, item.id)}
+                onClick={() => restore([item.id])}
                 className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
               >
                 Restore
               </button>
-              <button onClick={() => onPurge(type, item.id, label(item))} className="text-red-600 hover:underline">
+              <button
+                onClick={() =>
+                  purge(
+                    [item.id],
+                    `Permanently delete "${label(item)}"? This can't be undone${purgeWarning(type)}.`,
+                  )
+                }
+                className="text-red-600 hover:underline"
+              >
                 Delete permanently
               </button>
             </div>
@@ -75,22 +152,6 @@ export default function TrashAdminPage() {
     load();
   }, []);
 
-  async function restore(type: ItemType, id: string) {
-    await fetch(`/api/admin/trash/${type}/${id}`, { method: "POST" });
-    await load();
-  }
-
-  async function purge(type: ItemType, id: string, label: string) {
-    if (
-      !confirm(
-        `Permanently delete "${label}"? This can't be undone${type === "video" ? " and removes it from Bunny Stream" : type === "file" ? " and removes it from Bunny Storage" : ""}.`,
-      )
-    )
-      return;
-    await fetch(`/api/admin/trash/${type}/${id}`, { method: "DELETE" });
-    await load();
-  }
-
   return (
     <div className="space-y-6">
       <div>
@@ -111,8 +172,7 @@ export default function TrashAdminPage() {
             type="category"
             items={data.categories}
             label={(c) => c.name}
-            onRestore={restore}
-            onPurge={purge}
+            onChanged={load}
           />
           <Section
             title="Series"
@@ -120,8 +180,7 @@ export default function TrashAdminPage() {
             items={data.series}
             label={(s) => s.title}
             subtitle={(s) => s.category?.name ?? null}
-            onRestore={restore}
-            onPurge={purge}
+            onChanged={load}
           />
           <Section
             title="Videos"
@@ -129,8 +188,7 @@ export default function TrashAdminPage() {
             items={data.videos}
             label={(v) => v.title}
             subtitle={(v) => v.series?.title ?? v.category?.name ?? null}
-            onRestore={restore}
-            onPurge={purge}
+            onChanged={load}
           />
           <Section
             title="Files"
@@ -138,8 +196,7 @@ export default function TrashAdminPage() {
             items={data.files}
             label={(f) => f.title}
             subtitle={(f) => f.series?.title ?? f.category?.name ?? null}
-            onRestore={restore}
-            onPurge={purge}
+            onChanged={load}
           />
         </div>
       )}

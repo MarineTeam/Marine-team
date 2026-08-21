@@ -3,6 +3,15 @@
 import { useEffect, useState } from "react";
 import { DragHandle, useDragReorder } from "@/components/reorder-controls";
 import { reorderArray } from "@/lib/reorder";
+import {
+  BulkBar,
+  BulkButton,
+  BulkCheckbox,
+  BulkSelectAll,
+  bulkFetch,
+  runBulk,
+  useBulkSelect,
+} from "@/components/bulk-select";
 
 type Speaker = { id: string; name: string; slug: string; bio: string | null; photoUrl: string | null; position: number };
 
@@ -20,6 +29,17 @@ export default function SpeakersAdminPage() {
   const [bio, setBio] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const bulk = useBulkSelect(speakers.map((s) => s.id));
+
+  async function bulkDelete() {
+    if (!confirm(`Delete ${bulk.count} speaker${bulk.count === 1 ? "" : "s"}?`)) return;
+    setBusy(true);
+    await runBulk(bulk.selected, (id) => bulkFetch(`/api/admin/speakers/${id}`, { method: "DELETE" }));
+    bulk.clear();
+    setBusy(false);
+    await load();
+  }
 
   async function load() {
     const res = await fetch("/api/admin/speakers");
@@ -123,6 +143,16 @@ export default function SpeakersAdminPage() {
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
 
+      {speakers.length > 0 && (
+        <BulkSelectAll allSelected={bulk.allSelected} onToggle={bulk.toggleAll} disabled={busy} />
+      )}
+
+      <BulkBar count={bulk.count} onClear={bulk.clear} busy={busy}>
+        <BulkButton danger onClick={bulkDelete}>
+          Delete
+        </BulkButton>
+      </BulkBar>
+
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
         {speakers.map((s, index) => (
           <li
@@ -130,6 +160,11 @@ export default function SpeakersAdminPage() {
             className={`p-4 flex items-center gap-3 ${draggingIndex === index ? "opacity-40" : ""}`}
             {...dropZoneProps(index)}
           >
+            <BulkCheckbox
+              checked={bulk.isSelected(s.id)}
+              onChange={() => bulk.toggle(s.id)}
+              label={s.name}
+            />
             <DragHandle {...handleProps(index)} />
             <div className="min-w-0 flex-1">
               <p className="font-medium">{s.name}</p>

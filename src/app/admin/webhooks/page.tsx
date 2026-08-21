@@ -1,6 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  BulkBar,
+  BulkButton,
+  BulkCheckbox,
+  BulkSelectAll,
+  bulkFetch,
+  runBulk,
+  useBulkSelect,
+} from "@/components/bulk-select";
 
 type Webhook = { id: string; url: string; secret: string | null; active: boolean; createdAt: string };
 
@@ -9,6 +18,31 @@ export default function WebhooksAdminPage() {
   const [url, setUrl] = useState("");
   const [secret, setSecret] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const bulk = useBulkSelect(webhooks.map((w) => w.id));
+
+  async function bulkPatch(body: Record<string, unknown>) {
+    setBusy(true);
+    await runBulk(bulk.selected, (id) =>
+      bulkFetch(`/api/admin/webhooks/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    );
+    bulk.clear();
+    setBusy(false);
+    await load();
+  }
+
+  async function bulkDelete() {
+    if (!confirm(`Delete ${bulk.count} webhook${bulk.count === 1 ? "" : "s"}?`)) return;
+    setBusy(true);
+    await runBulk(bulk.selected, (id) => bulkFetch(`/api/admin/webhooks/${id}`, { method: "DELETE" }));
+    bulk.clear();
+    setBusy(false);
+    await load();
+  }
 
   async function load() {
     const res = await fetch("/api/admin/webhooks");
@@ -92,14 +126,33 @@ export default function WebhooksAdminPage() {
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
 
+      {webhooks.length > 0 && (
+        <BulkSelectAll allSelected={bulk.allSelected} onToggle={bulk.toggleAll} disabled={busy} />
+      )}
+
+      <BulkBar count={bulk.count} onClear={bulk.clear} busy={busy}>
+        <BulkButton onClick={() => bulkPatch({ active: true })}>Activate</BulkButton>
+        <BulkButton onClick={() => bulkPatch({ active: false })}>Deactivate</BulkButton>
+        <BulkButton danger onClick={bulkDelete}>
+          Delete
+        </BulkButton>
+      </BulkBar>
+
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
         {webhooks.map((w) => (
           <li key={w.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-            <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <BulkCheckbox
+                checked={bulk.isSelected(w.id)}
+                onChange={() => bulk.toggle(w.id)}
+                label={w.url}
+              />
+              <div className="min-w-0">
               <p className="truncate font-mono text-sm">{w.url}</p>
               <p className="text-xs text-zinc-400">
                 {w.secret ? "Signed" : "Unsigned"} · added {new Date(w.createdAt).toLocaleDateString()}
               </p>
+              </div>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <button
