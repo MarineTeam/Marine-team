@@ -135,14 +135,14 @@ export default async function CategoryPage({
       {!locked && <script {...jsonLdScriptProps(breadcrumbJsonLd)} />}
       <div>
         {locked ? (
-          <Link href={backHref} className="text-sm text-zinc-500 hover:underline">
+          <Link href={backHref} className="text-sm text-sec hover:underline">
             ← {backLabel}
           </Link>
         ) : (
           <Breadcrumbs items={breadcrumbItems} />
         )}
         <div className="flex flex-wrap items-start justify-between gap-3 mt-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{category.name}</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-ink">{category.name}</h1>
           {!locked && user && (
             <div className="flex flex-wrap items-center gap-2">
               {watchLaterOn && (
@@ -154,13 +154,13 @@ export default async function CategoryPage({
             </div>
           )}
         </div>
-        {category.description && <p className="mt-2 text-zinc-500">{category.description}</p>}
+        {category.description && <p className="mt-2 text-sec">{category.description}</p>}
         {category.tags.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {category.tags.map((tag) => (
               <span
                 key={tag}
-                className="rounded bg-zinc-100 px-2 py-1 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                className="rounded bg-chip px-2 py-1 text-xs text-sec"
               >
                 #{tag}
               </span>
@@ -173,7 +173,7 @@ export default async function CategoryPage({
         <MemberGate />
       ) : (
         <>
-          {isEmpty && <p className="text-zinc-500">Nothing published in this category yet.</p>}
+          {isEmpty && <p className="text-sec">Nothing published in this category yet.</p>}
 
           {category.hymnalStyle ? (
             <>
@@ -183,10 +183,10 @@ export default async function CategoryPage({
                     <Link
                       key={child.id}
                       href={`/categories/${child.slug}`}
-                      className="rounded-full border border-zinc-300 px-4 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                      className="rounded-full border border-sep px-4 py-1.5 text-sm hover:bg-hover"
                     >
                       {child.name}
-                      {child.memberOnly && <span className="ml-1.5 text-xs text-zinc-400">Members</span>}
+                      {child.memberOnly && <span className="ml-1.5 text-xs text-ter">Members</span>}
                     </Link>
                   ))}
                 </div>
@@ -208,7 +208,7 @@ export default async function CategoryPage({
 
           {category.videos.length > 0 && (
             <section className="space-y-3">
-              <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Videos</h2>
+              <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">Videos</h2>
               <div className="space-y-3">
                 {category.videos.map((video) => (
                   <MenuTile
@@ -226,7 +226,7 @@ export default async function CategoryPage({
 
           {looseFiles.length > 0 && (
             <section className="space-y-3">
-              <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+              <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">
                 {category.hymnalStyle && books.length > 0 ? "Other files" : "Files"}
               </h2>
               <FileList files={looseFiles} isLoggedIn={isLoggedIn} readerOn={readerOn} />
@@ -240,11 +240,11 @@ export default async function CategoryPage({
 
 function MemberGate() {
   return (
-    <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center">
+    <div className="rounded-lg border border-dashed border-sep p-8 text-center">
       <p className="font-medium">This category is for members only.</p>
       <a
         href="/auth/login"
-        className="mt-4 inline-block rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+        className="mt-4 inline-block rounded-md btn-primary text-white px-4 py-2 text-sm"
       >
         Log in to view
       </a>

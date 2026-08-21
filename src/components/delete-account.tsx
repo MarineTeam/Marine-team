@@ -38,7 +38,7 @@ export function DeleteAccount({ email }: { email: string }) {
   return (
     <div className="rounded-lg border border-red-300 p-4 dark:border-red-900">
       <h3 className="text-sm font-medium text-red-700 dark:text-red-400">Delete account</h3>
-      <p className="mt-1 text-xs text-zinc-500">
+      <p className="mt-1 text-xs text-sec">
         Permanently removes your account and everything attached to it — comments, notes, playlists, favorites, watch
         history, and any links you&apos;ve shared. This can&apos;t be undone.
       </p>
@@ -61,7 +61,7 @@ export function DeleteAccount({ email }: { email: string }) {
             value={confirmEmail}
             onChange={(e) => setConfirmEmail(e.target.value)}
             autoComplete="off"
-            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded-md border border-sep px-3 py-2 text-sm"
           />
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex flex-wrap gap-2">
@@ -79,7 +79,7 @@ export function DeleteAccount({ email }: { email: string }) {
                 setConfirmEmail("");
                 setError(null);
               }}
-              className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              className="rounded-md border border-sep px-3 py-1.5 text-sm hover:bg-hover"
             >
               Cancel
             </button>

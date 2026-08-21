@@ -217,15 +217,15 @@ export function PdfReader({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex flex-wrap items-center justify-center gap-2 border-b border-zinc-200 p-2 text-sm dark:border-zinc-800">
+      <div className="flex flex-wrap items-center justify-center gap-2 border-b border-sep p-2 text-sm">
         <button
           onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page <= 1}
-          className="rounded-md border border-zinc-300 px-2 py-1 disabled:opacity-40 dark:border-zinc-700"
+          className="rounded-md border border-sep px-2 py-1 disabled:opacity-40"
         >
           ‹ Prev
         </button>
-        <span className="tabular-nums text-zinc-500">
+        <span className="tabular-nums text-sec">
           <input
             type="number"
             value={page}
@@ -233,37 +233,37 @@ export function PdfReader({
             max={pageCount || 1}
             onChange={(e) => goToPage(Number(e.target.value))}
             aria-label="Page number"
-            className="w-16 rounded border border-zinc-300 px-1 py-0.5 text-center dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-16 rounded border border-sep px-1 py-0.5 text-center"
           />{" "}
           / {pageCount || "—"}
         </span>
         <button
           onClick={() => setPage((p) => Math.min(p + 1, pageCount))}
           disabled={pageCount === 0 || page >= pageCount}
-          className="rounded-md border border-zinc-300 px-2 py-1 disabled:opacity-40 dark:border-zinc-700"
+          className="rounded-md border border-sep px-2 py-1 disabled:opacity-40"
         >
           Next ›
         </button>
-        <span className="mx-2 text-zinc-300 dark:text-zinc-700">|</span>
+        <span className="mx-2 text-ter">|</span>
         <button
           onClick={() => setScale((s) => Math.max(0.5, Number((s - 0.2).toFixed(1))))}
-          className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+          className="rounded-md border border-sep px-2 py-1"
           aria-label="Zoom out"
         >
           −
         </button>
-        <span className="w-12 text-center tabular-nums text-zinc-500">{Math.round(scale * 100)}%</span>
+        <span className="w-12 text-center tabular-nums text-sec">{Math.round(scale * 100)}%</span>
         <button
           onClick={() => setScale((s) => Math.min(3, Number((s + 0.2).toFixed(1))))}
-          className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+          className="rounded-md border border-sep px-2 py-1"
           aria-label="Zoom in"
         >
           +
         </button>
       </div>
 
-      <div className="flex-1 overflow-auto bg-zinc-100 p-4 dark:bg-zinc-950">
-        {loading && <p className="py-12 text-center text-sm text-zinc-500">Opening…</p>}
+      <div className="flex-1 overflow-auto bg-chip p-4">
+        {loading && <p className="py-12 text-center text-sm text-sec">Opening…</p>}
         <canvas ref={canvasRef} className="mx-auto block shadow-lg" />
       </div>
     </div>

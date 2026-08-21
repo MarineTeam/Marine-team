@@ -107,7 +107,7 @@ export function DownloadButton({
           </span>
           <button
             onClick={remove}
-            className="rounded-md border border-zinc-300 px-3 py-1.5 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+            className="rounded-md border border-sep px-3 py-1.5 hover:bg-hover"
           >
             Remove
           </button>
@@ -116,7 +116,7 @@ export function DownloadButton({
         <button
           onClick={start}
           disabled={state === "checking" || state === "downloading"}
-          className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          className="rounded-md border border-sep px-3 py-1.5 text-sm hover:bg-hover disabled:opacity-60"
         >
           {state === "checking"
             ? "Preparing…"
@@ -127,8 +127,8 @@ export function DownloadButton({
       )}
       {message && <p className="text-xs text-red-600">{message}</p>}
       {state === "downloading" && (
-        <div className="h-1 w-40 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
-          <div className="h-full bg-sky-600 transition-all" style={{ width: `${Math.round(progress * 100)}%` }} />
+        <div className="h-1 w-40 overflow-hidden rounded-full bg-chip">
+          <div className="h-full bg-accent transition-all" style={{ width: `${Math.round(progress * 100)}%` }} />
         </div>
       )}
     </div>

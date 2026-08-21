@@ -26,16 +26,16 @@ export default async function ProfileSettingsPage() {
     <div className="space-y-8">
       <section className="space-y-3">
         <div>
-          <h2 className="text-lg font-medium">This device</h2>
-          <p className="mt-1 text-sm text-zinc-500">Saved in this browser, not on your account.</p>
+          <h2 className="text-lg font-semibold text-ink">This device</h2>
+          <p className="mt-1 text-sm text-sec">Saved in this browser, not on your account.</p>
         </div>
         <DeviceSettingsForm />
       </section>
 
-      <section className="space-y-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
+      <section className="space-y-3 border-t border-sep pt-6">
         <div>
-          <h2 className="text-lg font-medium">Account</h2>
-          <p className="mt-1 text-sm text-zinc-500">Applies everywhere you log in.</p>
+          <h2 className="text-lg font-semibold text-ink">Account</h2>
+          <p className="mt-1 text-sm text-sec">Applies everywhere you log in.</p>
         </div>
         <ProfileForm
           currentDisplayName={user.displayName}
@@ -46,10 +46,10 @@ export default async function ProfileSettingsPage() {
         />
       </section>
 
-      <section className="space-y-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
+      <section className="space-y-3 border-t border-sep pt-6">
         <div>
-          <h2 className="text-lg font-medium">Sign-in methods</h2>
-          <p className="mt-1 text-sm text-zinc-500">
+          <h2 className="text-lg font-semibold text-ink">Sign-in methods</h2>
+          <p className="mt-1 text-sm text-sec">
             Ways you&apos;ve signed in to this account. Any of them gets you to the same place — your
             history, notes and saved items are shared across all of them.
           </p>
@@ -66,7 +66,7 @@ export default async function ProfileSettingsPage() {
         />
       </section>
 
-      <section className="border-t border-zinc-200 pt-6 dark:border-zinc-800">
+      <section className="border-t border-sep pt-6">
         <DeleteAccount email={user.email} />
       </section>
     </div>

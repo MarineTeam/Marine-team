@@ -162,7 +162,7 @@ export function BulkSelectAll({
   disabled?: boolean;
 }) {
   return (
-    <label className="flex items-center gap-1.5 text-sm text-zinc-500">
+    <label className="flex items-center gap-1.5 text-sm text-sec">
       <input type="checkbox" checked={allSelected} onChange={onToggle} disabled={disabled} />
       Select all
     </label>
@@ -186,7 +186,7 @@ export function BulkBar({
 }) {
   if (count === 0) return null;
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-sep bg-chip p-3 text-sm">
       <span>
         {count} selected{busy ? " — working…" : ""}
       </span>
@@ -195,10 +195,10 @@ export function BulkBar({
       </div>
       {/* Hidden on small screens, where there's no keyboard to use them
           with and the bar needs the room. */}
-      <span className="ml-auto hidden text-xs text-zinc-400 sm:inline">
+      <span className="ml-auto hidden text-xs text-ter sm:inline">
         ⌘/Ctrl+A all · Shift-click range · Esc clear
       </span>
-      <button onClick={onClear} disabled={busy} className="text-zinc-500 hover:underline">
+      <button onClick={onClear} disabled={busy} className="text-sec hover:underline">
         Clear selection
       </button>
     </div>
@@ -221,7 +221,7 @@ export function BulkButton({
       className={`rounded-md border px-2 py-1 ${
         danger
           ? "border-red-300 text-red-600 dark:border-red-900"
-          : "border-zinc-300 dark:border-zinc-700"
+          : "border-sep"
       }`}
     >
       {children}

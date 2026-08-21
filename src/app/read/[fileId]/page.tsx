@@ -56,7 +56,7 @@ export default async function ReadPage({
         {!user && (
           <a
             href="/auth/login"
-            className="mt-4 inline-block rounded-md bg-zinc-900 px-4 py-2 text-sm text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+            className="mt-4 inline-block rounded-md btn-primary px-4 py-2 text-sm text-white"
           >
             Log in to read
           </a>

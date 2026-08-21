@@ -10,9 +10,9 @@ export default async function LivePage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Live</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-ink">Live</h1>
 
-      {!liveOn && <p className="text-zinc-500">Live streaming isn&apos;t enabled on this site.</p>}
+      {!liveOn && <p className="text-sec">Live streaming isn&apos;t enabled on this site.</p>}
 
       {liveOn && current && (
         <div className="space-y-3">
@@ -21,9 +21,9 @@ export default async function LivePage() {
               <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
               LIVE
             </span>
-            <h2 className="text-lg font-medium">{current.title}</h2>
+            <h2 className="text-lg font-semibold text-ink">{current.title}</h2>
           </div>
-          {current.description && <p className="text-zinc-500">{current.description}</p>}
+          {current.description && <p className="text-sec">{current.description}</p>}
           <div className="aspect-video overflow-hidden rounded-lg bg-black">
             <iframe
               src={current.embedUrl}
@@ -37,14 +37,14 @@ export default async function LivePage() {
 
       {liveOn && !current && next && (
         <div className="space-y-3">
-          <h2 className="text-lg font-medium">{next.title}</h2>
-          {next.description && <p className="text-zinc-500">{next.description}</p>}
+          <h2 className="text-lg font-semibold text-ink">{next.title}</h2>
+          {next.description && <p className="text-sec">{next.description}</p>}
           <PremiereCountdown premiereAt={next.startAt.toISOString()} label="Live starts in" />
         </div>
       )}
 
       {liveOn && !current && !next && (
-        <p className="text-zinc-500">Nothing live right now — check back later.</p>
+        <p className="text-sec">Nothing live right now — check back later.</p>
       )}
     </div>
   );

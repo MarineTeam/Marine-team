@@ -82,7 +82,7 @@ export function PlaylistDetail({ playlist: initial }: { playlist: Playlist }) {
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/playlists" className="text-sm text-zinc-500 hover:underline">
+        <Link href="/playlists" className="text-sm text-sec hover:underline">
           ← Playlists
         </Link>
         {renaming ? (
@@ -90,21 +90,21 @@ export function PlaylistDetail({ playlist: initial }: { playlist: Playlist }) {
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="flex-1 rounded-md border border-sep px-3 py-2 text-sm"
               autoFocus
             />
-            <button type="submit" className="rounded-md bg-zinc-900 text-white px-3 py-2 text-sm dark:bg-white dark:text-zinc-900">
+            <button type="submit" className="rounded-md btn-primary text-white px-3 py-2 text-sm">
               Save
             </button>
           </form>
         ) : (
           <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{playlist.title}</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-ink">{playlist.title}</h1>
             <div className="flex gap-2">
-              <button onClick={togglePublic} className="text-sm text-zinc-500 hover:underline">
+              <button onClick={togglePublic} className="text-sm text-sec hover:underline">
                 {playlist.public ? "Make private" : "Make shareable"}
               </button>
-              <button onClick={() => setRenaming(true)} className="text-sm text-zinc-500 hover:underline">
+              <button onClick={() => setRenaming(true)} className="text-sm text-sec hover:underline">
                 Rename
               </button>
               <button onClick={remove} className="text-sm text-red-600 hover:underline">
@@ -121,12 +121,12 @@ export function PlaylistDetail({ playlist: initial }: { playlist: Playlist }) {
       </div>
 
       {playlist.items.length === 0 && (
-        <p className="text-zinc-500">
+        <p className="text-sec">
           No videos in this playlist yet — use the + Playlist button on a video page to add one.
         </p>
       )}
 
-      <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
+      <ul className="divide-y divide-sep rounded-lg border border-sep">
         {playlist.items.map((item, index) => (
           <li key={item.id} className="p-3 flex items-center gap-3">
             <div className="flex flex-col">
@@ -154,14 +154,14 @@ export function PlaylistDetail({ playlist: initial }: { playlist: Playlist }) {
                 width={96}
                 height={56}
                 unoptimized
-                className="h-14 w-24 shrink-0 rounded object-cover bg-zinc-100 dark:bg-zinc-800"
+                className="h-14 w-24 shrink-0 rounded object-cover bg-chip"
               />
             ) : (
-              <div className="h-14 w-24 shrink-0 rounded bg-zinc-100 dark:bg-zinc-800" />
+              <div className="h-14 w-24 shrink-0 rounded bg-chip" />
             )}
             <Link href={`/videos/${item.video.slug}`} className="min-w-0 flex-1">
               <p className="font-medium truncate hover:underline">{item.video.title}</p>
-              {item.video.series && <p className="text-sm text-zinc-500 truncate">{item.video.series.title}</p>}
+              {item.video.series && <p className="text-sm text-sec truncate">{item.video.series.title}</p>}
             </Link>
             <button onClick={() => removeVideo(item.video.id)} className="text-sm text-red-600 hover:underline">
               Remove

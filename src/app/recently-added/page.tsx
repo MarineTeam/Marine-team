@@ -9,10 +9,10 @@ export default async function RecentlyAddedPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-8">
-      <h1 className="text-2xl font-semibold tracking-tight">Recently Added</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-ink">Recently Added</h1>
 
       {recentlyAdded.length === 0 ? (
-        <p className="text-zinc-500">Nothing has been published yet. Check back soon.</p>
+        <p className="text-sec">Nothing has been published yet. Check back soon.</p>
       ) : (
         <div className="space-y-3">
           {recentlyAdded.map((item) =>

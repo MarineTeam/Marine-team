@@ -74,7 +74,7 @@ export function PushNotificationToggle() {
     <button
       onClick={subscribed ? unsubscribe : subscribe}
       disabled={pending}
-      className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm disabled:opacity-50 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+      className="rounded-md border border-sep px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-hover"
     >
       {subscribed ? "🔔 Notifications on" : "🔕 Get notified of new content"}
     </button>

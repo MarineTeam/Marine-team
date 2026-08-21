@@ -177,7 +177,7 @@ export function CastButton({
         style={{ width: 24, height: 24, display: "inline-block" }}
         aria-label="Cast to TV"
       />
-      {loading && <p className="text-xs text-zinc-400">Starting cast…</p>}
+      {loading && <p className="text-xs text-ter">Starting cast…</p>}
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );

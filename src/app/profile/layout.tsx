@@ -33,7 +33,7 @@ export default async function ProfileLayout({ children }: { children: React.Reac
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:py-8">
-      <h1 className="text-2xl font-bold tracking-tight text-ink">Profile</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-ink">Profile</h1>
 
       <header className="flex items-center gap-4">
         {user.picture ? (

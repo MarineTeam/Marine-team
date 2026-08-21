@@ -66,9 +66,9 @@ export function ProfileForm({
             onChange={(e) => setDisplayName(e.target.value)}
             maxLength={50}
             placeholder="How your name appears on comments"
-            className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="mt-1 w-full rounded-md border border-sep px-3 py-2 text-sm"
           />
-          <p className="mt-1 text-xs text-zinc-500">Leave blank to use your account name instead.</p>
+          <p className="mt-1 text-xs text-sec">Leave blank to use your account name instead.</p>
         </div>
       )}
       {notificationsOn && (
@@ -80,7 +80,7 @@ export function ProfileForm({
             id="notificationFrequency"
             value={notificationFrequency}
             onChange={(e) => setNotificationFrequency(e.target.value as "INSTANT" | "DAILY")}
-            className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="mt-1 w-full rounded-md border border-sep px-3 py-2 text-sm"
           >
             <option value="INSTANT">Instant — right when it&apos;s published</option>
             <option value="DAILY">Daily digest — one summary a day</option>
@@ -93,7 +93,7 @@ export function ProfileForm({
             />
             Also email me when new content publishes
           </label>
-          <p className="mt-1 text-xs text-zinc-500">
+          <p className="mt-1 text-xs text-sec">
             Email always sends immediately, regardless of your push frequency above.
           </p>
         </div>
@@ -103,7 +103,7 @@ export function ProfileForm({
       <button
         type="submit"
         disabled={saving}
-        className="rounded-md bg-zinc-900 text-white px-4 py-1.5 text-sm hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+        className="rounded-md btn-primary text-white px-4 py-1.5 text-sm disabled:opacity-50"
       >
         {saving ? "Saving…" : "Save"}
       </button>

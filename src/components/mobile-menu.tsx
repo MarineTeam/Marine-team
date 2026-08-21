@@ -88,7 +88,7 @@ export function MobileMenu({
         aria-label="Open menu"
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="-m-2 rounded-md p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+        className="-m-2 rounded-md p-2 hover:bg-hover"
       >
         <MenuIcon className="h-6 w-6" />
       </button>
@@ -100,14 +100,14 @@ export function MobileMenu({
           aria-modal="true"
           aria-label="Menu"
           tabIndex={-1}
-          className="fixed inset-0 z-50 flex flex-col bg-white outline-none dark:bg-zinc-950"
+          className="fixed inset-0 z-50 flex flex-col bg-white outline-none"
         >
-          <div className="flex items-center gap-4 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+          <div className="flex items-center gap-4 border-b border-sep px-4 py-3">
             <button
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Close menu"
-              className="-m-2 rounded-md p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              className="-m-2 rounded-md p-2 hover:bg-hover"
             >
               <CloseIcon className="h-6 w-6" />
             </button>
@@ -116,7 +116,7 @@ export function MobileMenu({
 
           <div className="flex-1 overflow-y-auto px-4 py-4">
             {user ? (
-              <div className="mb-4 border-b border-zinc-200 pb-4 dark:border-zinc-800">
+              <div className="mb-4 border-b border-sep pb-4">
                 <p className="truncate font-medium">{getDisplayName(user)}</p>
                 {user.role === "ADMIN" && (
                   <Link
@@ -129,12 +129,12 @@ export function MobileMenu({
                 )}
               </div>
             ) : unauthorized ? (
-              <p className="mb-4 border-b border-zinc-200 pb-4 text-amber-600 dark:border-zinc-800 dark:text-amber-500">
+              <p className="mb-4 border-b border-sep pb-4 text-amber-600 dark:text-amber-500">
                 Access not authorized
               </p>
             ) : null}
 
-            <nav className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
+            <nav className="flex flex-col divide-y divide-sep">
               <Link href="/" onClick={() => setOpen(false)} className="py-3">
                 Browse
               </Link>
@@ -174,7 +174,7 @@ export function MobileMenu({
                 >
                   <span>Profile</span>
                   {unreadCount > 0 && (
-                    <span className="rounded-full bg-sky-600 px-2 text-xs leading-5 text-white">
+                    <span className="rounded-full bg-accent px-2 text-xs leading-5 text-white">
                       {unreadCount > 99 ? "99+" : unreadCount}
                     </span>
                   )}
@@ -188,18 +188,18 @@ export function MobileMenu({
               )}
             </nav>
 
-            <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+            <div className="mt-4 border-t border-sep pt-4">
               {user || unauthorized ? (
                 <a
                   href="/auth/logout"
-                  className="block rounded-md border border-zinc-300 px-3 py-2 text-center hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  className="block rounded-md border border-sep px-3 py-2 text-center hover:bg-hover"
                 >
                   Log out
                 </a>
               ) : (
                 <a
                   href="/auth/login"
-                  className="block rounded-md bg-zinc-900 px-3 py-2 text-center text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+                  className="block rounded-md btn-primary px-3 py-2 text-center text-white"
                 >
                   Log in
                 </a>

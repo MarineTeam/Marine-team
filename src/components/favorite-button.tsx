@@ -39,7 +39,7 @@ export function FavoriteButton({
       className={`rounded-md border px-3 py-1.5 text-sm disabled:opacity-50 ${
         favorited
           ? "border-amber-400 text-amber-700 dark:text-amber-400"
-          : "border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          : "border-sep hover:bg-hover"
       }`}
     >
       {favorited ? "★ Favorited" : "☆ Favorite"}

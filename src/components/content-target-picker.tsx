@@ -39,7 +39,7 @@ export function TargetSelect({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className={
-        className ?? "rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        className ?? "rounded-md border border-sep px-2 py-1 text-sm"
       }
     >
       <option value="">Unassigned</option>

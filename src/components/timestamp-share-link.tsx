@@ -29,7 +29,7 @@ export function TimestampShareLink({ path }: { path: string }) {
 
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
-      <label htmlFor="clip-timestamp" className="text-zinc-500">
+      <label htmlFor="clip-timestamp" className="text-sec">
         Share at
       </label>
       <input
@@ -38,11 +38,11 @@ export function TimestampShareLink({ path }: { path: string }) {
         onChange={(e) => setValue(e.target.value)}
         placeholder="0:00"
         inputMode="numeric"
-        className="w-20 rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+        className="w-20 rounded-md border border-sep px-2 py-1"
       />
       <button
         onClick={copyLink}
-        className="rounded-md border border-zinc-300 px-3 py-1.5 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+        className="rounded-md border border-sep px-3 py-1.5 hover:bg-hover"
       >
         {copied ? "Copied!" : "Copy timestamped link"}
       </button>

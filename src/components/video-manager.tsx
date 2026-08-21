@@ -73,7 +73,7 @@ type BunnyLibraryVideo = {
 function Mp4Badge({ video }: { video: Video }) {
   if (video.hasMp4Fallback === null) {
     return (
-      <span className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-500 dark:border-zinc-700">
+      <span className="rounded-md border border-sep px-2 py-1 text-xs text-sec">
         MP4: not synced
       </span>
     );
@@ -427,19 +427,19 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold">
+      <h2 className="text-lg font-semibold text-ink">
         {seriesId ? "Episodes" : categoryId ? "Videos in category" : "All videos"}
       </h2>
 
       <form
         onSubmit={uploadVideo}
-        className="space-y-2 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4"
+        className="space-y-2 rounded-lg border border-sep p-4"
       >
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder={seriesId ? "Episode title" : "Video title"}
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-full rounded-md border border-sep px-3 py-2 text-sm"
           required
         />
         <div className="flex flex-wrap items-center gap-3">
@@ -456,23 +456,23 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
           <button
             type="submit"
             disabled={progress !== null}
-            className="sm:ml-auto rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+            className="sm:ml-auto rounded-md btn-primary text-white px-4 py-2 text-sm disabled:opacity-50"
           >
             Upload
           </button>
         </div>
         {progress !== null && (
-          <div className="h-2 w-full rounded-full bg-zinc-200 dark:bg-zinc-800">
+          <div className="h-2 w-full rounded-full bg-chip">
             <div
-              className="h-2 rounded-full bg-zinc-900 dark:bg-white"
-              style={{ width: `${progress}%` }}
+              className="h-2 rounded-full"
+              style={{ width: `${progress}%`, background: "var(--grad-brand)" }}
             />
           </div>
         )}
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 space-y-4">
+      <div className="rounded-lg border border-sep p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-medium">Import existing Bunny videos</h3>
           <button
@@ -481,7 +481,7 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
               setShowImport(next);
               if (next && bunnyLibrary === null) loadBunnyLibrary();
             }}
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700"
+            className="rounded-md border border-sep px-3 py-1.5 text-sm"
           >
             {showImport ? "Hide" : "Show"}
           </button>
@@ -492,23 +492,23 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
             <button
               onClick={loadBunnyLibrary}
               disabled={bunnyLoading}
-              className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm disabled:opacity-50 dark:border-zinc-700"
+              className="rounded-md border border-sep px-3 py-1.5 text-sm disabled:opacity-50"
             >
               {bunnyLoading ? "Checking…" : "Check for new videos"}
             </button>
 
             {bunnyLibrary?.length === 0 && (
-              <p className="text-sm text-zinc-500">
+              <p className="text-sm text-sec">
                 Everything already in your Bunny Stream library has been imported.
               </p>
             )}
 
-            <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-md border border-zinc-200 dark:border-zinc-800">
+            <ul className="divide-y divide-sep rounded-md border border-sep">
               {bunnyLibrary?.map((v) => {
                 const draft = importDrafts[v.guid];
                 return (
                   <li key={v.guid} className="p-3 space-y-2">
-                    <p className="text-sm text-zinc-500">
+                    <p className="text-sm text-sec">
                       Bunny: {v.title} · uploaded {new Date(v.dateUploaded).toLocaleDateString()}
                     </p>
                     <div className="flex flex-wrap items-center gap-2">
@@ -516,13 +516,13 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
                         value={draft?.title ?? ""}
                         onChange={(e) => updateDraft(v.guid, "title", e.target.value)}
                         placeholder="Title"
-                        className="rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                        className="rounded-md border border-sep px-2 py-1 text-sm"
                       />
                       <input
                         value={draft?.slug ?? ""}
                         onChange={(e) => updateDraft(v.guid, "slug", e.target.value)}
                         placeholder="slug"
-                        className="rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                        className="rounded-md border border-sep px-2 py-1 text-sm"
                       />
                       {!scoped && (
                         <TargetSelect
@@ -535,7 +535,7 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
                       <button
                         onClick={() => importVideo(v.guid)}
                         disabled={importingGuid === v.guid}
-                        className="ml-auto rounded-md bg-zinc-900 text-white px-3 py-1.5 text-sm hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+                        className="ml-auto rounded-md btn-primary text-white px-3 py-1.5 text-sm disabled:opacity-50"
                       >
                         {importingGuid === v.guid ? "Importing…" : "Import"}
                       </button>
@@ -553,7 +553,7 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Filter videos by title…"
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-full rounded-md border border-sep px-3 py-2 text-sm"
         />
       )}
 
@@ -570,7 +570,7 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
         </BulkButton>
       </BulkBar>
 
-      <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
+      <ul className="divide-y divide-sep rounded-lg border border-sep">
         {visibleVideos.map((v, index) => (
           <li
             key={v.id}
@@ -592,12 +592,12 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
                   width={64}
                   height={40}
                   unoptimized
-                  className="h-10 w-16 shrink-0 rounded object-cover bg-zinc-100 dark:bg-zinc-800"
+                  className="h-10 w-16 shrink-0 rounded object-cover bg-chip"
                 />
               )}
               <div className="min-w-0">
                 <p className="font-medium">{v.title}</p>
-                <p className="text-sm text-zinc-500">{v.status}</p>
+                <p className="text-sm text-sec">{v.status}</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -611,7 +611,7 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
                   <button
                     onClick={() => move(index, "up")}
                     disabled={index === 0}
-                    className="rounded-md border border-zinc-300 px-2 py-1 disabled:opacity-30 dark:border-zinc-700"
+                    className="rounded-md border border-sep px-2 py-1 disabled:opacity-30"
                     aria-label="Move up"
                   >
                     ↑
@@ -619,7 +619,7 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
                   <button
                     onClick={() => move(index, "down")}
                     disabled={index === visibleVideos.length - 1}
-                    className="rounded-md border border-zinc-300 px-2 py-1 disabled:opacity-30 dark:border-zinc-700"
+                    className="rounded-md border border-sep px-2 py-1 disabled:opacity-30"
                     aria-label="Move down"
                   >
                     ↓
@@ -637,7 +637,7 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
               <select
                 value={v.speaker?.id ?? ""}
                 onChange={(e) => reassignSpeaker(v.id, e.target.value)}
-                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+                className="rounded-md border border-sep px-2 py-1"
                 aria-label="Speaker"
               >
                 <option value="">No speaker</option>
@@ -652,44 +652,44 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
                   set outside this app (e.g. in Bunny's own dashboard). */}
               <button
                 onClick={() => refreshStatus(v.id)}
-                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+                className="rounded-md border border-sep px-2 py-1"
                 title="Re-read status, duration, and thumbnail from Bunny"
               >
                 {v.status === "READY" ? "Sync from Bunny" : "Refresh status"}
               </button>
               <button
                 onClick={() => toggle(v, "published")}
-                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+                className="rounded-md border border-sep px-2 py-1"
               >
                 {v.published ? "Published" : "Draft"}
               </button>
               <button
                 onClick={() => setExpiry(v)}
-                className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${v.unpublishAt ? "border-amber-400 text-amber-700 dark:text-amber-400" : "border-zinc-300"}`}
+                className={`rounded-md border px-2 py-1 ${v.unpublishAt ? "border-amber-400 text-amber-700 dark:text-amber-400" : "border-sep"}`}
                 title={v.unpublishAt ? `Unpublishes ${new Date(v.unpublishAt).toLocaleString()}` : undefined}
               >
                 {v.unpublishAt ? "Expires" : "Set expiry"}
               </button>
               <button
                 onClick={() => toggle(v, "memberOnly")}
-                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+                className="rounded-md border border-sep px-2 py-1"
               >
                 {v.memberOnly ? "Members only" : "Public"}
               </button>
               <button
                 onClick={() => toggle(v, "hidden")}
-                className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${v.hidden ? "border-red-400 text-red-600 dark:text-red-400" : "border-zinc-300"}`}
+                className={`rounded-md border px-2 py-1 ${v.hidden ? "border-red-400 text-red-600 dark:text-red-400" : "border-sep"}`}
               >
                 {v.hidden ? "Hidden" : "Visible"}
               </button>
               <button
                 onClick={() => cycleDownload(v)}
-                className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${
+                className={`rounded-md border px-2 py-1 ${
                   v.downloadEnabled === false
                     ? "border-red-400 text-red-600 dark:text-red-400"
                     : v.downloadEnabled === true
                       ? "border-green-400 text-green-700 dark:text-green-400"
-                      : "border-zinc-300"
+                      : "border-sep"
                 }`}
                 title="Downloads: click to cycle inherit / allow / block"
               >
@@ -707,44 +707,44 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
               <Mp4Badge video={v} />
               <button
                 onClick={() => setPremiere(v)}
-                className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${v.isPremiere ? "border-purple-400 text-purple-700 dark:text-purple-400" : "border-zinc-300"}`}
+                className={`rounded-md border px-2 py-1 ${v.isPremiere ? "border-purple-400 text-purple-700 dark:text-purple-400" : "border-sep"}`}
                 title={v.isPremiere && v.publishAt ? `Premieres ${new Date(v.publishAt).toLocaleString()}` : undefined}
               >
                 {v.isPremiere ? "Premiere set" : "Schedule premiere"}
               </button>
               <button
                 onClick={() => setManagingThumbnailId(managingThumbnailId === v.id ? null : v.id)}
-                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+                className="rounded-md border border-sep px-2 py-1"
               >
                 Thumbnail
               </button>
               <button
                 onClick={() => setManagingChaptersId(managingChaptersId === v.id ? null : v.id)}
-                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+                className="rounded-md border border-sep px-2 py-1"
               >
                 Chapters
               </button>
               <button
                 onClick={() => setManagingTranscriptId(managingTranscriptId === v.id ? null : v.id)}
-                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+                className="rounded-md border border-sep px-2 py-1"
               >
                 Transcript
               </button>
               <button
                 onClick={() => setManagingScriptureId(managingScriptureId === v.id ? null : v.id)}
-                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+                className="rounded-md border border-sep px-2 py-1"
               >
                 Scripture
               </button>
               <button
                 onClick={() => setManagingAccessId(managingAccessId === v.id ? null : v.id)}
-                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+                className="rounded-md border border-sep px-2 py-1"
               >
                 Viewers
               </button>
               <button
                 onClick={() => setManagingCaptionsId(managingCaptionsId === v.id ? null : v.id)}
-                className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+                className="rounded-md border border-sep px-2 py-1"
               >
                 Captions
               </button>
@@ -786,7 +786,7 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
           </li>
         ))}
         {visibleVideos.length === 0 && (
-          <li className="p-4 text-sm text-zinc-500">
+          <li className="p-4 text-sm text-sec">
             {seriesId ? "No episodes in this series yet." : categoryId ? "No videos in this category yet." : "No videos yet."}
           </li>
         )}

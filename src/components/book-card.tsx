@@ -157,11 +157,11 @@ export function BookCard({ book }: { book: BookCardData }) {
     <Link href={book.href} className="group flex flex-col gap-1.5">
       <div
         ref={containerRef}
-        className="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-zinc-100 shadow-sm transition group-hover:-translate-y-0.5 group-hover:shadow-lg dark:bg-zinc-800"
+        className="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-chip shadow-sm transition group-hover:-translate-y-0.5 group-hover:shadow-lg"
       >
         {/* Shows through until a cover arrives, and stays put when one can't
             be drawn — a titled card is a fine cover on its own. */}
-        <div className="flex h-full items-center justify-center p-3 text-center text-sm font-medium text-zinc-500 dark:text-zinc-400">
+        <div className="flex h-full items-center justify-center p-3 text-center text-sm font-medium text-sec">
           {book.title}
         </div>
 
@@ -206,7 +206,7 @@ export function BookCard({ book }: { book: BookCardData }) {
 
       <div className="min-w-0">
         <p className="truncate text-sm font-medium leading-snug group-hover:underline">{book.title}</p>
-        {subtitle && <p className="text-xs text-zinc-500">{subtitle}</p>}
+        {subtitle && <p className="text-xs text-sec">{subtitle}</p>}
       </div>
     </Link>
   );

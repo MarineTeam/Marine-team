@@ -124,7 +124,7 @@ export function BunnyStorageImport({
   }
 
   return (
-    <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+    <div className="rounded-lg border border-sep p-4">
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
@@ -132,7 +132,7 @@ export function BunnyStorageImport({
             setOpen((current) => !current);
             if (!open && objects === null) void scan();
           }}
-          className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700"
+          className="rounded-md border border-sep px-3 py-1.5 text-sm"
         >
           {open ? "Hide" : "Import from Bunny Storage"}
         </button>
@@ -141,7 +141,7 @@ export function BunnyStorageImport({
             type="button"
             onClick={scan}
             disabled={loading}
-            className="text-sm text-zinc-500 hover:underline disabled:opacity-50"
+            className="text-sm text-sec hover:underline disabled:opacity-50"
           >
             {loading ? "Scanning…" : "Rescan"}
           </button>
@@ -152,22 +152,22 @@ export function BunnyStorageImport({
 
       {open && (
         <div className="mt-3 space-y-3">
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-sec">
             Files uploaded straight to Bunny (bigger than the 4MB limit above) show up here until
             they&apos;re added to the library.
           </p>
 
-          {loading && objects === null && <p className="text-sm text-zinc-500">Scanning…</p>}
+          {loading && objects === null && <p className="text-sm text-sec">Scanning…</p>}
 
           {objects !== null && objects.length === 0 && !loading && (
-            <p className="text-sm text-zinc-500">
+            <p className="text-sm text-sec">
               Nothing new in Bunny Storage — every file there is already in the library.
             </p>
           )}
 
           {objects !== null && objects.length > 0 && (
             <>
-              <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+              <ul className="divide-y divide-sep rounded-lg border border-sep">
                 {objects.map((object) => (
                   <li key={object.path} className="flex flex-wrap items-center gap-2 p-3">
                     <input
@@ -182,15 +182,15 @@ export function BunnyStorageImport({
                         setTitles((current) => ({ ...current, [object.path]: e.target.value }))
                       }
                       aria-label={`Title for ${object.name}`}
-                      className="min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                      className="min-w-0 flex-1 rounded-md border border-sep px-3 py-1.5 text-sm"
                     />
                     <span
-                      className="w-56 shrink-0 truncate text-xs text-zinc-500"
+                      className="w-56 shrink-0 truncate text-xs text-sec"
                       title={object.path}
                     >
                       {object.path}
                     </span>
-                    <span className="w-16 shrink-0 text-right text-xs text-zinc-500">
+                    <span className="w-16 shrink-0 text-right text-xs text-sec">
                       {formatSize(object.sizeBytes)}
                     </span>
                   </li>
@@ -207,7 +207,7 @@ export function BunnyStorageImport({
                         : new Set(objects.map((o) => o.path)),
                     )
                   }
-                  className="text-sm text-zinc-500 hover:underline"
+                  className="text-sm text-sec hover:underline"
                 >
                   {selected.size === objects.length ? "Clear selection" : "Select all"}
                 </button>
@@ -223,7 +223,7 @@ export function BunnyStorageImport({
                   type="button"
                   onClick={importSelected}
                   disabled={importing || selected.size === 0}
-                  className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+                  className="rounded-md btn-primary px-4 py-2 text-sm text-white disabled:opacity-50"
                 >
                   {importing ? "Importing…" : `Import ${selected.size || ""}`.trim()}
                 </button>

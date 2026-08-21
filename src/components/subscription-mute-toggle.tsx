@@ -34,8 +34,8 @@ export function SubscriptionMuteToggle({
       onClick={toggle}
       disabled={saving}
       title={muted ? "Not receiving notifications for this" : "Receiving notifications for this"}
-      className={`shrink-0 rounded-md border px-2 py-1 text-xs disabled:opacity-50 dark:border-zinc-700 ${
-        muted ? "border-zinc-300 text-zinc-500" : "border-zinc-300"
+      className={`shrink-0 rounded-md border px-2 py-1 text-xs disabled:opacity-50 ${
+        muted ? "border-sep text-sec" : "border-sep"
       }`}
     >
       {muted ? "🔕 Muted" : "🔔 Notify"}

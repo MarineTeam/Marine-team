@@ -47,7 +47,7 @@ export function StarRating({
             onClick={() => rate(star)}
             aria-label={`Rate ${star} star${star === 1 ? "" : "s"}`}
             className={`text-lg leading-none ${canRate ? "cursor-pointer" : "cursor-default"} ${
-              star <= displayValue ? "text-amber-500" : "text-zinc-300 dark:text-zinc-700"
+              star <= displayValue ? "text-amber-500" : "text-ter"
             }`}
           >
             ★
@@ -55,11 +55,11 @@ export function StarRating({
         ))}
       </div>
       {count > 0 ? (
-        <span className="text-sm text-zinc-500">
+        <span className="text-sm text-sec">
           {average.toFixed(1)} ({count})
         </span>
       ) : (
-        <span className="text-sm text-zinc-500">No ratings yet</span>
+        <span className="text-sm text-sec">No ratings yet</span>
       )}
     </div>
   );

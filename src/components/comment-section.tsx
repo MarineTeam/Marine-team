@@ -92,7 +92,7 @@ export function CommentSection({
 
   return (
     <section className="space-y-4">
-      <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+      <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">
         Comments {comments.length + replyCount > 0 && `(${comments.length + replyCount})`}
       </h2>
 
@@ -103,18 +103,18 @@ export function CommentSection({
             onChange={(e) => setBody(e.target.value)}
             placeholder="Add a comment…"
             rows={2}
-            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded-md border border-sep px-3 py-2 text-sm"
           />
           <button
             type="submit"
             disabled={posting || !body.trim()}
-            className="rounded-md bg-zinc-900 text-white px-4 py-1.5 text-sm hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+            className="rounded-md btn-primary text-white px-4 py-1.5 text-sm disabled:opacity-50"
           >
             {posting ? "Posting…" : "Post"}
           </button>
         </form>
       ) : (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-sec">
           <a href="/auth/login" className="underline">
             Log in
           </a>{" "}
@@ -125,18 +125,18 @@ export function CommentSection({
 
       <ul className="space-y-3">
         {comments.map((c) => (
-          <li key={c.id} className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+          <li key={c.id} className="rounded-lg border border-sep p-3">
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-medium">{getDisplayName(c.user)}</p>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-zinc-400">
+                <span className="text-xs text-ter">
                   {new Date(c.createdAt).toLocaleString()}
                 </span>
                 {currentUserId && c.userId !== currentUserId && (
                   <button
                     onClick={() => report(c.id)}
                     disabled={reportedIds.has(c.id)}
-                    className="text-xs text-zinc-400 hover:underline disabled:no-underline"
+                    className="text-xs text-ter hover:underline disabled:no-underline"
                   >
                     {reportedIds.has(c.id) ? "Reported" : "Report"}
                   </button>
@@ -151,7 +151,7 @@ export function CommentSection({
                 )}
               </div>
             </div>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap">
+            <p className="mt-1 text-sm text-sec whitespace-pre-wrap">
               {c.body}
             </p>
 
@@ -161,27 +161,27 @@ export function CommentSection({
                   setReplyingTo(replyingTo === c.id ? null : c.id);
                   setReplyBody("");
                 }}
-                className="mt-2 text-xs text-zinc-500 hover:underline"
+                className="mt-2 text-xs text-sec hover:underline"
               >
                 {replyingTo === c.id ? "Cancel" : "Reply"}
               </button>
             )}
 
             {c.replies.length > 0 && (
-              <ul className="mt-3 space-y-3 border-l border-zinc-200 pl-3 dark:border-zinc-800">
+              <ul className="mt-3 space-y-3 border-l border-sep pl-3">
                 {c.replies.map((r) => (
                   <li key={r.id}>
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-medium">{getDisplayName(r.user)}</p>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-zinc-400">
+                        <span className="text-xs text-ter">
                           {new Date(r.createdAt).toLocaleString()}
                         </span>
                         {currentUserId && r.userId !== currentUserId && (
                           <button
                             onClick={() => report(r.id)}
                             disabled={reportedIds.has(r.id)}
-                            className="text-xs text-zinc-400 hover:underline disabled:no-underline"
+                            className="text-xs text-ter hover:underline disabled:no-underline"
                           >
                             {reportedIds.has(r.id) ? "Reported" : "Report"}
                           </button>
@@ -196,7 +196,7 @@ export function CommentSection({
                         )}
                       </div>
                     </div>
-                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap">
+                    <p className="mt-1 text-sm text-sec whitespace-pre-wrap">
                       {r.body}
                     </p>
                   </li>
@@ -212,12 +212,12 @@ export function CommentSection({
                   placeholder={`Reply to ${getDisplayName(c.user)}…`}
                   rows={2}
                   autoFocus
-                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                  className="w-full rounded-md border border-sep px-3 py-2 text-sm"
                 />
                 <button
                   type="submit"
                   disabled={replyPosting || !replyBody.trim()}
-                  className="rounded-md bg-zinc-900 text-white px-4 py-1.5 text-sm hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+                  className="rounded-md btn-primary text-white px-4 py-1.5 text-sm disabled:opacity-50"
                 >
                   {replyPosting ? "Posting…" : "Post reply"}
                 </button>
@@ -225,7 +225,7 @@ export function CommentSection({
             )}
           </li>
         ))}
-        {comments.length === 0 && <li className="text-sm text-zinc-500">No comments yet.</li>}
+        {comments.length === 0 && <li className="text-sm text-sec">No comments yet.</li>}
       </ul>
     </section>
   );

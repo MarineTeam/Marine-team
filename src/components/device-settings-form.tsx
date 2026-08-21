@@ -60,7 +60,7 @@ export function DeviceSettingsForm() {
               />
               <span>
                 {option.label}
-                <span className="block text-xs text-zinc-500">{option.hint}</span>
+                <span className="block text-xs text-sec">{option.hint}</span>
               </span>
             </label>
           ))}
@@ -75,7 +75,7 @@ export function DeviceSettingsForm() {
             value={settings.language}
             onChange={(e) => update({ language: e.target.value })}
             disabled={LANGUAGES.length === 1}
-            className="mt-1 rounded-md border border-zinc-300 px-3 py-2 text-sm disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900"
+            className="mt-1 rounded-md border border-sep px-3 py-2 text-sm disabled:opacity-60"
           >
             {LANGUAGES.map((language) => (
               <option key={language.code} value={language.code}>
@@ -83,7 +83,7 @@ export function DeviceSettingsForm() {
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-zinc-500">More languages are coming; English is the only one for now.</p>
+          <p className="mt-1 text-xs text-sec">More languages are coming; English is the only one for now.</p>
         </div>
       </section>
 
@@ -98,7 +98,7 @@ export function DeviceSettingsForm() {
           />
           <span>
             Autoplay
-            <span className="block text-xs text-zinc-500">
+            <span className="block text-xs text-sec">
               Start playing as soon as a video page opens, and roll on to the next episode when one finishes.
             </span>
           </span>
@@ -112,7 +112,7 @@ export function DeviceSettingsForm() {
             id="playback-speed"
             value={settings.defaultPlaybackSpeed}
             onChange={(e) => update({ defaultPlaybackSpeed: Number(e.target.value) })}
-            className="mt-1 rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="mt-1 rounded-md border border-sep px-3 py-2 text-sm"
           >
             {PLAYBACK_SPEEDS.map((speed) => (
               <option key={speed} value={speed}>
@@ -120,14 +120,14 @@ export function DeviceSettingsForm() {
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-zinc-500">
+          <p className="mt-1 text-xs text-sec">
             Shown as a reminder under the player, which you set with its own ⚙️ control — the embedded Bunny player
             can&apos;t be started at a preset speed.
           </p>
         </div>
       </section>
 
-      <p className="text-xs text-zinc-500">
+      <p className="text-xs text-sec">
         These settings are stored on this device, so your phone and your computer can differ. Everything under
         Account below applies wherever you log in.
       </p>

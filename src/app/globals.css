@@ -122,3 +122,20 @@ body {
 :root[data-standalone="true"] .app-main {
   padding-bottom: 4rem;
 }
+
+/*
+ * The primary action. This used to be a near-black pill that inverted to
+ * white in dark mode; it is the brand gradient in both themes now, so the
+ * thing you are meant to press is the same colour as the app around it.
+ *
+ * Padding, radius and text size stay with the call sites — they differ from
+ * one button to the next, and only the colour was ever shared.
+ */
+.btn-primary {
+  background: var(--grad-brand);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}

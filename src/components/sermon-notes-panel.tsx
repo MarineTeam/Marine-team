@@ -87,9 +87,9 @@ export function SermonNotesPanel({
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">My notes</h2>
+        <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">My notes</h2>
         {notes.length > 0 && (
-          <button onClick={exportNotes} className="text-xs text-zinc-500 hover:underline">
+          <button onClick={exportNotes} className="text-xs text-sec hover:underline">
             Export as text
           </button>
         )}
@@ -99,51 +99,51 @@ export function SermonNotesPanel({
         <input
           value={timestamp}
           onChange={(e) => setTimestamp(e.target.value)}
-          className="w-20 shrink-0 rounded-md border border-zinc-300 px-2 py-1.5 text-sm tabular-nums dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-20 shrink-0 rounded-md border border-sep px-2 py-1.5 text-sm tabular-nums"
         />
         <input
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="Add a note…"
-          className="min-w-[10rem] flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="min-w-[10rem] flex-1 rounded-md border border-sep px-3 py-1.5 text-sm"
         />
         <button
           type="submit"
-          className="rounded-md bg-zinc-900 text-white px-3 py-1.5 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+          className="rounded-md btn-primary text-white px-3 py-1.5 text-sm"
         >
           Add
         </button>
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 text-sm">
+      <ul className="divide-y divide-sep text-sm">
         {notes.map((n) => (
           <li key={n.id} className="flex items-start gap-3 py-2">
-            <span className="w-14 shrink-0 tabular-nums text-zinc-500">{formatTimestamp(n.timestampSeconds)}</span>
+            <span className="w-14 shrink-0 tabular-nums text-sec">{formatTimestamp(n.timestampSeconds)}</span>
             {editingId === n.id ? (
               <div className="flex flex-1 flex-wrap items-center gap-2">
                 <input
                   value={editBody}
                   onChange={(e) => setEditBody(e.target.value)}
                   autoFocus
-                  className="min-w-[10rem] flex-1 rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+                  className="min-w-[10rem] flex-1 rounded-md border border-sep px-2 py-1"
                 />
-                <button onClick={() => saveEdit(n.id)} className="text-zinc-500 hover:underline">
+                <button onClick={() => saveEdit(n.id)} className="text-sec hover:underline">
                   Save
                 </button>
-                <button onClick={() => setEditingId(null)} className="text-zinc-500 hover:underline">
+                <button onClick={() => setEditingId(null)} className="text-sec hover:underline">
                   Cancel
                 </button>
               </div>
             ) : (
               <>
-                <p className="flex-1 whitespace-pre-wrap text-zinc-600 dark:text-zinc-400">{n.body}</p>
+                <p className="flex-1 whitespace-pre-wrap text-sec">{n.body}</p>
                 <button
                   onClick={() => {
                     setEditingId(n.id);
                     setEditBody(n.body);
                   }}
-                  className="text-zinc-500 hover:underline"
+                  className="text-sec hover:underline"
                 >
                   Edit
                 </button>
@@ -154,7 +154,7 @@ export function SermonNotesPanel({
             )}
           </li>
         ))}
-        {notes.length === 0 && <li className="py-2 text-zinc-500">No notes yet — jot one down as you watch.</li>}
+        {notes.length === 0 && <li className="py-2 text-sec">No notes yet — jot one down as you watch.</li>}
       </ul>
     </section>
   );

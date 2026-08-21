@@ -44,17 +44,17 @@ export function ShareLinkPanel({
   }
 
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800">
+    <div className="rounded-lg border border-sep">
       <button
         onClick={toggle}
         aria-expanded={open}
         className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium"
       >
         <span>Share a link{links.length > 0 ? ` (${links.length})` : ""}</span>
-        <span className="text-zinc-500">{open ? "−" : "+"}</span>
+        <span className="text-sec">{open ? "−" : "+"}</span>
       </button>
       {open && (
-        <div className="space-y-4 border-t border-zinc-200 p-3 dark:border-zinc-800">
+        <div className="space-y-4 border-t border-sep p-3">
           <ShareLinkForm
             target={target}
             endpoint="/api/share-links"
@@ -62,7 +62,7 @@ export function ShareLinkPanel({
             onCreated={(link) => setLinks((current) => [link, ...current])}
           />
           <div className="space-y-2">
-            <h3 className="text-xs font-medium uppercase tracking-wide text-zinc-500">Links you&apos;ve shared</h3>
+            <h3 className="text-xs font-medium uppercase tracking-wide text-sec">Links you&apos;ve shared</h3>
             <ShareLinkList links={links} revokeEndpoint="/api/share-links" onChange={load} />
           </div>
         </div>

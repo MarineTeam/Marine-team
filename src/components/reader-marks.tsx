@@ -88,12 +88,12 @@ export function ReaderMarks({
   }
 
   if (!canMark) {
-    return <p className="text-sm text-zinc-500">Log in to highlight and bookmark as you read.</p>;
+    return <p className="text-sm text-sec">Log in to highlight and bookmark as you read.</p>;
   }
 
   if (marks.length === 0) {
     return (
-      <p className="text-sm text-zinc-500">
+      <p className="text-sm text-sec">
         Nothing marked yet. Select text to highlight it, or use Bookmark to save your place.
       </p>
     );
@@ -102,7 +102,7 @@ export function ReaderMarks({
   return (
     <ul className="space-y-2 text-sm">
       {marks.map((mark) => (
-        <li key={mark.id} className="rounded border border-zinc-200 p-2 dark:border-zinc-800">
+        <li key={mark.id} className="rounded border border-sep p-2">
           <div className="flex items-start gap-2">
             <span aria-hidden>{KIND_ICON[mark.kind]}</span>
             <button
@@ -114,14 +114,14 @@ export function ReaderMarks({
                   {mark.excerpt}
                 </span>
               ) : (
-                <span className="text-zinc-500">Saved place</span>
+                <span className="text-sec">Saved place</span>
               )}
             </button>
             <button
               onClick={() => remove(mark.id)}
               disabled={busyId === mark.id}
               aria-label="Delete mark"
-              className="shrink-0 text-xs text-zinc-400 hover:text-red-600 disabled:opacity-50"
+              className="shrink-0 text-xs text-ter hover:text-red-600 disabled:opacity-50"
             >
               ✕
             </button>
@@ -134,19 +134,19 @@ export function ReaderMarks({
                 onChange={(e) => setDraftNote(e.target.value)}
                 rows={3}
                 aria-label="Note"
-                className="w-full rounded border border-zinc-300 p-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                className="w-full rounded border border-sep p-1 text-sm"
               />
               <div className="flex gap-2">
                 <button
                   onClick={() => saveNote(mark.id)}
                   disabled={busyId === mark.id}
-                  className="rounded-md border border-zinc-300 px-2 py-0.5 text-xs dark:border-zinc-700"
+                  className="rounded-md border border-sep px-2 py-0.5 text-xs"
                 >
                   Save
                 </button>
                 <button
                   onClick={() => setEditingId(null)}
-                  className="rounded-md border border-zinc-300 px-2 py-0.5 text-xs dark:border-zinc-700"
+                  className="rounded-md border border-sep px-2 py-0.5 text-xs"
                 >
                   Cancel
                 </button>
@@ -154,13 +154,13 @@ export function ReaderMarks({
             </div>
           ) : (
             <div className="mt-1 flex items-center gap-2">
-              {mark.note && <p className="min-w-0 flex-1 text-xs text-zinc-600 dark:text-zinc-400">{mark.note}</p>}
+              {mark.note && <p className="min-w-0 flex-1 text-xs text-sec">{mark.note}</p>}
               <button
                 onClick={() => {
                   setEditingId(mark.id);
                   setDraftNote(mark.note ?? "");
                 }}
-                className="text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                className="text-xs text-ter hover:text-ink"
               >
                 {mark.note ? "Edit note" : "Add note"}
               </button>

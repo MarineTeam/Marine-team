@@ -132,7 +132,7 @@ export function ShareLinkList({
   }
 
   if (links.length === 0) {
-    return <p className="text-sm text-zinc-500">No share links yet.</p>;
+    return <p className="text-sm text-sec">No share links yet.</p>;
   }
 
   return (
@@ -150,7 +150,7 @@ export function ShareLinkList({
         </BulkButton>
       </BulkBar>
 
-      <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+      <ul className="divide-y divide-sep rounded-lg border border-sep">
         {links.map((link) => {
           const status = statusOf(link);
           const target = link.video ?? link.series;
@@ -171,18 +171,18 @@ export function ShareLinkList({
                       {target?.title}
                     </a>
                   ) : (
-                    <span className="truncate font-medium text-zinc-500">Content removed</span>
+                    <span className="truncate font-medium text-sec">Content removed</span>
                   )}
                   <span
                     className={`rounded-full px-2 py-0.5 text-[11px] ${
                       status.tone === "live"
                         ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
-                        : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                        : "bg-chip text-sec"
                     }`}
                   >
                     {status.label}
                   </span>
-                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                  <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] text-sec">
                     {link.visibility === "EMAIL" ? "Private" : "Public"}
                   </span>
                   {link.grantsAccess && (
@@ -191,18 +191,18 @@ export function ShareLinkList({
                     </span>
                   )}
                   {link.passwordProtected && (
-                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] text-sec">
                       🔒 Password
                     </span>
                   )}
                 </div>
-                {link.note && <p className="text-sm text-zinc-600 dark:text-zinc-300">{link.note}</p>}
+                {link.note && <p className="text-sm text-sec">{link.note}</p>}
                 {link.visibility === "EMAIL" && link.recipients.length > 0 && (
-                  <p className="truncate text-xs text-zinc-500">
+                  <p className="truncate text-xs text-sec">
                     Shared with {link.recipients.map((r) => r.email).join(", ")}
                   </p>
                 )}
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-sec">
                   {showOwner && link.createdBy && <>By {link.createdBy.displayName || link.createdBy.name || link.createdBy.email} · </>}
                   Created {formatDate(link.createdAt)}
                   {link.expiresAt && <> · {status.label === "Expired" ? "Expired" : "Expires"} {formatDate(link.expiresAt)}</>}
@@ -214,7 +214,7 @@ export function ShareLinkList({
               <div className="flex shrink-0 items-center gap-2 text-sm">
                 <button
                   onClick={() => copy(link)}
-                  className="rounded-md border border-zinc-300 px-3 py-1 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  className="rounded-md border border-sep px-3 py-1 hover:bg-hover"
                 >
                   {copiedId === link.id ? "Copied!" : "Copy link"}
                 </button>

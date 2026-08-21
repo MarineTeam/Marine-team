@@ -47,19 +47,19 @@ export default async function HymnPage({ params }: { params: Promise<{ fileId: s
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 space-y-6">
-      <Link href={backHref} className="text-sm text-zinc-500 hover:underline">
+      <Link href={backHref} className="text-sm text-sec hover:underline">
         ← {backLabel}
       </Link>
 
       {locked ? (
-        <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
+        <div className="rounded-lg border border-dashed border-sep p-8 text-center">
           <p className="font-medium">
             {isLoggedIn ? "You don't have access to this hymn." : "This hymn is for members only."}
           </p>
           {!isLoggedIn && (
             <a
               href="/auth/login"
-              className="mt-4 inline-block rounded-md bg-zinc-900 px-4 py-2 text-sm text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+              className="mt-4 inline-block rounded-md btn-primary px-4 py-2 text-sm text-white"
             >
               Log in
             </a>
@@ -69,13 +69,13 @@ export default async function HymnPage({ params }: { params: Promise<{ fileId: s
         <>
           <div>
             <div className="flex flex-wrap items-baseline gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight">{file.title}</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-ink">{file.title}</h1>
               {file.pageNumber != null && (
-                <span className="text-sm text-zinc-500">Page {file.pageNumber}</span>
+                <span className="text-sm text-sec">Page {file.pageNumber}</span>
               )}
             </div>
             {file.series && (
-              <p className="mt-1 text-sm text-zinc-500">
+              <p className="mt-1 text-sm text-sec">
                 {file.series.abbreviation ? `${file.series.abbreviation} · ` : ""}
                 {file.series.title}
               </p>
@@ -84,22 +84,22 @@ export default async function HymnPage({ params }: { params: Promise<{ fileId: s
 
           {file.lyricsText ? (
             <>
-              <div className="whitespace-pre-wrap rounded-lg border border-zinc-200 p-5 text-[15px] leading-relaxed dark:border-zinc-800">
+              <div className="whitespace-pre-wrap rounded-lg border border-sep p-5 text-[15px] leading-relaxed">
                 {file.lyricsText}
               </div>
               <a
                 href={pdfHref}
-                className="inline-block rounded-md border border-zinc-300 px-4 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                className="inline-block rounded-md border border-sep px-4 py-2 text-sm hover:bg-hover"
               >
                 {pdfLabel} (if the text above doesn&apos;t look right)
               </a>
             </>
           ) : (
-            <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
-              <p className="text-zinc-500">Lyrics text isn&apos;t available for this hymn yet.</p>
+            <div className="rounded-lg border border-dashed border-sep p-8 text-center">
+              <p className="text-sec">Lyrics text isn&apos;t available for this hymn yet.</p>
               <a
                 href={pdfHref}
-                className="mt-4 inline-block rounded-md bg-zinc-900 px-4 py-2 text-sm text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+                className="mt-4 inline-block rounded-md btn-primary px-4 py-2 text-sm text-white"
               >
                 {pdfLabel}
               </a>

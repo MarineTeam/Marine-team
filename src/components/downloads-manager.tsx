@@ -80,17 +80,17 @@ export function DownloadsManager({
       <section className="space-y-2">
         <h3 className="text-sm font-medium">Availability</h3>
         {!pluginOn ? (
-          <p className="text-sm text-zinc-500">Downloads are turned off for this site.</p>
+          <p className="text-sm text-sec">Downloads are turned off for this site.</p>
         ) : !permitted ? (
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-sec">
             Your account doesn&apos;t have download access. Ask an admin if you think it should.
           </p>
         ) : !supported ? (
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-sec">
             This browser can&apos;t store downloads. Try installing the app, or use a different browser.
           </p>
         ) : (
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-sec">
             You can download videos for offline viewing
             {platform === "PWA"
               ? " in the installed app"
@@ -116,7 +116,7 @@ export function DownloadsManager({
             />
             <span>
               Wi-Fi only
-              <span className="block text-xs text-zinc-500">Downloads wait until you&apos;re on Wi-Fi.</span>
+              <span className="block text-xs text-sec">Downloads wait until you&apos;re on Wi-Fi.</span>
             </span>
           </label>
           <label className="flex items-start gap-2">
@@ -129,13 +129,13 @@ export function DownloadsManager({
             />
             <span>
               Wi-Fi or mobile data
-              <span className="block text-xs text-zinc-500">
+              <span className="block text-xs text-sec">
                 Downloads start anywhere. This can use a lot of data.
               </span>
             </span>
           </label>
         </fieldset>
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-sec">
           Applies to this device only. Detecting a mobile connection isn&apos;t possible in every browser — where
           it isn&apos;t, downloads go ahead.
         </p>
@@ -147,7 +147,7 @@ export function DownloadsManager({
           {items.length > 0 && (
             <button
               onClick={clearAll}
-              className="rounded-md border border-zinc-300 px-3 py-1 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              className="rounded-md border border-sep px-3 py-1 text-sm hover:bg-hover"
             >
               Remove all
             </button>
@@ -155,19 +155,19 @@ export function DownloadsManager({
         </div>
 
         {items.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-zinc-300 p-6 text-center dark:border-zinc-700">
+          <div className="rounded-lg border border-dashed border-sep p-6 text-center">
             <p className="text-sm font-medium">Nothing downloaded yet</p>
-            <p className="mt-1 text-xs text-zinc-500">
+            <p className="mt-1 text-xs text-sec">
               Downloaded videos are kept on this device and play without a connection.
             </p>
           </div>
         ) : (
           <>
             <div className="space-y-1">
-              <div className="h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
-                <div className="h-full bg-sky-600" style={{ width: `${Math.round(usedFraction * 100)}%` }} />
+              <div className="h-1.5 overflow-hidden rounded-full bg-chip">
+                <div className="h-full bg-accent" style={{ width: `${Math.round(usedFraction * 100)}%` }} />
               </div>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-sec">
                 {formatBytes(usedBytes)} used of a suggested {maxDeviceGb} GB · {items.length} video
                 {items.length === 1 ? "" : "s"}
               </p>
@@ -178,7 +178,7 @@ export function DownloadsManager({
                 {/* Served from Cache Storage by the service worker, so this
                     plays with no connection. */}
                 <video src={playing.cacheUrl} controls autoPlay className="w-full rounded-lg bg-black" />
-                <div className="flex items-center justify-between text-xs text-zinc-500">
+                <div className="flex items-center justify-between text-xs text-sec">
                   <span className="truncate">{playing.title}</span>
                   <button onClick={() => setPlaying(null)} className="underline">
                     Close
@@ -187,12 +187,12 @@ export function DownloadsManager({
               </div>
             )}
 
-            <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+            <ul className="divide-y divide-sep rounded-lg border border-sep">
               {items.map((item) => (
                 <li key={item.videoId} className="flex flex-wrap items-center justify-between gap-2 p-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{item.title}</p>
-                    <p className="truncate text-xs text-zinc-500">
+                    <p className="truncate text-xs text-sec">
                       {item.seriesTitle ? `${item.seriesTitle} · ` : ""}
                       {formatBytes(item.bytes)} · saved{" "}
                       {new Date(item.downloadedAt).toLocaleDateString(undefined, {
@@ -204,13 +204,13 @@ export function DownloadsManager({
                   <div className="flex shrink-0 items-center gap-2 text-sm">
                     <button
                       onClick={() => setPlaying(item)}
-                      className="rounded-md border border-zinc-300 px-3 py-1 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                      className="rounded-md border border-sep px-3 py-1 hover:bg-hover"
                     >
                       Play offline
                     </button>
                     <Link
                       href={`/videos/${item.videoSlug}`}
-                      className="rounded-md border border-zinc-300 px-3 py-1 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                      className="rounded-md border border-sep px-3 py-1 hover:bg-hover"
                     >
                       Open page
                     </Link>

@@ -147,20 +147,20 @@ export function ReaderSpeech({ handleRef }: { handleRef: React.RefObject<ReaderH
   if (!supported) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-t border-zinc-200 px-4 py-2 text-sm dark:border-zinc-800">
+    <div className="flex flex-wrap items-center gap-2 border-t border-sep px-4 py-2 text-sm">
       <button
         onClick={() => (speaking ? stop() : void start())}
-        className="rounded-md border border-zinc-300 px-3 py-1 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+        className="rounded-md border border-sep px-3 py-1 hover:bg-hover"
       >
         {speaking ? "■ Stop" : "🔊 Read aloud"}
       </button>
 
-      <label className="text-zinc-500">
+      <label className="text-sec">
         <span className="sr-only">Reading speed</span>
         <select
           value={rate}
           onChange={(e) => setRate(Number(e.target.value))}
-          className="rounded border border-zinc-300 px-1 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded border border-sep px-1 py-1"
         >
           {RATES.map((r) => (
             <option key={r} value={r}>
@@ -171,12 +171,12 @@ export function ReaderSpeech({ handleRef }: { handleRef: React.RefObject<ReaderH
       </label>
 
       {voices.length > 0 && (
-        <label className="min-w-0 text-zinc-500">
+        <label className="min-w-0 text-sec">
           <span className="sr-only">Voice</span>
           <select
             value={voiceName}
             onChange={(e) => setVoiceName(e.target.value)}
-            className="max-w-48 truncate rounded border border-zinc-300 px-1 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+            className="max-w-48 truncate rounded border border-sep px-1 py-1"
           >
             <option value="">Default voice</option>
             {voices.map((voice) => (
@@ -188,7 +188,7 @@ export function ReaderSpeech({ handleRef }: { handleRef: React.RefObject<ReaderH
         </label>
       )}
 
-      {speaking && <span className="text-xs text-zinc-400">Stops if you minimise the app.</span>}
+      {speaking && <span className="text-xs text-ter">Stops if you minimise the app.</span>}
     </div>
   );
 }

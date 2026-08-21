@@ -27,8 +27,8 @@ export function QueryMonitorAdminToggle({ initialEnabled }: { initialEnabled: bo
     <button
       onClick={toggle}
       disabled={pending}
-      className={`shrink-0 rounded-md border px-3 py-1.5 text-sm disabled:opacity-50 dark:border-zinc-700 ${
-        enabled ? "" : "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
+      className={`shrink-0 rounded-md border px-3 py-1.5 text-sm disabled:opacity-50 ${
+        enabled ? "" : "btn-primary text-white"
       }`}
     >
       {enabled ? "Disable" : "Enable"}

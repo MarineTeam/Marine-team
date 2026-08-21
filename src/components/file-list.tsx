@@ -21,7 +21,7 @@ export function FileList({
   readerOn?: boolean;
 }) {
   return (
-    <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
+    <ul className="divide-y divide-sep rounded-lg border border-sep">
       {files.map((file) => {
         const locked = !canAccess(file.memberOnly, isLoggedIn);
         const isAudio = file.mimeType?.startsWith("audio/") ?? false;
@@ -36,13 +36,13 @@ export function FileList({
             <div className="flex items-center justify-between gap-4">
               <span className="font-medium">{file.title}</span>
               {locked ? (
-                <span className="text-sm text-zinc-400">Members only</span>
+                <span className="text-sm text-ter">Members only</span>
               ) : (
                 <div className="flex items-center gap-2">
                   {readable && (
                     <Link
                       href={`/read/${file.id}`}
-                      className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                      className="rounded-md border border-sep px-3 py-1.5 text-sm hover:bg-hover"
                     >
                       {readable === "pdf" ? "Read PDF" : "Read EPUB"}
                     </Link>
@@ -50,7 +50,7 @@ export function FileList({
                   {!isAudio && (
                     <a
                       href={`${url}?download=1`}
-                      className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                      className="rounded-md border border-sep px-3 py-1.5 text-sm hover:bg-hover"
                     >
                       Download
                     </a>

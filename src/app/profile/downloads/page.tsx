@@ -17,8 +17,8 @@ export default async function ProfileDownloadsPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-medium">Downloads</h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h2 className="text-lg font-semibold text-ink">Downloads</h2>
+        <p className="mt-1 text-sm text-sec">
           Videos saved to this device play without a connection. They&apos;re stored per device, so what you
           download on your phone won&apos;t appear here on a computer.
         </p>

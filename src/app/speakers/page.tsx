@@ -6,10 +6,10 @@ export default async function SpeakersPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Speakers</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-ink">Speakers</h1>
 
       {speakers.length === 0 ? (
-        <p className="text-zinc-500">No speakers listed yet.</p>
+        <p className="text-sec">No speakers listed yet.</p>
       ) : (
         <div className="space-y-3">
           {speakers.map((s) => (

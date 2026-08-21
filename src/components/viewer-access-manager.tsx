@@ -88,10 +88,10 @@ export function ViewerAccessManager({ type, id }: { type: "series" | "video"; id
   const restricted = groupGrants.length > 0 || userGrants.length > 0;
 
   return (
-    <div className="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+    <div className="space-y-3 rounded-lg border border-sep p-4">
       <div>
         <h3 className="font-medium">Restricted viewing</h3>
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-sec">
           {restricted
             ? "Only the roles and people below can view this — the “Members only” setting is ignored while any grant exists."
             : "No role or per-user restrictions — falls back to the “Members only” setting above."}
@@ -100,7 +100,7 @@ export function ViewerAccessManager({ type, id }: { type: "series" | "video"; id
 
       {availableGroups.length > 0 && (
         <div>
-          <p className="mb-1 text-xs font-medium uppercase text-zinc-500">Roles</p>
+          <p className="mb-1 text-xs font-medium uppercase text-sec">Roles</p>
           <div className="flex flex-wrap gap-3">
             {availableGroups.map((g) => (
               <label key={g.id} className="flex items-center gap-1.5 text-sm">
@@ -117,7 +117,7 @@ export function ViewerAccessManager({ type, id }: { type: "series" | "video"; id
       )}
 
       <div>
-        <p className="mb-1 text-xs font-medium uppercase text-zinc-500">Specific people</p>
+        <p className="mb-1 text-xs font-medium uppercase text-sec">Specific people</p>
         {userGrants.length > 0 && (
           <ul className="mb-2 space-y-1">
             {userGrants.map((grant) => (
@@ -136,16 +136,16 @@ export function ViewerAccessManager({ type, id }: { type: "series" | "video"; id
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="person@example.com"
-            className="min-w-0 flex-1 rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="min-w-0 flex-1 rounded-md border border-sep px-2 py-1 text-sm"
           />
           <button
             type="submit"
-            className="rounded-md bg-zinc-900 px-2 py-1 text-sm text-white dark:bg-white dark:text-zinc-900"
+            className="rounded-md btn-primary px-2 py-1 text-sm text-white"
           >
             Grant
           </button>
         </form>
-        <p className="mt-1 text-xs text-zinc-400">They must have logged in at least once already.</p>
+        <p className="mt-1 text-xs text-ter">They must have logged in at least once already.</p>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}

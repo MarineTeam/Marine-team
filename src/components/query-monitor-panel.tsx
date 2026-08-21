@@ -27,7 +27,7 @@ export async function QueryMonitorPanel() {
   return (
     <>
       <QueryMonitorRefresher />
-      <details className="fixed inset-x-0 bottom-0 z-50 border-t border-zinc-700 bg-zinc-950 text-xs text-zinc-100">
+      <details className="fixed inset-x-0 bottom-0 z-50 border-t border-sep bg-zinc-950 text-xs text-zinc-100">
         <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5">
           <span>⏱ {elapsedMs.toFixed(0)}ms</span>
           <span>
@@ -36,15 +36,15 @@ export async function QueryMonitorPanel() {
           <span>
             🧠 {formatMb(memory.heapUsed)} heap / {formatMb(memory.rss)} rss
           </span>
-          <span className="ml-auto text-zinc-500">Query Monitor</span>
+          <span className="ml-auto text-sec">Query Monitor</span>
         </summary>
-        <div className="max-h-64 overflow-y-auto border-t border-zinc-800 px-3 py-2">
+        <div className="max-h-64 overflow-y-auto border-t border-sep px-3 py-2">
           {queries.length === 0 ? (
-            <p className="text-zinc-500">No queries recorded for this request.</p>
+            <p className="text-sec">No queries recorded for this request.</p>
           ) : (
             <table className="w-full border-collapse">
               <thead>
-                <tr className="text-left text-zinc-500">
+                <tr className="text-left text-sec">
                   <th className="py-1 pr-3">Query</th>
                   <th className="py-1 pr-3">Args</th>
                   <th className="py-1 text-right">Time</th>
@@ -52,11 +52,11 @@ export async function QueryMonitorPanel() {
               </thead>
               <tbody>
                 {queries.map((q, i) => (
-                  <tr key={i} className="border-t border-zinc-800 align-top">
+                  <tr key={i} className="border-t border-sep align-top">
                     <td className="whitespace-nowrap py-1 pr-3 font-mono">
                       {q.model ?? "?"}.{q.operation}
                     </td>
-                    <td className="break-all py-1 pr-3 font-mono text-zinc-400">{q.args}</td>
+                    <td className="break-all py-1 pr-3 font-mono text-ter">{q.args}</td>
                     <td className="py-1 text-right tabular-nums">{q.durationMs.toFixed(1)}ms</td>
                   </tr>
                 ))}

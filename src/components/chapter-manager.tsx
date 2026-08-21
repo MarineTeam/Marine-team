@@ -75,31 +75,31 @@ export function ChapterManager({ videoId }: { videoId: string }) {
   const { draggingIndex, handleProps, dropZoneProps } = useDragReorder(reorderTo);
 
   return (
-    <div className="space-y-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+    <div className="space-y-3 rounded-lg border border-sep p-3">
       <form onSubmit={add} className="flex flex-wrap items-center gap-2">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Chapter title"
-          className="min-w-[10rem] flex-1 rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="min-w-[10rem] flex-1 rounded-md border border-sep px-2 py-1 text-sm"
         />
         <input
           value={timestamp}
           onChange={(e) => setTimestamp(e.target.value)}
           placeholder="1:23"
-          className="w-24 rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-24 rounded-md border border-sep px-2 py-1 text-sm"
         />
         <button
           type="submit"
           disabled={saving}
-          className="rounded-md border border-zinc-300 px-2 py-1 text-sm disabled:opacity-50 dark:border-zinc-700"
+          className="rounded-md border border-sep px-2 py-1 text-sm disabled:opacity-50"
         >
           Add chapter
         </button>
       </form>
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+      <ul className="divide-y divide-sep">
         {chapters.map((c, index) => (
           <li
             key={c.id}
@@ -107,7 +107,7 @@ export function ChapterManager({ videoId }: { videoId: string }) {
             {...dropZoneProps(index)}
           >
             <DragHandle {...handleProps(index)} />
-            <span className="w-16 shrink-0 tabular-nums text-zinc-500">
+            <span className="w-16 shrink-0 tabular-nums text-sec">
               {formatTimestamp(c.timestampSeconds)}
             </span>
             <span className="flex-1 truncate">{c.title}</span>
@@ -117,7 +117,7 @@ export function ChapterManager({ videoId }: { videoId: string }) {
             </button>
           </li>
         ))}
-        {chapters.length === 0 && <li className="py-2 text-sm text-zinc-500">No chapters yet.</li>}
+        {chapters.length === 0 && <li className="py-2 text-sm text-sec">No chapters yet.</li>}
       </ul>
     </div>
   );

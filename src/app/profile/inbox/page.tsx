@@ -28,7 +28,7 @@ export default async function ProfileInboxPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-medium">Inbox</h2>
+        <h2 className="text-lg font-semibold text-ink">Inbox</h2>
         {notificationsOn && <PushNotificationToggle />}
       </div>
       <InboxList initialItems={items} />

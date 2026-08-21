@@ -13,7 +13,7 @@ export default async function SubscriptionsPage() {
         <p className="font-medium">Log in to see your subscriptions.</p>
         <a
           href="/auth/login"
-          className="mt-4 inline-block rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+          className="mt-4 inline-block rounded-md btn-primary text-white px-4 py-2 text-sm"
         >
           Log in
         </a>
@@ -25,24 +25,24 @@ export default async function SubscriptionsPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-8">
-      <h1 className="text-2xl font-semibold tracking-tight">Subscriptions</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-ink">Subscriptions</h1>
 
       {seriesSubs.length === 0 && categorySubs.length === 0 && (
-        <p className="text-zinc-500">
+        <p className="text-sec">
           Not following anything yet — look for the Subscribe button on a series or category page.
         </p>
       )}
 
       {categorySubs.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Categories</h2>
+          <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">Categories</h2>
           <div className="space-y-3">
             {categorySubs.map((s) =>
               s.category ? (
                 <div key={s.id} className="flex items-center gap-2">
                   <Link
                     href={`/categories/${s.category.slug}`}
-                    className="flex-1 block rounded-xl border border-zinc-200 bg-white p-3 shadow-sm hover:-translate-y-0.5 hover:shadow-lg transition dark:border-zinc-800 dark:bg-zinc-900"
+                    className="flex-1 block rounded-xl border border-sep bg-white p-3 shadow-sm hover:-translate-y-0.5 hover:shadow-lg transition"
                   >
                     <span className="font-medium">{s.category.name}</span>
                   </Link>
@@ -56,7 +56,7 @@ export default async function SubscriptionsPage() {
 
       {seriesSubs.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Series</h2>
+          <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">Series</h2>
           <div className="space-y-3">
             {seriesSubs.map((s) =>
               s.series ? (

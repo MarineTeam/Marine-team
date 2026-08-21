@@ -194,7 +194,7 @@ export default async function SeriesPage({
       {viewCountsOn && !seriesLocked && <ViewEventBeacon type="series" id={series.id} />}
       <div>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">{series.title}</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-ink">{series.title}</h1>
           {!seriesLocked && (
             <div className="flex flex-wrap items-center gap-2">
               {user && favoritesOn && (
@@ -209,7 +209,7 @@ export default async function SeriesPage({
             </div>
           )}
         </div>
-        {series.description && <p className="mt-2 text-zinc-500">{series.description}</p>}
+        {series.description && <p className="mt-2 text-sec">{series.description}</p>}
         {!seriesLocked && (ratingsOn || viewCountsOn || likesOn) && (
           <div className="mt-3 flex flex-wrap items-center gap-4">
             {ratingsOn && (
@@ -229,7 +229,7 @@ export default async function SeriesPage({
               />
             )}
             {viewCountsOn && (
-              <span className="text-sm text-zinc-500">
+              <span className="text-sm text-sec">
                 {series.viewCount + 1} view{series.viewCount === 0 ? "" : "s"}
               </span>
             )}
@@ -251,7 +251,7 @@ export default async function SeriesPage({
               <Link
                 key={tag}
                 href={`/tags/${encodeURIComponent(tag)}`}
-                className="rounded bg-zinc-100 px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                className="rounded bg-chip px-2 py-1 text-xs text-sec hover:bg-hover"
               >
                 #{tag}
               </Link>
@@ -261,7 +261,7 @@ export default async function SeriesPage({
         {hasAudio && (
           <a
             href={`/series/${series.slug}/podcast.xml`}
-            className="mt-3 inline-block text-xs text-zinc-500 hover:underline"
+            className="mt-3 inline-block text-xs text-sec hover:underline"
           >
             Podcast RSS feed
           </a>
@@ -274,7 +274,7 @@ export default async function SeriesPage({
         <>
           {series.videos.length > 0 && (
             <section className="space-y-3">
-              <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Videos</h2>
+              <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">Videos</h2>
               <div className="space-y-3">
                 {series.videos.map((video) => {
                   const locked = !viewableVideoIds.has(video.id);
@@ -317,7 +317,7 @@ export default async function SeriesPage({
                 <>
                   {soleBook ? (
                     soleBookLocked ? (
-                      <p className="text-sm text-zinc-500">This book is for members only.</p>
+                      <p className="text-sm text-sec">This book is for members only.</p>
                     ) : (
                       <BookContents fileId={soleBook.id} readerOn={readerOn} />
                     )
@@ -328,7 +328,7 @@ export default async function SeriesPage({
                   )}
                   {otherFiles.length > 0 && (
                     <>
-                      <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+                      <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">
                         {bookPdfs.length > 0 ? "Other files" : "Files"}
                       </h2>
                       <FileList files={otherFiles} isLoggedIn={isLoggedIn} readerOn={readerOn} />
@@ -337,7 +337,7 @@ export default async function SeriesPage({
                 </>
               ) : (
                 <>
-                  <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Files</h2>
+                  <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">Files</h2>
                   <FileList files={series.files} isLoggedIn={isLoggedIn} readerOn={readerOn} />
                 </>
               )}
@@ -345,14 +345,14 @@ export default async function SeriesPage({
           )}
 
           {series.videos.length === 0 && series.files.length === 0 && (
-            <p className="text-zinc-500">Nothing published in this series yet.</p>
+            <p className="text-sec">Nothing published in this series yet.</p>
           )}
         </>
       )}
 
       {!seriesLocked && relatedOn && related.length > 0 && (
         <section>
-          <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500 mb-3">
+          <h2 className="mb-3 text-[11px] font-bold tracking-[0.08em] text-ter uppercase">
             More like this
           </h2>
           <div className="space-y-3">
@@ -378,11 +378,11 @@ export default async function SeriesPage({
 
 function MemberGate() {
   return (
-    <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center">
+    <div className="rounded-lg border border-dashed border-sep p-8 text-center">
       <p className="font-medium">This series is for members only.</p>
       <a
         href="/auth/login"
-        className="mt-4 inline-block rounded-md bg-zinc-900 text-white px-4 py-2 text-sm hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+        className="mt-4 inline-block rounded-md btn-primary text-white px-4 py-2 text-sm"
       >
         Log in to view
       </a>

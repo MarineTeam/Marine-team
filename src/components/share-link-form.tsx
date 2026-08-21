@@ -115,9 +115,9 @@ export function ShareLinkForm({
             onChange={(e) => setEmails(e.target.value)}
             rows={2}
             placeholder="someone@example.com, another@example.com"
-            className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+            className="mt-1 w-full rounded-md border border-sep px-3 py-2"
           />
-          <p className="mt-1 text-xs text-zinc-500">
+          <p className="mt-1 text-xs text-sec">
             We email each person their link. They&apos;ll need to log in with that address to open it, so forwarding it
             on won&apos;t hand over access.
           </p>
@@ -134,7 +134,7 @@ export function ShareLinkForm({
           />
           <span>
             Let recipients watch this even though it&apos;s restricted
-            <span className="block text-xs text-zinc-500">
+            <span className="block text-xs text-sec">
               Overrides &ldquo;Members only&rdquo; and any viewer restriction for this link alone — the way to give one
               guest access without opening the content to anyone else. Leave this off and the link only works for
               people who already have access.
@@ -153,7 +153,7 @@ export function ShareLinkForm({
           />
           <span>
             Require a password
-            <span className="block text-xs text-zinc-500">
+            <span className="block text-xs text-sec">
               Recipients type it before the link opens. Pass it on yourself — we never include it in the email.
             </span>
           </span>
@@ -172,9 +172,9 @@ export function ShareLinkForm({
               maxLength={128}
               autoComplete="off"
               placeholder="At least 6 characters"
-              className="w-full rounded-md border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+              className="w-full rounded-md border border-sep px-3 py-2"
             />
-            <p className="mt-1 text-xs text-zinc-500">
+            <p className="mt-1 text-xs text-sec">
               Shown in plain text so you can copy it — we can&apos;t show it again once the link is created.
             </p>
           </div>
@@ -184,7 +184,7 @@ export function ShareLinkForm({
       <div className="flex flex-wrap gap-3">
         <div className="min-w-0 flex-1">
           <label htmlFor="share-note" className="block font-medium">
-            Note <span className="font-normal text-zinc-500">(optional)</span>
+            Note <span className="font-normal text-sec">(optional)</span>
           </label>
           <input
             id="share-note"
@@ -193,7 +193,7 @@ export function ShareLinkForm({
             onChange={(e) => setNote(e.target.value)}
             maxLength={200}
             placeholder="What this link was for"
-            className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+            className="mt-1 w-full rounded-md border border-sep px-3 py-2"
           />
         </div>
         <div>
@@ -204,7 +204,7 @@ export function ShareLinkForm({
             id="share-expiry"
             value={expiresInDays}
             onChange={(e) => setExpiresInDays(e.target.value)}
-            className="mt-1 rounded-md border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+            className="mt-1 rounded-md border border-sep px-3 py-2"
           >
             {EXPIRY_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -219,7 +219,7 @@ export function ShareLinkForm({
       <button
         type="submit"
         disabled={saving || disabled || (usePassword && password.trim().length < 6)}
-        className="rounded-md bg-zinc-900 text-white px-4 py-1.5 hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+        className="rounded-md btn-primary text-white px-4 py-1.5 disabled:opacity-50"
       >
         {saving ? "Creating…" : "Create link"}
       </button>

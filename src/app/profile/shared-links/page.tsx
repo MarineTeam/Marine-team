@@ -29,8 +29,8 @@ export default async function ProfileSharedLinksPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-medium">Shared links</h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h2 className="text-lg font-semibold text-ink">Shared links</h2>
+        <p className="mt-1 text-sm text-sec">
           {shareLinksOn ? (
             <>
               Create a link from any series or video page. Revoking one here cuts off everyone holding it,
@@ -46,7 +46,7 @@ export default async function ProfileSharedLinksPage() {
       </div>
       <SharedLinksManager initialLinks={items} />
       {items.length === 0 && shareLinksOn && (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-sec">
           Nothing shared yet — open a{" "}
           <Link href="/" className="underline">
             series or video

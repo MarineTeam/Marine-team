@@ -46,8 +46,8 @@ export default async function ShareUnlockPage({ params }: { params: Promise<{ to
   return (
     <div className="max-w-sm mx-auto px-4 py-16 space-y-4">
       <div className="text-center">
-        <h1 className="text-xl font-semibold tracking-tight">This link is password protected</h1>
-        <p className="mt-2 text-sm text-zinc-500">
+        <h1 className="text-3xl font-bold tracking-tight text-ink">This link is password protected</h1>
+        <p className="mt-2 text-sm text-sec">
           Enter the password you were given to open it. Whoever shared the link has it.
         </p>
       </div>
