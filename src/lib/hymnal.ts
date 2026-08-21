@@ -29,6 +29,9 @@ type FileLike = {
   mimeType: string | null;
   bunnyPath: string;
   memberOnly: boolean;
+  /** Derived once by an admin; absent means the card works them out live instead. */
+  coverDataUrl: string | null;
+  hymnCount: number | null;
 };
 
 type SeriesLike = {
@@ -55,9 +58,11 @@ export function fileBook(file: FileLike, isLoggedIn: boolean): BookCardData {
     badge: null,
     locked,
     coverImageUrl: null,
+    coverDataUrl: file.coverDataUrl,
     // Skipped when locked: fetching the bytes to draw a cover would 403.
     coverFileId: locked ? null : file.id,
     subtitle: null,
+    hymnCount: file.hymnCount,
   };
 }
 
@@ -84,7 +89,12 @@ export function seriesBook(series: SeriesLike, isLoggedIn: boolean): BookCardDat
     badge: series.abbreviation,
     locked,
     coverImageUrl: series.coverImageUrl,
+    coverDataUrl: cover?.coverDataUrl ?? null,
     coverFileId: coverReadable ? cover.id : null,
     subtitle,
+    // Only meaningful for a single whole-book series, where `subtitle` is
+    // null and the count is the book's own; a shelf and a hymn-per-file
+    // book both already have their number.
+    hymnCount: cover?.hymnCount ?? null,
   };
 }

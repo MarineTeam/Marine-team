@@ -12,6 +12,8 @@ import {
   type CategoryOption,
 } from "@/components/content-target-picker";
 import { BunnyStorageImport } from "@/components/bunny-storage-import";
+import { CoverGenerator } from "@/components/cover-generator";
+import { readerFormat } from "@/lib/reader";
 
 type UploadStatus = "pending" | "uploading" | "done" | "failed";
 
@@ -34,6 +36,8 @@ type FileAsset = {
   mimeType: string | null;
   podcastPublished: boolean;
   publicPath: string | null;
+  bunnyPath: string;
+  coverDataUrl: string | null;
   pageNumber: number | null;
   groupLabel: string | null;
   lyricsText: string | null;
@@ -407,6 +411,13 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
         seriesList={seriesList}
         categoryList={categoryList}
         onImported={load}
+      />
+
+      {/* PDFs only — a cover is that PDF's own first page, so there's
+          nothing to draw for audio or anything else here. */}
+      <CoverGenerator
+        files={visibleFiles.filter((f) => readerFormat(f.mimeType, f.bunnyPath) === "pdf")}
+        onGenerated={load}
       />
 
       {!scoped && (

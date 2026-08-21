@@ -93,6 +93,50 @@ export function countOutlineLeaves(items: PdfOutlineItems): number {
 }
 
 /**
+ * Width in device pixels of a stored cover thumbnail. Small on purpose:
+ * these are held inline on the row (FileAsset.coverDataUrl) and travel with
+ * every listing that renders a book grid, so the cost of one is paid on
+ * every page load, not just when it's looked at.
+ */
+const COVER_WIDTH = 240;
+const COVER_QUALITY = 0.6;
+
+/** What an admin's "Generate covers" pass derives from a book, for storing on its row. */
+export type DerivedBookCard = { coverDataUrl: string; hymnCount: number };
+
+/**
+ * Draws a book's first page to a JPEG data URL and counts its bookmarks —
+ * the same two things a BookCard works out live when nothing is stored,
+ * done once so every later visitor is served the results instead.
+ */
+export async function derivePdfBookCard(fileUrl: string): Promise<DerivedBookCard> {
+  const task = await openPdfMetadataTask(fileUrl);
+  try {
+    const doc = await task.promise;
+
+    const page = await doc.getPage(1);
+    const natural = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: COVER_WIDTH / natural.width });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Couldn't draw the cover");
+    // JPEG, not PNG: a scanned page as PNG runs several times larger for no
+    // visible gain at this size, and these are stored inline.
+    await page.render({ canvas, canvasContext: context, viewport }).promise;
+
+    const outline = await doc.getOutline();
+    return {
+      coverDataUrl: canvas.toDataURL("image/jpeg", COVER_QUALITY),
+      hymnCount: outline ? countOutlineLeaves(outline) : 0,
+    };
+  } finally {
+    void task.destroy();
+  }
+}
+
+/**
  * Opens a PDF purely to read its embedded outline/bookmarks — its own
  * short-lived document instance, not shared with any open reader — for a
  * book's contents list shown before the full reader is opened.

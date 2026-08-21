@@ -21,6 +21,19 @@ export const updateSchema = z
     pageNumber: z.number().int().nullable().optional(),
     groupLabel: z.string().nullable().optional(),
     lyricsText: z.string().nullable().optional(),
+    // A generated cover thumbnail. Constrained to an inline image rather
+    // than accepted as free text: this is rendered straight into an <img>
+    // on public pages, so a `data:text/html` or remote URL sneaking in here
+    // would be someone else's problem later. The cap is well above what
+    // derivePdfBookCard produces at COVER_WIDTH and well below anything
+    // that would bloat a listing.
+    coverDataUrl: z
+      .string()
+      .regex(/^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+$/, "must be an inline JPEG or PNG")
+      .max(256 * 1024)
+      .nullable()
+      .optional(),
+    hymnCount: z.number().int().min(0).nullable().optional(),
     podcastPublished: z.boolean().optional(),
   })
   .refine((body) => !(body.seriesId && body.categoryId), {

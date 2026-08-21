@@ -11,12 +11,16 @@ export type BookCardData = {
   /** Short badge like "GSFH1" — a series' abbreviation; a bare PDF has none. */
   badge: string | null;
   locked: boolean;
-  /** An uploaded cover, which wins over drawing one from the PDF. */
+  /** An uploaded cover, which wins over everything below. */
   coverImageUrl: string | null;
-  /** The PDF this card draws its cover and hymn count from; null when there's nothing to read. */
+  /** A cover already derived from the PDF and stored on the row — see "Generate covers". */
+  coverDataUrl: string | null;
+  /** The PDF to fall back to, drawing the cover and counting hymns live; null when there's nothing to read. */
   coverFileId: string | null;
-  /** Pre-computed subtitle (e.g. "13 books"); when null, the PDF's own bookmark count is read instead. */
+  /** Pre-computed subtitle (e.g. "13 books"); when null a hymn count is used instead. */
   subtitle: string | null;
+  /** A hymn count already derived and stored, used when `subtitle` is null. */
+  hymnCount: number | null;
 };
 
 // A small fixed palette rather than an arbitrary hash-to-hue: keeps every
@@ -56,9 +60,13 @@ export function BookCard({ book }: { book: BookCardData }) {
   const [drawn, setDrawn] = useState(false);
   const [hymnCount, setHymnCount] = useState<number | null>(null);
 
+  // The PDF is opened only for what isn't already known. A book an admin
+  // has generated needs nothing at all, which is the whole point of storing
+  // these — see derivePdfBookCard.
+  const storedCover = book.coverImageUrl ?? book.coverDataUrl;
   const readable = Boolean(book.coverFileId) && !book.locked;
-  const needsCover = readable && !book.coverImageUrl;
-  const needsCount = readable && book.subtitle === null;
+  const needsCover = readable && !storedCover;
+  const needsCount = readable && book.subtitle === null && book.hymnCount === null;
 
   useEffect(() => {
     if (visible || (!needsCover && !needsCount)) return;
@@ -141,8 +149,9 @@ export function BookCard({ book }: { book: BookCardData }) {
     };
   }, [visible, needsCover, needsCount, book.coverFileId]);
 
+  const count = book.hymnCount ?? hymnCount;
   const subtitle =
-    book.subtitle ?? (hymnCount === null ? null : `${hymnCount} ${hymnCount === 1 ? "hymn" : "hymns"}`);
+    book.subtitle ?? (count === null ? null : `${count} ${count === 1 ? "hymn" : "hymns"}`);
 
   return (
     <Link href={book.href} className="group flex flex-col gap-1.5">
@@ -160,6 +169,12 @@ export function BookCard({ book }: { book: BookCardData }) {
           // unoptimized: a cover is a freeform admin-pasted URL on any host
           // — see next.config.ts and MenuTile's matching note.
           <Image src={book.coverImageUrl} alt="" fill unoptimized className="object-cover" />
+        ) : book.coverDataUrl ? (
+          // A plain img, not next/image, because next/image's src is a URL
+          // or path and doesn't reliably take a data: URI. Nothing is lost:
+          // an inline image has no network fetch for Next to optimise.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={book.coverDataUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
         ) : (
           needsCover && (
             <canvas

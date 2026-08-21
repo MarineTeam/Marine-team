@@ -564,6 +564,17 @@ model FileAsset {
   // Formatted lyrics shown on this hymn's page; when null that page falls
   // back to the PDF reader/download as its primary view.
   lyricsText       String?
+  // A small JPEG data URL of this book's first page, and how many hymns its
+  // bookmarks list — both derived from the PDF once by an admin (see
+  // "Generate covers" in the file manager) rather than by every visitor's
+  // browser opening the PDF to work them out again.
+  //
+  // Held inline rather than as another storage object so they can't outlive
+  // the row: a deleted file takes its thumbnail with it, with no orphan
+  // left in Bunny for a later purge to miss. Kept small for the same reason
+  // — these travel with every listing that renders a book grid.
+  coverDataUrl     String?
+  hymnCount        Int?
   // The admin's *intent* to publish this as a podcast episode, set from the
   // admin file list. Deliberately separate from publicPath below, which is
   // the *state*: a file can be intended for the podcast while temporarily
