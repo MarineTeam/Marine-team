@@ -165,7 +165,49 @@ model User {
   downloadGrants        DownloadPolicyUser[]
   readingProgress       ReadingProgress[]
   readingMarks          ReadingMark[]
+  identities            UserIdentity[]
   authorizedEmailsAdded AuthorizedEmail[]     @relation("AuthorizedEmailAddedBy")
+}
+
+/**
+ * Every Auth0 identity that has signed in as this member — Google, Microsoft,
+ * a database password, and so on.
+ * `User.auth0Id` records only whichever was used most recently, which makes
+ * it useless for answering "which sign-in methods does this person have?"
+ * and unsafe to key anything on. These rows are the actual record; auth0Id
+ * is kept in step for the existing queries that read it.
+ * `sub` is the strong identifier: Auth0 issues it and it never changes, even
+ * when the person changes their email at the provider. Resolving a login by
+ * sub first (before falling back to email) is what keeps an email change from
+ * stranding someone's history on an orphaned row.
+ */
+model UserIdentity {
+  id            String   @id @default(cuid())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  /**
+   * The Auth0 `sub`, e.g. "google-oauth2|1234567890". Globally unique by construction.
+   */
+  sub           String   @unique
+  /**
+   * Connection/strategy parsed from the sub, e.g. "google-oauth2", for display.
+   */
+  provider      String
+  /**
+   * The email this identity presented, which can differ per provider and can change.
+   */
+  email         String
+  /**
+   * Whether the provider asserted the email was verified. An unverified
+   * identity is never allowed to attach itself to an existing member — that
+   * is the account-takeover path email-based linking is known for.
+   */
+  emailVerified Boolean  @default(false)
+  lastLoginAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+  @@index([email])
 }
 
 // Grants a non-admin user editor access to one category (and everything

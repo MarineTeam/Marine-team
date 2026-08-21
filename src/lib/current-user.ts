@@ -9,6 +9,7 @@ import {
   providerFromSub,
   recordAccessAttempt,
 } from "@/lib/authorization";
+import { decideLinking } from "@/lib/identity-linking";
 import type { User } from "@prisma/client";
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
@@ -23,6 +24,13 @@ export type SessionIdentity = {
   /** The organization claim from the verified ID token — never anything the browser sent. */
   orgId: string | null;
   sub: string;
+  /**
+   * Whether the identity provider says it verified this address. Governs
+   * whether a *new* identity may attach itself to an existing member — see
+   * decideLinking. Absent means not verified: a claim that isn't made isn't
+   * a claim that's true.
+   */
+  emailVerified: boolean;
 };
 
 /**
@@ -41,6 +49,7 @@ export const getSessionIdentity = cache(async (): Promise<SessionIdentity | null
     picture: session.user.picture ?? null,
     orgId: session.user.org_id ?? null,
     sub: session.user.sub,
+    emailVerified: session.user.email_verified === true,
   };
 });
 
@@ -72,7 +81,7 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
   const identity = await getSessionIdentity();
   if (!identity) return null;
 
-  const { sub, name, picture, email, orgId } = identity;
+  const { sub, email, orgId } = identity;
   const decision = await authorizeIdentity({ email, orgId });
 
   if (!decision.allowed) {
@@ -102,27 +111,95 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
   // Authorized: keep the row in sync with the session, and with the fact that
   // the allowlist currently says yes.
   const isBootstrapAdmin = ADMIN_EMAILS.includes(email);
-  const user = await prisma.user.upsert({
-    where: { email },
+  return resolveUserForIdentity(identity, isBootstrapAdmin);
+});
+
+/**
+ * Maps a verified Auth0 identity onto a member row, creating or linking as
+ * decideLinking() dictates, and records the identity itself.
+ *
+ * Replaces an `upsert({ where: { email } })` that wrote `auth0Id: sub` on
+ * every login. That had two faults. It treated email as the identifier, so
+ * an email change at the provider looked like a brand-new person — and
+ * because `auth0Id` is unique, the create it then attempted collided with
+ * the old row and threw P2002, turning a login into a 500 rather than a
+ * denial. And it linked any identity presenting a known address, verified or
+ * not, which hands an existing member's row (and role) to whoever asserts
+ * their email.
+ */
+async function resolveUserForIdentity(
+  identity: SessionIdentity,
+  isBootstrapAdmin: boolean,
+): Promise<User | null> {
+  const { sub, email, name, picture, emailVerified } = identity;
+
+  const [identityRow, userByEmail] = await Promise.all([
+    prisma.userIdentity.findUnique({ where: { sub }, select: { userId: true } }),
+    prisma.user.findUnique({ where: { email }, select: { id: true } }),
+  ]);
+
+  const decision = decideLinking(
+    { sub, email, emailVerified },
+    { userIdBySub: identityRow?.userId ?? null, userIdByEmail: userByEmail?.id ?? null },
+  );
+
+  if (decision.action === "refuse") {
+    // Deliberately indistinguishable from any other denial to the person
+    // trying: telling them the address is taken confirms a member exists.
+    console.warn(`Refused to link unverified identity ${sub} to existing email ${email}`);
+    return null;
+  }
+
+  const shared = {
+    name,
+    picture,
+    authorized: true,
+    auth0Id: sub,
+    ...(isBootstrapAdmin ? { role: "ADMIN" as const } : {}),
+  };
+
+  // User.email is unique too, so renaming a row onto an address another row
+  // already holds would just swap P2002 on auth0Id for P2002 on email. That
+  // happens when someone changes their provider email to one a second member
+  // row is already using. Sign-in still succeeds — sub identified them — but
+  // the rename is skipped and left for a human, since merging two member rows
+  // means deciding which history to keep and isn't something to do silently.
+  // "create" has no target row yet, and reached that branch precisely
+  // because no row holds this email — so there is nothing to collide with.
+  const targetUserId = decision.action === "create" ? null : decision.userId;
+  const emailBelongsElsewhere = Boolean(targetUserId && userByEmail && userByEmail.id !== targetUserId);
+  if (emailBelongsElsewhere) {
+    console.warn(`Kept existing email for user ${targetUserId}: ${email} already belongs to another member`);
+  }
+
+  const user =
+    decision.action === "create"
+      ? await prisma.user.create({
+          data: { ...shared, email, role: isBootstrapAdmin ? "ADMIN" : "MEMBER" },
+        })
+      : await prisma.user.update({
+          where: { id: decision.userId },
+          // For the "existing" branch, writing email is what makes a
+          // provider-side change a rename of the member we already know
+          // rather than stranding their history on the old row.
+          data: { ...shared, ...(emailBelongsElsewhere ? {} : { email }) },
+        });
+
+  await prisma.userIdentity.upsert({
+    where: { sub },
     create: {
-      auth0Id: sub,
+      userId: user.id,
+      sub,
+      provider: providerFromSub(sub) ?? "unknown",
       email,
-      name,
-      picture,
-      role: isBootstrapAdmin ? "ADMIN" : "MEMBER",
-      authorized: true,
+      emailVerified,
+      lastLoginAt: new Date(),
     },
-    update: {
-      auth0Id: sub,
-      name,
-      picture,
-      authorized: true,
-      ...(isBootstrapAdmin ? { role: "ADMIN" as const } : {}),
-    },
+    update: { email, emailVerified, lastLoginAt: new Date(), userId: user.id },
   });
 
   return user;
-});
+}
 
 export async function requireAdmin(): Promise<User> {
   const user = await getCurrentUser();
