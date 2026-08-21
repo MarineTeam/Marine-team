@@ -103,7 +103,20 @@ export function BookContents({ fileId, readerOn }: { fileId: string; readerOn: b
   }
 
   if (entries === null) {
-    return <p className="text-sm text-zinc-500">Reading contents…</p>;
+    // The direct link is offered while still loading, not just on failure: a
+    // large book fetched over range requests can take a while, and there's
+    // no reason to make someone wait on the contents to start reading.
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-zinc-500">Reading contents…</p>
+        <a
+          href={readerOn ? `/read/${fileId}` : `/api/files/${fileId}/content?download=1`}
+          className="inline-block rounded-md border border-zinc-300 px-4 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+        >
+          {readerOn ? "Open PDF" : "Download PDF"}
+        </a>
+      </div>
+    );
   }
 
   if (entries.length === 0) {

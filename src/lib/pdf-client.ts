@@ -72,7 +72,12 @@ export async function loadPdfOutline(fileUrl: string): Promise<TocEntry[]> {
   try {
     const doc = await task.promise;
     const outline = await doc.getOutline();
-    return outline ? resolvePdfOutline(doc, outline) : [];
+    // Awaited rather than returned as a pending promise: `finally` runs as
+    // soon as the return is evaluated, so handing back an unsettled promise
+    // would destroy the worker out from under resolvePdfOutline's own
+    // getDestination/getPageIndex calls — which then never settle, hanging
+    // the caller forever instead of failing.
+    return outline ? await resolvePdfOutline(doc, outline) : [];
   } finally {
     void task.destroy();
   }
