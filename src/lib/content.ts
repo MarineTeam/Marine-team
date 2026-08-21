@@ -213,7 +213,14 @@ export const getCategoryBySlug = cache(async function getCategoryBySlug(slug: st
     // still resolves here so the page can show a MemberGate instead of a bare 404.
     where: { slug, ...publishedNow() },
     include: {
-      series: { where: publishedNow(), orderBy: seriesOrder },
+      // The file count powers the hymn count shown on each book cover in a
+      // hymnalStyle category's grid (see hymnal-book-grid.tsx) — harmless to
+      // fetch for non-hymnal categories too, it's just unused there.
+      series: {
+        where: publishedNow(),
+        orderBy: seriesOrder,
+        include: { _count: { select: { files: { where: publishedNow() } } } },
+      },
       videos: { where, orderBy: { position: "asc" } },
       files: { where, orderBy: { position: "asc" } },
       children: {
@@ -222,7 +229,11 @@ export const getCategoryBySlug = cache(async function getCategoryBySlug(slug: st
         where: publishedNow(),
         orderBy: categoryOrder,
         include: {
-          series: { where: publishedNow(), orderBy: seriesOrder },
+          series: {
+            where: publishedNow(),
+            orderBy: seriesOrder,
+            include: { _count: { select: { files: { where: publishedNow() } } } },
+          },
           videos: { where, orderBy: { position: "asc" } },
           files: { where, orderBy: { position: "asc" } },
           children: true,
@@ -1503,7 +1514,9 @@ export const getReadableFile = cache(async function getReadableFile(id: string) 
       // categoryId comes along so callers can scope a plugin check to the
       // section a file sits in — a file on a series inherits that series'
       // category, which is the level plugin overrides are set at.
-      series: { select: { id: true, title: true, slug: true, memberOnly: true, categoryId: true } },
+      series: {
+        select: { id: true, title: true, slug: true, memberOnly: true, categoryId: true, abbreviation: true },
+      },
       category: { select: { id: true, name: true, slug: true, memberOnly: true } },
     },
   });

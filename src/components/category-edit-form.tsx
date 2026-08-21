@@ -19,6 +19,7 @@ type Category = {
   unpublishAt: Date | string | null;
   featured: boolean;
   requireSequential: boolean;
+  hymnalStyle: boolean;
 };
 
 /** Converts a Date/ISO string to the value a <input type="datetime-local"> expects (local time, no seconds). */
@@ -44,6 +45,7 @@ export function CategoryEditForm({ category }: { category: Category }) {
   const [publishAt, setPublishAt] = useState(toDatetimeLocal(category.publishAt));
   const [unpublishAt, setUnpublishAt] = useState(toDatetimeLocal(category.unpublishAt));
   const [requireSequential, setRequireSequential] = useState(category.requireSequential);
+  const [hymnalStyle, setHymnalStyle] = useState(category.hymnalStyle);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -71,6 +73,7 @@ export function CategoryEditForm({ category }: { category: Category }) {
           publishAt: publishAt ? new Date(publishAt).toISOString() : null,
           unpublishAt: unpublishAt ? new Date(unpublishAt).toISOString() : null,
           requireSequential,
+          hymnalStyle,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed to save");
@@ -202,6 +205,14 @@ export function CategoryEditForm({ category }: { category: Category }) {
             onChange={(e) => setRequireSequential(e.target.checked)}
           />
           Require watching in order (applies to this category&apos;s own direct videos)
+        </label>
+        <label className="flex items-center gap-1.5 text-sm">
+          <input
+            type="checkbox"
+            checked={hymnalStyle}
+            onChange={(e) => setHymnalStyle(e.target.checked)}
+          />
+          Hymnal grid style (series shown as a cover grid; hymns browsable by Page/A-Z/Category)
         </label>
         <button
           type="submit"

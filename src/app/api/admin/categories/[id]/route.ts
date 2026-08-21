@@ -25,6 +25,7 @@ const updateSchema = z.object({
   unpublishAt: z.string().nullable().optional(),
   featured: z.boolean().optional(),
   requireSequential: z.boolean().optional(),
+  hymnalStyle: z.boolean().optional(),
   parentId: z.string().optional().nullable(),
   position: z.number().int().optional(),
   pinned: z.boolean().optional(),

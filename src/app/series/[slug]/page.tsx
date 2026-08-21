@@ -36,6 +36,7 @@ import { ShareLinkPanel } from "@/components/share-link-panel";
 import { SeriesTile } from "@/components/series-tile";
 import { MenuTile } from "@/components/menu-tile";
 import { FileList } from "@/components/file-list";
+import { HymnList } from "@/components/hymn-list";
 import { CommentSection } from "@/components/comment-section";
 import { ViewEventBeacon } from "@/components/view-event-beacon";
 
@@ -294,8 +295,14 @@ export default async function SeriesPage({
 
           {series.files.length > 0 && (
             <section className="space-y-3">
-              <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Files</h2>
-              <FileList files={series.files} isLoggedIn={isLoggedIn} readerOn={readerOn} />
+              {!series.category?.hymnalStyle && (
+                <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">Files</h2>
+              )}
+              {series.category?.hymnalStyle ? (
+                <HymnList hymns={series.files} isLoggedIn={isLoggedIn} />
+              ) : (
+                <FileList files={series.files} isLoggedIn={isLoggedIn} readerOn={readerOn} />
+              )}
             </section>
           )}
 

@@ -18,6 +18,9 @@ export const updateSchema = z
     publishAt: z.string().nullable().optional(),
     unpublishAt: z.string().nullable().optional(),
     position: z.number().int().optional(),
+    pageNumber: z.number().int().nullable().optional(),
+    groupLabel: z.string().nullable().optional(),
+    lyricsText: z.string().nullable().optional(),
     podcastPublished: z.boolean().optional(),
   })
   .refine((body) => !(body.seriesId && body.categoryId), {

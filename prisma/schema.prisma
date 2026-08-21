@@ -263,6 +263,12 @@ model Category {
   // Applies only to this category's own direct videos (see Video.categoryId), not to child
   // categories/series — mirrors Series.requireSequential one level down.
   requireSequential Boolean                  @default(false)
+  // Renders this category's series as a grid of book covers (title,
+  // abbreviation badge, hymn count) with Page/A-Z/Category browsing inside
+  // each one, instead of the default plain list — see hymnal-book-grid.tsx
+  // and hymn-list.tsx. Meant for categories that hold hymnal-style file
+  // collections rather than video series.
+  hymnalStyle       Boolean                  @default(false)
   position          Int                      @default(0)
   pinned            Boolean                  @default(false)
   parentId          String?
@@ -289,6 +295,9 @@ model Series {
   slug              String              @unique
   description       String?
   coverImageUrl     String?
+  // Short badge shown on the book cover in a hymnalStyle category's grid
+  // (e.g. "GSFH1"). Unused outside that grid.
+  abbreviation      String?
   memberOnly        Boolean             @default(false)
   // Tri-state download override — see Category.downloadEnabled. Null inherits
   // from this series' category chain.
@@ -536,6 +545,17 @@ model FileAsset {
   // isn't removed until the trash entry is permanently purged.
   deletedAt        DateTime?
   position         Int       @default(0)
+  // The printed page number in a hymnal-style book, shown as the leading
+  // number in hymn-list.tsx and used for its "Page" sort tab — distinct
+  // from `position` above, which drives plain drag-reorder and isn't
+  // necessarily the same sequence (page numbers can skip or repeat).
+  pageNumber       Int?
+  // Free-text topical grouping (e.g. "Praise", "Prayer"), used for the
+  // "Category" sort tab in hymn-list.tsx. Unrelated to the Category model.
+  groupLabel       String?
+  // Formatted lyrics text shown on a hymn's detail page. When null, that
+  // page falls back to the PDF reader/download as its primary view.
+  lyricsText       String?
   // The admin's *intent* to publish this as a podcast episode, set from the
   // admin file list. Deliberately separate from publicPath below, which is
   // the *state*: a file can be intended for the podcast while temporarily

@@ -6,6 +6,7 @@ import { jsonLdScriptProps, breadcrumbListJsonLd, type BreadcrumbItem } from "@/
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { CategoryTile } from "@/components/category-tile";
 import { SeriesTile } from "@/components/series-tile";
+import { HymnalBookGrid } from "@/components/hymnal-book-grid";
 import { SubscribeButton } from "@/components/subscribe-button";
 import { WatchLaterButton } from "@/components/watch-later-button";
 import { MenuTile } from "@/components/menu-tile";
@@ -158,15 +159,35 @@ export default async function CategoryPage({
         <>
           {isEmpty && <p className="text-zinc-500">Nothing published in this category yet.</p>}
 
-          {(category.children.length > 0 || category.series.length > 0) && (
-            <div className="space-y-3">
-              {category.children.map((child) => (
-                <CategoryTile key={child.id} category={child} />
-              ))}
-              {category.series.map((series) => (
-                <SeriesTile key={series.id} series={series} />
-              ))}
-            </div>
+          {category.hymnalStyle ? (
+            <>
+              {category.children.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {category.children.map((child) => (
+                    <Link
+                      key={child.id}
+                      href={`/categories/${child.slug}`}
+                      className="rounded-full border border-zinc-300 px-4 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                    >
+                      {child.name}
+                      {child.memberOnly && <span className="ml-1.5 text-xs text-zinc-400">Members</span>}
+                    </Link>
+                  ))}
+                </div>
+              )}
+              {category.series.length > 0 && <HymnalBookGrid books={category.series} />}
+            </>
+          ) : (
+            (category.children.length > 0 || category.series.length > 0) && (
+              <div className="space-y-3">
+                {category.children.map((child) => (
+                  <CategoryTile key={child.id} category={child} />
+                ))}
+                {category.series.map((series) => (
+                  <SeriesTile key={series.id} series={series} />
+                ))}
+              </div>
+            )
           )}
 
           {category.videos.length > 0 && (
