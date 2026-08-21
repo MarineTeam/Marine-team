@@ -295,6 +295,9 @@ model Series {
   slug              String              @unique
   description       String?
   coverImageUrl     String?
+  // Short badge shown on this book's cover in a hymnalStyle category's grid
+  // (e.g. "GSFH1"). Unused outside that grid.
+  abbreviation      String?
   memberOnly        Boolean             @default(false)
   // Tri-state download override — see Category.downloadEnabled. Null inherits
   // from this series' category chain.

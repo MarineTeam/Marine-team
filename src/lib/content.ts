@@ -213,10 +213,10 @@ export const getCategoryBySlug = cache(async function getCategoryBySlug(slug: st
     // still resolves here so the page can show a MemberGate instead of a bare 404.
     where: { slug, ...publishedNow() },
     include: {
-      // A hymnalStyle category shows every book in it as one grid, including
-      // books filed under one of its series (see hymnal-book-grid.tsx), so
-      // those files come along here — harmless for other categories, which
-      // only read the series rows themselves.
+      // A hymnalStyle category grids each series as a book (or a shelf of
+      // them), which needs to know how many PDFs it holds and which one to
+      // draw a cover from — hence the files here. See lib/hymnal.ts;
+      // harmless for other categories, which read only the series rows.
       series: {
         where: publishedNow(),
         orderBy: seriesOrder,

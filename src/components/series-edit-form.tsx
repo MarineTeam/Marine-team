@@ -11,6 +11,7 @@ type Series = {
   slug: string;
   description: string | null;
   coverImageUrl: string | null;
+  abbreviation: string | null;
   categoryId: string | null;
   memberOnly: boolean;
   downloadEnabled: boolean | null;
@@ -49,6 +50,7 @@ export function SeriesEditForm({
   const [slug, setSlug] = useState(series.slug);
   const [description, setDescription] = useState(series.description ?? "");
   const [coverImageUrl, setCoverImageUrl] = useState(series.coverImageUrl ?? "");
+  const [abbreviation, setAbbreviation] = useState(series.abbreviation ?? "");
   const [categoryId, setCategoryId] = useState(series.categoryId ?? "");
   const [memberOnly, setMemberOnly] = useState(series.memberOnly);
   const [downloadEnabled, setDownloadEnabled] = useState(series.downloadEnabled);
@@ -70,6 +72,7 @@ export function SeriesEditForm({
       slug,
       description,
       coverImageUrl,
+      abbreviation,
       categoryId: categoryId || null,
       memberOnly,
       downloadEnabled,
@@ -136,6 +139,7 @@ export function SeriesEditForm({
     if (d.slug !== undefined) setSlug(d.slug);
     if (d.description !== undefined) setDescription(d.description ?? "");
     if (d.coverImageUrl !== undefined) setCoverImageUrl(d.coverImageUrl ?? "");
+    if (d.abbreviation !== undefined) setAbbreviation(d.abbreviation ?? "");
     if (d.categoryId !== undefined) setCategoryId(d.categoryId ?? "");
     if (d.memberOnly !== undefined) setMemberOnly(d.memberOnly);
     if (d.downloadEnabled !== undefined) setDownloadEnabled(d.downloadEnabled);
@@ -217,6 +221,18 @@ export function SeriesEditForm({
           value={coverImageUrl}
           onChange={(e) => setCoverImageUrl(e.target.value)}
           placeholder="https://…"
+          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        />
+      </label>
+
+      <label className="text-sm space-y-1 block">
+        <span className="text-zinc-500">
+          Abbreviation (badge on this book&apos;s cover in a hymnal grid, e.g. &quot;GSFH1&quot;)
+        </span>
+        <input
+          value={abbreviation}
+          onChange={(e) => setAbbreviation(e.target.value)}
+          placeholder="GSFH1"
           className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
         />
       </label>

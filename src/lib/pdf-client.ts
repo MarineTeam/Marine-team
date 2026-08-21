@@ -57,6 +57,20 @@ export async function resolvePdfOutline(
 }
 
 /**
+ * How many hymns a book's outline describes: its *leaf* entries that point
+ * at a page. Counting every entry would inflate the total for a book whose
+ * bookmarks nest hymns under topical sections, since those section headings
+ * are entries too.
+ */
+export function countHymns(entries: TocEntry[]): number {
+  return entries.filter((entry, i) => {
+    if (!entry.location) return false;
+    const next = entries[i + 1];
+    return !next || next.depth <= entry.depth;
+  }).length;
+}
+
+/**
  * Opens a PDF purely to read its embedded outline/bookmarks — its own
  * short-lived document instance, not shared with any open reader — for a
  * book's contents list shown before the full reader is opened.

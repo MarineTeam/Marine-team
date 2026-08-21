@@ -7,7 +7,7 @@ import { Breadcrumbs } from "@/components/breadcrumbs";
 import { CategoryTile } from "@/components/category-tile";
 import { SeriesTile } from "@/components/series-tile";
 import { HymnalBookGrid } from "@/components/hymnal-book-grid";
-import { readerFormat } from "@/lib/reader";
+import { fileBook, pdfsOf, seriesBook } from "@/lib/hymnal";
 import { SubscribeButton } from "@/components/subscribe-button";
 import { WatchLaterButton } from "@/components/watch-later-button";
 import { MenuTile } from "@/components/menu-tile";
@@ -115,18 +115,19 @@ export default async function CategoryPage({
     category.videos.length === 0 &&
     category.files.length === 0;
 
-  // A hymnalStyle category shows every book it holds as one cover grid,
-  // whether the PDF hangs off the category directly or off one of its
-  // series — the series layer is a filing detail, not something a reader
-  // browsing for a hymnal should have to click through. Files that aren't
-  // PDFs fall through to the normal file list below.
-  const bookFiles = category.hymnalStyle
-    ? [...category.series.flatMap((s) => s.files), ...category.files].filter(
-        (f) => readerFormat(f.mimeType, f.bunnyPath) === "pdf",
-      )
+  // A hymnalStyle category shows its books as one cover grid: each series
+  // (a book, or a shelf of them) plus any PDF filed straight on the
+  // category — see lib/hymnal.ts for why both shapes count. Files that
+  // aren't PDFs fall through to the normal file list below.
+  const categoryPdfs = category.hymnalStyle ? pdfsOf(category.files) : [];
+  const books = category.hymnalStyle
+    ? [
+        ...category.series.map((series) => seriesBook(series, isLoggedIn)),
+        ...categoryPdfs.map((file) => fileBook(file, isLoggedIn)),
+      ]
     : [];
   const looseFiles = category.hymnalStyle
-    ? category.files.filter((f) => !bookFiles.some((book) => book.id === f.id))
+    ? category.files.filter((file) => !categoryPdfs.some((pdf) => pdf.id === file.id))
     : category.files;
 
   return (
@@ -190,7 +191,7 @@ export default async function CategoryPage({
                   ))}
                 </div>
               )}
-              {bookFiles.length > 0 && <HymnalBookGrid books={bookFiles} isLoggedIn={isLoggedIn} />}
+              {books.length > 0 && <HymnalBookGrid books={books} />}
             </>
           ) : (
             (category.children.length > 0 || category.series.length > 0) && (
@@ -226,7 +227,7 @@ export default async function CategoryPage({
           {looseFiles.length > 0 && (
             <section className="space-y-3">
               <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-                {category.hymnalStyle && bookFiles.length > 0 ? "Other files" : "Files"}
+                {category.hymnalStyle && books.length > 0 ? "Other files" : "Files"}
               </h2>
               <FileList files={looseFiles} isLoggedIn={isLoggedIn} readerOn={readerOn} />
             </section>

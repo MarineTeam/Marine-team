@@ -37,7 +37,8 @@ import { SeriesTile } from "@/components/series-tile";
 import { MenuTile } from "@/components/menu-tile";
 import { FileList } from "@/components/file-list";
 import { HymnalBookGrid } from "@/components/hymnal-book-grid";
-import { readerFormat } from "@/lib/reader";
+import { BookContents } from "@/components/book-contents";
+import { fileBook, pdfsOf } from "@/lib/hymnal";
 import { CommentSection } from "@/components/comment-section";
 import { ViewEventBeacon } from "@/components/view-event-beacon";
 
@@ -100,16 +101,16 @@ export default async function SeriesPage({
 
   const isLoggedIn = Boolean(user);
   const hasAudio = series.files.some((f) => f.mimeType?.startsWith("audio/"));
-  // In a hymnalStyle category every PDF is its own book (its embedded
-  // bookmarks are its contents — see BookContents), so they're shown as a
-  // cover grid rather than a file list. Anything that isn't a PDF still
-  // lists underneath as a plain download.
+  // In a hymnalStyle category this series is either a book or a shelf of
+  // them (see lib/hymnal.ts): holding one PDF, it *is* that book and shows
+  // its contents; holding several, it grids them. Anything that isn't a PDF
+  // still lists underneath as a plain download.
   const hymnalStyle = Boolean(series.category?.hymnalStyle);
-  const bookFiles = hymnalStyle
-    ? series.files.filter((f) => readerFormat(f.mimeType, f.bunnyPath) === "pdf")
-    : [];
+  const bookPdfs = hymnalStyle ? pdfsOf(series.files) : [];
+  const soleBook = bookPdfs.length === 1 ? bookPdfs[0] : null;
+  const soleBookLocked = Boolean(soleBook?.memberOnly) && !isLoggedIn;
   const otherFiles = hymnalStyle
-    ? series.files.filter((f) => !bookFiles.some((book) => book.id === f.id))
+    ? series.files.filter((file) => !bookPdfs.some((pdf) => pdf.id === file.id))
     : series.files;
   const [
     favorited,
@@ -309,13 +310,21 @@ export default async function SeriesPage({
             <section className="space-y-3">
               {hymnalStyle ? (
                 <>
-                  {bookFiles.length > 0 && (
-                    <HymnalBookGrid books={bookFiles} isLoggedIn={isLoggedIn} />
+                  {soleBook ? (
+                    soleBookLocked ? (
+                      <p className="text-sm text-zinc-500">This book is for members only.</p>
+                    ) : (
+                      <BookContents fileId={soleBook.id} readerOn={readerOn} />
+                    )
+                  ) : (
+                    bookPdfs.length > 0 && (
+                      <HymnalBookGrid books={bookPdfs.map((pdf) => fileBook(pdf, isLoggedIn))} />
+                    )
                   )}
                   {otherFiles.length > 0 && (
                     <>
                       <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-                        {bookFiles.length > 0 ? "Other files" : "Files"}
+                        {bookPdfs.length > 0 ? "Other files" : "Files"}
                       </h2>
                       <FileList files={otherFiles} isLoggedIn={isLoggedIn} readerOn={readerOn} />
                     </>
