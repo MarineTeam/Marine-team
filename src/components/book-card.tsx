@@ -56,7 +56,7 @@ function badgeColor(seed: string): string {
 export function BookCard({ book }: { book: BookCardData }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [visible, setVisible] = useState(false);
+  const [seen, setSeen] = useState(false);
   const [drawn, setDrawn] = useState(false);
   const [hymnCount, setHymnCount] = useState<number | null>(null);
 
@@ -68,22 +68,21 @@ export function BookCard({ book }: { book: BookCardData }) {
   const needsCover = readable && !storedCover;
   const needsCount = readable && book.subtitle === null && book.hymnCount === null;
 
+  // No IntersectionObserver (older browsers, jsdom) means no way to know when
+  // this scrolls in, so the card counts as on screen from the start — drawn
+  // right away rather than never.
+  const visible = seen || typeof IntersectionObserver === "undefined";
+
   useEffect(() => {
     if (visible || (!needsCover && !needsCount)) return;
     const element = containerRef.current;
     if (!element) return;
 
-    // No IntersectionObserver (older browsers, jsdom) means no way to know
-    // when this scrolls in — draw right away rather than never.
-    if (typeof IntersectionObserver === "undefined") {
-      setVisible(true);
-      return;
-    }
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
           observer.disconnect();
-          setVisible(true);
+          setSeen(true);
         }
       },
       // Starts a little before the card is actually on screen, so a cover is
