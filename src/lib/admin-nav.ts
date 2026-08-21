@@ -11,6 +11,11 @@
  * twenty-four links read as five short sections instead of one long scroll.
  */
 
+import { isActivePath } from "./active-path";
+
+/** The overview, and the prefix every other admin href sits under. */
+export const ADMIN_ROOT = "/admin";
+
 export type AdminAccess = {
   /** Admins see everything; the per-link rules below are for everyone else. */
   isAdmin: boolean;
@@ -51,7 +56,7 @@ export const ADMIN_GROUPS: AdminGroup[] = [
     links: [
       // /admin redirects a non-admin to /admin/series, so offering it to them
       // would be a link straight to a bounce.
-      { href: "/admin", label: "Overview", visible: adminOnly },
+      { href: ADMIN_ROOT, label: "Overview", visible: adminOnly },
     ],
   },
   {
@@ -124,19 +129,31 @@ export function adminGroupsFor(access: AdminAccess): ResolvedAdminGroup[] {
 }
 
 /**
+ * Whether an admin link is the page being viewed.
+ *
+ * The overview matches only itself: every admin page sits under /admin, so a
+ * prefix match there would light the overview up on all of them. Shared by the
+ * rail and the label below, which have to agree about where you are.
+ */
+export function isAdminLinkActive(pathname: string, href: string): boolean {
+  return isActivePath(pathname, href, href === ADMIN_ROOT);
+}
+
+/**
  * The label of the section currently open, for the collapsed nav on a phone —
  * which shows where you are instead of making you find it in a scroller.
  *
  * Longest matching href wins, so /admin/share-links doesn't resolve to the
- * /admin overview.
+ * /admin overview. A page no link claims — a new screen, or one hidden from
+ * this person — falls back to "Admin" rather than borrowing another section's
+ * name.
  */
 export function currentAdminLabel(groups: ResolvedAdminGroup[], pathname: string): string {
   let best = "";
   let label = "Admin";
   for (const group of groups) {
     for (const link of group.links) {
-      const isMatch = pathname === link.href || pathname.startsWith(`${link.href}/`);
-      if (isMatch && link.href.length > best.length) {
+      if (isAdminLinkActive(pathname, link.href) && link.href.length > best.length) {
         best = link.href;
         label = link.label;
       }

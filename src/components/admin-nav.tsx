@@ -4,8 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MenuIcon, Sheet } from "@/components/sheet";
-import { currentAdminLabel, type ResolvedAdminGroup } from "@/lib/admin-nav";
-import { isActivePath } from "@/lib/active-path";
+import { currentAdminLabel, isAdminLinkActive, type ResolvedAdminGroup } from "@/lib/admin-nav";
 
 /**
  * The admin's section navigation.
@@ -25,9 +24,7 @@ export function AdminNav({ groups }: { groups: ResolvedAdminGroup[] }) {
   const openerRef = useRef<HTMLButtonElement>(null);
   const close = () => setOpen(false);
 
-  // /admin would otherwise light up on every admin page, since they all start
-  // with it.
-  const active = (href: string) => isActivePath(pathname, href, href === "/admin");
+  const active = (href: string) => isAdminLinkActive(pathname, href);
 
   const groupList = (onNavigate?: () => void) =>
     groups.map((group, index) => (

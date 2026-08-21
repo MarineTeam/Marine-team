@@ -12,10 +12,19 @@ describe("isActivePath", () => {
     expect(isActivePath("/recently-played", "/recently-added")).toBe(false);
   });
 
-  it("only matches Home exactly, or Home would light up everywhere", () => {
+  it("only lights Home up on Home", () => {
     expect(isActivePath("/", "/", true)).toBe(true);
     expect(isActivePath("/series", "/", true)).toBe(false);
-    // The reason the flag exists: without it, every path starts with "/".
-    expect(isActivePath("/series", "/")).toBe(true);
+    // Belt and braces: the segment rule already stops "/" claiming "/series",
+    // which would take a path starting "//".
+    expect(isActivePath("/series", "/")).toBe(false);
+  });
+
+  it("keeps an overview from staying lit on the pages under it", () => {
+    // The reason the flag exists: /profile and /admin sit above their own
+    // siblings in the nav, so without it two links are marked at once.
+    expect(isActivePath("/profile/inbox", "/profile")).toBe(true);
+    expect(isActivePath("/profile/inbox", "/profile", true)).toBe(false);
+    expect(isActivePath("/profile", "/profile", true)).toBe(true);
   });
 });

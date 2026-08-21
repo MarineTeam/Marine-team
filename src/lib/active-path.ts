@@ -5,7 +5,11 @@
  * bar must agree on it — and because the segment-boundary rule is the kind of
  * thing that quietly regresses: a plain `startsWith` lights up "/series" while
  * you're reading /series-archive, and lights up *every* link when the href is
- * "/", which is why Home passes `exact`.
+ * "/".
+ *
+ * `exact` is for an overview whose children are its siblings in the nav —
+ * /profile, /admin — which would otherwise stay lit on every page beneath it,
+ * marking two links at once.
  */
 export function isActivePath(pathname: string, href: string, exact = false): boolean {
   if (exact) return pathname === href;
