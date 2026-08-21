@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { PdfReader } from "@/components/pdf-reader";
 import { EpubReader } from "@/components/epub-reader";
+import { ReaderSpeech } from "@/components/reader-speech";
 import type { ReaderFormat } from "@/lib/reader";
 import type { ReaderHandle, SearchHit, TocEntry } from "@/components/reader-types";
 
@@ -204,6 +205,8 @@ export function BookReader({
           )}
         </main>
       </div>
+
+      <ReaderSpeech handleRef={handleRef} />
     </div>
   );
 }
