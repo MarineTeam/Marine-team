@@ -33,6 +33,9 @@ type FileAsset = {
   mimeType: string | null;
   podcastPublished: boolean;
   publicPath: string | null;
+  pageNumber: number | null;
+  groupLabel: string | null;
+  lyricsText: string | null;
   series: { id: string; title: string } | null;
   category: { id: string; name: string } | null;
 };
@@ -55,6 +58,14 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
   const [uploading, setUploading] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Hymn fields (printed page number, "Category" tab grouping, lyrics) are
+  // edited in a per-row panel rather than as more buttons in the row above:
+  // they're free text, and only meaningful inside a hymnPerFile series.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editPageNumber, setEditPageNumber] = useState("");
+  const [editGroupLabel, setEditGroupLabel] = useState("");
+  const [editLyricsText, setEditLyricsText] = useState("");
+  const [savingDetails, setSavingDetails] = useState(false);
 
   async function load() {
     const [filesRes, seriesRes, categoriesRes] = await Promise.all([
@@ -170,6 +181,33 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
     if (!confirm("Move this file to Trash? It's restorable from Admin > Trash; the Bunny Storage object isn't removed until it's permanently deleted from there.")) return;
     await fetch(`/api/admin/files/${id}`, { method: "DELETE" });
     await load();
+  }
+
+  function startEditingDetails(f: FileAsset) {
+    setEditingId(f.id);
+    setEditPageNumber(f.pageNumber != null ? String(f.pageNumber) : "");
+    setEditGroupLabel(f.groupLabel ?? "");
+    setEditLyricsText(f.lyricsText ?? "");
+  }
+
+  async function saveDetails(id: string) {
+    setSavingDetails(true);
+    try {
+      const trimmedPage = editPageNumber.trim();
+      await fetch(`/api/admin/files/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pageNumber: trimmedPage ? Number(trimmedPage) : null,
+          groupLabel: editGroupLabel.trim() || null,
+          lyricsText: editLyricsText.trim() || null,
+        }),
+      });
+      setEditingId(null);
+      await load();
+    } finally {
+      setSavingDetails(false);
+    }
   }
 
   async function reassignTarget(id: string, target: string) {
@@ -400,7 +438,7 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
         {visibleFiles.map((f, index) => (
           <li
             key={f.id}
-            className={`p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 ${draggingIndex === index ? "opacity-40" : ""}`}
+            className={`p-4 flex flex-wrap flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 ${draggingIndex === index ? "opacity-40" : ""}`}
             {...(scoped ? dropZoneProps(index) : {})}
           >
             <div className="min-w-0 flex items-center gap-2">
@@ -489,10 +527,58 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
               >
                 {f.hidden ? "Hidden" : "Visible"}
               </button>
+              <button
+                onClick={() => (editingId === f.id ? setEditingId(null) : startEditingDetails(f))}
+                className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${f.pageNumber != null || f.groupLabel || f.lyricsText ? "border-sky-400 text-sky-700 dark:text-sky-400" : "border-zinc-300"}`}
+                title="Page number, category grouping and lyrics — used when this file is one hymn in a 'one hymn per file' series."
+              >
+                {editingId === f.id ? "Close" : "Hymn details"}
+              </button>
               <button onClick={() => remove(f.id)} className="text-red-600 hover:underline">
                 Delete
               </button>
             </div>
+            {editingId === f.id && (
+              <div className="w-full space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <label className="space-y-1 text-xs">
+                    <span className="text-zinc-500">Page number (printed page in the book)</span>
+                    <input
+                      type="number"
+                      value={editPageNumber}
+                      onChange={(e) => setEditPageNumber(e.target.value)}
+                      className="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+                    />
+                  </label>
+                  <label className="space-y-1 text-xs">
+                    <span className="text-zinc-500">Category grouping (e.g. &quot;Praise&quot;, &quot;Prayer&quot;)</span>
+                    <input
+                      value={editGroupLabel}
+                      onChange={(e) => setEditGroupLabel(e.target.value)}
+                      className="w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+                    />
+                  </label>
+                </div>
+                <label className="block space-y-1 text-xs">
+                  <span className="text-zinc-500">
+                    Lyrics (shown on the hymn&apos;s page; leave blank to show the PDF instead)
+                  </span>
+                  <textarea
+                    value={editLyricsText}
+                    onChange={(e) => setEditLyricsText(e.target.value)}
+                    rows={6}
+                    className="w-full rounded-md border border-zinc-300 px-2 py-1.5 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-950"
+                  />
+                </label>
+                <button
+                  onClick={() => saveDetails(f.id)}
+                  disabled={savingDetails}
+                  className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-zinc-900"
+                >
+                  {savingDetails ? "Saving…" : "Save details"}
+                </button>
+              </div>
+            )}
           </li>
         ))}
         {visibleFiles.length === 0 && (

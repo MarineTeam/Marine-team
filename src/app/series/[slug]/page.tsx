@@ -38,6 +38,7 @@ import { MenuTile } from "@/components/menu-tile";
 import { FileList } from "@/components/file-list";
 import { HymnalBookGrid } from "@/components/hymnal-book-grid";
 import { BookContents } from "@/components/book-contents";
+import { HymnList } from "@/components/hymn-list";
 import { fileBook, pdfsOf } from "@/lib/hymnal";
 import { CommentSection } from "@/components/comment-section";
 import { ViewEventBeacon } from "@/components/view-event-beacon";
@@ -101,17 +102,19 @@ export default async function SeriesPage({
 
   const isLoggedIn = Boolean(user);
   const hasAudio = series.files.some((f) => f.mimeType?.startsWith("audio/"));
-  // In a hymnalStyle category this series is either a book or a shelf of
-  // them (see lib/hymnal.ts): holding one PDF, it *is* that book and shows
-  // its contents; holding several, it grids them. Anything that isn't a PDF
-  // still lists underneath as a plain download.
+  // In a hymnalStyle category this series is one of three things (see
+  // lib/hymnal.ts): a book whose files are its own hymns (hymnPerFile), a
+  // book that is one whole PDF, or a shelf of several. Anything left over
+  // that isn't a PDF still lists underneath as a plain download.
   const hymnalStyle = Boolean(series.category?.hymnalStyle);
-  const bookPdfs = hymnalStyle ? pdfsOf(series.files) : [];
+  const hymnPerFile = hymnalStyle && series.hymnPerFile;
+  const bookPdfs = hymnalStyle && !hymnPerFile ? pdfsOf(series.files) : [];
   const soleBook = bookPdfs.length === 1 ? bookPdfs[0] : null;
   const soleBookLocked = Boolean(soleBook?.memberOnly) && !isLoggedIn;
-  const otherFiles = hymnalStyle
-    ? series.files.filter((file) => !bookPdfs.some((pdf) => pdf.id === file.id))
-    : series.files;
+  const otherFiles =
+    hymnalStyle && !hymnPerFile
+      ? series.files.filter((file) => !bookPdfs.some((pdf) => pdf.id === file.id))
+      : series.files;
   const [
     favorited,
     queued,
@@ -308,7 +311,9 @@ export default async function SeriesPage({
 
           {series.files.length > 0 && (
             <section className="space-y-3">
-              {hymnalStyle ? (
+              {hymnPerFile ? (
+                <HymnList hymns={series.files} isLoggedIn={isLoggedIn} />
+              ) : hymnalStyle ? (
                 <>
                   {soleBook ? (
                     soleBookLocked ? (

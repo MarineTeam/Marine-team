@@ -12,6 +12,7 @@ type Series = {
   description: string | null;
   coverImageUrl: string | null;
   abbreviation: string | null;
+  hymnPerFile: boolean;
   categoryId: string | null;
   memberOnly: boolean;
   downloadEnabled: boolean | null;
@@ -51,6 +52,7 @@ export function SeriesEditForm({
   const [description, setDescription] = useState(series.description ?? "");
   const [coverImageUrl, setCoverImageUrl] = useState(series.coverImageUrl ?? "");
   const [abbreviation, setAbbreviation] = useState(series.abbreviation ?? "");
+  const [hymnPerFile, setHymnPerFile] = useState(series.hymnPerFile);
   const [categoryId, setCategoryId] = useState(series.categoryId ?? "");
   const [memberOnly, setMemberOnly] = useState(series.memberOnly);
   const [downloadEnabled, setDownloadEnabled] = useState(series.downloadEnabled);
@@ -73,6 +75,7 @@ export function SeriesEditForm({
       description,
       coverImageUrl,
       abbreviation,
+      hymnPerFile,
       categoryId: categoryId || null,
       memberOnly,
       downloadEnabled,
@@ -140,6 +143,7 @@ export function SeriesEditForm({
     if (d.description !== undefined) setDescription(d.description ?? "");
     if (d.coverImageUrl !== undefined) setCoverImageUrl(d.coverImageUrl ?? "");
     if (d.abbreviation !== undefined) setAbbreviation(d.abbreviation ?? "");
+    if (d.hymnPerFile !== undefined) setHymnPerFile(d.hymnPerFile);
     if (d.categoryId !== undefined) setCategoryId(d.categoryId ?? "");
     if (d.memberOnly !== undefined) setMemberOnly(d.memberOnly);
     if (d.downloadEnabled !== undefined) setDownloadEnabled(d.downloadEnabled);
@@ -318,6 +322,14 @@ export function SeriesEditForm({
         <label className="flex items-center gap-1.5 text-sm">
           <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
           Pinned (shown first)
+        </label>
+        <label className="flex items-center gap-1.5 text-sm">
+          <input
+            type="checkbox"
+            checked={hymnPerFile}
+            onChange={(e) => setHymnPerFile(e.target.checked)}
+          />
+          One hymn per file (this series is a single book; its files are its hymns, not whole books)
         </label>
         <label className="flex items-center gap-1.5 text-sm">
           <input

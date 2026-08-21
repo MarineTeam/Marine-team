@@ -19,6 +19,7 @@ export const updateSchema = z.object({
   description: z.string().optional(),
   coverImageUrl: z.string().url().optional().or(z.literal("")),
   abbreviation: z.string().optional(),
+  hymnPerFile: z.boolean().optional(),
   categoryId: z.string().optional().nullable(),
   memberOnly: z.boolean().optional(),
   // Tri-state: null clears the override and goes back to inheriting.

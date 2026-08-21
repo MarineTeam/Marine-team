@@ -298,6 +298,11 @@ model Series {
   // Short badge shown on this book's cover in a hymnalStyle category's grid
   // (e.g. "GSFH1"). Unused outside that grid.
   abbreviation      String?
+  // This series is one book whose files are its individual hymns (one file
+  // per hymn, each with its own pageNumber), rather than one or more
+  // complete book PDFs. Can't be inferred: "several files in a series" looks
+  // identical either way, so the admin says which. See lib/hymnal.ts.
+  hymnPerFile       Boolean             @default(false)
   memberOnly        Boolean             @default(false)
   // Tri-state download override — see Category.downloadEnabled. Null inherits
   // from this series' category chain.
@@ -545,6 +550,20 @@ model FileAsset {
   // isn't removed until the trash entry is permanently purged.
   deletedAt        DateTime?
   position         Int       @default(0)
+  // The three below apply only inside a hymnPerFile series, where this file
+  // is one hymn rather than a whole book.
+  //
+  // The printed page number in the book, shown as the leading number in
+  // hymn-list.tsx and driving its "Page" sort — distinct from `position`
+  // above, which drives drag-reorder and isn't necessarily the same
+  // sequence (printed page numbers can skip).
+  pageNumber       Int?
+  // Free-text topical grouping (e.g. "Praise", "Prayer") for hymn-list's
+  // "Category" sort. Unrelated to the Category model.
+  groupLabel       String?
+  // Formatted lyrics shown on this hymn's page; when null that page falls
+  // back to the PDF reader/download as its primary view.
+  lyricsText       String?
   // The admin's *intent* to publish this as a podcast episode, set from the
   // admin file list. Deliberately separate from publicPath below, which is
   // the *state*: a file can be intended for the podcast while temporarily
