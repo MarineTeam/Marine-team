@@ -5,10 +5,11 @@ import Link from "next/link";
 import { PdfReader } from "@/components/pdf-reader";
 import { EpubReader } from "@/components/epub-reader";
 import { ReaderSpeech } from "@/components/reader-speech";
+import { ReaderMarks, type ReadingMark } from "@/components/reader-marks";
 import type { ReaderFormat } from "@/lib/reader";
 import type { ReaderHandle, SearchHit, TocEntry } from "@/components/reader-types";
 
-type Panel = "contents" | "search";
+type Panel = "contents" | "search" | "marks";
 
 /**
  * The chrome around whichever reader engine is in use: contents, in-book
@@ -40,6 +41,8 @@ export function BookReader({
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[] | null>(null);
   const [searching, setSearching] = useState(false);
+  const [marks, setMarks] = useState<ReadingMark[]>([]);
+  const [marking, setMarking] = useState(false);
 
   const onReady = useCallback((handle: ReaderHandle) => {
     handleRef.current = handle;
@@ -100,6 +103,45 @@ export function BookReader({
     handleRef.current?.goTo(location);
   }
 
+  /**
+   * Creates a mark at wherever the reader currently is.
+   *
+   * Selected text is read from the top-level selection, which covers PDF
+   * (the text layer sits in this document) but not EPUB, whose content is
+   * inside a same-origin iframe epub.js owns. Rather than reach into that
+   * iframe, an EPUB highlight falls back to a bookmark at the current CFI —
+   * still useful, and honest about what it captured.
+   */
+  async function addMark(kind: "HIGHLIGHT" | "BOOKMARK") {
+    const handle = handleRef.current;
+    if (!handle || !canSaveProgress) return;
+
+    const selected = typeof window !== "undefined" ? window.getSelection()?.toString().trim() : "";
+    const excerpt = selected ? selected.slice(0, 2000) : null;
+
+    setMarking(true);
+    try {
+      const res = await fetch("/api/reading/marks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileId,
+          kind: excerpt ? kind : "BOOKMARK",
+          location: handle.currentLocation(),
+          excerpt,
+          color: "yellow",
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMarks((current) => [...current, data.mark]);
+        setPanel("marks");
+      }
+    } finally {
+      setMarking(false);
+    }
+  }
+
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col">
       <header className="flex flex-wrap items-center gap-3 border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
@@ -121,6 +163,23 @@ export function BookReader({
         >
           Search
         </button>
+        <button
+          onClick={() => setPanel((p) => (p === "marks" ? null : "marks"))}
+          aria-pressed={panel === "marks"}
+          className="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+        >
+          Marks{marks.length > 0 ? ` (${marks.length})` : ""}
+        </button>
+        {canSaveProgress && (
+          <button
+            onClick={() => void addMark("HIGHLIGHT")}
+            disabled={marking}
+            title="Highlight the selected text, or save this spot"
+            className="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          >
+            🖍 Mark
+          </button>
+        )}
       </header>
 
       <div className="flex min-h-0 flex-1">
@@ -182,6 +241,19 @@ export function BookReader({
                     </li>
                   ))}
                 </ul>
+              </>
+            )}
+
+            {panel === "marks" && (
+              <>
+                <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">Marks</h2>
+                <ReaderMarks
+                  fileId={fileId}
+                  marks={marks}
+                  onChanged={setMarks}
+                  onGoTo={goTo}
+                  canMark={canSaveProgress}
+                />
               </>
             )}
           </aside>
