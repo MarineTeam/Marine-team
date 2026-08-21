@@ -38,7 +38,9 @@ export async function QueryMonitorPanel() {
           </span>
           <span className="ml-auto text-sec">Query Monitor</span>
         </summary>
-        <div className="max-h-64 overflow-y-auto border-t border-sep px-3 py-2">
+        {/* overflow-x as well as -y: a long SQL statement would otherwise push
+            the whole page sideways on a phone. */}
+        <div className="max-h-64 overflow-x-auto overflow-y-auto border-t border-sep px-3 py-2">
           {queries.length === 0 ? (
             <p className="text-sec">No queries recorded for this request.</p>
           ) : (
