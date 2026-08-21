@@ -1,27 +1,34 @@
 import Link from "next/link";
 import { BrandMark } from "@/components/brand-mark";
-import { MobileMenu } from "@/components/mobile-menu";
+import { NavSheet } from "@/components/nav-sheet";
 import { BellIcon, PersonIcon, SearchIcon } from "@/components/icons";
-import { getCurrentUser } from "@/lib/current-user";
 import { getShellNav } from "@/lib/nav";
 
 /**
  * The top bar, in both of its forms.
  *
  * Both are rendered; CSS shows one. In a browser tab it's a website header —
- * a real search field, and a hamburger for the sections the rail would show
- * if the window were wider. Installed, it's an app bar: the wordmark and a
- * few icon targets, with getting around handled by the tab strip below.
+ * a real search field, and the menu for the sections the rail would show if
+ * the window were wider. Installed, it's an app bar: the menu, the wordmark
+ * and a few icon targets, with the tab strip below carrying the rest.
  *
  * Rendering both rather than branching in JS is what keeps this free of a
  * hydration mismatch — the server can't know which mode the browser is in,
  * and guessing would flash the wrong chrome on every load.
  */
 export async function AppHeader() {
-  // getCurrentUser is React-cached and getShellNav already awaited it, so this
-  // is a second read of the same result, not a second query.
-  const [nav, user] = await Promise.all([getShellNav(), getCurrentUser()]);
-  const { branding, account, unauthorized, unreadCount, plugins } = nav;
+  const nav = await getShellNav();
+  const { branding, sections, account, unauthorized, unreadCount, plugins } = nav;
+
+  const menu = (
+    <NavSheet
+      sections={sections}
+      account={account}
+      unauthorized={unauthorized}
+      unreadCount={unreadCount}
+      showPushToggle={Boolean(account) && plugins.notifications}
+    />
+  );
 
   const actions = (
     <HeaderActions
@@ -36,24 +43,9 @@ export async function AppHeader() {
   return (
     <>
       <header className="only-web sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-sep bg-panel px-4 sm:px-7">
-        <div className="lg:hidden">
-          <MobileMenu
-            user={
-              user
-                ? { name: user.name, displayName: user.displayName, email: user.email, role: user.role }
-                : null
-            }
-            unauthorized={unauthorized}
-            watchLaterOn={plugins["watch-later"]}
-            playlistsOn={plugins.playlists}
-            subscriptionsOn={plugins.subscriptions}
-            notificationsOn={plugins.notifications}
-            liveStreamingOn={plugins["live-streaming"]}
-            unreadCount={unreadCount}
-          />
-        </div>
+        {/* From lg up the rail carries these sections, so the menu stands down. */}
+        <div className="lg:hidden">{menu}</div>
 
-        {/* The rail carries the wordmark from lg up; below that this is the only place it appears. */}
         <Link href="/" className="flex min-w-0 items-center gap-2.5 lg:hidden">
           <BrandMark branding={branding} size={30} />
           <span className="truncate text-[15px] font-bold tracking-tight text-accent">
@@ -81,8 +73,15 @@ export async function AppHeader() {
         {actions}
       </header>
 
+      {/*
+        The installed app has no browser chrome to fall back on, so the menu is
+        the only route to anything the five tabs don't carry — Live, Playlists,
+        Subscriptions, Watch later, the category list, the admin. It sits on the
+        left, where a fourth icon on the right would crowd a narrow phone.
+      */}
       <header className="only-app pad-top-safe sticky top-0 z-30 border-b border-sep bg-panel">
         <div className="flex h-14 items-center gap-2 px-4">
+          {menu}
           <Link href="/" className="flex min-w-0 items-center gap-2.5">
             <BrandMark branding={branding} size={30} />
             <span className="truncate text-[17px] font-bold tracking-tight text-accent">

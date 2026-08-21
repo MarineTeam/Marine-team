@@ -42,7 +42,7 @@ export default async function SubscriptionsPage() {
                 <div key={s.id} className="flex items-center gap-2">
                   <Link
                     href={`/categories/${s.category.slug}`}
-                    className="flex-1 block rounded-xl border border-sep bg-white p-3 shadow-sm hover:-translate-y-0.5 hover:shadow-lg transition"
+                    className="flex-1 block rounded-xl border border-sep bg-panel p-3 transition-colors hover:bg-hover"
                   >
                     <span className="font-medium">{s.category.name}</span>
                   </Link>

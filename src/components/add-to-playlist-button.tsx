@@ -69,7 +69,7 @@ export function AddToPlaylistButton({ videoId }: { videoId: string }) {
         + Playlist
       </button>
       {open && (
-        <div className="absolute right-0 z-20 mt-2 w-64 rounded-md border border-sep bg-white p-3 shadow-lg">
+        <div className="absolute right-0 z-20 mt-2 w-64 rounded-md border border-sep bg-panel p-3 shadow-lg">
           <p className="mb-2 text-xs font-medium uppercase text-sec">Save to playlist</p>
           <div className="max-h-48 space-y-1 overflow-y-auto">
             {playlists?.map((p) => (
