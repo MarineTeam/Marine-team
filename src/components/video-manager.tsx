@@ -18,6 +18,13 @@ import {
   type SeriesOption,
   type CategoryOption,
 } from "@/components/content-target-picker";
+import {
+  BulkBar,
+  BulkButton,
+  BulkCheckbox,
+  BulkSelectAll,
+  useBulkSelect,
+} from "@/components/bulk-select";
 
 type Speaker = { id: string; name: string };
 
@@ -130,7 +137,7 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
   >({});
   const [importingGuid, setImportingGuid] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [managingAccessId, setManagingAccessId] = useState<string | null>(null);
   const [managingThumbnailId, setManagingThumbnailId] = useState<string | null>(null);
   const [managingChaptersId, setManagingChaptersId] = useState<string | null>(null);
@@ -368,51 +375,32 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
       ? scopedVideos.filter((v) => v.title.toLowerCase().includes(query.trim().toLowerCase()))
       : scopedVideos;
 
-  function toggleSelected(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  // Scoped to what's on screen, so a filtered-out video can't be caught by
+  // "select all" or a shift-range it isn't visibly part of.
+  const bulk = useBulkSelect(visibleVideos.map((v) => v.id));
 
-  async function bulkSetPublished(published: boolean) {
+  /** One request for the whole selection — see /api/admin/videos/bulk. */
+  async function bulkAction(body: Record<string, unknown>) {
+    setBulkBusy(true);
     await fetch("/api/admin/videos/bulk", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: Array.from(selectedIds), action: published ? "publish" : "unpublish" }),
+      body: JSON.stringify({ ids: bulk.selected, ...body }),
     });
-    setSelectedIds(new Set());
+    bulk.clear();
+    setBulkBusy(false);
     await load();
   }
 
   async function bulkSchedule() {
-    const input = prompt(`Publish ${selectedIds.size} video(s) at (YYYY-MM-DDTHH:MM, local time)?`, "");
+    const input = prompt(`Publish ${bulk.count} video(s) at (YYYY-MM-DDTHH:MM, local time)?`, "");
     if (!input?.trim()) return;
-    await fetch("/api/admin/videos/bulk", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ids: Array.from(selectedIds),
-        action: "schedule",
-        publishAt: new Date(input.trim()).toISOString(),
-      }),
-    });
-    setSelectedIds(new Set());
-    await load();
+    await bulkAction({ action: "schedule", publishAt: new Date(input.trim()).toISOString() });
   }
 
   async function bulkDelete() {
-    if (!confirm(`Move ${selectedIds.size} video(s) to Trash? Restorable from Admin > Trash.`))
-      return;
-    await fetch("/api/admin/videos/bulk", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: Array.from(selectedIds), action: "delete" }),
-    });
-    setSelectedIds(new Set());
-    await load();
+    if (!confirm(`Move ${bulk.count} video(s) to Trash? Restorable from Admin > Trash.`)) return;
+    await bulkAction({ action: "delete" });
   }
 
   async function reorderTo(fromIndex: number, toIndex: number) {
@@ -569,35 +557,18 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
         />
       )}
 
-      {selectedIds.size > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <span>{selectedIds.size} selected</span>
-          <button
-            onClick={() => bulkSetPublished(true)}
-            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
-          >
-            Publish
-          </button>
-          <button
-            onClick={() => bulkSetPublished(false)}
-            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
-          >
-            Unpublish
-          </button>
-          <button
-            onClick={bulkSchedule}
-            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
-          >
-            Schedule publish…
-          </button>
-          <button onClick={bulkDelete} className="rounded-md border border-red-300 px-2 py-1 text-red-600 dark:border-red-900">
-            Delete
-          </button>
-          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-zinc-500 hover:underline">
-            Clear selection
-          </button>
-        </div>
+      {visibleVideos.length > 0 && (
+        <BulkSelectAll allSelected={bulk.allSelected} onToggle={bulk.toggleAll} disabled={bulkBusy} />
       )}
+
+      <BulkBar count={bulk.count} onClear={bulk.clear} busy={bulkBusy}>
+        <BulkButton onClick={() => bulkAction({ action: "publish" })}>Publish</BulkButton>
+        <BulkButton onClick={() => bulkAction({ action: "unpublish" })}>Unpublish</BulkButton>
+        <BulkButton onClick={bulkSchedule}>Schedule publish…</BulkButton>
+        <BulkButton danger onClick={bulkDelete}>
+          Delete
+        </BulkButton>
+      </BulkBar>
 
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
         {visibleVideos.map((v, index) => (
@@ -608,11 +579,10 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
           >
           <div className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
             <div className="min-w-0 flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={selectedIds.has(v.id)}
-                onChange={() => toggleSelected(v.id)}
-                aria-label={`Select ${v.title}`}
+              <BulkCheckbox
+                checked={bulk.isSelected(v.id)}
+                onToggle={(shift) => bulk.toggle(v.id, shift)}
+                label={v.title}
               />
               {scoped && <DragHandle {...handleProps(index)} />}
               {v.thumbnailPreviewUrl && (

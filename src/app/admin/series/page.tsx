@@ -4,6 +4,15 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DragHandle, PositionInput } from "@/components/reorder-controls";
 import { reorderArray } from "@/lib/reorder";
+import {
+  BulkBar,
+  BulkButton,
+  BulkCheckbox,
+  BulkSelectAll,
+  bulkFetch,
+  runBulk,
+  useBulkSelect,
+} from "@/components/bulk-select";
 
 type Category = { id: string; name: string };
 type Series = {
@@ -50,7 +59,7 @@ export default function SeriesAdminPage() {
   const [loading, setLoading] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   async function load() {
     const [seriesRes, categoriesRes] = await Promise.all([
@@ -124,17 +133,7 @@ export default function SeriesAdminPage() {
   }
 
   async function bulkMoveToCategory(newCategoryId: string) {
-    await Promise.all(
-      Array.from(selectedIds).map((id) =>
-        fetch(`/api/admin/series/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ categoryId: newCategoryId || null }),
-        }),
-      ),
-    );
-    setSelectedIds(new Set());
-    await load();
+    await bulkPatch({ categoryId: newCategoryId || null });
   }
 
   async function reorderTo(siblings: Series[], fromIndex: number, toIndex: number) {
@@ -157,53 +156,34 @@ export default function SeriesAdminPage() {
     await reorderTo(siblings, index, targetIndex);
   }
 
-  function toggleSelected(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  async function bulkSetPublished(published: boolean) {
-    await Promise.all(
-      Array.from(selectedIds).map((id) =>
-        fetch(`/api/admin/series/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ published }),
-        }),
-      ),
+  // Series has no server-side bulk route, so these loop the per-item
+  // endpoint and report failures rather than stopping at the first.
+  async function bulkPatch(body: Record<string, unknown>) {
+    setBulkBusy(true);
+    await runBulk(bulk.selected, (id) =>
+      bulkFetch(`/api/admin/series/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
     );
-    setSelectedIds(new Set());
+    bulk.clear();
+    setBulkBusy(false);
     await load();
   }
 
   async function bulkSchedule() {
-    const input = prompt(`Publish ${selectedIds.size} series at (YYYY-MM-DDTHH:MM, local time)?`, "");
+    const input = prompt(`Publish ${bulk.count} series at (YYYY-MM-DDTHH:MM, local time)?`, "");
     if (!input?.trim()) return;
-    const publishAt = new Date(input.trim()).toISOString();
-    await Promise.all(
-      Array.from(selectedIds).map((id) =>
-        fetch(`/api/admin/series/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ published: true, publishAt }),
-        }),
-      ),
-    );
-    setSelectedIds(new Set());
-    await load();
+    await bulkPatch({ published: true, publishAt: new Date(input.trim()).toISOString() });
   }
 
   async function bulkDelete() {
-    if (!confirm(`Move ${selectedIds.size} series to Trash? Restorable from Admin > Trash.`))
-      return;
-    await Promise.all(
-      Array.from(selectedIds).map((id) => fetch(`/api/admin/series/${id}`, { method: "DELETE" })),
-    );
-    setSelectedIds(new Set());
+    if (!confirm(`Move ${bulk.count} series to Trash? Restorable from Admin > Trash.`)) return;
+    setBulkBusy(true);
+    await runBulk(bulk.selected, (id) => bulkFetch(`/api/admin/series/${id}`, { method: "DELETE" }));
+    bulk.clear();
+    setBulkBusy(false);
     await load();
   }
 
@@ -215,6 +195,9 @@ export default function SeriesAdminPage() {
     [series, query],
   );
   const groups = groupByCategory(filteredSeries);
+  // Scoped to what the filter leaves on screen, so a hidden series can't be
+  // caught by "select all" or a shift-range it isn't visibly part of.
+  const bulk = useBulkSelect(filteredSeries.map((s) => s.id));
 
   return (
     <div className="space-y-6">
@@ -267,53 +250,36 @@ export default function SeriesAdminPage() {
         className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
       />
 
-      {selectedIds.size > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <span>{selectedIds.size} selected</span>
-          <button
-            onClick={() => bulkSetPublished(true)}
-            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
-          >
-            Publish
-          </button>
-          <button
-            onClick={() => bulkSetPublished(false)}
-            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
-          >
-            Unpublish
-          </button>
-          <button
-            onClick={bulkSchedule}
-            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
-          >
-            Schedule publish…
-          </button>
-          <select
-            defaultValue="__placeholder"
-            onChange={(e) => {
-              if (e.target.value !== "__placeholder") bulkMoveToCategory(e.target.value);
-              e.target.value = "__placeholder";
-            }}
-            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
-          >
-            <option value="__placeholder" disabled>
-              Move to category…
-            </option>
-            <option value="">Uncategorized</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <button onClick={bulkDelete} className="rounded-md border border-red-300 px-2 py-1 text-red-600 dark:border-red-900">
-            Delete
-          </button>
-          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-zinc-500 hover:underline">
-            Clear selection
-          </button>
-        </div>
+      {filteredSeries.length > 0 && (
+        <BulkSelectAll allSelected={bulk.allSelected} onToggle={bulk.toggleAll} disabled={bulkBusy} />
       )}
+
+      <BulkBar count={bulk.count} onClear={bulk.clear} busy={bulkBusy}>
+        <BulkButton onClick={() => bulkPatch({ published: true })}>Publish</BulkButton>
+        <BulkButton onClick={() => bulkPatch({ published: false })}>Unpublish</BulkButton>
+        <BulkButton onClick={bulkSchedule}>Schedule publish…</BulkButton>
+        <select
+          defaultValue="__placeholder"
+          onChange={(e) => {
+            if (e.target.value !== "__placeholder") bulkMoveToCategory(e.target.value);
+            e.target.value = "__placeholder";
+          }}
+          className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+        >
+          <option value="__placeholder" disabled>
+            Move to category…
+          </option>
+          <option value="">Uncategorized</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <BulkButton danger onClick={bulkDelete}>
+          Delete
+        </BulkButton>
+      </BulkBar>
 
       {groups.map((group) => (
         <section key={group.key} className="space-y-2">
@@ -334,11 +300,10 @@ export default function SeriesAdminPage() {
                 }}
               >
                 <div className="min-w-0 flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(s.id)}
-                    onChange={() => toggleSelected(s.id)}
-                    aria-label={`Select ${s.title}`}
+                  <BulkCheckbox
+                    checked={bulk.isSelected(s.id)}
+                    onToggle={(shift) => bulk.toggle(s.id, shift)}
+                    label={s.title}
                   />
                   <DragHandle
                     draggable

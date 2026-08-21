@@ -13,6 +13,13 @@ import {
 } from "@/components/content-target-picker";
 import { BunnyStorageImport } from "@/components/bunny-storage-import";
 import { CoverGenerator } from "@/components/cover-generator";
+import {
+  BulkBar,
+  BulkButton,
+  BulkCheckbox,
+  BulkSelectAll,
+  useBulkSelect,
+} from "@/components/bulk-select";
 import { readerFormat } from "@/lib/reader";
 
 type UploadStatus = "pending" | "uploading" | "done" | "failed";
@@ -62,7 +69,7 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
   const [queue, setQueue] = useState<PendingUpload[]>([]);
   const [uploading, setUploading] = useState(false);
   const [query, setQuery] = useState("");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   // Hymn fields (printed page number, "Category" tab grouping, lyrics) are
   // edited in a per-row panel rather than as more buttons in the row above:
   // they're free text, and only meaningful inside a hymnPerFile series.
@@ -240,51 +247,32 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
       ? scopedFiles.filter((f) => f.title.toLowerCase().includes(query.trim().toLowerCase()))
       : scopedFiles;
 
-  function toggleSelected(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  // Scoped to what's on screen, so a filtered-out file can't be caught by
+  // "select all" or a shift-range it isn't visibly part of.
+  const bulk = useBulkSelect(visibleFiles.map((f) => f.id));
 
-  async function bulkSetPublished(published: boolean) {
+  /** One request for the whole selection — see /api/admin/files/bulk. */
+  async function bulkAction(body: Record<string, unknown>) {
+    setBulkBusy(true);
     await fetch("/api/admin/files/bulk", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: Array.from(selectedIds), action: published ? "publish" : "unpublish" }),
+      body: JSON.stringify({ ids: bulk.selected, ...body }),
     });
-    setSelectedIds(new Set());
+    bulk.clear();
+    setBulkBusy(false);
     await load();
   }
 
   async function bulkSchedule() {
-    const input = prompt(`Publish ${selectedIds.size} file(s) at (YYYY-MM-DDTHH:MM, local time)?`, "");
+    const input = prompt(`Publish ${bulk.count} file(s) at (YYYY-MM-DDTHH:MM, local time)?`, "");
     if (!input?.trim()) return;
-    await fetch("/api/admin/files/bulk", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ids: Array.from(selectedIds),
-        action: "schedule",
-        publishAt: new Date(input.trim()).toISOString(),
-      }),
-    });
-    setSelectedIds(new Set());
-    await load();
+    await bulkAction({ action: "schedule", publishAt: new Date(input.trim()).toISOString() });
   }
 
   async function bulkDelete() {
-    if (!confirm(`Move ${selectedIds.size} file(s) to Trash? Restorable from Admin > Trash.`))
-      return;
-    await fetch("/api/admin/files/bulk", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: Array.from(selectedIds), action: "delete" }),
-    });
-    setSelectedIds(new Set());
-    await load();
+    if (!confirm(`Move ${bulk.count} file(s) to Trash? Restorable from Admin > Trash.`)) return;
+    await bulkAction({ action: "delete" });
   }
 
   async function reorderTo(fromIndex: number, toIndex: number) {
@@ -429,35 +417,18 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
         />
       )}
 
-      {selectedIds.size > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <span>{selectedIds.size} selected</span>
-          <button
-            onClick={() => bulkSetPublished(true)}
-            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
-          >
-            Publish
-          </button>
-          <button
-            onClick={() => bulkSetPublished(false)}
-            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
-          >
-            Unpublish
-          </button>
-          <button
-            onClick={bulkSchedule}
-            className="rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
-          >
-            Schedule publish…
-          </button>
-          <button onClick={bulkDelete} className="rounded-md border border-red-300 px-2 py-1 text-red-600 dark:border-red-900">
-            Delete
-          </button>
-          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-zinc-500 hover:underline">
-            Clear selection
-          </button>
-        </div>
+      {visibleFiles.length > 0 && (
+        <BulkSelectAll allSelected={bulk.allSelected} onToggle={bulk.toggleAll} disabled={bulkBusy} />
       )}
+
+      <BulkBar count={bulk.count} onClear={bulk.clear} busy={bulkBusy}>
+        <BulkButton onClick={() => bulkAction({ action: "publish" })}>Publish</BulkButton>
+        <BulkButton onClick={() => bulkAction({ action: "unpublish" })}>Unpublish</BulkButton>
+        <BulkButton onClick={bulkSchedule}>Schedule publish…</BulkButton>
+        <BulkButton danger onClick={bulkDelete}>
+          Delete
+        </BulkButton>
+      </BulkBar>
 
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-800">
         {visibleFiles.map((f, index) => (
@@ -467,11 +438,10 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
             {...(scoped ? dropZoneProps(index) : {})}
           >
             <div className="min-w-0 flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={selectedIds.has(f.id)}
-                onChange={() => toggleSelected(f.id)}
-                aria-label={`Select ${f.title}`}
+              <BulkCheckbox
+                checked={bulk.isSelected(f.id)}
+                onToggle={(shift) => bulk.toggle(f.id, shift)}
+                label={f.title}
               />
               {scoped && <DragHandle {...handleProps(index)} />}
               <div className="min-w-0">
