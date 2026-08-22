@@ -564,6 +564,15 @@ model FileAsset {
   // Formatted lyrics shown on this hymn's page; when null that page falls
   // back to the PDF reader/download as its primary view.
   lyricsText       String?
+  // How many PDF pages sit in front of this book's printed page 1 — its
+  // front matter. Applies to a whole-book PDF, unlike the three above.
+  //
+  // Everything stored stays in PDF pages (ReadingProgress.location, a
+  // ?page= link, a bookmark's resolved destination); this converts only
+  // where a number is shown to or typed by a person, so a hymn on the
+  // book's page 45 is listed and reached as 45 rather than as 55. See
+  // lib/page-offset.ts.
+  pageOffset       Int       @default(0)
   // A small JPEG data URL of this book's first page, and how many hymns its
   // bookmarks list — both derived from the PDF once by an admin (see
   // "Generate covers" in the file manager) rather than by every visitor's

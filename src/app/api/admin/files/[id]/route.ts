@@ -21,6 +21,11 @@ export const updateSchema = z
     pageNumber: z.number().int().nullable().optional(),
     groupLabel: z.string().nullable().optional(),
     lyricsText: z.string().nullable().optional(),
+    // How many PDF pages precede the book's printed page 1. Not nullable:
+    // the column defaults to 0, and "no front matter" is the same answer
+    // as "nobody has set this" — see lib/page-offset.ts. Unbounded in both
+    // directions, since a scan can start partway into a book.
+    pageOffset: z.number().int().optional(),
     // A generated cover thumbnail. Constrained to an inline image rather
     // than accepted as free text: this is rendered straight into an <img>
     // on public pages, so a `data:text/html` or remote URL sneaking in here

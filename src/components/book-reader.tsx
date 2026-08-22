@@ -23,6 +23,7 @@ export function BookReader({
   backHref,
   backLabel,
   initialLocation,
+  pageOffset,
   canSaveProgress,
 }: {
   fileId: string;
@@ -31,6 +32,12 @@ export function BookReader({
   backHref: string;
   backLabel: string;
   initialLocation: string | null;
+  /**
+   * The book's front matter, for showing printed page numbers rather than
+   * PDF ones — see lib/page-offset.ts. PDF-only: an EPUB reflows and has no
+   * fixed pages to be offset from, so EpubReader is handed nothing.
+   */
+  pageOffset: number;
   /** False for a signed-out reader: the book still opens, nothing is stored. */
   canSaveProgress: boolean;
 }) {
@@ -264,6 +271,7 @@ export function BookReader({
             <PdfReader
               fileUrl={`/api/files/${fileId}/content`}
               initialLocation={initialLocation}
+              pageOffset={pageOffset}
               onReady={onReady}
               onLocationChange={onLocationChange}
             />

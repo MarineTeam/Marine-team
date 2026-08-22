@@ -421,6 +421,15 @@ own section like any other.
   half-broken outline doesn't look like an empty one.
 - **Search in the book** — matches across every page (PDF) or spine section
   (EPUB), listed with a snippet of surrounding text.
+- **Page offset** — a scanned book whose printed page 1 sits behind a title
+  page and ten pages of contents would otherwise be listed by its PDF page
+  numbers, which match nothing in the paper copy. Setting **Page offset** on
+  the file (Details, in the admin file list) to the number of front-matter
+  pages makes the contents list, the page box and the search results quote
+  the printed numbers instead. Everything stored — a member's place, a mark,
+  a `?page=` link — stays in PDF pages, so an offset can be corrected later
+  without moving anyone's place; front matter itself shows no number, and
+  the reader displays the PDF page alongside while an offset is set.
 - **Read aloud** — speaks the current page or section with a voice and speed
   picker, advancing through the book on its own. **It stops when the app is
   minimised**: browsers suspend speech for a backgrounded page, and no

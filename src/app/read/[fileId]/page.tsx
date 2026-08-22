@@ -91,6 +91,7 @@ export default async function ReadPage({
       backHref={backHref}
       backLabel={backLabel}
       initialLocation={requestedPage ?? progress?.location ?? null}
+      pageOffset={file.pageOffset}
       canSaveProgress={Boolean(user)}
     />
   );

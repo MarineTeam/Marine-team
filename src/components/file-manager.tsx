@@ -48,6 +48,7 @@ type FileAsset = {
   pageNumber: number | null;
   groupLabel: string | null;
   lyricsText: string | null;
+  pageOffset: number;
   series: { id: string; title: string } | null;
   category: { id: string; name: string } | null;
 };
@@ -70,11 +71,14 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
   const [uploading, setUploading] = useState(false);
   const [query, setQuery] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
-  // Hymn fields (printed page number, "Category" tab grouping, lyrics) are
-  // edited in a per-row panel rather than as more buttons in the row above:
-  // they're free text, and only meaningful inside a hymnPerFile series.
+  // Book and hymn fields (page offset; printed page number, "Category" tab
+  // grouping, lyrics) are edited in a per-row panel rather than as more
+  // buttons in the row above: they're free text, and each only applies to
+  // one shape of book — the offset to a whole-book PDF, the other three to
+  // a file that is one hymn inside a hymnPerFile series.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [editPageOffset, setEditPageOffset] = useState("");
   const [editPageNumber, setEditPageNumber] = useState("");
   const [editGroupLabel, setEditGroupLabel] = useState("");
   const [editLyricsText, setEditLyricsText] = useState("");
@@ -199,6 +203,9 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
   function startEditingDetails(f: FileAsset) {
     setEditingId(f.id);
     setEditTitle(f.title);
+    // Blank rather than "0" for a book nobody has set an offset on: an empty
+    // box reads as "not needed", which is the truth for most books.
+    setEditPageOffset(f.pageOffset ? String(f.pageOffset) : "");
     setEditPageNumber(f.pageNumber != null ? String(f.pageNumber) : "");
     setEditGroupLabel(f.groupLabel ?? "");
     setEditLyricsText(f.lyricsText ?? "");
@@ -215,6 +222,9 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
           // Omitted rather than sent blank: the API requires a non-empty
           // title, and clearing the box shouldn't fail the whole save.
           ...(editTitle.trim() ? { title: editTitle.trim() } : {}),
+          // Cleared back to 0 rather than omitted: the column isn't
+          // nullable, and emptying the box is how an offset is removed.
+          pageOffset: Number(editPageOffset.trim()) || 0,
           pageNumber: trimmedPage ? Number(trimmedPage) : null,
           groupLabel: editGroupLabel.trim() || null,
           lyricsText: editLyricsText.trim() || null,
@@ -524,8 +534,8 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
               </button>
               <button
                 onClick={() => (editingId === f.id ? setEditingId(null) : startEditingDetails(f))}
-                className={`rounded-md border px-2 py-1 ${f.pageNumber != null || f.groupLabel || f.lyricsText ? "border-accent text-accent" : "border-sep"}`}
-                title="Rename this file. Page number, category grouping and lyrics apply when it's one hymn in a 'one hymn per file' series."
+                className={`rounded-md border px-2 py-1 ${f.pageOffset !== 0 || f.pageNumber != null || f.groupLabel || f.lyricsText ? "border-accent text-accent" : "border-sep"}`}
+                title="Rename this file. Page offset applies to a whole-book PDF; page number, category grouping and lyrics apply when it's one hymn in a 'one hymn per file' series."
               >
                 {editingId === f.id ? "Close" : "Details"}
               </button>
@@ -543,6 +553,24 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
                     className="w-full rounded-md border border-sep px-2 py-1.5 text-sm"
                   />
                 </label>
+                {/* A whole-book setting, so it sits above the per-hymn
+                    fields and only appears on a PDF — nothing else in this
+                    list has pages to offset. */}
+                {readerFormat(f.mimeType, f.bunnyPath) === "pdf" && (
+                  <label className="block space-y-1 text-xs">
+                    <span className="text-sec">
+                      Page offset — pages of front matter before printed page 1. A book with a title
+                      page and a 10-page contents section: 10. Leave blank when the book starts on
+                      its first page.
+                    </span>
+                    <input
+                      type="number"
+                      value={editPageOffset}
+                      onChange={(e) => setEditPageOffset(e.target.value)}
+                      className="w-full rounded-md border border-sep px-2 py-1.5 text-sm sm:w-40"
+                    />
+                  </label>
+                )}
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <label className="space-y-1 text-xs">
                     <span className="text-sec">Page number (printed page in the book)</span>

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { fileContentUrl, loadPdfOutline } from "@/lib/pdf-client";
+import { printedPage } from "@/lib/page-offset";
 import type { TocEntry } from "@/components/reader-types";
 
 type SortMode = "page" | "az" | "category";
@@ -26,11 +27,26 @@ function groupByOutlineSection(entries: TocEntry[]): Group[] {
   return groups;
 }
 
-function EntryRow({ entry, fileId, readerOn }: { entry: TocEntry; fileId: string; readerOn: boolean }) {
+function EntryRow({
+  entry,
+  fileId,
+  readerOn,
+  pageOffset,
+}: {
+  entry: TocEntry;
+  fileId: string;
+  readerOn: boolean;
+  pageOffset: number;
+}) {
+  // Two different numbers, deliberately: the column shows the page printed
+  // in the book, while the link carries the PDF page the bookmark actually
+  // resolved to. Front matter has no printed number and shows none — the
+  // row still opens the reader at the right place.
+  const printed = entry.location === null ? null : printedPage(Number(entry.location), pageOffset);
   const content = (
     <>
       <span className="w-8 shrink-0 text-right text-sm tabular-nums text-ter">
-        {entry.location ?? ""}
+        {printed ?? ""}
       </span>
       <span className="min-w-0 flex-1 truncate text-sm">{entry.label}</span>
       {entry.location && readerOn && (
@@ -57,8 +73,20 @@ function EntryRow({ entry, fileId, readerOn }: { entry: TocEntry; fileId: string
  * outline/bookmarks rather than typed in by an admin — see
  * lib/pdf-client.ts. Tapping an entry opens the book reader
  * scrolled straight to that page.
+ *
+ * `pageOffset` is the book's front matter (FileAsset.pageOffset), so the
+ * numbers listed here are the ones printed in the book rather than the PDF
+ * pages the bookmarks resolve to.
  */
-export function BookContents({ fileId, readerOn }: { fileId: string; readerOn: boolean }) {
+export function BookContents({
+  fileId,
+  readerOn,
+  pageOffset,
+}: {
+  fileId: string;
+  readerOn: boolean;
+  pageOffset: number;
+}) {
   // Tagged with the book it was read from, so switching books shows the
   // loading state on the very first render rather than the outline of the
   // book just navigated away from.
@@ -175,7 +203,13 @@ export function BookContents({ fileId, readerOn }: { fileId: string; readerOn: b
             )}
             <div className="divide-y divide-sep">
               {group.entries.map((entry, j) => (
-                <EntryRow key={`${entry.label}-${j}`} entry={entry} fileId={fileId} readerOn={readerOn} />
+                <EntryRow
+                  key={`${entry.label}-${j}`}
+                  entry={entry}
+                  fileId={fileId}
+                  readerOn={readerOn}
+                  pageOffset={pageOffset}
+                />
               ))}
             </div>
           </div>

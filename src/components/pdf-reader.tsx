@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { excerptAround, findMatches } from "@/lib/reader";
 import { getPdfjs, resolvePdfOutline } from "@/lib/pdf-client";
+import { pdfPageOf, printedPage } from "@/lib/page-offset";
 import type { ReaderHandle, SearchHit, TocEntry } from "@/components/reader-types";
 
 /**
@@ -16,11 +17,20 @@ type PdfDocument = PDFDocumentProxy;
 export function PdfReader({
   fileUrl,
   initialLocation,
+  pageOffset,
   onReady,
   onLocationChange,
 }: {
   fileUrl: string;
   initialLocation: string | null;
+  /**
+   * How many PDF pages of front matter precede this book's printed page 1
+   * (see lib/page-offset.ts). Affects only what a person reads and types:
+   * `initialLocation`, `onLocationChange` and every ReaderHandle location
+   * stay in PDF pages, so a stored place still resolves if an admin later
+   * corrects the offset.
+   */
+  pageOffset: number;
   onReady: (handle: ReaderHandle) => void;
   onLocationChange: (location: string, percent: number) => void;
 }) {
@@ -164,8 +174,12 @@ export function PdfReader({
           .replace(/\s+/g, " ");
 
         for (const at of findMatches(text, query)) {
+          const printed = printedPage(pageNumber, pageOffset);
           hits.push({
-            label: `Page ${pageNumber}`,
+            // Labelled by the page printed in the book, falling back to the
+            // PDF page (and saying so) for a hit in the front matter, which
+            // has no printed number to quote.
+            label: printed === null ? `PDF page ${pageNumber}` : `Page ${printed}`,
             excerpt: excerptAround(text, at, query.length),
             location: String(pageNumber),
           });
@@ -205,7 +219,7 @@ export function PdfReader({
         return moved;
       },
     });
-  }, [pageCount, page, goToPage, onReady]);
+  }, [pageCount, page, pageOffset, goToPage, onReady]);
 
   if (error) {
     return (
@@ -214,6 +228,15 @@ export function PdfReader({
       </div>
     );
   }
+
+  // The page box counts in printed pages — the numbers on the paper, and the
+  // ones the contents list and the search results quote. With no offset set
+  // these are the PDF's own page numbers and the box is exactly what it has
+  // always been; with one set, the PDF numbering is shown beside it so a
+  // book can still be navigated by it, and a page of front matter (which has
+  // no printed number) leaves the box empty rather than showing a zero.
+  const shownPage = printedPage(page, pageOffset);
+  const shownCount = printedPage(pageCount, pageOffset);
 
   return (
     <div className="flex h-full flex-col">
@@ -228,15 +251,20 @@ export function PdfReader({
         <span className="tabular-nums text-sec">
           <input
             type="number"
-            value={page}
+            value={shownPage ?? ""}
             min={1}
-            max={pageCount || 1}
-            onChange={(e) => goToPage(Number(e.target.value))}
+            max={shownCount ?? 1}
+            onChange={(e) => goToPage(pdfPageOf(Number(e.target.value), pageOffset))}
             aria-label="Page number"
             className="w-16 rounded border border-sep px-1 py-0.5 text-center"
           />{" "}
-          / {pageCount || "—"}
+          / {shownCount ?? "—"}
         </span>
+        {pageOffset !== 0 && (
+          <span className="tabular-nums text-xs text-ter">
+            PDF page {page} of {pageCount || "—"}
+          </span>
+        )}
         <button
           onClick={() => setPage((p) => Math.min(p + 1, pageCount))}
           disabled={pageCount === 0 || page >= pageCount}
