@@ -53,7 +53,11 @@ export async function GET() {
     }
     const videos = await prisma.video.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      // Reorder writes `position`, so the list has to read it back or the
+      // arrows and drag-handle appear to do nothing. createdAt breaks the
+      // ties: every row sits at the default 0 until something is moved, and
+      // an untouched list should still read newest-first.
+      orderBy: [{ position: "asc" }, { createdAt: "desc" }],
       include: { series: true, category: true, speaker: true },
     });
     // Computed server-side so the admin UI never needs to import bunny.ts
