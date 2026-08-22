@@ -50,6 +50,21 @@ const categoryOrder: Prisma.CategoryOrderByWithRelationInput[] = [
   { position: "asc" },
 ];
 
+// Videos and files are the two the create routes never assign a position to,
+// so every row sits at the schema default of 0 until an admin reorders one.
+// Position alone would leave those ties to the database to settle however it
+// likes, and a category nobody has touched could come back in a different
+// order on each load. createdAt second matches what the admin lists show, so
+// the reorder screen and the page it is ordering agree.
+const videoOrder: Prisma.VideoOrderByWithRelationInput[] = [
+  { position: "asc" },
+  { createdAt: "desc" },
+];
+const fileOrder: Prisma.FileAssetOrderByWithRelationInput[] = [
+  { position: "asc" },
+  { createdAt: "desc" },
+];
+
 /** Root-level categories (no parent) for the homepage — each may have its own series, child categories, and/or videos/files attached directly (skipping the series layer). */
 async function getPublishedCategoriesWithSeriesUncached(isLoggedIn: boolean) {
   const where = { ...publishedNow(), ...guestFilter(isLoggedIn) };
@@ -62,8 +77,8 @@ async function getPublishedCategoriesWithSeriesUncached(isLoggedIn: boolean) {
     include: {
       series: { where: publishedNow(), orderBy: seriesOrder },
       children: { where: publishedNow(), orderBy: categoryOrder },
-      videos: { where, orderBy: { position: "asc" } },
-      files: { where, orderBy: { position: "asc" } },
+      videos: { where, orderBy: videoOrder },
+      files: { where, orderBy: fileOrder },
     },
   });
 }
@@ -150,8 +165,8 @@ async function getRecentlyAddedUncached(isLoggedIn: boolean, limit = 10): Promis
       include: {
         series: { where: publishedNow(), orderBy: seriesOrder },
         children: { where: publishedNow(), orderBy: categoryOrder },
-        videos: { where: contentWhere, orderBy: { position: "asc" } },
-        files: { where: contentWhere, orderBy: { position: "asc" } },
+        videos: { where: contentWhere, orderBy: videoOrder },
+        files: { where: contentWhere, orderBy: fileOrder },
       },
     }),
     getRecentlyAddedSeries(limit),
@@ -220,10 +235,10 @@ export const getCategoryBySlug = cache(async function getCategoryBySlug(slug: st
       series: {
         where: publishedNow(),
         orderBy: seriesOrder,
-        include: { files: { where, orderBy: { position: "asc" } } },
+        include: { files: { where, orderBy: fileOrder } },
       },
-      videos: { where, orderBy: { position: "asc" } },
-      files: { where, orderBy: { position: "asc" } },
+      videos: { where, orderBy: videoOrder },
+      files: { where, orderBy: fileOrder },
       children: {
         // Same as the top-level listing: sub-categories stay visible (badged
         // and gated) even when member-only.
@@ -231,8 +246,8 @@ export const getCategoryBySlug = cache(async function getCategoryBySlug(slug: st
         orderBy: categoryOrder,
         include: {
           series: { where: publishedNow(), orderBy: seriesOrder },
-          videos: { where, orderBy: { position: "asc" } },
-          files: { where, orderBy: { position: "asc" } },
+          videos: { where, orderBy: videoOrder },
+          files: { where, orderBy: fileOrder },
           children: true,
         },
       },
@@ -258,8 +273,8 @@ export const getSeriesBySlug = cache(async function getSeriesBySlug(slug: string
     where: { slug, ...publishedNow() },
     include: {
       category: true,
-      videos: { where: publishedNow(), orderBy: { position: "asc" } },
-      files: { where: publishedNow(), orderBy: { position: "asc" } },
+      videos: { where: publishedNow(), orderBy: videoOrder },
+      files: { where: publishedNow(), orderBy: fileOrder },
     },
   });
 });
@@ -305,7 +320,7 @@ export async function getRelatedVideos(
   if (video.seriesId) {
     return prisma.video.findMany({
       where: { ...where, seriesId: video.seriesId, id: { not: video.id } },
-      orderBy: { position: "asc" },
+      orderBy: videoOrder,
       take: limit,
       include: { series: true },
     });
@@ -476,8 +491,8 @@ export async function searchContent(query: string, isLoggedIn: boolean, filters:
           include: {
             series: { where: publishedNow(), orderBy: seriesOrder },
             children: true,
-            videos: { where, orderBy: { position: "asc" } },
-            files: { where, orderBy: { position: "asc" } },
+            videos: { where, orderBy: videoOrder },
+            files: { where, orderBy: fileOrder },
           },
           take: 20,
         }),
@@ -1177,7 +1192,7 @@ export async function getUpNextVideo(
       ...publishedNow(),
       ...guestFilter(isLoggedIn),
     },
-    orderBy: { position: "asc" },
+    orderBy: videoOrder,
     include: { series: true },
   });
 }
