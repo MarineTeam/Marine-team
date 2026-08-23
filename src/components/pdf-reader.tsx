@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
-import { excerptAround, findMatches } from "@/lib/reader";
+import { excerptAround, findMatches, shouldFetchWholeBook } from "@/lib/reader";
 import { getPdfjs, resolvePdfOutline } from "@/lib/pdf-client";
 import { pdfPageOf, printedPage } from "@/lib/page-offset";
+import { readDeviceSettings, writeDeviceSettings } from "@/lib/device-settings";
 import type { ReaderHandle, SearchHit, TocEntry } from "@/components/reader-types";
 
 /**
@@ -14,10 +15,27 @@ import type { ReaderHandle, SearchHit, TocEntry } from "@/components/reader-type
  */
 type PdfDocument = PDFDocumentProxy;
 
+/** How far a finger has to travel across the page before it counts as a page turn. */
+const SWIPE_DISTANCE = 60;
+/**
+ * How far it has to travel before the gesture commits to an axis at all.
+ * Below this a touch is still ambiguous, and claiming it would make the page
+ * jump about while someone is only trying to scroll.
+ */
+const SWIPE_AXIS_LOCK = 12;
+/**
+ * The page follows the finger at a fraction of its travel, and no further
+ * than this. There is no neighbouring page rendered behind it to reveal, so
+ * this is feedback that the gesture was seen, not a page actually moving.
+ */
+const SWIPE_DRAG_RATIO = 0.35;
+const SWIPE_DRAG_MAX = 90;
+
 export function PdfReader({
   fileUrl,
   initialLocation,
   pageOffset,
+  sizeBytes,
   onReady,
   onLocationChange,
 }: {
@@ -31,10 +49,18 @@ export function PdfReader({
    * corrects the offset.
    */
   pageOffset: number;
+  /**
+   * The file's size, which decides how it is fetched: a book small enough to
+   * hold is fetched whole, in one request a browser can cache and revalidate,
+   * rather than in the byte ranges pdf.js would otherwise ask for and no
+   * cache holds usefully. See shouldFetchWholeBook.
+   */
+  sizeBytes: number | null;
   onReady: (handle: ReaderHandle) => void;
   onLocationChange: (location: string, percent: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const docRef = useRef<PdfDocument | null>(null);
   // pdf.js throws RenderingCancelledException if a second render starts on the
   // same canvas before the first finishes, which page-flipping does routinely.
@@ -48,6 +74,20 @@ export function PdfReader({
   const [scale, setScale] = useState(1.2);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // Read in an effect rather than during render: it comes from localStorage,
+  // which the server doesn't have.
+  const [swipeOn, setSwipeOn] = useState(true);
+  // Whether the page is drawn wider than the space it sits in — i.e. whether
+  // dragging sideways is panning rather than a spare gesture to turn pages.
+  const [zoomedWide, setZoomedWide] = useState(false);
+  const [drag, setDrag] = useState(0);
+
+  const swipeTurnsPages = swipeOn && !zoomedWide;
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSwipeOn(readDeviceSettings().swipeToTurnPages);
+  }, []);
 
   // --- Load the document ---------------------------------------------------
   useEffect(() => {
@@ -57,11 +97,38 @@ export function PdfReader({
     // worker running). Destroying the task is what stops the worker and
     // aborts in-flight range requests.
     let loadingTask: { destroy: () => Promise<void> } | null = null;
+    // Aborts a whole-book fetch that's still running when someone navigates
+    // away, rather than letting tens of megabytes finish arriving for a
+    // reader that has already gone.
+    const fetching = new AbortController();
 
     (async () => {
       try {
         const pdfjs = await getPdfjs();
-        const task = pdfjs.getDocument({ url: fileUrl, withCredentials: true });
+
+        // A book worth caching is fetched in one request and handed to pdf.js
+        // as bytes. That one request is an ordinary GET the browser stores
+        // and revalidates, so the second time someone opens the hymnal it
+        // arrives from disk after a 304 instead of over the wire; the ranged
+        // path below caches nothing of the sort. A failure here isn't fatal
+        // — it falls through to letting pdf.js fetch the document itself.
+        let data: Uint8Array | null = null;
+        if (shouldFetchWholeBook(sizeBytes)) {
+          try {
+            const response = await fetch(fileUrl, {
+              credentials: "same-origin",
+              signal: fetching.signal,
+            });
+            if (response.ok) data = new Uint8Array(await response.arrayBuffer());
+          } catch {
+            // Offline, or the fetch was aborted; ask pdf.js to try its way.
+          }
+        }
+        if (cancelled) return;
+
+        const task = data
+          ? pdfjs.getDocument({ data })
+          : pdfjs.getDocument({ url: fileUrl, withCredentials: true });
         loadingTask = task;
         const doc = await task.promise;
         if (cancelled) {
@@ -80,11 +147,12 @@ export function PdfReader({
 
     return () => {
       cancelled = true;
+      fetching.abort();
       renderTaskRef.current?.cancel();
       void loadingTask?.destroy();
       docRef.current = null;
     };
-  }, [fileUrl]);
+  }, [fileUrl, sizeBytes]);
 
   // --- Render the current page --------------------------------------------
   useEffect(() => {
@@ -114,6 +182,18 @@ export function PdfReader({
         const task = pdfPage.render({ canvas, canvasContext: context, viewport });
         renderTaskRef.current = task;
         await task.promise;
+        if (cancelled) return;
+
+        // Warms the pages either side. getPage parses the page and pulls
+        // whatever of it isn't local yet, which is the slow half of a page
+        // turn; pdf.js keeps what it has parsed, so the next swipe draws from
+        // memory. Nothing is rendered here — a canvas is not touched — and a
+        // failure is simply a page turn that costs what it used to.
+        for (const neighbour of [page + 1, page - 1]) {
+          if (neighbour >= 1 && neighbour <= doc.numPages) {
+            void doc.getPage(neighbour).catch(() => {});
+          }
+        }
       } catch (err) {
         // A cancelled render is the expected outcome of flipping pages
         // quickly, not a failure worth showing anyone.
@@ -144,6 +224,101 @@ export function PdfReader({
       return Math.min(Math.max(1, Math.floor(next)), max);
     });
   }, []);
+
+  const nextPage = useCallback(() => {
+    setPage((p) => Math.min(p + 1, docRef.current?.numPages ?? p));
+  }, []);
+  const previousPage = useCallback(() => setPage((p) => Math.max(1, p - 1)), []);
+
+  // --- Turning the page: swipe and arrow keys ------------------------------
+  // The gesture lives in a ref, not state: it is read inside touch handlers
+  // that would otherwise close over a stale copy, and only its visual offset
+  // needs to cause a render.
+  const gestureRef = useRef<{ x: number; y: number; dx: number; turning: boolean } | null>(null);
+
+  function onTouchStart(event: React.TouchEvent) {
+    gestureRef.current = null;
+    setDrag(0);
+    if (!swipeTurnsPages || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    gestureRef.current = { x: touch.clientX, y: touch.clientY, dx: 0, turning: false };
+  }
+
+  function onTouchMove(event: React.TouchEvent) {
+    const gesture = gestureRef.current;
+    if (!gesture) return;
+    // A second finger means a pinch-zoom, which is not a page turn.
+    if (event.touches.length !== 1) {
+      gestureRef.current = null;
+      setDrag(0);
+      return;
+    }
+
+    const dx = event.touches[0].clientX - gesture.x;
+    const dy = event.touches[0].clientY - gesture.y;
+    if (!gesture.turning) {
+      if (Math.abs(dx) < SWIPE_AXIS_LOCK && Math.abs(dy) < SWIPE_AXIS_LOCK) return;
+      // Committed to the other axis: this is a scroll, and it is left alone
+      // for the rest of the touch.
+      if (Math.abs(dy) >= Math.abs(dx)) {
+        gestureRef.current = null;
+        return;
+      }
+      gesture.turning = true;
+    }
+
+    gesture.dx = dx;
+    const offset = Math.max(-SWIPE_DRAG_MAX, Math.min(SWIPE_DRAG_MAX, dx * SWIPE_DRAG_RATIO));
+    setDrag(offset);
+  }
+
+  function onTouchEnd() {
+    const gesture = gestureRef.current;
+    gestureRef.current = null;
+    setDrag(0);
+    if (!gesture?.turning || Math.abs(gesture.dx) < SWIPE_DISTANCE) return;
+    // Swiping left drags the current page away to the left, so the next one
+    // arrives — the direction a paper book turns.
+    if (gesture.dx < 0) nextPage();
+    else previousPage();
+  }
+
+  useEffect(() => {
+    if (!swipeOn) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      // Never while someone is typing — the reader's own search box and page
+      // box both live on this page.
+      const target = event.target as HTMLElement | null;
+      if (target?.isContentEditable) return;
+      if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+
+      if (event.key === "ArrowRight" || event.key === "PageDown") {
+        nextPage();
+        event.preventDefault();
+      } else if (event.key === "ArrowLeft" || event.key === "PageUp") {
+        previousPage();
+        event.preventDefault();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [swipeOn, nextPage, previousPage]);
+
+  // Whether sideways dragging is needed to see the whole page. Measured after
+  // each render of the page and on resize, because `touch-action` has to be
+  // in the DOM before the finger lands — it can't be decided mid-gesture.
+  useEffect(() => {
+    function measure() {
+      const container = scrollRef.current;
+      const canvas = canvasRef.current;
+      if (!container || !canvas) return;
+      setZoomedWide(canvas.getBoundingClientRect().width > container.clientWidth);
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [page, scale, pageCount]);
 
   // --- Expose TOC / search / text to the surrounding chrome ----------------
   useEffect(() => {
@@ -204,8 +379,8 @@ export function PdfReader({
       search,
       textAt,
       goTo: (location) => goToPage(Number(location)),
-      next: () => setPage((p) => Math.min(p + 1, docRef.current?.numPages ?? p)),
-      previous: () => setPage((p) => Math.max(1, p - 1)),
+      next: nextPage,
+      previous: previousPage,
       currentLocation: () => String(page),
       advance: () => {
         const doc = docRef.current;
@@ -218,8 +393,16 @@ export function PdfReader({
         });
         return moved;
       },
+      // A PDF location is already a number line: the page it names. An empty
+      // or non-numeric location is one this reader never wrote.
+      order: (locations) =>
+        locations.map((location) => {
+          if (location === null || location.trim() === "") return null;
+          const parsed = Number(location);
+          return Number.isFinite(parsed) ? parsed : null;
+        }),
     });
-  }, [pageCount, page, pageOffset, goToPage, onReady]);
+  }, [pageCount, page, pageOffset, goToPage, nextPage, previousPage, onReady]);
 
   if (error) {
     return (
@@ -242,7 +425,7 @@ export function PdfReader({
     <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-center justify-center gap-2 border-b border-sep p-2 text-sm">
         <button
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          onClick={previousPage}
           disabled={page <= 1}
           className="rounded-md border border-sep px-2 py-1 disabled:opacity-40"
         >
@@ -266,7 +449,7 @@ export function PdfReader({
           </span>
         )}
         <button
-          onClick={() => setPage((p) => Math.min(p + 1, pageCount))}
+          onClick={nextPage}
           disabled={pageCount === 0 || page >= pageCount}
           className="rounded-md border border-sep px-2 py-1 disabled:opacity-40"
         >
@@ -288,11 +471,47 @@ export function PdfReader({
         >
           +
         </button>
+        <span className="mx-2 text-ter">|</span>
+        <button
+          onClick={() => {
+            const next = !swipeOn;
+            setSwipeOn(next);
+            // Stored per device, alongside the other reading and playback
+            // preferences, so a phone can turn pages by swipe while a shared
+            // desktop doesn't.
+            writeDeviceSettings({ swipeToTurnPages: next });
+          }}
+          aria-pressed={swipeOn}
+          title="Turn pages by swiping left and right, or with the arrow keys"
+          className={`rounded-md border border-sep px-2 py-1 ${swipeOn ? "bg-chip" : ""}`}
+        >
+          {swipeOn ? "Swipe on" : "Swipe off"}
+        </button>
       </div>
 
-      <div className="flex-1 overflow-auto bg-chip p-4">
+      <div
+        ref={scrollRef}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchEnd}
+        // pan-y keeps the browser's vertical scrolling while reserving
+        // horizontal movement for the page turn, which is what stops a swipe
+        // from also dragging the page sideways. Zoomed in past the width of
+        // the screen, sideways movement is needed for panning and is handed
+        // straight back — as it is when swiping is turned off.
+        style={{ touchAction: swipeTurnsPages ? "pan-y" : "auto" }}
+        className="flex-1 overflow-auto bg-chip p-4"
+      >
         {loading && <p className="py-12 text-center text-sm text-sec">Opening…</p>}
-        <canvas ref={canvasRef} className="mx-auto block shadow-lg" />
+        <div
+          style={{
+            transform: drag === 0 ? undefined : `translateX(${drag}px)`,
+            transition: drag === 0 ? "transform 160ms ease-out" : undefined,
+          }}
+        >
+          <canvas ref={canvasRef} className="mx-auto block shadow-lg" />
+        </div>
       </div>
     </div>
   );

@@ -415,10 +415,27 @@ own section like any other.
 
 - **Reading** — PDFs render page by page with zoom and a page jump box;
   EPUBs reflow as a scrolling document, which reads better on a phone.
+- **Swipe to turn the page** — in a PDF, a swipe left or right turns the
+  page, and the arrow keys do the same on a desktop. Scrolling still
+  scrolls: the gesture decides which way it is going before it claims the
+  touch, a second finger is a pinch-zoom, and once you have zoomed in past
+  the width of the screen a sideways drag pans the page instead. Turn it off
+  from the reader's toolbar or under **Reading** in `/profile/settings` —
+  per device, like the other settings there.
 - **Contents** — the PDF outline or the EPUB navigation document, nested,
   each entry jumping straight to its place. A contents entry whose
   destination doesn't resolve is shown greyed rather than dropped, so a
   half-broken outline doesn't look like an empty one.
+- **Back and Next, by hymn rather than by page** — a bar along the bottom of
+  the reader names the entry being read and steps to the one either side of
+  it, using the book's own contents. **Back** goes to the start of the hymn
+  being read before it goes to the hymn before it, which is what you want
+  after paging past the first verse. A book with only one contents entry, or
+  none that resolve, shows no bar.
+  - In a **hymn-per-file** book — one whose hymns are separate files rather
+    than one PDF — the same arrows sit at the foot of each hymn's page,
+    stepping in the order that book's list shows and skipping any hymn the
+    viewer can't open.
 - **Search in the book** — matches across every page (PDF) or spine section
   (EPUB), listed with a snippet of surrounding text.
 - **Page offset** — a scanned book whose printed page 1 sits behind a title
@@ -441,6 +458,16 @@ own section like any other.
 - **Your place is kept** — reopening a book returns to where you stopped,
   stored per account (not per device), so it follows you between phone and
   desktop. Signed-out readers can still open a public book; nothing is saved.
+- **Opening a book a second time is cheap** — a hymnal is tens of megabytes
+  that never change, and it used to arrive again in full every time somebody
+  looked up a hymn. Now the browser keeps its copy and only asks whether it
+  is still current, which comes back as a few hundred bytes; the book itself
+  is read off the device. Access is still checked on every open, so this
+  costs nothing in control: a member who loses access is refused on their
+  next open exactly as before. Its contents list — the hymn numbers and
+  titles, which are read out of the PDF's bookmarks and are the slow part of
+  a book's page — is remembered on the device too, for a month, and re-read
+  from scratch whenever the file is replaced.
 
 ### How file access actually works
 
@@ -504,8 +531,21 @@ Limits worth knowing: a **highlight of selected text only works in a PDF**.
 An EPUB's pages live in an iframe the reader library owns, and the selection
 inside it isn't readable from the surrounding page — so marking in an EPUB
 saves a bookmark at the current position rather than pretending to capture
-text it can't see. Reading also needs a connection: unlike video downloads,
-books aren't cached for offline use.
+text it can't see.
+
+Reading still needs a connection. The caching above makes a re-open cheap,
+not free: the browser has to ask whether its copy is current before it may
+use it, which is what keeps access checks immediate — so with no signal at
+all a book won't open. That is a different thing from a downloaded video,
+which plays with the network off. A very large PDF (over 48 MB) also keeps
+streaming in pieces as it always did, since waiting for the whole file
+before the first page appears would be the worse trade.
+
+Stepping by contents entry is as good as the book's own contents. A PDF
+whose bookmarks were never added has nothing to step through, and an EPUB
+that packs several hymns into one section file steps by section rather than
+by hymn — there is no ordering for anchors inside a document to do better
+with.
 
 ## Auth
 

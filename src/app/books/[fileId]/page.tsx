@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/current-user";
 import { isPluginEnabled } from "@/lib/plugins";
 import { readerFormat } from "@/lib/reader";
 import { BookContents } from "@/components/book-contents";
+import { bookCacheTag } from "@/lib/reader-cache";
 
 /**
  * A hymnal book's own page: its table of contents, read straight from the
@@ -69,7 +70,12 @@ export default async function BookPage({ params }: { params: Promise<{ fileId: s
           )}
         </div>
       ) : (
-        <BookContents fileId={file.id} readerOn={readerOn} pageOffset={file.pageOffset} />
+        <BookContents
+          fileId={file.id}
+          readerOn={readerOn}
+          pageOffset={file.pageOffset}
+          cacheTag={bookCacheTag(file)}
+        />
       )}
     </div>
   );

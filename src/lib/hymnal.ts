@@ -44,6 +44,24 @@ type SeriesLike = {
   files: FileLike[];
 };
 
+/**
+ * A hymn-per-file book's hymns in the order the book prints them: by page
+ * number, with any hymn that has none kept in the order an admin arranged
+ * them, at the end.
+ *
+ * Shared between the list on the book's page and the "next hymn" arrows on a
+ * hymn's own page, so the two can't disagree about what comes next.
+ * `pageNumber` is the number printed in the book and `position` is the
+ * admin's drag order — related but not the same sequence, since printed
+ * numbers skip.
+ */
+export function hymnReadingOrder<T extends { pageNumber: number | null }>(files: T[]): T[] {
+  const numbered = files
+    .filter((file) => file.pageNumber !== null)
+    .sort((a, b) => a.pageNumber! - b.pageNumber!);
+  return [...numbered, ...files.filter((file) => file.pageNumber === null)];
+}
+
 /** The PDFs among a set of files — the only kind of file that can be a book. */
 export function pdfsOf<T extends { mimeType: string | null; bunnyPath: string }>(files: T[]): T[] {
   return files.filter((file) => readerFormat(file.mimeType, file.bunnyPath) === "pdf");

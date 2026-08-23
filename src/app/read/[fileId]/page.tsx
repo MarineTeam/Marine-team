@@ -92,6 +92,7 @@ export default async function ReadPage({
       backLabel={backLabel}
       initialLocation={requestedPage ?? progress?.location ?? null}
       pageOffset={file.pageOffset}
+      sizeBytes={file.sizeBytes}
       canSaveProgress={Boolean(user)}
     />
   );

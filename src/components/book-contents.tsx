@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { fileContentUrl, loadPdfOutline } from "@/lib/pdf-client";
+import { loadCachedToc } from "@/lib/reader-cache";
 import { printedPage } from "@/lib/page-offset";
 import type { TocEntry } from "@/components/reader-types";
 
@@ -77,15 +78,22 @@ function EntryRow({
  * `pageOffset` is the book's front matter (FileAsset.pageOffset), so the
  * numbers listed here are the ones printed in the book rather than the PDF
  * pages the bookmarks resolve to.
+ *
+ * Reading those bookmarks means opening the PDF and resolving every one of
+ * them to a page, which on a hymnal is the slowest thing this page does — so
+ * the result is cached on the device, tagged with `cacheTag` so a replaced
+ * book is read afresh. See lib/reader-cache.ts.
  */
 export function BookContents({
   fileId,
   readerOn,
   pageOffset,
+  cacheTag,
 }: {
   fileId: string;
   readerOn: boolean;
   pageOffset: number;
+  cacheTag: string;
 }) {
   // Tagged with the book it was read from, so switching books shows the
   // loading state on the very first render rather than the outline of the
@@ -102,7 +110,7 @@ export function BookContents({
 
   useEffect(() => {
     let cancelled = false;
-    loadPdfOutline(fileContentUrl(fileId))
+    loadCachedToc(fileId, cacheTag, () => loadPdfOutline(fileContentUrl(fileId)))
       .then((result) => {
         if (!cancelled) setOutline({ fileId, entries: result, error: null });
       })
@@ -113,7 +121,7 @@ export function BookContents({
     return () => {
       cancelled = true;
     };
-  }, [fileId]);
+  }, [fileId, cacheTag]);
 
   const groups = useMemo<Group[]>(() => {
     if (!entries) return [];

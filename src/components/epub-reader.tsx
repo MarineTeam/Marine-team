@@ -21,9 +21,21 @@ type SectionMatch = { cfi: string; excerpt: string };
 /** The spine's own type isn't exported usefully; this is the shape actually used here. */
 type SpineItem = {
   href: string;
+  index: number;
   load: (request: unknown) => Promise<unknown>;
   unload: () => void;
   find: (query: string) => SectionMatch[];
+};
+
+/**
+ * `get` takes either of the two things this reader calls a location — a
+ * chapter href from the navigation document, or a CFI — and answers with the
+ * spine item it lands in. Declared here for the same reason SectionMatch is:
+ * the bundled definitions don't describe it usefully.
+ */
+type Spine = {
+  spineItems: SpineItem[];
+  get: (target: string) => SpineItem | null;
 };
 
 export function EpubReader({
@@ -80,6 +92,13 @@ export function EpubReader({
         await rendition.display(initialLocation ?? undefined);
         if (cancelled) return;
         setLoading(false);
+
+        // Where the book opened. The "relocated" handler below is registered
+        // after this first display and so never sees it, which would leave
+        // the reader unable to say where it is — to the contents bar, or to a
+        // mark made before the first scroll — until something moved.
+        const opened = rendition.currentLocation() as unknown as { start?: { cfi?: string } };
+        if (opened?.start?.cfi) locationRef.current = opened.start.cfi;
 
         rendition.on("relocated", (location: { start?: { cfi?: string } }) => {
           const cfi = location?.start?.cfi;
@@ -151,7 +170,7 @@ export function EpubReader({
       if (!book) return [];
       await book.ready;
 
-      const spine = book.spine as unknown as { spineItems: SpineItem[] };
+      const spine = book.spine as unknown as Spine;
       const labelFor = (href: string) =>
         book.navigation.toc.find((item) => item.href.includes(href.split("/").pop() ?? ""))?.label.trim();
 
@@ -208,6 +227,29 @@ export function EpubReader({
         // stops when a section yields no text instead.
         return true;
       },
+      /**
+       * An EPUB reflows and has no page numbers, so the number line is the
+       * spine: which section of the book a location sits in. That is enough
+       * to step between chapters — or between hymns in a book with one
+       * hymn per file, which is how they are usually produced.
+       *
+       * Its limit is a book that packs several hymns into one section file:
+       * they all report the same position, so stepping moves by section
+       * rather than by hymn. Nothing here can do better without an ordering
+       * for anchors inside a document, which epub.js only offers for CFIs
+       * and the navigation document gives as hrefs.
+       */
+      order: (locations) =>
+        locations.map((location) => {
+          const book = bookRef.current;
+          if (!book || location === null || location.trim() === "") return null;
+          try {
+            const spine = book.spine as unknown as Spine;
+            return spine.get(location)?.index ?? null;
+          } catch {
+            return null;
+          }
+        }),
     });
   }, [loading, error, onReady]);
 

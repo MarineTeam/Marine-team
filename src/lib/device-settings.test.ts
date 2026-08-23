@@ -22,6 +22,7 @@ describe("parseDeviceSettings", () => {
       autoplay: true,
       defaultPlaybackSpeed: 1.5,
       downloadOverCellular: true,
+      swipeToTurnPages: false,
     };
     expect(parseDeviceSettings(JSON.stringify(stored))).toEqual(stored);
   });
@@ -51,6 +52,12 @@ describe("parseDeviceSettings", () => {
     const settings = parseDeviceSettings(JSON.stringify({ autoplay: "yes", downloadOverCellular: 1 }));
     expect(settings.autoplay).toBe(false);
     expect(settings.downloadOverCellular).toBe(false);
+  });
+
+  it("keeps page swiping on unless it was deliberately turned off", () => {
+    expect(parseDeviceSettings("{}").swipeToTurnPages).toBe(true);
+    expect(parseDeviceSettings(JSON.stringify({ swipeToTurnPages: "no" })).swipeToTurnPages).toBe(true);
+    expect(parseDeviceSettings(JSON.stringify({ swipeToTurnPages: false })).swipeToTurnPages).toBe(false);
   });
 });
 

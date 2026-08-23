@@ -40,6 +40,7 @@ import { HymnalBookGrid } from "@/components/hymnal-book-grid";
 import { BookContents } from "@/components/book-contents";
 import { HymnList } from "@/components/hymn-list";
 import { fileBook, pdfsOf } from "@/lib/hymnal";
+import { bookCacheTag } from "@/lib/reader-cache";
 import { CommentSection } from "@/components/comment-section";
 import { ViewEventBeacon } from "@/components/view-event-beacon";
 
@@ -323,6 +324,7 @@ export default async function SeriesPage({
                         fileId={soleBook.id}
                         readerOn={readerOn}
                         pageOffset={soleBook.pageOffset}
+                        cacheTag={bookCacheTag(soleBook)}
                       />
                     )
                   ) : (

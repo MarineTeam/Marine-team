@@ -4,6 +4,7 @@ import { unstable_cache } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { isPluginEnabled } from "@/lib/plugins";
 import { getShareGrants } from "@/lib/share-access";
+import { hymnReadingOrder } from "@/lib/hymnal";
 
 export function canAccess(memberOnly: boolean, isLoggedIn: boolean): boolean {
   return !memberOnly || isLoggedIn;
@@ -1543,6 +1544,46 @@ export const getReadableFile = cache(async function getReadableFile(id: string) 
 });
 
 export type ReadableFile = NonNullable<Awaited<ReturnType<typeof getReadableFile>>>;
+
+/**
+ * The hymn before and after this one in its book, for the arrows on a hymn's
+ * page — the equivalent, for a book whose files are its hymns, of stepping
+ * through a single PDF's contents in the reader.
+ *
+ * Only answers for a `hymnPerFile` series: anywhere else the files sitting
+ * beside this one are a series' attachments, not a sequence anybody reads in
+ * order. Steps in `hymnReadingOrder`, the same order the book's own list
+ * shows, and skips hymns this viewer can't open so "next" always leads
+ * somewhere they can go.
+ */
+export const getAdjacentHymns = cache(async function getAdjacentHymns(
+  fileId: string,
+  seriesId: string | null,
+  isLoggedIn: boolean,
+) {
+  const nowhere = { previous: null, next: null };
+  if (!seriesId) return nowhere;
+
+  const series = await prisma.series.findFirst({
+    where: { id: seriesId, hymnPerFile: true, ...publishedNow() },
+    select: {
+      files: {
+        where: { ...publishedNow(), ...guestFilter(isLoggedIn) },
+        orderBy: fileOrder,
+        select: { id: true, title: true, pageNumber: true },
+      },
+    },
+  });
+  if (!series) return nowhere;
+
+  const hymns = hymnReadingOrder(series.files);
+  const at = hymns.findIndex((hymn) => hymn.id === fileId);
+  // -1 covers the hymn this viewer can't see itself (a member-only hymn read
+  // through a share link, say): the neighbours of a place in the list it
+  // isn't in would be guesswork.
+  if (at === -1) return nowhere;
+  return { previous: hymns[at - 1] ?? null, next: hymns[at + 1] ?? null };
+});
 
 /**
  * Whether this viewer may read a file's *bytes*.

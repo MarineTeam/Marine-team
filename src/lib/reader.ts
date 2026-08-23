@@ -131,3 +131,48 @@ export function excerptAround(text: string, at: number, length: number, radius =
   const end = Math.min(text.length, at + length + radius);
   return `${start > 0 ? "…" : ""}${text.slice(start, end).trim()}${end < text.length ? "…" : ""}`;
 }
+
+/**
+ * The size below which a book is fetched whole rather than streamed in
+ * ranges.
+ *
+ * pdf.js asks for byte ranges as it needs them, which is the right way to
+ * open a document quickly — but a ranged response is a poor thing for a
+ * browser cache to hold, so every re-open of a hymnal pulls the same
+ * megabytes down again. One plain GET of the whole file is a single
+ * cacheable resource: revalidated on the next open (see the content route's
+ * `no-cache`) and answered from disk with no bytes on the wire.
+ *
+ * The limit is where that trade stops paying: the whole file has to arrive,
+ * and sit in memory, before the first page is drawn. Hymnals and most books
+ * are comfortably under it; a large scanned volume keeps the streaming
+ * behaviour it has always had.
+ */
+export const WHOLE_BOOK_MAX_BYTES = 48 * 1024 * 1024;
+
+/**
+ * An unknown size is treated as too big on purpose: it is the case where the
+ * file could be anything, and streaming is the option that degrades
+ * gracefully.
+ */
+export function shouldFetchWholeBook(sizeBytes: number | null | undefined): boolean {
+  return typeof sizeBytes === "number" && sizeBytes > 0 && sizeBytes <= WHOLE_BOOK_MAX_BYTES;
+}
+
+/**
+ * Whether a client's `If-None-Match` covers the entity we would send back —
+ * i.e. whether it already holds this exact file and can be told so with a
+ * bodyless 304 instead of the megabytes.
+ *
+ * Compares weakly (RFC 9110 §8.8.3.2): `W/"abc"` and `"abc"` identify the
+ * same bytes, and only a byte-range or a partial-content merge would need
+ * the strong comparison neither this nor the caller performs.
+ */
+export function etagMatches(ifNoneMatch: string | null | undefined, etag: string | null | undefined): boolean {
+  if (!ifNoneMatch || !etag) return false;
+  const strip = (value: string) => value.trim().replace(/^W\//, "");
+  const held = ifNoneMatch.split(",").map(strip);
+  // "*" means "any current representation", which by definition includes the
+  // one we are about to send.
+  return held.includes("*") || held.includes(strip(etag));
+}

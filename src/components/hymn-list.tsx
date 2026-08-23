@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { hymnReadingOrder } from "@/lib/hymnal";
 
 type HymnListItem = {
   id: string;
@@ -63,11 +64,11 @@ export function HymnList({ hymns, isLoggedIn }: { hymns: HymnListItem[]; isLogge
         .sort(([a], [b]) => (a === "Other" ? 1 : b === "Other" ? -1 : a.localeCompare(b)))
         .map(([label, list]) => ({ label, hymns: list }));
     }
-    // "page": server order is already position asc; sort by pageNumber when
-    // present, keeping page-less hymns in that original order at the end.
-    const withPage = hymns.filter((h) => h.pageNumber != null).sort((a, b) => a.pageNumber! - b.pageNumber!);
-    const withoutPage = hymns.filter((h) => h.pageNumber == null);
-    return [{ label: null, hymns: [...withPage, ...withoutPage] }];
+    // "page": server order is already position asc; hymnReadingOrder sorts by
+    // the printed page number where there is one and keeps the rest in that
+    // original order at the end. Shared with the next/previous arrows on a
+    // hymn's own page, which have to step in the same sequence this shows.
+    return [{ label: null, hymns: hymnReadingOrder(hymns) }];
   }, [hymns, sort]);
 
   return (

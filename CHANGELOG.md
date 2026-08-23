@@ -146,6 +146,49 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Books are cached on the device that reads them, and hymns can be stepped
+  through.** Several changes that matter to the same person: someone
+  finding hymn 214 in a scanned hymnal on a phone, on a Sunday.
+  - **A book is no longer re-downloaded every time it is opened.**
+    `/api/files/[id]/content` serves PDFs and EPUBs as `private, no-cache`
+    rather than `private, no-store`, and passes a conditional request
+    (`If-None-Match`/`If-Modified-Since`) through to Bunny — so a re-open
+    revalidates and comes back as a bodyless `304`, with the file itself
+    read from disk. `no-cache` is the deliberate choice over a `max-age`:
+    the browser must still ask, so **`canViewFile` runs against the live
+    session on every open** and losing access still takes effect on the next
+    one. Everything that isn't a book keeps `no-store`.
+  - A PDF small enough to hold (48 MB) is now fetched **whole, in one
+    request**, instead of in the byte ranges pdf.js asks for as it goes. A
+    ranged response is a poor thing for a browser cache to hold, so the
+    ranged path is what made re-opens cost full price; larger scans keep it,
+    since there the wait for the whole file before the first page would be
+    worse. The fetch is aborted if the reader is closed while it runs.
+  - **A book's contents list is remembered per device.** Reading it means
+    opening the PDF and resolving every bookmark to a page — for a hymnal,
+    hundreds of lookups, and the slowest thing the book's page does. The
+    resolved list is now cached in `localStorage`, tagged with the file's
+    size so a replaced book is read afresh, and dropped after a month. Both
+    the book's contents page and the reader's own Contents panel use it.
+  - **"Back" and "Next" step by hymn, not by page.** A bar along the bottom
+    of the reader names the entry being read and moves to the neighbouring
+    one, driven by the book's own contents — the PDF's bookmarks or the
+    EPUB's navigation document. Back goes to the start of the hymn being
+    read before it goes to the previous one, the way a track skip does.
+    Readers place their own locations on a comparable number line
+    (`ReaderHandle.order`), so this works for a PDF's page numbers and an
+    EPUB's CFIs without the chrome learning either.
+  - In a **hymn-per-file** book, whose hymns are separate files rather than
+    one PDF, a hymn's page now carries the same arrows, stepping in the
+    order the book's list shows and skipping hymns the viewer can't open.
+- **Swipe left and right to turn the page** in the PDF reader, with the
+  arrow keys (and PageUp/PageDown) doing the same on a desktop. The gesture
+  commits to an axis before it claims a touch, so scrolling still scrolls,
+  and a second finger is a pinch-zoom rather than a page turn. Zoomed in past
+  the width of the screen — where a sideways drag is how you pan — the page
+  pans instead. On by default; switched off from the reader's toolbar or
+  **Reading** in `/profile/settings`, per device like the other settings
+  there.
 - **Page offset for a book PDF** — a scanned hymnal usually opens with a
   title page and several pages of table of contents before printed page 1,
   so the PDF's page 55 is the book's page 45. A **Page offset** on the

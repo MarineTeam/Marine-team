@@ -127,6 +127,26 @@ export function DeviceSettingsForm() {
         </div>
       </section>
 
+      <section className="space-y-3">
+        <h3 className="text-sm font-medium">Reading</h3>
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={settings.swipeToTurnPages}
+            onChange={(e) => update({ swipeToTurnPages: e.target.checked })}
+          />
+          <span>
+            Swipe to turn pages
+            <span className="block text-xs text-sec">
+              In the PDF reader, a swipe left or right turns the page, and so do the arrow keys. Turn this off if
+              you would rather only use the Prev and Next buttons. Zoomed in past the width of the screen, a
+              sideways drag pans the page either way.
+            </span>
+          </span>
+        </label>
+      </section>
+
       <p className="text-xs text-sec">
         These settings are stored on this device, so your phone and your computer can differ. Everything under
         Account below applies wherever you log in.

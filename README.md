@@ -496,6 +496,18 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     file link now goes through, readers and downloads alike. See **File
     access** below for why. Range requests are forwarded so pdf.js can chunk
     large documents.
+  - Books (and only books) are served `private, no-cache` rather than
+    `private, no-store`, and conditional requests are forwarded to Bunny, so
+    a re-open revalidates into a bodyless `304` instead of re-downloading —
+    the access check still runs on every request, which `max-age` would have
+    given up. A PDF under `WHOLE_BOOK_MAX_BYTES` is fetched whole rather
+    than in ranges so there is a single cacheable resource to revalidate.
+  - A resolved contents list is cached per device in `localStorage`
+    (`src/lib/reader-cache.ts`), tagged with the file's size, because
+    resolving a hymnal's bookmarks to page numbers is hundreds of round
+    trips. `ReaderHandle.order` maps each engine's opaque locations onto one
+    number line so `src/lib/toc-nav.ts` can step between contents entries
+    without knowing which engine produced them.
   - pdf.js's worker is resolved via `new URL(..., import.meta.url)` so it
     stays version-locked instead of needing a copy in `/public`; the build
     emits it to `.next/static/media`.

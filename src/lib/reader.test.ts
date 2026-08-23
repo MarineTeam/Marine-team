@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   clampPercent,
   contentDispositionFilename,
+  etagMatches,
   excerptAround,
   findMatches,
   readerFormat,
+  shouldFetchWholeBook,
   toSpeechChunks,
+  WHOLE_BOOK_MAX_BYTES,
 } from "./reader";
 
 describe("readerFormat", () => {
@@ -144,5 +147,45 @@ describe("excerptAround", () => {
 
   it("adds no ellipsis when the whole string already fits", () => {
     expect(excerptAround("short text", 0, 5, 60)).toBe("short text");
+  });
+});
+
+describe("shouldFetchWholeBook", () => {
+  it("fetches an ordinary book in one cacheable request", () => {
+    expect(shouldFetchWholeBook(8 * 1024 * 1024)).toBe(true);
+    expect(shouldFetchWholeBook(WHOLE_BOOK_MAX_BYTES)).toBe(true);
+  });
+
+  it("leaves a very large scan streaming, so its first page still opens quickly", () => {
+    expect(shouldFetchWholeBook(WHOLE_BOOK_MAX_BYTES + 1)).toBe(false);
+  });
+
+  it("treats an unrecorded size as too big rather than guessing", () => {
+    expect(shouldFetchWholeBook(null)).toBe(false);
+    expect(shouldFetchWholeBook(undefined)).toBe(false);
+    expect(shouldFetchWholeBook(0)).toBe(false);
+  });
+});
+
+describe("etagMatches", () => {
+  it("matches the tag the client already holds", () => {
+    expect(etagMatches('"abc"', '"abc"')).toBe(true);
+    expect(etagMatches('"abc"', '"def"')).toBe(false);
+  });
+
+  it("compares weakly, so a validator marked weak still counts as the same bytes", () => {
+    expect(etagMatches('W/"abc"', '"abc"')).toBe(true);
+    expect(etagMatches('"abc"', 'W/"abc"')).toBe(true);
+  });
+
+  it("accepts any tag in a list, and the wildcard", () => {
+    expect(etagMatches('"x", "abc" , W/"y"', '"abc"')).toBe(true);
+    expect(etagMatches("*", '"abc"')).toBe(true);
+  });
+
+  it("is false when either side has nothing to compare", () => {
+    expect(etagMatches(null, '"abc"')).toBe(false);
+    expect(etagMatches('"abc"', null)).toBe(false);
+    expect(etagMatches("", "")).toBe(false);
   });
 });

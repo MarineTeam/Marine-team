@@ -27,6 +27,13 @@ export type DeviceSettings = {
   defaultPlaybackSpeed: number;
   /** False (the default) keeps downloads to Wi-Fi, so nobody burns their data plan by surprise. */
   downloadOverCellular: boolean;
+  /**
+   * Whether a horizontal swipe (or the arrow keys) turns the page in the PDF
+   * reader. On by default — it is how a book behaves on a phone — but it is a
+   * setting because a swipe is also how some people scroll, and because a
+   * pen or a trackpad can produce one by accident.
+   */
+  swipeToTurnPages: boolean;
 };
 
 export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
@@ -35,6 +42,7 @@ export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
   autoplay: false,
   defaultPlaybackSpeed: 1,
   downloadOverCellular: false,
+  swipeToTurnPages: true,
 };
 
 export const DEVICE_SETTINGS_KEY = "marine-device-settings";
@@ -75,6 +83,10 @@ export function parseDeviceSettings(raw: string | null | undefined): DeviceSetti
       typeof value.downloadOverCellular === "boolean"
         ? value.downloadOverCellular
         : DEFAULT_DEVICE_SETTINGS.downloadOverCellular,
+    swipeToTurnPages:
+      typeof value.swipeToTurnPages === "boolean"
+        ? value.swipeToTurnPages
+        : DEFAULT_DEVICE_SETTINGS.swipeToTurnPages,
   };
 }
 
