@@ -16,8 +16,21 @@
 
 import type { NavItem } from "@/lib/nav";
 
-/** Five is already a lot on a phone; past that the labels stop being readable. */
-export const MAX_TABS = 5;
+/**
+ * How many tabs fit across a phone before the labels stop being readable.
+ * Up to this many share the width evenly, which is what a tab bar normally
+ * looks like.
+ */
+export const TABS_ACROSS = 5;
+
+/**
+ * The most a device may choose. Past TABS_ACROSS the bar scrolls sideways
+ * instead of squeezing, which is worth having for someone who wants their
+ * hymnal, their songbook and the sections they teach from all within reach —
+ * but a bar you have to scroll to see is still a bar you have to scroll to
+ * see, so it doesn't go on forever.
+ */
+export const MAX_TABS = 10;
 
 /**
  * What the offline shell reads to draw the same bar (public/offline.html),

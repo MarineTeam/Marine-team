@@ -421,9 +421,16 @@ Saving stores three things, because reading a hymn offline needs all three:
   at install and build time (`scripts/copy-offline-pdfjs.mjs`, so it stays the
   version `package.json` pins) and fetched once, when the first book is saved.
 
-Only a whole-book PDF can be saved. A **hymn-per-file** book — one whose hymns
-are separate lyrics pages — has no single file to store and isn't kept
-offline.
+A **hymn-per-file** book — one whose hymns are separate files rather than one
+PDF — is saved from its own page, and stores something different: there is no
+document to keep, so what goes on the device is the list of hymns with their
+lyrics. Offline it reads as the book does online — hymns in printed-page order
+under their group headings, a find box that matches a number, a title or a
+line of the lyrics, and Back/Next stepping hymn to hymn. Two things follow
+from what it stores: hymns with **no lyrics text aren't saved** (offline they
+would be blank pages, since the file behind them isn't stored), and because
+lyrics get corrected long after a scan would have settled, the button offers
+**Update** as well as Remove.
 
 ### What the offline screen shows
 
@@ -445,6 +452,9 @@ network, and it is now a small app of its own rather than a list of videos:
   bar naming the hymn you are on. Where a browser can't draw the pages
   itself, the book is handed to that browser's own PDF viewer at the right
   page rather than showing a blank sheet.
+- **Or a hymnal's hymns, then one hymn's lyrics**, for a hymn-per-file book —
+  searchable, grouped, and steppable with Back and Next. A link to a single
+  hymn (`/hymns/<id>`) opens it directly when its book is on the device.
 - **Downloaded videos**, exactly as before.
 
 The **in-app** reader survives the connection dropping while it is open, too:
@@ -457,9 +467,16 @@ check that said no.
 
 In the installed app the row of icons along the bottom is the only navigation
 there is, so what belongs in it depends on why someone opened the app. **This
-device → Bottom bar** in `/profile/settings` adds, removes and reorders up to
-five destinations: Home, Search, New, any section of the library (a Hymnals
-category included), your own lists, Profile, and Admin for staff.
+device → Bottom bar** in `/profile/settings` adds, removes and reorders the
+destinations it holds: Home, Search, New, any section of the library (a
+Hymnals category included), your own lists, Profile, and Admin for staff.
+
+- **Five across, then it scrolls.** Five is what fits on a phone before the
+  labels stop being readable, so up to five share the width the way a tab bar
+  normally does. Add more — up to ten — and the icons keep a thumb-sized
+  width of their own and the row scrolls sideways instead of squeezing, with
+  the section you are in scrolled into view. The picker marks the ones that
+  sit past the fold.
 
 - Stored **per device**, with the theme and playback preferences — the same
   member can have the hymnal on their phone and the default set on the church

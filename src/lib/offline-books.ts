@@ -29,8 +29,29 @@ export const OFFLINE_BOOKS_CHANGED_EVENT = "marine-offline-books-change";
  */
 export const VIEWER_ASSETS = ["/pdfjs/pdf.min.mjs", "/pdfjs/pdf.worker.min.mjs"];
 
+/**
+ * The two shapes a "book" comes in here, which is the same split the rest of
+ * the app makes (see lib/hymnal.ts): one PDF holding the whole book, or a
+ * series whose files *are* its hymns. They are saved differently — a file of
+ * bytes against a list of lyrics — and read differently offline, but they are
+ * one list to the person who saved them, so they share an index.
+ */
+export type OfflineBookKind = "pdf" | "hymnal";
+
+/** One hymn of a hymn-per-file book, as it is stored for reading offline. */
+export type OfflineHymn = {
+  id: string;
+  title: string;
+  pageNumber: number | null;
+  groupLabel: string | null;
+  lyricsText: string;
+};
+
 export type OfflineBook = {
-  fileId: string;
+  /** "pdf": the book is one file. "hymnal": the book is a series of hymns. */
+  kind: OfflineBookKind;
+  /** The file's id for a PDF; the series' id for a hymn-per-file book. */
+  id: string;
   /** The cache key the file is stored under; also what the offline shell opens. */
   cacheUrl: string;
   title: string;
@@ -48,22 +69,33 @@ export type OfflineBook = {
    */
   categoryHref: string | null;
   categoryLabel: string | null;
-  /** Front matter, so the offline contents list can quote printed page numbers. */
+  /** PDF only: front matter, so the offline contents can quote printed page numbers. */
   pageOffset: number;
   /**
-   * The file's recorded size — which is also the tag its cached contents list
-   * is stored under (see lib/reader-cache.ts), so the offline shell can tell
-   * whether that list still describes this book.
+   * PDF only: the file's recorded size — which is also the tag its cached
+   * contents list is stored under (see lib/reader-cache.ts), so the offline
+   * shell can tell whether that list still describes this book.
    */
   sizeBytes: number | null;
+  /** Hymn-per-file only: how many hymns were actually stored. */
+  hymnCount?: number;
   /** What was actually stored, which is what the "saved on this device" total counts. */
   bytes: number;
   savedAt: string;
 };
 
-/** Books are keyed by file id on our own origin, so the SW can recognise them by path. */
+/** Books are keyed by id on our own origin, so the SW can recognise them by path. */
 export function offlineBookUrl(fileId: string): string {
   return `/offline-book/${fileId}.pdf`;
+}
+
+/**
+ * A hymn-per-file book is a list of hymns rather than a file, so what's
+ * stored is the list itself — under its own path, for the same reason: the
+ * service worker and the offline shell both find it by name.
+ */
+export function offlineHymnalUrl(seriesId: string): string {
+  return `/offline-hymnal/${seriesId}.json`;
 }
 
 export function readOfflineBooks(): OfflineBook[] {
@@ -71,7 +103,11 @@ export function readOfflineBooks(): OfflineBook[] {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(INDEX_KEY) ?? "[]");
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is OfflineBook => Boolean(item?.fileId && item?.cacheUrl));
+    return parsed
+      .filter((item) => Boolean(item?.id && item?.cacheUrl))
+      // Everything without a kind predates hymn-per-file books being savable,
+      // and every one of those was a PDF.
+      .map((item): OfflineBook => ({ ...item, kind: item.kind === "hymnal" ? "hymnal" : "pdf" }));
   } catch {
     return [];
   }
@@ -86,8 +122,8 @@ function writeOfflineBooks(items: OfflineBook[]): void {
   window.dispatchEvent(new CustomEvent(OFFLINE_BOOKS_CHANGED_EVENT));
 }
 
-export function isBookSaved(fileId: string): boolean {
-  return readOfflineBooks().some((item) => item.fileId === fileId);
+export function isBookSaved(id: string): boolean {
+  return readOfflineBooks().some((item) => item.id === id);
 }
 
 /** Whether this browser can hold books at all — Cache Storage needs a secure context. */
@@ -105,12 +141,12 @@ export function offlineBooksSupported(): boolean {
  * than fetching the whole file a second time to do it.
  */
 export async function saveBookOffline(
-  meta: Omit<OfflineBook, "cacheUrl" | "bytes" | "savedAt">,
+  meta: Omit<OfflineBook, "kind" | "cacheUrl" | "bytes" | "savedAt">,
   onProgress?: (fraction: number, bytes: number) => void,
   signal?: AbortSignal,
 ): Promise<{ entry: OfflineBook; data: Uint8Array }> {
-  const cacheUrl = offlineBookUrl(meta.fileId);
-  const response = await fetch(`/api/files/${meta.fileId}/content`, {
+  const cacheUrl = offlineBookUrl(meta.id);
+  const response = await fetch(`/api/files/${meta.id}/content`, {
     credentials: "same-origin",
     signal,
   });
@@ -160,12 +196,52 @@ export async function saveBookOffline(
 
   const entry: OfflineBook = {
     ...meta,
+    kind: "pdf",
     cacheUrl,
     bytes: data.byteLength,
     savedAt: new Date().toISOString(),
   };
-  writeOfflineBooks([entry, ...readOfflineBooks().filter((item) => item.fileId !== meta.fileId)]);
+  writeOfflineBooks([entry, ...readOfflineBooks().filter((item) => item.id !== meta.id)]);
   return { entry, data };
+}
+
+/**
+ * Keeps a hymn-per-file book on the device: its hymns, with the lyrics, as
+ * one JSON document in the same cache the PDFs live in.
+ *
+ * There is no file to store for one of these — the "book" is a series, and
+ * each hymn is a row with its own lyrics — so what is saved is the list the
+ * server would have rendered. Hymns with no lyrics text are dropped rather
+ * than saved as blank pages: offline they would be nothing at all, and the
+ * count on the button says how many were actually kept.
+ */
+export async function saveHymnalOffline(
+  meta: Omit<OfflineBook, "kind" | "cacheUrl" | "bytes" | "savedAt" | "hymnCount" | "pageOffset" | "sizeBytes">,
+  hymns: OfflineHymn[],
+): Promise<OfflineBook> {
+  const cacheUrl = offlineHymnalUrl(meta.id);
+  const body = JSON.stringify({ id: meta.id, title: meta.title, hymns });
+
+  const cache = await caches.open(BOOK_CACHE);
+  await cache.put(
+    cacheUrl,
+    new Response(body, {
+      headers: { "Content-Type": "application/json", "Content-Length": String(body.length) },
+    }),
+  );
+
+  const entry: OfflineBook = {
+    ...meta,
+    kind: "hymnal",
+    cacheUrl,
+    pageOffset: 0,
+    sizeBytes: null,
+    hymnCount: hymns.length,
+    bytes: body.length,
+    savedAt: new Date().toISOString(),
+  };
+  writeOfflineBooks([entry, ...readOfflineBooks().filter((item) => item.id !== meta.id)]);
+  return entry;
 }
 
 /**
@@ -188,15 +264,18 @@ export async function cacheViewerAssets(): Promise<void> {
   }
 }
 
-export async function removeOfflineBook(fileId: string): Promise<void> {
+export async function removeOfflineBook(id: string): Promise<void> {
+  const saved = readOfflineBooks().find((item) => item.id === id);
   try {
     const cache = await caches.open(BOOK_CACHE);
-    await cache.delete(offlineBookUrl(fileId));
+    // By the stored key rather than a rebuilt one: a hymn-per-file book is
+    // not at the path a PDF would be.
+    await cache.delete(saved?.cacheUrl ?? offlineBookUrl(id));
   } catch {
     // Already gone, or storage cleared by the browser — the index entry below
     // goes either way, so the list doesn't offer a book that isn't there.
   }
-  writeOfflineBooks(readOfflineBooks().filter((item) => item.fileId !== fileId));
+  writeOfflineBooks(readOfflineBooks().filter((item) => item.id !== id));
 }
 
 export async function removeAllOfflineBooks(): Promise<void> {

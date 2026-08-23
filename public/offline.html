@@ -68,6 +68,10 @@
   #canvas-wrap { background: var(--chip); border-radius: 10px; padding: 10px; overflow: auto; touch-action: pan-y; }
   #canvas-wrap canvas { display: block; margin: 0 auto; max-width: 100%; box-shadow: 0 2px 12px rgba(0,0,0,0.18); }
   .hint { font-size: 12px; color: var(--sec); margin-top: 8px; }
+  .lyrics { white-space: pre-wrap; line-height: 1.6; font-size: 15px; border: 1px solid var(--sep); border-radius: 10px; padding: 16px; }
+  .hymn-nav { display: flex; gap: 10px; align-items: center; margin-top: 14px; font-size: 13px; }
+  .hymn-nav .spacer { flex: 1; }
+  .group { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--sec); padding: 8px 14px; background: var(--chip); border-bottom: 1px solid var(--sep); }
 
   /* The same tab bar the app draws, from the snapshot it left behind. */
   #tabbar {
@@ -75,10 +79,15 @@
     border-top: 1px solid var(--sep); background: var(--panel);
     padding-bottom: env(safe-area-inset-bottom);
   }
+  /* Past five icons the row scrolls sideways rather than squeezing — the
+     same rule the app's own bar follows (see src/lib/nav-tabs.ts). */
+  #tabbar.scrolls { overflow-x: auto; scrollbar-width: none; }
+  #tabbar.scrolls::-webkit-scrollbar { display: none; }
   #tabbar a {
     flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
     padding: 8px 2px; font-size: 11px; color: var(--sec); text-decoration: none; min-width: 0;
   }
+  #tabbar.scrolls a { flex: 0 0 4.75rem; }
   #tabbar a.active { color: var(--accent); font-weight: 500; }
   #tabbar a.saved { color: var(--ink); }
   #tabbar span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -156,7 +165,12 @@ function readJson(key, fallback) {
 
 function readBooks() {
   const items = readJson(BOOK_INDEX_KEY, []);
-  return Array.isArray(items) ? items.filter((item) => item && item.fileId && item.cacheUrl) : [];
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter((item) => item && item.id && item.cacheUrl)
+    // Entries written before hymn-per-file books could be saved have no kind,
+    // and every one of those was a PDF.
+    .map((item) => Object.assign({}, item, { kind: item.kind === "hymnal" ? "hymnal" : "pdf" }));
 }
 
 function readVideos() {
@@ -182,7 +196,7 @@ function writeBooks(items) {
  * different version of the file describes a different book.
  */
 function readToc(book) {
-  const stored = readJson(TOC_PREFIX + book.fileId, null);
+  const stored = readJson(TOC_PREFIX + book.id, null);
   if (!stored || stored.tag !== String(book.sizeBytes == null ? 0 : book.sizeBytes)) return null;
   return Array.isArray(stored.entries) ? stored.entries : null;
 }
@@ -247,6 +261,8 @@ function renderTabs() {
     bar.style.display = "none";
     return;
   }
+  // TABS_ACROSS in src/lib/nav-tabs.ts.
+  bar.className = tabs.length > 5 ? "scrolls" : "";
   tabs.forEach((tab) => {
     if (!tab || typeof tab.href !== "string") return;
     const link = el("a");
@@ -261,6 +277,8 @@ function renderTabs() {
     link.appendChild(el("span", null, tab.label || ""));
     bar.appendChild(link);
   });
+  const active = bar.querySelector("a.active");
+  if (active) active.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
 
 // ------------------------------------------------------------ the library --
@@ -323,12 +341,19 @@ function bookRow(book) {
   const meta = el("div", "meta");
   meta.appendChild(el("div", "title", book.title || "Untitled book"));
   const bits = [];
-  const toc = readToc(book);
-  if (toc) bits.push(toc.length + (toc.length === 1 ? " entry" : " entries"));
+  if (book.kind === "hymnal") {
+    if (book.hymnCount) bits.push(book.hymnCount + (book.hymnCount === 1 ? " hymn" : " hymns"));
+  } else {
+    const toc = readToc(book);
+    if (toc) bits.push(toc.length + (toc.length === 1 ? " entry" : " entries"));
+  }
   if (book.bytes) bits.push(formatBytes(book.bytes));
   meta.appendChild(el("div", "detail", bits.join(" · ")));
   open.appendChild(meta);
-  open.addEventListener("click", () => renderBook(book));
+  open.addEventListener("click", () => {
+    if (book.kind === "hymnal") renderHymnal(book);
+    else renderBook(book);
+  });
 
   const remove = el("button", "remove", "Remove");
   remove.addEventListener("click", async () => {
@@ -337,7 +362,7 @@ function bookRow(book) {
       const cache = await caches.open(BOOK_CACHE);
       await cache.delete(book.cacheUrl);
     } catch (e) {}
-    writeBooks(readBooks().filter((item) => item.fileId !== book.fileId));
+    writeBooks(readBooks().filter((item) => item.id !== book.id));
     renderTabs();
     renderLibrary();
   });
@@ -396,6 +421,134 @@ function renderBook(book) {
   }
 }
 
+// ------------------------------------------------- a hymn-per-file book --
+/**
+ * A book whose hymns are its files is saved as its list of hymns rather than
+ * as a document (see lib/offline-books.ts), so reading it offline is reading
+ * that list: the hymns in printed-page order, then one hymn's lyrics, with
+ * the next and previous ones a tap away — the same stepping the app offers.
+ */
+async function loadHymnal(book) {
+  const cache = await caches.open(BOOK_CACHE);
+  const response = await cache.match(book.cacheUrl);
+  if (!response) throw new Error("This hymnal is no longer stored on this device.");
+  const data = await response.json();
+  return Array.isArray(data.hymns) ? data.hymns : [];
+}
+
+async function renderHymnal(book) {
+  activeReader = null;
+  view.innerHTML = "";
+  view.appendChild(el("p", "sub", "Opening…"));
+
+  let hymns;
+  try {
+    hymns = await loadHymnal(book);
+  } catch (error) {
+    writeBooks(readBooks().filter((item) => item.id !== book.id));
+    view.innerHTML = "";
+    view.appendChild(el("h1", null, book.title || "Untitled hymnal"));
+    view.appendChild(
+      el("p", "sub", "This hymnal is no longer stored on this device. Connect and save it again."),
+    );
+    const back = el("button", null, "← Back");
+    back.addEventListener("click", renderLibrary);
+    view.appendChild(back);
+    renderTabs();
+    return;
+  }
+
+  view.innerHTML = "";
+  const back = el("button", null, "← Back");
+  back.addEventListener("click", renderLibrary);
+  view.appendChild(back);
+  view.appendChild(el("h1", null, book.title || "Untitled hymnal"));
+  view.appendChild(
+    el("p", "sub", hymns.length + (hymns.length === 1 ? " hymn saved here." : " hymns saved here.")),
+  );
+
+  const search = document.createElement("input");
+  search.type = "search";
+  search.placeholder = "Find a hymn";
+  search.setAttribute("aria-label", "Find a hymn");
+  search.style.cssText =
+    "width:100%;padding:8px 10px;border:1px solid var(--sep);border-radius:8px;background:var(--panel);color:inherit;font:inherit;font-size:14px;margin-bottom:10px";
+  view.appendChild(search);
+
+  const list = el("ul");
+  view.appendChild(list);
+
+  // By number and by title, because that is how someone looks for a hymn —
+  // "412" from the board at the front, or a line of the first verse.
+  function draw(query) {
+    const needle = (query || "").trim().toLowerCase();
+    const shown = !needle
+      ? hymns
+      : hymns.filter(
+          (hymn) =>
+            String(hymn.pageNumber || "").startsWith(needle) ||
+            (hymn.title || "").toLowerCase().includes(needle) ||
+            (hymn.lyricsText || "").toLowerCase().includes(needle),
+        );
+    list.innerHTML = "";
+    if (shown.length === 0) {
+      list.appendChild(el("li", null, "No hymn here matches that."));
+      return;
+    }
+    let group = null;
+    shown.forEach((hymn) => {
+      if (!needle && hymn.groupLabel && hymn.groupLabel !== group) {
+        group = hymn.groupLabel;
+        const heading = el("li", "group", group);
+        heading.style.display = "block";
+        list.appendChild(heading);
+      }
+      const li = el("li");
+      const row = el("button", "rowlink");
+      row.appendChild(el("span", "pagenum", hymn.pageNumber == null ? "" : String(hymn.pageNumber)));
+      row.appendChild(el("span", "title", hymn.title || ""));
+      row.addEventListener("click", () => renderHymn(book, hymns, hymns.indexOf(hymn)));
+      li.appendChild(row);
+      list.appendChild(li);
+    });
+  }
+
+  search.addEventListener("input", () => draw(search.value));
+  draw("");
+}
+
+function renderHymn(book, hymns, index) {
+  const hymn = hymns[index];
+  if (!hymn) return;
+  view.innerHTML = "";
+
+  const back = el("button", null, "‹ " + (book.title || "Back"));
+  back.addEventListener("click", () => renderHymnal(book));
+  view.appendChild(back);
+
+  const heading = el("h1", null, hymn.title || "");
+  view.appendChild(heading);
+  if (hymn.pageNumber != null) view.appendChild(el("p", "sub", "Page " + hymn.pageNumber));
+  view.appendChild(el("div", "lyrics", hymn.lyricsText || ""));
+
+  const nav = el("div", "hymn-nav");
+  const previous = hymns[index - 1];
+  const next = hymns[index + 1];
+  const back1 = el("button", null, "‹ Back");
+  back1.disabled = !previous;
+  back1.title = previous ? previous.title : "";
+  back1.addEventListener("click", () => renderHymn(book, hymns, index - 1));
+  const forward = el("button", null, "Next ›");
+  forward.disabled = !next;
+  forward.title = next ? next.title : "";
+  forward.addEventListener("click", () => renderHymn(book, hymns, index + 1));
+  nav.appendChild(back1);
+  nav.appendChild(el("span", "spacer"));
+  nav.appendChild(forward);
+  view.appendChild(nav);
+  window.scrollTo({ top: 0 });
+}
+
 // --------------------------------------------------------------- reading --
 let pdfjsPromise = null;
 let activeReader = null;
@@ -439,7 +592,7 @@ async function openBook(book, page, toc) {
   } catch (error) {
     // The browser evicted it under storage pressure. Saying so beats offering
     // a book that won't open, and the index is corrected so the list agrees.
-    writeBooks(readBooks().filter((item) => item.fileId !== book.fileId));
+    writeBooks(readBooks().filter((item) => item.id !== book.id));
     view.innerHTML = "";
     view.appendChild(el("h1", null, book.title || "Untitled book"));
     view.appendChild(
@@ -714,14 +867,45 @@ document.getElementById("retry").addEventListener("click", () => {
  */
 function bookFromPath() {
   const match = /^\/(?:books|read)\/([^/]+)/.exec(scopePath || "");
-  if (!match) return null;
-  return readBooks().find((book) => book.fileId === match[1]) || null;
+  if (match) return readBooks().find((book) => book.id === match[1]) || null;
+  // A hymn-per-file book *is* its series, so its own page is the series page.
+  const saved = readBooks().filter((book) => book.homeHref === scopePath);
+  return saved.length === 1 && saved[0].kind === "hymnal" ? saved[0] : null;
+}
+
+/**
+ * The same for a single hymn — /hymns/<id> — which needs the saved hymnals
+ * opened to know which one holds it, so it can only be answered
+ * asynchronously.
+ */
+async function openHymnFromPath() {
+  const match = /^\/hymns\/([^/]+)/.exec(scopePath || "");
+  if (!match) return false;
+  for (const book of readBooks().filter((item) => item.kind === "hymnal")) {
+    try {
+      const hymns = await loadHymnal(book);
+      const at = hymns.findIndex((hymn) => hymn.id === match[1]);
+      if (at !== -1) {
+        renderHymn(book, hymns, at);
+        return true;
+      }
+    } catch (error) {
+      // Evicted, or never finished saving; try the next hymnal.
+    }
+  }
+  return false;
 }
 
 renderTabs();
 const requested = bookFromPath();
-if (requested) renderBook(requested);
-else renderLibrary();
+if (requested) {
+  if (requested.kind === "hymnal") renderHymnal(requested);
+  else renderBook(requested);
+} else {
+  renderLibrary();
+  // Replaces the list it just drew, if this turns out to be a hymn we hold.
+  openHymnFromPath();
+}
 </script>
 </body>
 </html>

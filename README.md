@@ -514,6 +514,11 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     shell has no bundle to draw pages with. `scripts/copy-offline-pdfjs.mjs`
     puts that copy there at install and build time so it tracks the pinned
     version rather than being committed.
+  - A **hymn-per-file** book has no document to store, so
+    `/api/offline/hymnal/[seriesId]` returns its hymns and lyrics (same view
+    and plugin checks as the page) and they are cached as JSON under
+    `/offline-hymnal/<id>.json`. Both kinds share one index, discriminated by
+    `kind`.
 - **The bottom bar** is per device: `getShellNav` returns both the app's
   suggested `tabs` and every destination this viewer could choose
   (`tabOptions`), and `src/lib/nav-tabs.ts` resolves a stored list of hrefs

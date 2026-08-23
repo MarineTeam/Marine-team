@@ -73,7 +73,7 @@ export function SaveBookButton({
     setProgress(0);
     try {
       const { data } = await saveBookOffline(
-        { fileId, title, homeHref, homeLabel, categoryHref, categoryLabel, pageOffset, sizeBytes },
+        { id: fileId, title, homeHref, homeLabel, categoryHref, categoryLabel, pageOffset, sizeBytes },
         (fraction) => setProgress(fraction),
       );
       try {

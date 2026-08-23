@@ -149,6 +149,19 @@ body {
 }
 
 /*
+ * A tab bar holding more icons than fit scrolls sideways (see
+ * lib/nav-tabs.ts). The scrollbar itself is suppressed: it would sit across
+ * the labels on a desktop, and touch devices don't show one anyway.
+ */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/*
  * Installed below `lg`, the tab strip is the only navigation there is, so it
  * stays put past the `sm` breakpoint where the website would hand over to the
  * rail. From `lg` up the rail is back, and the strip stands down with it.

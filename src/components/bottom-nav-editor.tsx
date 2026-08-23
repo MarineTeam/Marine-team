@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { NAV_ICONS } from "@/components/app-sidebar";
 import { readDeviceSettings, writeDeviceSettings } from "@/lib/device-settings";
-import { MAX_TABS, resolveTabs } from "@/lib/nav-tabs";
+import { MAX_TABS, resolveTabs, TABS_ACROSS } from "@/lib/nav-tabs";
 import type { NavItem } from "@/lib/nav";
 
 /**
@@ -67,8 +67,9 @@ export function BottomNavEditor({ options, suggested }: { options: NavItem[]; su
       <div>
         <h3 className="text-sm font-medium">Bottom bar</h3>
         <p className="text-xs text-sec">
-          The icons along the bottom of the app, in order. Up to {MAX_TABS}. Add the section you open most —
-          a hymnal book you&apos;ve saved for offline stays reachable from its icon even with no connection.
+          The icons along the bottom of the app, in order. Add the section you open most — a hymnal
+          you&apos;ve saved for offline stays reachable from its icon even with no connection. The first{" "}
+          {TABS_ACROSS} share the width; add more (up to {MAX_TABS}) and the row scrolls sideways.
         </p>
       </div>
 
@@ -76,7 +77,13 @@ export function BottomNavEditor({ options, suggested }: { options: NavItem[]; su
         {current.map((tab, index) => {
           const Icon = NAV_ICONS[tab.icon];
           return (
-            <li key={tab.href} className="flex items-center gap-2 px-3 py-2">
+            <li
+              key={tab.href}
+              className={`flex items-center gap-2 px-3 py-2 ${
+                index >= TABS_ACROSS ? "bg-chip" : ""
+              }`}
+              title={index >= TABS_ACROSS ? "Reached by scrolling the bar sideways" : undefined}
+            >
               <Icon className="h-5 w-5 shrink-0 text-sec" />
               <span className="min-w-0 flex-1 truncate">{tab.label}</span>
               <button
@@ -112,8 +119,10 @@ export function BottomNavEditor({ options, suggested }: { options: NavItem[]; su
         <div className="space-y-1">
           <p className="text-xs text-sec">
             {currentHrefs.length >= MAX_TABS
-              ? `The bar is full — remove one to add another.`
-              : "Add:"}
+              ? `That's ${MAX_TABS} — remove one to add another.`
+              : currentHrefs.length >= TABS_ACROSS
+                ? "Add (the row will scroll sideways):"
+                : "Add:"}
           </p>
           <div className="flex flex-wrap gap-2">
             {available.map((option) => {

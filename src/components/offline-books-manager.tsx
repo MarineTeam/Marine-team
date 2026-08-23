@@ -60,17 +60,31 @@ export function OfflineBooksManager() {
         <>
           <ul className="divide-y divide-sep rounded-lg border border-sep text-sm">
             {items.map((book) => (
-              <li key={book.fileId} className="flex items-center gap-2 px-3 py-2">
+              <li key={book.id} className="flex items-center gap-2 px-3 py-2">
                 <div className="min-w-0 flex-1">
-                  <Link href={`/books/${book.fileId}`} className="block truncate hover:underline">
+                  {/*
+                    A hymn-per-file book has no page of its own — it *is* its
+                    series — so each kind links back to where it was saved
+                    from.
+                  */}
+                  <Link
+                    href={book.kind === "hymnal" ? (book.homeHref ?? "/") : `/books/${book.id}`}
+                    className="block truncate hover:underline"
+                  >
                     {book.title}
                   </Link>
                   <p className="text-xs text-sec">
-                    {[book.homeLabel, formatBytes(book.bytes)].filter(Boolean).join(" · ")}
+                    {[
+                      book.homeLabel,
+                      book.kind === "hymnal" && book.hymnCount ? `${book.hymnCount} hymns` : null,
+                      formatBytes(book.bytes),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </p>
                 </div>
                 <button
-                  onClick={() => void removeOfflineBook(book.fileId)}
+                  onClick={() => void removeOfflineBook(book.id)}
                   className="rounded-md border border-sep px-2 py-1 text-xs hover:bg-hover"
                 >
                   Remove

@@ -20,11 +20,14 @@ const SHELL_ASSETS = ["/manifest.json", "/icon-192.png", "/icon-512.png", "/offl
 
 // Written by src/lib/offline-downloads.ts and src/lib/offline-books.ts; kept
 // out of the activate-time cleanup below so a version bump of the shell never
-// wipes someone's downloads or their hymnal.
+// wipes someone's downloads or their hymnals.
 const DOWNLOAD_CACHE = "marine-team-downloads-v1";
 const DOWNLOAD_PATH_PREFIX = "/offline-video/";
 const BOOK_CACHE = "marine-team-books-v1";
 const BOOK_PATH_PREFIX = "/offline-book/";
+// A hymn-per-file book is saved as its list of hymns rather than as a file,
+// and lives in the same cache under its own path.
+const HYMNAL_PATH_PREFIX = "/offline-hymnal/";
 // pdf.js, saved into the book cache alongside the first book so the offline
 // shell has something to draw pages with.
 const VIEWER_PATH_PREFIX = "/pdfjs/";
@@ -94,14 +97,19 @@ self.addEventListener("fetch", (event) => {
   // server, so this handler is the only thing that can answer them — which is
   // what makes a plain <video src> play, and a saved hymnal open, with no
   // network at all.
-  if (url.pathname.startsWith(DOWNLOAD_PATH_PREFIX) || url.pathname.startsWith(BOOK_PATH_PREFIX)) {
-    const isBook = url.pathname.startsWith(BOOK_PATH_PREFIX);
+  if (
+    url.pathname.startsWith(DOWNLOAD_PATH_PREFIX) ||
+    url.pathname.startsWith(BOOK_PATH_PREFIX) ||
+    url.pathname.startsWith(HYMNAL_PATH_PREFIX)
+  ) {
+    const isVideo = url.pathname.startsWith(DOWNLOAD_PATH_PREFIX);
+    const isHymnal = url.pathname.startsWith(HYMNAL_PATH_PREFIX);
     event.respondWith(
       respondFromCache(
-        isBook ? BOOK_CACHE : DOWNLOAD_CACHE,
+        isVideo ? DOWNLOAD_CACHE : BOOK_CACHE,
         url.pathname,
         event.request,
-        isBook ? "application/pdf" : "video/mp4",
+        isVideo ? "video/mp4" : isHymnal ? "application/json" : "application/pdf",
       ).then((response) => response || new Response("Not saved on this device", { status: 404 })),
     );
     return;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_TABS, parseTabHrefs, resolveTabs, toSnapshot } from "./nav-tabs";
+import { MAX_TABS, parseTabHrefs, resolveTabs, TABS_ACROSS, toSnapshot } from "./nav-tabs";
 import type { NavItem } from "./nav";
 
 const options: NavItem[] = [
@@ -27,9 +27,13 @@ describe("parseTabHrefs", () => {
     expect(parseTabHrefs(["/", 7, null, "/", "search"])).toEqual(["/"]);
   });
 
-  it("stops at the number of tabs that fit", () => {
-    const many = ["/a", "/b", "/c", "/d", "/e", "/f", "/g"];
-    expect(parseTabHrefs(many)).toHaveLength(MAX_TABS);
+  it("keeps more than fit across the screen — those scroll — but not without limit", () => {
+    const seven = ["/a", "/b", "/c", "/d", "/e", "/f", "/g"];
+    expect(seven.length).toBeGreaterThan(TABS_ACROSS);
+    expect(parseTabHrefs(seven)).toHaveLength(7);
+
+    const tooMany = Array.from({ length: MAX_TABS + 4 }, (_, i) => `/p${i}`);
+    expect(parseTabHrefs(tooMany)).toHaveLength(MAX_TABS);
   });
 });
 

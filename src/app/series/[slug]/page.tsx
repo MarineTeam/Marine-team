@@ -39,6 +39,7 @@ import { FileList } from "@/components/file-list";
 import { HymnalBookGrid } from "@/components/hymnal-book-grid";
 import { BookContents } from "@/components/book-contents";
 import { SaveBookButton } from "@/components/save-book-button";
+import { SaveHymnalButton } from "@/components/save-hymnal-button";
 import { HymnList } from "@/components/hymn-list";
 import { fileBook, pdfsOf } from "@/lib/hymnal";
 import { bookCacheTag } from "@/lib/reader-cache";
@@ -315,7 +316,24 @@ export default async function SeriesPage({
           {series.files.length > 0 && (
             <section className="space-y-3">
               {hymnPerFile ? (
-                <HymnList hymns={series.files} isLoggedIn={isLoggedIn} />
+                <>
+                  {/*
+                    A book whose files are its hymns has no PDF to save, so
+                    what goes on the device is the hymns themselves — see
+                    SaveHymnalButton.
+                  */}
+                  {downloadsOn && !seriesLocked && (
+                    <SaveHymnalButton
+                      seriesId={series.id}
+                      title={series.title}
+                      homeHref={`/series/${series.slug}`}
+                      homeLabel={series.title}
+                      categoryHref={series.category ? `/categories/${series.category.slug}` : null}
+                      categoryLabel={series.category?.name ?? null}
+                    />
+                  )}
+                  <HymnList hymns={series.files} isLoggedIn={isLoggedIn} />
+                </>
               ) : hymnalStyle ? (
                 <>
                   {soleBook ? (

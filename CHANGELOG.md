@@ -188,10 +188,20 @@ All notable changes to this project are documented here. Format follows
     copy, but only after the network has actually failed and only for a book
     this device was deliberately given — a cached copy never stands in for an
     access check that said no.
+  - **A hymn-per-file book saves too** — one whose hymns are separate files
+    rather than one PDF. There is no document to store for a book like that,
+    so what's kept is the list of hymns with their lyrics
+    (`/api/offline/hymnal/[seriesId]`, behind the same view and plugin checks
+    as the page itself), and the offline screen renders them: hymns in
+    printed-page order under their group headings, a find box that matches a
+    number, a title or a line of the lyrics, and **Back**/**Next** stepping
+    hymn to hymn. A link straight to `/hymns/<id>` opens that hymn. Lyrics
+    are corrected and added long after a scan would have stopped changing, so
+    this one offers **Update** as well as Remove. Hymns with no lyrics text
+    aren't saved — offline they would be blank — and the button says how many
+    were actually kept.
   - Gated by the existing **Downloads** plugin, per category like the rest of
-    it, and by the member choosing to save a particular book. Only whole-book
-    PDFs can be saved; a hymn-per-file book (one whose hymns are separate
-    lyrics pages) is not stored offline.
+    it, and by the member choosing to save a particular book.
 - **Books are cached on the device that reads them, and hymns can be stepped
   through.** Several changes that matter to the same person: someone
   finding hymn 214 in a scanned hymnal on a phone, on a Sunday.

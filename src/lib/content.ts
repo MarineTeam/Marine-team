@@ -15,7 +15,7 @@ export function canAccess(memberOnly: boolean, isLoggedIn: boolean): boolean {
  * gate (if any) has passed, and whose unpublishAt gate (if any) hasn't
  * passed yet.
  */
-function publishedNow() {
+export function publishedNow() {
   const now = new Date();
   return {
     published: true,
