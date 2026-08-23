@@ -319,7 +319,11 @@ export default async function SeriesPage({
                     soleBookLocked ? (
                       <p className="text-sm text-sec">This book is for members only.</p>
                     ) : (
-                      <BookContents fileId={soleBook.id} readerOn={readerOn} />
+                      <BookContents
+                        fileId={soleBook.id}
+                        readerOn={readerOn}
+                        pageOffset={soleBook.pageOffset}
+                      />
                     )
                   ) : (
                     bookPdfs.length > 0 && (

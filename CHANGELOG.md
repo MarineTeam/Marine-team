@@ -146,6 +146,21 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Page offset for a book PDF** — a scanned hymnal usually opens with a
+  title page and several pages of table of contents before printed page 1,
+  so the PDF's page 55 is the book's page 45. A **Page offset** on the
+  file's Details panel in the admin file list says how many pages of front
+  matter come first, and the book's contents list, the reader's page box and
+  its search results then quote the number printed in the book rather than
+  the PDF's own. Set per book by an admin, because nothing in a PDF says
+  where its printed numbering starts; left at 0, every book reads exactly as
+  it did before.
+  - What's *stored* stays in PDF pages — where a member got to, a saved
+    mark, a `?page=` link — so correcting an offset later re-labels the
+    numbers without moving anyone's place in the book. Pages of front matter
+    have no printed number and show none, and while an offset is set the
+    reader shows the PDF page alongside so the file can still be navigated
+    by it.
 - **Downloads** (new plugin): members can save a video to their device and
   watch it with no connection. The file is streamed into Cache Storage and
   served back by the service worker — range requests included, so seeking

@@ -1,0 +1,15 @@
+-- A book PDF's contents list is read from its embedded bookmarks, whose
+-- destinations resolve to PDF page numbers. Those are only the book's own
+-- page numbers when nothing sits in front of printed page 1 — and in a
+-- scanned hymnal, a title page, a preface and ten pages of table of
+-- contents routinely do, so hymn 1 is listed on "page 11" and nobody
+-- holding the paper copy can find it.
+--
+-- pageOffset is how many PDF pages precede printed page 1. Set per book by
+-- an admin rather than inferred: nothing in a PDF says where its printed
+-- numbering starts, and guessing it wrong is worse than leaving it alone.
+--
+-- Zero rather than nullable: "no offset" and "nobody has checked yet"
+-- display identically, so there is nothing to be gained from telling them
+-- apart, and every existing book keeps the numbers it shows today.
+ALTER TABLE "FileAsset" ADD COLUMN "pageOffset" INTEGER NOT NULL DEFAULT 0;

@@ -69,7 +69,7 @@ export default async function BookPage({ params }: { params: Promise<{ fileId: s
           )}
         </div>
       ) : (
-        <BookContents fileId={file.id} readerOn={readerOn} />
+        <BookContents fileId={file.id} readerOn={readerOn} pageOffset={file.pageOffset} />
       )}
     </div>
   );
