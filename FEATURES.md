@@ -398,6 +398,82 @@ offline** / **Remove**. The list self-heals — browsers evict caches silently
 under storage pressure, so entries whose file has vanished are dropped on
 load rather than offering playback of something that isn't there.
 
+### Books on the device
+
+A hymnal can be saved the same way, and then read with no connection at all.
+**Save for offline** on a book's page (`/books/[fileId]`) stores it; the same
+page's **Remove** takes it back off, and `/profile/downloads` lists every book
+this device is holding. Gated by the same **Downloads** plugin as video, with
+the same per-category override, and then by the member choosing to save a
+particular book.
+
+Saving stores three things, because reading a hymn offline needs all three:
+
+- **The file**, streamed into Cache Storage under `/offline-book/<id>.pdf`,
+  fetched through the app's own content route so access is checked exactly as
+  it is for reading the book online.
+- **The contents list**, read out of the bytes that were just downloaded
+  rather than fetched all over again. Without it there is no way to find hymn
+  214 with no connection, which is most of the point.
+- **pdf.js itself.** The offline screen is a static page with no application
+  bundle behind it, so it has no way to draw a page unless the library is
+  already on the device. It's copied out of `pdfjs-dist` into `public/pdfjs`
+  at install and build time (`scripts/copy-offline-pdfjs.mjs`, so it stays the
+  version `package.json` pins) and fetched once, when the first book is saved.
+
+Only a whole-book PDF can be saved. A **hymn-per-file** book — one whose hymns
+are separate lyrics pages — has no single file to store and isn't kept
+offline.
+
+### What the offline screen shows
+
+`public/offline.html` is served for any navigation that can't reach the
+network, and it is now a small app of its own rather than a list of videos:
+
+- **The same bottom bar the app draws.** The app leaves a snapshot of its
+  tabs where this page can read it, so losing the connection no longer loses
+  the icons. Sections holding something saved on this device are shown in
+  full colour; the icons are the app's own.
+- **What is saved, under the icon you tapped.** The page is served *at the URL
+  that was asked for*, so it knows whether you tapped Hymnals or Home. Tapping
+  Hymnals lists the hymnals — including books filed under a series inside that
+  section — and a link straight to a book (`/books/<id>` or `/read/<id>`)
+  opens that book.
+- **A book's contents, then its pages.** Entries are listed with the numbers
+  printed in the book (the page offset is stored with it), and opening one
+  draws that page with pdf.js: swipe left and right, arrow keys, zoom, and a
+  bar naming the hymn you are on. Where a browser can't draw the pages
+  itself, the book is handed to that browser's own PDF viewer at the right
+  page rather than showing a blank sheet.
+- **Downloaded videos**, exactly as before.
+
+The **in-app** reader survives the connection dropping while it is open, too:
+the service worker answers `/api/files/[id]/content` from the saved copy —
+but only after the network has actually failed, and only for a book this
+device was deliberately given. A cached copy never stands in for an access
+check that said no.
+
+## The bottom bar
+
+In the installed app the row of icons along the bottom is the only navigation
+there is, so what belongs in it depends on why someone opened the app. **This
+device → Bottom bar** in `/profile/settings` adds, removes and reorders up to
+five destinations: Home, Search, New, any section of the library (a Hymnals
+category included), your own lists, Profile, and Admin for staff.
+
+- Stored **per device**, with the theme and playback preferences — the same
+  member can have the hymnal on their phone and the default set on the church
+  computer — and applied the moment it changes, with no reload.
+- A device that has never touched it keeps exactly the bar it had.
+- A choice is stored as destinations, not positions, and re-resolved against
+  what that viewer may currently see: a category that gets unpublished, or a
+  page whose plugin is switched off, drops out of the bar rather than sitting
+  there leading nowhere. If nothing survives, the app's own suggestion is
+  drawn, because an installed app with an empty bar has no way to get
+  anywhere.
+- The bar is snapshotted for the offline screen each time it renders, which
+  is what lets those icons still be there with no connection.
+
 Limits worth knowing: the Wi-Fi-only preference relies on the Network
 Information API, which only Chromium implements — where the connection type
 can't be read, downloads go ahead rather than being blocked everywhere. The

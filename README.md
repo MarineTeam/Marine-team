@@ -508,6 +508,22 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     trips. `ReaderHandle.order` maps each engine's opaque locations onto one
     number line so `src/lib/toc-nav.ts` can step between contents entries
     without knowing which engine produced them.
+  - A book can also be **saved to the device** (`src/lib/offline-books.ts`),
+    which stores its bytes under `/offline-book/<id>.pdf` in Cache Storage,
+    its contents list, and a copy of pdf.js from `public/pdfjs` — the offline
+    shell has no bundle to draw pages with. `scripts/copy-offline-pdfjs.mjs`
+    puts that copy there at install and build time so it tracks the pinned
+    version rather than being committed.
+- **The bottom bar** is per device: `getShellNav` returns both the app's
+  suggested `tabs` and every destination this viewer could choose
+  (`tabOptions`), and `src/lib/nav-tabs.ts` resolves a stored list of hrefs
+  against the latter — so a destination that disappears drops out instead of
+  404ing. `BottomNav` also writes a snapshot of what it drew to
+  `localStorage`, which is the only way `public/offline.html` can draw the
+  same icons with no server. That file is a standalone offline app: the tab
+  bar, the books and videos saved on the device, a book's cached contents,
+  and a pdf.js page view, all from Cache Storage and `localStorage`, with the
+  browser's own PDF viewer as the fallback where it can't render.
   - pdf.js's worker is resolved via `new URL(..., import.meta.url)` so it
     stays version-locked instead of needing a copy in `/public`; the build
     emits it to `.next/static/media`.

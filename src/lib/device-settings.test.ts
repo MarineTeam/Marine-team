@@ -23,6 +23,7 @@ describe("parseDeviceSettings", () => {
       defaultPlaybackSpeed: 1.5,
       downloadOverCellular: true,
       swipeToTurnPages: false,
+      tabHrefs: ["/", "/categories/hymnals"],
     };
     expect(parseDeviceSettings(JSON.stringify(stored))).toEqual(stored);
   });
@@ -52,6 +53,17 @@ describe("parseDeviceSettings", () => {
     const settings = parseDeviceSettings(JSON.stringify({ autoplay: "yes", downloadOverCellular: 1 }));
     expect(settings.autoplay).toBe(false);
     expect(settings.downloadOverCellular).toBe(false);
+  });
+
+  it("treats a bottom bar that was never customised as unset", () => {
+    // Null means "use the app's suggestion", which is not the same as an
+    // empty bar — see lib/nav-tabs.ts.
+    expect(parseDeviceSettings("{}").tabHrefs).toBeNull();
+    expect(parseDeviceSettings(JSON.stringify({ tabHrefs: "/" })).tabHrefs).toBeNull();
+    expect(parseDeviceSettings(JSON.stringify({ tabHrefs: ["/", "/search"] })).tabHrefs).toEqual([
+      "/",
+      "/search",
+    ]);
   });
 
   it("keeps page swiping on unless it was deliberately turned off", () => {

@@ -38,6 +38,7 @@ import { MenuTile } from "@/components/menu-tile";
 import { FileList } from "@/components/file-list";
 import { HymnalBookGrid } from "@/components/hymnal-book-grid";
 import { BookContents } from "@/components/book-contents";
+import { SaveBookButton } from "@/components/save-book-button";
 import { HymnList } from "@/components/hymn-list";
 import { fileBook, pdfsOf } from "@/lib/hymnal";
 import { bookCacheTag } from "@/lib/reader-cache";
@@ -149,6 +150,7 @@ export default async function SeriesPage({
     "likes-dislikes": likesOn,
     "share-links": shareLinksOn,
     "book-reader": readerOn,
+    downloads: downloadsOn,
   } = plugins;
 
   const [ratingSummary, myRating, reactionSummary, myReaction, related, comments, shareOptions] = await Promise.all([
@@ -320,12 +322,34 @@ export default async function SeriesPage({
                     soleBookLocked ? (
                       <p className="text-sm text-sec">This book is for members only.</p>
                     ) : (
-                      <BookContents
-                        fileId={soleBook.id}
-                        readerOn={readerOn}
-                        pageOffset={soleBook.pageOffset}
-                        cacheTag={bookCacheTag(soleBook)}
-                      />
+                      <>
+                        {/*
+                          A series holding one PDF *is* that book, and its
+                          contents are listed here rather than on the book's
+                          own page — so the way to keep it on the device has
+                          to be here too.
+                        */}
+                        {downloadsOn && (
+                          <SaveBookButton
+                            fileId={soleBook.id}
+                            title={soleBook.title}
+                            homeHref={`/series/${series.slug}`}
+                            homeLabel={series.title}
+                            categoryHref={
+                              series.category ? `/categories/${series.category.slug}` : null
+                            }
+                            categoryLabel={series.category?.name ?? null}
+                            pageOffset={soleBook.pageOffset}
+                            sizeBytes={soleBook.sizeBytes}
+                          />
+                        )}
+                        <BookContents
+                          fileId={soleBook.id}
+                          readerOn={readerOn}
+                          pageOffset={soleBook.pageOffset}
+                          cacheTag={bookCacheTag(soleBook)}
+                        />
+                      </>
                     )
                   ) : (
                     bookPdfs.length > 0 && (

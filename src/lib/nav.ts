@@ -61,8 +61,15 @@ export type ShellNav = {
   unreadCount: number;
   /** The left rail's grouped sections. */
   sections: NavSection[];
-  /** The installed app's bottom strip. Kept short deliberately; five is already a lot on a phone. */
+  /**
+   * The installed app's bottom strip, as the app itself would arrange it.
+   * Kept short deliberately; five is already a lot on a phone. A device that
+   * has chosen its own set overrides this in the browser — see
+   * lib/nav-tabs.ts — which is why `tabOptions` travels with it.
+   */
   tabs: NavItem[];
+  /** Everything this viewer could put in that strip, for the picker in settings. */
+  tabOptions: NavItem[];
 };
 
 export const getShellNav = cache(async (): Promise<ShellNav> => {
@@ -88,7 +95,9 @@ export const getShellNav = cache(async (): Promise<ShellNav> => {
   const library: NavItem[] = categories.map((category) => ({
     href: `/categories/${category.slug}`,
     label: category.name,
-    icon: "folder" as const,
+    // A hymnal section reads as books, not as a folder — and it is the
+    // category most likely to be put in the bottom bar.
+    icon: category.hymnalStyle ? ("book" as const) : ("folder" as const),
   }));
 
   const mine: NavItem[] = [];
@@ -129,6 +138,20 @@ export const getShellNav = cache(async (): Promise<ShellNav> => {
     tabs.push({ href: "/profile", label: "Profile", icon: "person", badge: unreadCount });
   }
 
+  // Everything a device may choose between. Ordered as the rail is — the
+  // places to browse, then the library, then what's yours — so the picker
+  // reads like the app rather than like a list of URLs.
+  const tabOptions: NavItem[] = [
+    ...browse,
+    { href: "/recently-added", label: "New", icon: "sparkle" },
+    ...library,
+    ...mine,
+  ];
+  if (user) {
+    tabOptions.push({ href: "/profile", label: "Profile", icon: "person", badge: unreadCount });
+  }
+  if (staff) tabOptions.push({ href: "/admin", label: "Admin", icon: "shield" });
+
   return {
     branding,
     plugins,
@@ -145,5 +168,6 @@ export const getShellNav = cache(async (): Promise<ShellNav> => {
     unreadCount,
     sections,
     tabs,
+    tabOptions,
   };
 });

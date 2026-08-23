@@ -8,6 +8,8 @@
  * out, unlike the account settings on the profile page.
  */
 
+import { parseTabHrefs } from "@/lib/nav-tabs";
+
 export type ThemePreference = "system" | "light" | "dark";
 
 /** Speeds offered in the settings UI; the stored value is validated against these. */
@@ -34,6 +36,12 @@ export type DeviceSettings = {
    * pen or a trackpad can produce one by accident.
    */
   swipeToTurnPages: boolean;
+  /**
+   * Which icons the bottom bar carries, as hrefs, in order — see
+   * lib/nav-tabs.ts. Null means the app's own suggestion, which is what
+   * every device starts with.
+   */
+  tabHrefs: string[] | null;
 };
 
 export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
@@ -43,6 +51,7 @@ export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
   defaultPlaybackSpeed: 1,
   downloadOverCellular: false,
   swipeToTurnPages: true,
+  tabHrefs: null,
 };
 
 export const DEVICE_SETTINGS_KEY = "marine-device-settings";
@@ -87,6 +96,7 @@ export function parseDeviceSettings(raw: string | null | undefined): DeviceSetti
       typeof value.swipeToTurnPages === "boolean"
         ? value.swipeToTurnPages
         : DEFAULT_DEVICE_SETTINGS.swipeToTurnPages,
+    tabHrefs: parseTabHrefs(value.tabHrefs),
   };
 }
 

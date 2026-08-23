@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Copied out of pdfjs-dist at install/build time for the offline shell
+# (scripts/copy-offline-pdfjs.mjs) — version-locked to package.json, so it is
+# generated rather than committed.
+/public/pdfjs

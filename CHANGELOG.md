@@ -146,6 +146,52 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **The bottom bar is yours to arrange, and it survives losing the
+  connection.** The row of icons in the installed app is the only navigation
+  it has, so what belongs there depends on why you opened it. **Bottom bar**
+  in `/profile/settings` adds, removes and reorders up to five destinations —
+  Home, Search, New, any section of the library, your own lists, Profile —
+  stored per device with the other device settings and applied the moment you
+  change it. A device that has chosen nothing keeps exactly the bar it had.
+  - A choice is stored as hrefs and re-resolved against what you may
+    currently see, so a category that is unpublished, or a page whose plugin
+    is switched off, drops out of the bar instead of leading nowhere.
+  - **The icons are drawn offline too.** They used to vanish the moment the
+    connection did: the offline screen had no navigation at all. The app now
+    leaves a snapshot of the bar where the offline screen can find it, and
+    that screen draws the same icons — with the sections that have something
+    saved on this device shown in full colour.
+- **Hymnals can be saved to the device and read with no connection at all.**
+  "Save for offline" on a book's page stores the PDF in Cache Storage, the
+  same place a downloaded video lives, and the book then opens from its own
+  icon in the bottom bar with the network off — contents list, hymn numbers,
+  page turning and all.
+  - Saving stores three things, because all three are needed to actually read
+    a hymn offline: the file's bytes, the book's **contents list** (read out
+    of the bytes just downloaded rather than fetched again), and a copy of
+    **pdf.js**, since the offline screen is a static page with no application
+    bundle to draw pages with. The library is copied out of `pdfjs-dist` at
+    install/build time into `public/pdfjs` (`scripts/copy-offline-pdfjs.mjs`)
+    and fetched once, when the first book is saved.
+  - The offline screen is now a small reader: the books saved on this device,
+    each book's contents with the page numbers printed in it, and a page view
+    with swipe, arrow keys and zoom. Where a browser can't draw the pages
+    itself, the book is handed to that browser's own PDF viewer at the right
+    page rather than showing a blank sheet.
+  - Tapping an icon offline shows what is saved under it — the Hymnals icon
+    shows the hymnals, including books filed under a series inside that
+    section — and a link straight to `/books/<id>` or `/read/<id>` opens that
+    book. Saved books are listed and removable in `/profile/downloads`
+    alongside saved videos.
+  - The **in-app** reader also survives the connection dropping while it is
+    open: the service worker answers `/api/files/<id>/content` from the saved
+    copy, but only after the network has actually failed and only for a book
+    this device was deliberately given — a cached copy never stands in for an
+    access check that said no.
+  - Gated by the existing **Downloads** plugin, per category like the rest of
+    it, and by the member choosing to save a particular book. Only whole-book
+    PDFs can be saved; a hymn-per-file book (one whose hymns are separate
+    lyrics pages) is not stored offline.
 - **Books are cached on the device that reads them, and hymns can be stepped
   through.** Several changes that matter to the same person: someone
   finding hymn 214 in a scanned hymnal on a phone, on a Sunday.

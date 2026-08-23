@@ -1704,7 +1704,9 @@ async function getNavCategoriesUncached() {
   return prisma.category.findMany({
     where: { parentId: null, ...publishedNow() },
     orderBy: categoryOrder,
-    select: { id: true, name: true, slug: true },
+    // hymnalStyle so the nav can badge a hymnal section with a book rather
+    // than a folder — see lib/nav.ts.
+    select: { id: true, name: true, slug: true, hymnalStyle: true },
   });
 }
 

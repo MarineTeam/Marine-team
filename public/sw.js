@@ -2,26 +2,36 @@
 // notifications. Deliberately does NOT cache pages/API responses — this
 // site's content is dynamic and often auth-gated, so an aggressive cache
 // would risk showing stale or wrong-audience content offline. It only
-// caches its own static shell assets, plus videos the member explicitly
-// downloaded (see the /offline-video/ fetch handler below), which are
-// deliberate, member-initiated copies rather than opportunistic caching.
+// caches its own static shell assets, plus the videos and books a member
+// explicitly saved (see the /offline-video/ and /offline-book/ handlers
+// below), which are deliberate, member-initiated copies rather than
+// opportunistic caching.
 //
 // /offline.html is the one exception to "no pages": it's a static,
 // unauthenticated, data-free file (no Next.js build output, no server
-// round trip) that reads the same localStorage download index the app
-// writes and plays straight out of DOWNLOAD_CACHE. Without it, a failed
+// round trip) that reads the same localStorage indexes the app writes and
+// plays or reads straight out of those caches. Without it, a failed
 // navigation — including the installed PWA's own start_url on a cold
 // launch — falls through to the browser's native "you're offline"
-// interstitial, which has no way to reach a video already saved to the
-// device. See the navigate branch of the fetch handler below.
-const CACHE_NAME = "marine-team-shell-v4";
+// interstitial, which has no way to reach anything already on the device.
+// See the navigate branch of the fetch handler below.
+const CACHE_NAME = "marine-team-shell-v5";
 const SHELL_ASSETS = ["/manifest.json", "/icon-192.png", "/icon-512.png", "/offline.html"];
 
-// Written by src/lib/offline-downloads.ts; kept out of the activate-time
-// cleanup below so a version bump of the shell never wipes someone's
-// downloads.
+// Written by src/lib/offline-downloads.ts and src/lib/offline-books.ts; kept
+// out of the activate-time cleanup below so a version bump of the shell never
+// wipes someone's downloads or their hymnal.
 const DOWNLOAD_CACHE = "marine-team-downloads-v1";
 const DOWNLOAD_PATH_PREFIX = "/offline-video/";
+const BOOK_CACHE = "marine-team-books-v1";
+const BOOK_PATH_PREFIX = "/offline-book/";
+// pdf.js, saved into the book cache alongside the first book so the offline
+// shell has something to draw pages with.
+const VIEWER_PATH_PREFIX = "/pdfjs/";
+// The app's own file route. A saved book is the same bytes under a different
+// name, which is what lets the in-app reader survive the connection dropping
+// while it is open.
+const CONTENT_PATH = /^\/api\/files\/([^/]+)\/content$/;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -36,7 +46,7 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key !== CACHE_NAME && key !== DOWNLOAD_CACHE)
+            .filter((key) => key !== CACHE_NAME && key !== DOWNLOAD_CACHE && key !== BOOK_CACHE)
             .map((key) => caches.delete(key)),
         ),
       )
@@ -45,43 +55,86 @@ self.addEventListener("activate", (event) => {
 });
 
 /**
- * Serves downloaded videos from the cache. These URLs are ours by
- * construction (/offline-video/<id>.mp4) and never exist on the server, so
- * this handler is the only thing that can answer them — which is what makes a
- * plain <video src> play with no network at all.
+ * Answers from one of the saved-media caches.
  *
  * Range requests get an explicit slice of the cached blob: a media element
  * seeking in a file expects 206 Partial Content, and Cache Storage always
  * replays the whole 200 response, which several browsers refuse to seek in.
+ * A PDF viewer asking for ranges is the same story.
  */
+async function respondFromCache(cacheName, path, request, fallbackType) {
+  const cached = await caches.open(cacheName).then((cache) => cache.match(path));
+  if (!cached) return null;
+
+  const range = request.headers.get("range");
+  if (!range) return cached;
+
+  const blob = await cached.blob();
+  const match = /bytes=(\d*)-(\d*)/.exec(range);
+  const start = match && match[1] ? Number(match[1]) : 0;
+  const end = match && match[2] ? Number(match[2]) : blob.size - 1;
+
+  return new Response(blob.slice(start, end + 1), {
+    status: 206,
+    headers: {
+      "Content-Type": blob.type || fallbackType,
+      "Content-Range": `bytes ${start}-${end}/${blob.size}`,
+      "Content-Length": String(end - start + 1),
+      "Accept-Ranges": "bytes",
+    },
+  });
+}
+
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (url.pathname.startsWith(DOWNLOAD_PATH_PREFIX)) {
+  // Downloaded videos and saved books. These URLs are ours by construction
+  // (/offline-video/<id>.mp4, /offline-book/<id>.pdf) and never exist on the
+  // server, so this handler is the only thing that can answer them — which is
+  // what makes a plain <video src> play, and a saved hymnal open, with no
+  // network at all.
+  if (url.pathname.startsWith(DOWNLOAD_PATH_PREFIX) || url.pathname.startsWith(BOOK_PATH_PREFIX)) {
+    const isBook = url.pathname.startsWith(BOOK_PATH_PREFIX);
     event.respondWith(
-      (async () => {
-        const cached = await caches.open(DOWNLOAD_CACHE).then((cache) => cache.match(url.pathname));
-        if (!cached) return new Response("Not downloaded", { status: 404 });
+      respondFromCache(
+        isBook ? BOOK_CACHE : DOWNLOAD_CACHE,
+        url.pathname,
+        event.request,
+        isBook ? "application/pdf" : "video/mp4",
+      ).then((response) => response || new Response("Not saved on this device", { status: 404 })),
+    );
+    return;
+  }
 
-        const range = event.request.headers.get("range");
-        if (!range) return cached;
+  // pdf.js for the offline shell: cache first, because the whole point is
+  // that it is there when the network isn't.
+  if (url.pathname.startsWith(VIEWER_PATH_PREFIX)) {
+    event.respondWith(
+      caches
+        .open(BOOK_CACHE)
+        .then((cache) => cache.match(url.pathname))
+        .then((cached) => cached || fetch(event.request)),
+    );
+    return;
+  }
 
-        const blob = await cached.blob();
-        const match = /bytes=(\d*)-(\d*)/.exec(range);
-        const start = match && match[1] ? Number(match[1]) : 0;
-        const end = match && match[2] ? Number(match[2]) : blob.size - 1;
-
-        return new Response(blob.slice(start, end + 1), {
-          status: 206,
-          headers: {
-            "Content-Type": blob.type || "video/mp4",
-            "Content-Range": `bytes ${start}-${end}/${blob.size}`,
-            "Content-Length": String(end - start + 1),
-            "Accept-Ranges": "bytes",
-          },
-        });
-      })(),
+  // A book's own bytes, for the reader inside the app. The network is asked
+  // first and always wins — this is an access-checked route, and a cached
+  // copy must never stand in for a "no" — so this only catches the case where
+  // there is no network to answer at all, and only for a book this device was
+  // deliberately given.
+  const contentMatch = CONTENT_PATH.exec(url.pathname);
+  if (contentMatch && event.request.method === "GET") {
+    event.respondWith(
+      fetch(event.request).catch(() =>
+        respondFromCache(
+          BOOK_CACHE,
+          `${BOOK_PATH_PREFIX}${contentMatch[1]}.pdf`,
+          event.request,
+          "application/pdf",
+        ).then((response) => response || Response.error()),
+      ),
     );
     return;
   }
@@ -90,8 +143,13 @@ self.addEventListener("fetch", (event) => {
   // try the network exactly as they would with no service worker at all —
   // this never serves a stale page. Only when the network is actually
   // unreachable does it fall back to the offline shell, so a member who
-  // opens the app with no connection lands on their downloaded videos
-  // instead of the OS's own offline error page.
+  // opens the app with no connection lands on what they've saved instead of
+  // the OS's own offline error page.
+  //
+  // The shell is served *at the URL that was asked for* — the address bar
+  // still says /categories/hymnals — so it can read its own location and
+  // open the hymnals, rather than a generic list, when that is the icon
+  // that was tapped.
   if (event.request.mode === "navigate") {
     event.respondWith(fetch(event.request).catch(() => caches.match("/offline.html")));
   }
