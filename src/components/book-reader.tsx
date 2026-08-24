@@ -8,7 +8,14 @@ import { ReaderSpeech } from "@/components/reader-speech";
 import { ReaderMarks, type ReadingMark } from "@/components/reader-marks";
 import type { ReaderFormat } from "@/lib/reader";
 import { bookCacheTag, loadCachedToc } from "@/lib/reader-cache";
-import { currentTocIndex, nextTocIndex, previousTocIndex, type TocPosition } from "@/lib/toc-nav";
+import {
+  countNumberedEntries,
+  currentTocIndex,
+  findHymnIndex,
+  nextTocIndex,
+  previousTocIndex,
+  type TocPosition,
+} from "@/lib/toc-nav";
 import type { ReaderHandle, SearchHit, TocEntry } from "@/components/reader-types";
 
 type Panel = "contents" | "search" | "marks";
@@ -69,6 +76,8 @@ export function BookReader({
   const [searching, setSearching] = useState(false);
   const [marks, setMarks] = useState<ReadingMark[]>([]);
   const [marking, setMarking] = useState(false);
+  const [hymnQuery, setHymnQuery] = useState("");
+  const [hymnMissing, setHymnMissing] = useState<number | null>(null);
 
   const cacheTag = bookCacheTag({ sizeBytes });
 
@@ -205,6 +214,25 @@ export function BookReader({
     }
   }
 
+  /**
+   * Jumps to the hymn printed under a number — the number that goes up on the
+   * board, which in most books is not the page it is on.
+   */
+  function goToHymn(event: React.FormEvent) {
+    event.preventDefault();
+    const wanted = Number(hymnQuery.trim());
+    if (!toc || !Number.isInteger(wanted) || wanted < 1) return;
+    const at = findHymnIndex(toc, wanted);
+    const entry = at === null ? null : toc[at];
+    if (!entry?.location) {
+      setHymnMissing(wanted);
+      return;
+    }
+    setHymnMissing(null);
+    setHymnQuery("");
+    goTo(entry.location);
+  }
+
   // --- Hymn to hymn, by the book's own contents ----------------------------
   const currentEntry = toc?.[currentTocIndex(positions, here) ?? -1] ?? null;
   const previousEntry = toc?.[previousTocIndex(positions, here) ?? -1] ?? null;
@@ -212,6 +240,9 @@ export function BookReader({
   // One entry can't be stepped between, and a book whose bookmarks all failed
   // to resolve would offer buttons that do nothing.
   const canStepEntries = positions.filter((position) => position !== null).length > 1;
+  // Offered only where the book numbers its own entries: a contents list of
+  // chapter titles has nothing to type into it.
+  const canJumpToHymn = (toc?.length ?? 0) > 0 && countNumberedEntries(toc ?? []) > 1;
 
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col">
@@ -370,8 +401,31 @@ export function BookReader({
       {canStepEntries && (
         <nav
           aria-label="Contents navigation"
-          className="flex items-center gap-3 border-t border-sep px-3 py-2 text-sm"
+          className="flex flex-wrap items-center gap-2 border-t border-sep px-3 py-2 text-sm sm:gap-3"
         >
+          {canJumpToHymn && (
+            <form onSubmit={goToHymn} className="flex items-center gap-1">
+              <label htmlFor="hymn-number" className="text-xs text-sec">
+                Hymn
+              </label>
+              <input
+                id="hymn-number"
+                value={hymnQuery}
+                onChange={(e) => {
+                  setHymnQuery(e.target.value);
+                  setHymnMissing(null);
+                }}
+                // A phone should offer digits for this, and Enter should be
+                // the whole interaction — in a service there is no time for
+                // a second tap on a Go button.
+                inputMode="numeric"
+                pattern="[0-9]*"
+                aria-label="Go to hymn number"
+                aria-invalid={hymnMissing !== null}
+                className="w-14 rounded border border-sep px-1.5 py-1 text-center tabular-nums"
+              />
+            </form>
+          )}
           <button
             onClick={() => previousEntry?.location && goTo(previousEntry.location)}
             disabled={!previousEntry}
@@ -382,7 +436,7 @@ export function BookReader({
             ‹ Back
           </button>
           <p className="min-w-0 flex-1 truncate text-center text-sec" aria-live="polite">
-            {currentEntry?.label ?? ""}
+            {hymnMissing !== null ? `No hymn ${hymnMissing} in this book` : (currentEntry?.label ?? "")}
           </p>
           <button
             onClick={() => nextEntry?.location && goTo(nextEntry.location)}

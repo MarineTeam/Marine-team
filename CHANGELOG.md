@@ -146,6 +146,21 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Type the hymn number, land on the hymn.** The number that goes up on the
+  board is not the page it is printed on, and until now the reader only took
+  pages — so finding hymn 214 meant scrolling a contents list while everyone
+  else was standing up to sing. A **Hymn** box now sits in the reader's
+  contents bar, on a book's contents page, and on the offline screen; a
+  number and Enter is the whole interaction, and phones get a numeric keypad
+  for it.
+  - The number is read from the book's own contents entries — "214", "1.
+    Holy, Holy, Holy", "Hymn 45", "No. 12", "#7" — and only from the *front*
+    of an entry. A number anywhere else belongs to the title, and following
+    one would send someone to the wrong hymn while looking like it worked.
+  - Offered only where a book actually numbers its entries, so a contents
+    list of chapter titles doesn't grow a box with nothing to type in it, and
+    a number the book doesn't list says so rather than jumping somewhere
+    close.
 - **EPUBs save for offline too, not just PDFs.** The asymmetry was an
   accident of which reader came first. A saved EPUB stores its bytes, its
   contents (read out of those bytes with epub.js rather than fetched again)

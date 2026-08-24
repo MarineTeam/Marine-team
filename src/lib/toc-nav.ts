@@ -79,3 +79,49 @@ export function previousTocIndex(positions: TocPosition[], at: TocPosition): num
   }
   return found;
 }
+
+
+/**
+ * The hymn number a contents entry announces, if it announces one.
+ *
+ * This is the number that goes up on the board at the front of a service,
+ * and the one somebody wants to type. It is *not* the page number: in most
+ * hymnals the two differ, and in the ones where they agree the reader's page
+ * box already gets you there.
+ *
+ * Only a number at the *start* of the label counts, with the words a
+ * hymnal's own bookmarks put in front of one — "214", "1. Holy, Holy,
+ * Holy", "Hymn 45 — Praise", "No. 12", "#7". A number anywhere else is part
+ * of a title ("Psalm 23 of David" is a title; "All People That On Earth Do
+ * Dwell 100" is a stray), and guessing at those would send someone to the
+ * wrong hymn while looking like it worked.
+ */
+export function hymnNumberOf(label: string): number | null {
+  const match = /^\s*(?:hymn|hymn\s+no\.?|no\.?|#)?\s*(\d{1,4})(?![\d])/i.exec(label);
+  if (!match) return null;
+  const number = Number(match[1]);
+  return number >= 1 ? number : null;
+}
+
+/**
+ * Which contents entry is that hymn, or null if the book doesn't list one.
+ *
+ * The first match wins: a book that numbers two entries the same (a hymn and
+ * its descant, say) means the first, which is the one printed under that
+ * number.
+ */
+export function findHymnIndex(entries: { label: string }[], hymnNumber: number): number | null {
+  for (let index = 0; index < entries.length; index++) {
+    if (hymnNumberOf(entries[index].label) === hymnNumber) return index;
+  }
+  return null;
+}
+
+/**
+ * How many of a book's entries are numbered — what decides whether offering
+ * a "hymn number" box makes any sense. A contents list of chapter titles has
+ * nothing to type into it.
+ */
+export function countNumberedEntries(entries: { label: string }[]): number {
+  return entries.reduce((count, entry) => count + (hymnNumberOf(entry.label) === null ? 0 : 1), 0);
+}

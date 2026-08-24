@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { fileContentUrl, loadPdfOutline } from "@/lib/pdf-client";
 import { loadCachedToc } from "@/lib/reader-cache";
 import { printedPage } from "@/lib/page-offset";
+import { countNumberedEntries, findHymnIndex } from "@/lib/toc-nav";
 import type { TocEntry } from "@/components/reader-types";
 
 type SortMode = "page" | "az" | "category";
@@ -104,6 +106,9 @@ export function BookContents({
     error: string | null;
   }>({ fileId, entries: null, error: null });
   const [sort, setSort] = useState<SortMode>("page");
+  const [hymnQuery, setHymnQuery] = useState("");
+  const [hymnMissing, setHymnMissing] = useState<number | null>(null);
+  const router = useRouter();
 
   const { entries, error } =
     outline.fileId === fileId ? outline : { entries: null, error: null };
@@ -177,8 +182,59 @@ export function BookContents({
     );
   }
 
+  /**
+   * Straight to the hymn printed under a number, which is what someone
+   * standing up to sing actually has: the number on the board, not the page
+   * it happens to be on.
+   */
+  function goToHymn(event: React.FormEvent) {
+    event.preventDefault();
+    const wanted = Number(hymnQuery.trim());
+    // `entries` is non-null by the time this renders — the loading and empty
+    // states return above — but the closure doesn't carry that narrowing.
+    if (!entries || !Number.isInteger(wanted) || wanted < 1) return;
+    const at = findHymnIndex(entries, wanted);
+    const entry = at === null ? null : entries[at];
+    if (!entry?.location) {
+      setHymnMissing(wanted);
+      return;
+    }
+    router.push(`/read/${fileId}?page=${entry.location}`);
+  }
+
+  // Only where the book numbers its own contents, and only when there is a
+  // reader to open at that hymn.
+  const canJumpToHymn = readerOn && countNumberedEntries(entries ?? []) > 1;
+
   return (
     <div className="space-y-3">
+      {canJumpToHymn && (
+        <form onSubmit={goToHymn} className="flex flex-wrap items-center gap-2 text-sm">
+          <label htmlFor="contents-hymn-number" className="text-sec">
+            Go to hymn
+          </label>
+          <input
+            id="contents-hymn-number"
+            value={hymnQuery}
+            onChange={(e) => {
+              setHymnQuery(e.target.value);
+              setHymnMissing(null);
+            }}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            aria-label="Hymn number"
+            aria-invalid={hymnMissing !== null}
+            className="w-20 rounded-md border border-sep px-2 py-1.5 text-center tabular-nums"
+          />
+          <button type="submit" className="rounded-md border border-sep px-3 py-1.5 hover:bg-hover">
+            Open
+          </button>
+          {hymnMissing !== null && (
+            <span className="text-sec">No hymn {hymnMissing} in this book.</span>
+          )}
+        </form>
+      )}
+
       <div className="inline-flex rounded-lg border border-sep p-0.5 text-sm">
         {(
           [

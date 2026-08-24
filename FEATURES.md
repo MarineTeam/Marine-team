@@ -496,6 +496,9 @@ network, and it is now a small app of its own rather than a list of videos:
   Hymnals lists the hymnals — including books filed under a series inside that
   section — and a link straight to a book (`/books/<id>` or `/read/<id>`)
   opens that book.
+- **The hymn number, typed.** The same **Go to hymn** box as online, above a
+  saved book's contents — the one moment it matters most, since a service
+  with no signal is exactly when nobody wants to scroll a list.
 - **A book's contents, then its pages.** Entries are listed with the numbers
   printed in the book (the page offset is stored with it), and opening one
   draws that page with pdf.js: swipe left and right, arrow keys, zoom, and a
@@ -573,6 +576,14 @@ own section like any other.
   each entry jumping straight to its place. A contents entry whose
   destination doesn't resolve is shown greyed rather than dropped, so a
   half-broken outline doesn't look like an empty one.
+- **Go to hymn 214** — a **Hymn** box in the reader's contents bar takes the
+  number on the board and opens that hymn, which in most books is not the
+  page it is printed on. The same box sits on a book's contents page (it
+  opens the reader there) and on the offline screen. The number is read from
+  the front of each contents entry — "214", "1. Holy, Holy, Holy", "Hymn 45",
+  "No. 12", "#7" — never from inside a title, since following a number that
+  happens to end a title would look like it worked and be wrong. Books whose
+  contents aren't numbered don't show the box.
 - **Back and Next, by hymn rather than by page** — a bar along the bottom of
   the reader names the entry being read and steps to the one either side of
   it, using the book's own contents. **Back** goes to the start of the hymn

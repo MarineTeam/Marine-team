@@ -211,6 +211,19 @@ function readToc(book) {
   return Array.isArray(stored.entries) ? stored.entries : null;
 }
 
+/**
+ * The hymn number a contents entry announces — the number on the board, not
+ * the page it is on. Same rule as hymnNumberOf in src/lib/toc-nav.ts: only a
+ * number at the start counts, with the words a hymnal's bookmarks put in
+ * front of one. Kept in step by hand, like everything else in this file.
+ */
+function hymnNumberOf(label) {
+  const match = /^\s*(?:hymn|hymn\s+no\.?|no\.?|#)?\s*(\d{1,4})(?![\d])/i.exec(label || "");
+  if (!match) return null;
+  const number = Number(match[1]);
+  return number >= 1 ? number : null;
+}
+
 function formatBytes(bytes) {
   if (!bytes) return "";
   if (bytes < 1024 * 1024) return Math.max(1, Math.round(bytes / 1024)) + " KB";
@@ -407,6 +420,44 @@ function renderBook(book) {
   const openFirst = el("button", "primary", "Open the book");
   openFirst.addEventListener("click", () => openBook(book, null, toc));
   view.appendChild(openFirst);
+
+  // Typing the number on the board is the fastest way into a hymnal, and
+  // never more so than with no connection to fall back on.
+  const numbered = (toc || []).filter((entry) => hymnNumberOf(entry.label) !== null && entry.location !== null);
+  if (numbered.length > 1) {
+    const form = document.createElement("form");
+    form.style.cssText = "display:flex;gap:8px;align-items:center;margin-top:12px;font-size:14px";
+    const label = el("label", null, "Go to hymn");
+    label.setAttribute("for", "offline-hymn-number");
+    const input = document.createElement("input");
+    input.id = "offline-hymn-number";
+    input.inputMode = "numeric";
+    input.pattern = "[0-9]*";
+    input.setAttribute("aria-label", "Hymn number");
+    input.style.cssText =
+      "width:5rem;padding:6px 8px;border:1px solid var(--sep);border-radius:6px;background:var(--panel);color:inherit;font:inherit;text-align:center";
+    const go = el("button", null, "Open");
+    go.type = "submit";
+    const miss = el("span", "detail");
+    form.appendChild(label);
+    form.appendChild(input);
+    form.appendChild(go);
+    form.appendChild(miss);
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const wanted = Number(input.value.trim());
+      const entry = numbered.find((item) => hymnNumberOf(item.label) === wanted);
+      if (!entry) {
+        miss.textContent = wanted ? "No hymn " + wanted + " in this book." : "";
+        return;
+      }
+      openBook(book, entry.location, toc);
+    });
+    input.addEventListener("input", () => {
+      miss.textContent = "";
+    });
+    view.appendChild(form);
+  }
 
   if (toc && toc.length > 0) {
     const list = el("ul");
