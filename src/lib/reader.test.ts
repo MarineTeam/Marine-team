@@ -5,6 +5,7 @@ import {
   etagMatches,
   excerptAround,
   findMatches,
+  isCompatibleReplacement,
   readerFormat,
   shouldFetchWholeBook,
   toSpeechChunks,
@@ -187,5 +188,33 @@ describe("etagMatches", () => {
     expect(etagMatches(null, '"abc"')).toBe(false);
     expect(etagMatches('"abc"', null)).toBe(false);
     expect(etagMatches("", "")).toBe(false);
+  });
+});
+
+describe("isCompatibleReplacement", () => {
+  const pdf = { mimeType: "application/pdf", path: "books/hymnal.pdf" };
+
+  it("allows a re-scan of the same kind of book", () => {
+    expect(isCompatibleReplacement(pdf, { mimeType: null, path: "books/hymnal-2026.pdf" })).toBe(true);
+  });
+
+  it("refuses swapping one reader's format for the other's", () => {
+    // Every saved place in a PDF is a page number; in an EPUB it's a CFI.
+    expect(isCompatibleReplacement(pdf, { mimeType: "application/epub+zip", path: "x" })).toBe(false);
+  });
+
+  it("refuses turning a book into something no reader opens, and the reverse", () => {
+    const audio = { mimeType: "audio/mpeg", path: "sermons/talk.mp3" };
+    expect(isCompatibleReplacement(pdf, audio)).toBe(false);
+    expect(isCompatibleReplacement(audio, pdf)).toBe(false);
+  });
+
+  it("leaves files with no reader positions interchangeable", () => {
+    expect(
+      isCompatibleReplacement(
+        { mimeType: "audio/mpeg", path: "a.mp3" },
+        { mimeType: "audio/mp4", path: "a.m4a" },
+      ),
+    ).toBe(true);
   });
 });

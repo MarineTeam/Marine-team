@@ -440,6 +440,40 @@ would be blank pages, since the file behind them isn't stored), and because
 lyrics get corrected long after a scan would have settled, the button offers
 **Update** as well as Remove.
 
+### Replacing a book
+
+A re-scanned hymnal is the same book, so it keeps the same row. **Replace the
+file**, in a file's Details panel in `/admin/files`, points that row at new
+bytes: a small file uploaded straight from the panel, or — for anything past
+the app's 4MB upload cap, which a scan always is — an object uploaded to
+Bunny Storage and chosen from the same listing the importer uses.
+
+Doing it this way rather than adding the new scan as a new file is the whole
+point. Everything that refers to a book refers to its row: where each member
+got to, their marks, the `?page=` links on its contents list, its podcast
+episode, and every copy saved to a phone. A new row leaves all of that on the
+old book with nothing to say it has been superseded.
+
+What it does and doesn't touch:
+
+- The title, series or category, page offset and every other setting stay.
+  **Check the page offset** if the new scan's front matter differs — the
+  stored page numbers are unchanged, so the printed numbers shown beside them
+  follow whatever the offset says.
+- Saved places and marks stay, and they are page numbers: a scan with
+  different pagination will move where they land.
+- The cover and hymn count are cleared, because they described the old file —
+  re-run **Generate covers**.
+- A podcast episode is re-copied to the public zone from the new bytes.
+- Devices holding this book offline show **Update available** the next time
+  they're on its page or `/profile/downloads`.
+- The replacement has to be the same kind of book — a PDF for a PDF, an EPUB
+  for an EPUB — since every saved place is in that format's own terms.
+- The old object stays in Bunny Storage, at its own path (the new bytes never
+  overwrite the old ones, or the CDN would keep serving the old file). It
+  turns up in the storage importer, where it can be dealt with once the new
+  scan has been checked.
+
 ### What the offline screen shows
 
 `public/offline.html` is served for any navigation that can't reach the

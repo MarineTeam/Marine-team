@@ -146,6 +146,30 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **A file can be replaced without becoming a different file.** A re-scanned
+  hymnal used to have to be uploaded as a *new* file, which quietly stranded
+  everything that referred to the old one: members' saved places and marks,
+  the `?page=` links on its contents list, its podcast episode, and every
+  copy saved to a phone for offline reading. **Replace the file** (in a
+  file's Details panel in `/admin/files`) points the existing row at new
+  bytes instead, so all of that follows the book.
+  - Two ways in, because the app's own upload runs through a serverless
+    function capped at 4MB: a small file straight from the panel, or an
+    object already uploaded to Bunny Storage, chosen from the same listing
+    the importer uses.
+  - The replacement must be **the same kind of book** — a PDF for a PDF, an
+    EPUB for an EPUB. Every saved place is in that format's own terms (a page
+    number, a CFI), so swapping one for the other would turn them all into
+    nonsense while looking like an ordinary edit.
+  - The new bytes go to a **new storage path**, never over the old one: a
+    pull zone caches by URL, so overwriting in place would leave the CDN
+    serving last year's scan. The old object is left in Bunny — replacing is
+    destructive enough, and storage has no undo — where the importer lists it
+    for whoever wants to clean it up.
+  - The cover and hymn count are cleared, since they described the previous
+    file; re-run **Generate covers**. A mirrored podcast episode is
+    re-copied. Devices holding the book offline see **Update available** on
+    their next visit, which is exactly what that check was built for.
 - **A book that can't be drawn is handed to the browser instead of showing an
   error.** pdf.js needs a fairly current browser engine — an older phone can
   open a PDF perfectly well and still not be able to run the library that

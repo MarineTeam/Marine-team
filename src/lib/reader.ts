@@ -26,6 +26,24 @@ export function readerFormat(mimeType: string | null | undefined, path: string):
 }
 
 /**
+ * Whether new bytes may take the place of an existing file's.
+ *
+ * The rule is that a book stays the same kind of book. Everything stored
+ * about where someone got to is in that format's own terms — a PDF page
+ * number, an EPUB CFI — so putting an EPUB behind what was a PDF turns every
+ * saved place, mark and `?page=` link into nonsense while looking like an
+ * ordinary edit. Files that neither reader opens (audio, a slide deck) have
+ * no such positions to invalidate, so they're interchangeable with each
+ * other and never with a book.
+ */
+export function isCompatibleReplacement(
+  before: { mimeType: string | null; path: string },
+  after: { mimeType: string | null; path: string },
+): boolean {
+  return readerFormat(before.mimeType, before.path) === readerFormat(after.mimeType, after.path);
+}
+
+/**
  * Percentages are stored as a whole number 0-100; anything outside that is a
  * bug upstream, not a value to persist.
  *
