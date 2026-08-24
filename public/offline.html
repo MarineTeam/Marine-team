@@ -68,6 +68,7 @@
   #canvas-wrap { background: var(--chip); border-radius: 10px; padding: 10px; overflow: auto; touch-action: pan-y; }
   #canvas-wrap canvas { display: block; margin: 0 auto; max-width: 100%; box-shadow: 0 2px 12px rgba(0,0,0,0.18); }
   .hint { font-size: 12px; color: var(--sec); margin-top: 8px; }
+  #epub-view { height: 70vh; background: #fff; border: 1px solid var(--sep); border-radius: 10px; overflow: hidden; }
   .lyrics { white-space: pre-wrap; line-height: 1.6; font-size: 15px; border: 1px solid var(--sep); border-radius: 10px; padding: 16px; }
   .hymn-nav { display: flex; gap: 10px; align-items: center; margin-top: 14px; font-size: 13px; }
   .hymn-nav .spacer { flex: 1; }
@@ -135,6 +136,10 @@ const TABS_KEY = "marine-nav-tabs";
 const TOC_PREFIX = "marine-toc-v1:";
 const PDFJS_URL = "/pdfjs/pdf.min.mjs";
 const PDFJS_WORKER_URL = "/pdfjs/pdf.worker.min.mjs";
+// epub.js's dist build is UMD and expects JSZip as a global, so the two load
+// in this order or neither works.
+const JSZIP_URL = "/epubjs/jszip.min.js";
+const EPUBJS_URL = "/epubjs/epub.min.js";
 
 // Copied from src/components/icons.tsx — same 24-unit box, same 1.75 stroke —
 // so the bar offline is the bar the app draws. Keep in sync by hand.
@@ -168,9 +173,14 @@ function readBooks() {
   if (!Array.isArray(items)) return [];
   return items
     .filter((item) => item && item.id && item.cacheUrl)
-    // Entries written before hymn-per-file books could be saved have no kind,
-    // and every one of those was a PDF.
-    .map((item) => Object.assign({}, item, { kind: item.kind === "hymnal" ? "hymnal" : "pdf" }));
+    // Anything that isn't a hymnal is a document, whatever an older version
+    // of the app called it, and a document with no format recorded is a PDF.
+    .map((item) =>
+      Object.assign({}, item, {
+        kind: item.kind === "hymnal" ? "hymnal" : "file",
+        format: item.format === "epub" ? "epub" : "pdf",
+      }),
+    );
 }
 
 function readVideos() {
@@ -283,7 +293,7 @@ function renderTabs() {
 
 // ------------------------------------------------------------ the library --
 function renderLibrary() {
-  activeReader = null;
+  teardownReader();
   view.innerHTML = "";
   const scoped = booksIn(scopePath);
   const books = scoped.length > 0 ? scoped : readBooks();
@@ -376,7 +386,7 @@ function bookRow(book) {
 
 // ----------------------------------------------------------- one book --
 function renderBook(book) {
-  activeReader = null;
+  teardownReader();
   view.innerHTML = "";
   const back = el("button", null, "← Back");
   back.addEventListener("click", renderLibrary);
@@ -395,7 +405,7 @@ function renderBook(book) {
   );
 
   const openFirst = el("button", "primary", "Open the book");
-  openFirst.addEventListener("click", () => openBook(book, 1, toc));
+  openFirst.addEventListener("click", () => openBook(book, null, toc));
   view.appendChild(openFirst);
 
   if (toc && toc.length > 0) {
@@ -404,15 +414,20 @@ function renderBook(book) {
     toc.forEach((entry) => {
       const li = el("li");
       const row = el("button", "rowlink");
-      // The number printed in the book, not the PDF's own — the same sum
-      // lib/page-offset.ts does, and front matter shows none.
-      const printed = entry.location === null ? null : Number(entry.location) - (book.pageOffset || 0);
+      // A PDF's contents entry is a page, and the number shown is the one
+      // printed in the book — the same sum lib/page-offset.ts does, with
+      // front matter showing none. An EPUB's is a chapter href, which is not
+      // a number and has no column of its own.
+      const printed =
+        book.format === "epub" || entry.location === null
+          ? null
+          : Number(entry.location) - (book.pageOffset || 0);
       row.appendChild(el("span", "pagenum", printed !== null && printed >= 1 ? String(printed) : ""));
       row.appendChild(el("span", "title", entry.label || ""));
       if (entry.location === null) {
         row.disabled = true;
       } else {
-        row.addEventListener("click", () => openBook(book, Number(entry.location), toc));
+        row.addEventListener("click", () => openBook(book, entry.location, toc));
       }
       li.appendChild(row);
       list.appendChild(li);
@@ -437,7 +452,7 @@ async function loadHymnal(book) {
 }
 
 async function renderHymnal(book) {
-  activeReader = null;
+  teardownReader();
   view.innerHTML = "";
   view.appendChild(el("p", "sub", "Opening…"));
 
@@ -551,7 +566,25 @@ function renderHymn(book, hymns, index) {
 
 // --------------------------------------------------------------- reading --
 let pdfjsPromise = null;
+let epubjsPromise = null;
 let activeReader = null;
+// epub.js renders into an iframe it owns and holds an unzipped archive; both
+// have to be let go of when the reader closes, or a few books in a session
+// add up to real memory.
+let activeEpub = null;
+
+function teardownReader() {
+  activeReader = null;
+  if (activeEpub) {
+    try {
+      activeEpub.rendition.destroy();
+      activeEpub.book.destroy();
+    } catch (error) {
+      // Already torn down.
+    }
+    activeEpub = null;
+  }
+}
 
 window.addEventListener("keydown", (event) => {
   if (!activeReader || event.metaKey || event.ctrlKey || event.altKey) return;
@@ -561,6 +594,30 @@ window.addEventListener("keydown", (event) => {
 window.addEventListener("resize", () => {
   if (activeReader) activeReader.draw();
 });
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const tag = document.createElement("script");
+    tag.src = src;
+    tag.onload = () => resolve();
+    tag.onerror = () => reject(new Error("Couldn't load " + src));
+    document.head.appendChild(tag);
+  });
+}
+
+function loadEpubjs() {
+  if (!epubjsPromise) {
+    // Saved into the book cache with the first EPUB (lib/offline-books.ts),
+    // so the service worker can answer for both with no network.
+    epubjsPromise = loadScript(JSZIP_URL)
+      .then(() => loadScript(EPUBJS_URL))
+      .then(() => {
+        if (!window.ePub) throw new Error("epub.js didn't load");
+        return window.ePub;
+      });
+  }
+  return epubjsPromise;
+}
 
 function loadPdfjs() {
   if (!pdfjsPromise) {
@@ -582,7 +639,11 @@ async function bookBytes(book) {
   return new Uint8Array(await response.arrayBuffer());
 }
 
-async function openBook(book, page, toc) {
+/**
+ * `target` is whatever that book's contents entries hold — a PDF page number
+ * or an EPUB chapter href — or null to open at the beginning.
+ */
+async function openBook(book, target, toc) {
   view.innerHTML = "";
   view.appendChild(el("p", "sub", "Opening…"));
 
@@ -605,6 +666,11 @@ async function openBook(book, page, toc) {
     return;
   }
 
+  if (book.format === "epub") {
+    await openEpub(book, data, target, toc);
+    return;
+  }
+
   let doc;
   try {
     const pdfjs = await loadPdfjs();
@@ -613,10 +679,156 @@ async function openBook(book, page, toc) {
     // No viewer on the device (the book was saved before pdf.js was deployed,
     // or that copy was evicted). The browser has a PDF viewer of its own, and
     // the service worker serves the file as a PDF precisely so it can be used.
-    renderViewerFallback(book, page, error);
+    renderViewerFallback(book, Number(target) || 1, error);
     return;
   }
-  renderReader(book, doc, page, toc);
+  renderReader(book, doc, Number(target) || 1, toc);
+}
+
+/**
+ * An EPUB reflows, so there are no pages to draw and nothing for a browser to
+ * fall back to — no browser renders an EPUB of its own. epub.js does the
+ * rendering, into an iframe it owns, which is why the keys and the swipe are
+ * registered inside that document rather than on this one.
+ */
+async function openEpub(book, data, target, toc) {
+  let ePub;
+  try {
+    ePub = await loadEpubjs();
+  } catch (error) {
+    renderEpubFallback(book, error);
+    return;
+  }
+
+  view.innerHTML = "";
+  const bar = el("div", "reader-bar");
+  const back = el("button", null, "‹ Contents");
+  back.addEventListener("click", () => {
+    teardownReader();
+    renderBook(book);
+  });
+  const label = el("span", "detail");
+  const previous = el("button", null, "‹");
+  previous.setAttribute("aria-label", "Previous");
+  const next = el("button", null, "›");
+  next.setAttribute("aria-label", "Next");
+  bar.appendChild(back);
+  bar.appendChild(el("span", "spacer"));
+  bar.appendChild(previous);
+  bar.appendChild(label);
+  bar.appendChild(next);
+  view.appendChild(bar);
+
+  const container = el("div");
+  container.id = "epub-view";
+  view.appendChild(container);
+  view.appendChild(el("p", "hint", "Swipe left and right, or use the arrow keys, to move through the book."));
+
+  // A copy of the bytes, not a view onto them: epub.js hands the buffer
+  // straight to JSZip.
+  const epubBook = ePub(data.slice().buffer);
+  const rendition = epubBook.renderTo(container, {
+    width: "100%",
+    height: "100%",
+    // Scrolled rather than paginated, matching the in-app reader: it behaves
+    // far better on a phone.
+    flow: "scrolled-doc",
+    spread: "none",
+  });
+  activeEpub = { book: epubBook, rendition: rendition };
+  activeReader = { go: (by) => (by > 0 ? rendition.next() : rendition.prev()), draw: () => {} };
+
+  previous.addEventListener("click", () => rendition.prev());
+  next.addEventListener("click", () => rendition.next());
+
+  // Which chapter is on screen, by the same loose href match the in-app
+  // reader's search results use — a navigation href can carry a fragment the
+  // spine item's doesn't.
+  rendition.on("relocated", (location) => {
+    const href = location && location.start && location.start.href;
+    if (!href || !toc) return;
+    const tail = String(href).split("/").pop();
+    const entry = toc.find((item) => item.location && String(item.location).includes(tail));
+    label.textContent = entry ? entry.label : "";
+  });
+
+  // Inside the iframe, because that is where the reading happens and where
+  // the events land.
+  rendition.hooks.content.register((contents) => {
+    const doc = contents.document;
+    doc.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowRight") rendition.next();
+      else if (event.key === "ArrowLeft") rendition.prev();
+    });
+    let gesture = null;
+    doc.addEventListener(
+      "touchstart",
+      (event) => {
+        gesture = event.touches.length === 1 ? { x: event.touches[0].clientX, y: event.touches[0].clientY, dx: 0, turning: false } : null;
+      },
+      { passive: true },
+    );
+    doc.addEventListener(
+      "touchmove",
+      (event) => {
+        if (!gesture || event.touches.length !== 1) { gesture = null; return; }
+        const dx = event.touches[0].clientX - gesture.x;
+        const dy = event.touches[0].clientY - gesture.y;
+        if (!gesture.turning) {
+          if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
+          if (Math.abs(dy) >= Math.abs(dx)) { gesture = null; return; }
+          gesture.turning = true;
+        }
+        gesture.dx = dx;
+      },
+      { passive: true },
+    );
+    doc.addEventListener("touchend", () => {
+      if (gesture && gesture.turning && Math.abs(gesture.dx) >= 60) {
+        if (gesture.dx < 0) rendition.next();
+        else rendition.prev();
+      }
+      gesture = null;
+    });
+  });
+
+  try {
+    await rendition.display(target || undefined);
+  } catch (error) {
+    // A contents entry pointing at a section this copy doesn't have; the
+    // book still opens at its beginning.
+    try {
+      await rendition.display();
+    } catch (ignored) {
+      renderEpubFallback(book, error);
+    }
+  }
+}
+
+/**
+ * No browser renders an EPUB on its own, so unlike a PDF there is nothing to
+ * hand it to — the honest offer is the file itself, for whatever reading app
+ * the device has.
+ */
+function renderEpubFallback(book, error) {
+  teardownReader();
+  view.innerHTML = "";
+  const back = el("button", null, "← Back");
+  back.addEventListener("click", () => renderBook(book));
+  view.appendChild(back);
+  view.appendChild(el("h1", null, book.title || "Untitled book"));
+  view.appendChild(
+    el(
+      "p",
+      "sub",
+      "The reader for this book isn't saved on this device, and a browser can't show an EPUB on its own. The file itself is here — open it in a reading app.",
+    ),
+  );
+  const open = el("a", "btn", "Save the file");
+  open.href = book.cacheUrl;
+  open.setAttribute("download", (book.title || "book") + ".epub");
+  view.appendChild(open);
+  if (error && error.message) view.appendChild(el("p", "hint", error.message));
 }
 
 function renderViewerFallback(book, page, error) {
@@ -650,7 +862,7 @@ function renderReader(book, doc, startPage, toc) {
   const back = el("button", null, "‹ Contents");
   back.addEventListener("click", () => {
     if (renderTask) renderTask.cancel();
-    activeReader = null;
+    teardownReader();
     renderBook(book);
   });
   const prev = el("button", null, "‹");

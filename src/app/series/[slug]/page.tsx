@@ -351,6 +351,8 @@ export default async function SeriesPage({
                           <SaveBookButton
                             fileId={soleBook.id}
                             title={soleBook.title}
+                            // pdfsOf() already narrowed this list to PDFs.
+                            format="pdf"
                             homeHref={`/series/${series.slug}`}
                             homeLabel={series.title}
                             categoryHref={

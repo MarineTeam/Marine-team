@@ -6,6 +6,7 @@ import { formatBytes, isLikelyCellular } from "@/lib/offline-downloads";
 import {
   checkSavedBook,
   offlineBooksSupported,
+  type OfflineBookFormat,
   readOfflineBooks,
   removeOfflineBook,
   saveBookWithContents,
@@ -31,6 +32,7 @@ type State = "idle" | "saving" | "done" | "error";
 export function SaveBookButton({
   fileId,
   title,
+  format,
   homeHref,
   homeLabel,
   categoryHref,
@@ -40,6 +42,8 @@ export function SaveBookButton({
 }: {
   fileId: string;
   title: string;
+  /** Which reader opens it, so the right library is saved alongside it. */
+  format: OfflineBookFormat;
   homeHref: string | null;
   homeLabel: string | null;
   categoryHref: string | null;
@@ -81,7 +85,7 @@ export function SaveBookButton({
     setProgress(0);
     try {
       await saveBookWithContents(
-        { id: fileId, title, homeHref, homeLabel, categoryHref, categoryLabel, pageOffset, sizeBytes },
+        { id: fileId, title, format, homeHref, homeLabel, categoryHref, categoryLabel, pageOffset, sizeBytes },
         (fraction) => setProgress(fraction),
       );
       setStatus("current");
@@ -90,7 +94,7 @@ export function SaveBookButton({
       setState("error");
       setMessage(error instanceof Error ? error.message : "Couldn't save this book.");
     }
-  }, [fileId, title, homeHref, homeLabel, categoryHref, categoryLabel, pageOffset, sizeBytes]);
+  }, [fileId, title, format, homeHref, homeLabel, categoryHref, categoryLabel, pageOffset, sizeBytes]);
 
   async function remove() {
     await removeOfflineBook(fileId);

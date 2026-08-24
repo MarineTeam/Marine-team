@@ -21,13 +21,19 @@ const INDEX_KEY = "marine-offline-books";
 export const OFFLINE_BOOKS_CHANGED_EVENT = "marine-offline-books-change";
 
 /**
- * pdf.js, copied into `public/pdfjs` at build time
- * (scripts/copy-offline-pdfjs.mjs). Saved into the book cache along with the
- * first book, so the offline shell has something to draw pages with; without
- * it that shell falls back to handing the file to the browser's own PDF
- * viewer.
+ * The reader libraries, copied into `public/` at build time
+ * (scripts/copy-offline-viewers.mjs) and saved into the book cache alongside
+ * the first book that needs them — the offline shell is a static page with
+ * no bundle, so a book without its library is a book it can't open.
+ *
+ * Per format on purpose: pdf.js is 1.7MB and a church whose library is all
+ * EPUBs should never fetch it. epub.js's dist build is UMD and expects
+ * `JSZip` as a global, so those two travel together.
  */
-export const VIEWER_ASSETS = ["/pdfjs/pdf.min.mjs", "/pdfjs/pdf.worker.min.mjs"];
+export const VIEWER_ASSETS: Record<OfflineBookFormat, string[]> = {
+  pdf: ["/pdfjs/pdf.min.mjs", "/pdfjs/pdf.worker.min.mjs"],
+  epub: ["/epubjs/jszip.min.js", "/epubjs/epub.min.js"],
+};
 
 /**
  * The two shapes a "book" comes in here, which is the same split the rest of
@@ -36,7 +42,10 @@ export const VIEWER_ASSETS = ["/pdfjs/pdf.min.mjs", "/pdfjs/pdf.worker.min.mjs"]
  * bytes against a list of lyrics — and read differently offline, but they are
  * one list to the person who saved them, so they share an index.
  */
-export type OfflineBookKind = "pdf" | "hymnal";
+export type OfflineBookKind = "file" | "hymnal";
+
+/** Which reader opens a saved file, and so which library has to be there to do it. */
+export type OfflineBookFormat = "pdf" | "epub";
 
 /** One hymn of a hymn-per-file book, as it is stored for reading offline. */
 export type OfflineHymn = {
@@ -48,9 +57,11 @@ export type OfflineHymn = {
 };
 
 export type OfflineBook = {
-  /** "pdf": the book is one file. "hymnal": the book is a series of hymns. */
+  /** "file": the book is one document. "hymnal": the book is a series of hymns. */
   kind: OfflineBookKind;
-  /** The file's id for a PDF; the series' id for a hymn-per-file book. */
+  /** Which reader opens it. Files only; a hymnal is lyrics and needs neither. */
+  format?: OfflineBookFormat;
+  /** The file's id for a document; the series' id for a hymn-per-file book. */
   id: string;
   /** The cache key the file is stored under; also what the offline shell opens. */
   cacheUrl: string;
@@ -72,7 +83,7 @@ export type OfflineBook = {
   /** PDF only: front matter, so the offline contents can quote printed page numbers. */
   pageOffset: number;
   /**
-   * PDF only: the file's recorded size — which is also the tag its cached
+   * Files only: the file's recorded size — which is also the tag its cached
    * contents list is stored under (see lib/reader-cache.ts), so the offline
    * shell can tell whether that list still describes this book.
    */
@@ -92,9 +103,13 @@ export type OfflineBook = {
   savedAt: string;
 };
 
-/** Books are keyed by id on our own origin, so the SW can recognise them by path. */
-export function offlineBookUrl(fileId: string): string {
-  return `/offline-book/${fileId}.pdf`;
+/**
+ * Books are keyed by id on our own origin, so the SW can recognise them by
+ * path. The extension carries the format, which is what lets that same
+ * handler answer with a type the browser understands.
+ */
+export function offlineBookUrl(fileId: string, format: OfflineBookFormat = "pdf"): string {
+  return `/offline-book/${fileId}.${format}`;
 }
 
 /**
@@ -113,9 +128,13 @@ export function readOfflineBooks(): OfflineBook[] {
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter((item) => Boolean(item?.id && item?.cacheUrl))
-      // Everything without a kind predates hymn-per-file books being savable,
-      // and every one of those was a PDF.
-      .map((item): OfflineBook => ({ ...item, kind: item.kind === "hymnal" ? "hymnal" : "pdf" }));
+      .map((item): OfflineBook => ({
+        ...item,
+        // Anything that isn't a hymnal is a document, whatever an older
+        // version of this app called it.
+        kind: item.kind === "hymnal" ? "hymnal" : "file",
+        format: item.format === "epub" ? "epub" : "pdf",
+      }));
   } catch {
     return [];
   }
@@ -149,11 +168,11 @@ export function offlineBooksSupported(): boolean {
  * than fetching the whole file a second time to do it.
  */
 export async function saveBookOffline(
-  meta: Omit<OfflineBook, "kind" | "cacheUrl" | "bytes" | "savedAt">,
+  meta: Omit<OfflineBook, "kind" | "cacheUrl" | "bytes" | "savedAt"> & { format: OfflineBookFormat },
   onProgress?: (fraction: number, bytes: number) => void,
   signal?: AbortSignal,
 ): Promise<{ entry: OfflineBook; data: Uint8Array }> {
-  const cacheUrl = offlineBookUrl(meta.id);
+  const cacheUrl = offlineBookUrl(meta.id, meta.format);
   const response = await fetch(`/api/files/${meta.id}/content`, {
     credentials: "same-origin",
     signal,
@@ -191,21 +210,22 @@ export async function saveBookOffline(
     cacheUrl,
     new Response(data, {
       headers: {
-        // Typed as a PDF whatever the upload said, so the browser's own
-        // viewer will render it if the offline shell has to fall back to it.
-        "Content-Type": "application/pdf",
+        // The reader's own type whatever the upload said, so a PDF still
+        // opens in the browser's own viewer if the offline shell has to fall
+        // back to it.
+        "Content-Type": meta.format === "epub" ? "application/epub+zip" : "application/pdf",
         "Content-Length": String(data.byteLength),
         "Accept-Ranges": "bytes",
       },
     }),
   );
   // Best effort, and after the book itself: the shell can still hand a saved
-  // book to the browser's PDF viewer without these.
-  await cacheViewerAssets();
+  // PDF to the browser's own viewer without these.
+  await cacheViewerAssets(meta.format);
 
   const entry: OfflineBook = {
     ...meta,
-    kind: "pdf",
+    kind: "file",
     cacheUrl,
     version,
     bytes: data.byteLength,
@@ -269,14 +289,20 @@ export async function saveHymnalOffline(
  * kept — it just opens at the first page.
  */
 export async function saveBookWithContents(
-  meta: Omit<OfflineBook, "kind" | "cacheUrl" | "bytes" | "savedAt" | "version">,
+  meta: Omit<OfflineBook, "kind" | "cacheUrl" | "bytes" | "savedAt" | "version"> & {
+    format: OfflineBookFormat;
+  },
   onProgress?: (fraction: number, bytes: number) => void,
 ): Promise<OfflineBook> {
   const { entry, data } = await saveBookOffline(meta, onProgress);
   try {
-    const { loadPdfOutlineFromBytes } = await import("@/lib/pdf-client");
     const { bookCacheTag, writeCachedToc } = await import("@/lib/reader-cache");
-    writeCachedToc(meta.id, bookCacheTag({ sizeBytes: meta.sizeBytes }), await loadPdfOutlineFromBytes(data));
+    // Each format's own parser, from the bytes already in hand.
+    const entries =
+      meta.format === "epub"
+        ? await (await import("@/lib/epub-client")).loadEpubTocFromBytes(data)
+        : await (await import("@/lib/pdf-client")).loadPdfOutlineFromBytes(data);
+    writeCachedToc(meta.id, bookCacheTag({ sizeBytes: meta.sizeBytes }), entries);
   } catch {
     // See above: a book whose contents won't read is still worth having.
   }
@@ -288,11 +314,11 @@ export async function saveBookWithContents(
  * the HTTP cache holds — this is the moment an upgraded copy should land, and
  * it happens once per save rather than once per page.
  */
-export async function cacheViewerAssets(): Promise<void> {
+export async function cacheViewerAssets(format: OfflineBookFormat): Promise<void> {
   try {
     const cache = await caches.open(BOOK_CACHE);
     await Promise.all(
-      VIEWER_ASSETS.map(async (asset) => {
+      VIEWER_ASSETS[format].map(async (asset) => {
         const response = await fetch(asset, { cache: "reload" });
         if (response.ok) await cache.put(asset, response);
       }),
@@ -366,8 +392,8 @@ export async function removeOfflineBook(id: string): Promise<void> {
   const saved = readOfflineBooks().find((item) => item.id === id);
   try {
     const cache = await caches.open(BOOK_CACHE);
-    // By the stored key rather than a rebuilt one: a hymn-per-file book is
-    // not at the path a PDF would be.
+    // By the stored key rather than a rebuilt one: neither a hymn-per-file
+    // book nor an EPUB is at the path a PDF would be.
     await cache.delete(saved?.cacheUrl ?? offlineBookUrl(id));
   } catch {
     // Already gone, or storage cleared by the browser — the index entry below

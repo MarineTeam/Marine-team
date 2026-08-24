@@ -510,10 +510,12 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     without knowing which engine produced them.
   - A book can also be **saved to the device** (`src/lib/offline-books.ts`),
     which stores its bytes under `/offline-book/<id>.pdf` in Cache Storage,
-    its contents list, and a copy of pdf.js from `public/pdfjs` — the offline
-    shell has no bundle to draw pages with. `scripts/copy-offline-pdfjs.mjs`
-    puts that copy there at install and build time so it tracks the pinned
-    version rather than being committed.
+    its contents list, and a copy of the reader it needs — pdf.js from
+    `public/pdfjs`, or epub.js plus JSZip from `public/epubjs`, since the
+    offline shell has no bundle to render with.
+    `scripts/copy-offline-viewers.mjs` puts those there at install and build
+    time so they track the pinned versions rather than being committed, and
+    only the library a saved book actually needs is fetched.
   - A **hymn-per-file** book has no document to store, so
     `/api/offline/hymnal/[seriesId]` returns its hymns and lyrics (same view
     and plugin checks as the page) and they are cached as JSON under

@@ -146,6 +146,15 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **EPUBs save for offline too, not just PDFs.** The asymmetry was an
+  accident of which reader came first. A saved EPUB stores its bytes, its
+  contents (read out of those bytes with epub.js rather than fetched again)
+  and the library needed to render it, and the offline screen opens it the
+  way the in-app reader does: scrolling, chapter by chapter, with the arrow
+  keys and the swipe registered inside the frame epub.js owns and the current
+  chapter named in the bar. Where a PDF can fall back to the browser's own
+  viewer, an EPUB can't — no browser renders one — so that case offers the
+  file for whatever reading app the device has.
 - **A file can be replaced without becoming a different file.** A re-scanned
   hymnal used to have to be uploaded as a *new* file, which quietly stranded
   everything that referred to the old one: members' saved places and marks,

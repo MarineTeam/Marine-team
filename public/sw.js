@@ -28,9 +28,9 @@ const BOOK_PATH_PREFIX = "/offline-book/";
 // A hymn-per-file book is saved as its list of hymns rather than as a file,
 // and lives in the same cache under its own path.
 const HYMNAL_PATH_PREFIX = "/offline-hymnal/";
-// pdf.js, saved into the book cache alongside the first book so the offline
-// shell has something to draw pages with.
-const VIEWER_PATH_PREFIX = "/pdfjs/";
+// The reader libraries, saved into the book cache alongside the first book
+// that needs them so the offline shell has something to draw a page with.
+const VIEWER_PATH_PREFIXES = ["/pdfjs/", "/epubjs/"];
 // The app's own file route. A saved book is the same bytes under a different
 // name, which is what lets the in-app reader survive the connection dropping
 // while it is open.
@@ -109,15 +109,21 @@ self.addEventListener("fetch", (event) => {
         isVideo ? DOWNLOAD_CACHE : BOOK_CACHE,
         url.pathname,
         event.request,
-        isVideo ? "video/mp4" : isHymnal ? "application/json" : "application/pdf",
+        isVideo
+          ? "video/mp4"
+          : isHymnal
+            ? "application/json"
+            : url.pathname.endsWith(".epub")
+              ? "application/epub+zip"
+              : "application/pdf",
       ).then((response) => response || new Response("Not saved on this device", { status: 404 })),
     );
     return;
   }
 
-  // pdf.js for the offline shell: cache first, because the whole point is
-  // that it is there when the network isn't.
-  if (url.pathname.startsWith(VIEWER_PATH_PREFIX)) {
+  // The reader libraries: cache first, because the whole point of having
+  // saved them is that they are there when the network isn't.
+  if (VIEWER_PATH_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) {
     event.respondWith(
       caches
         .open(BOOK_CACHE)
@@ -135,14 +141,20 @@ self.addEventListener("fetch", (event) => {
   const contentMatch = CONTENT_PATH.exec(url.pathname);
   if (contentMatch && event.request.method === "GET") {
     event.respondWith(
-      fetch(event.request).catch(() =>
-        respondFromCache(
-          BOOK_CACHE,
-          `${BOOK_PATH_PREFIX}${contentMatch[1]}.pdf`,
-          event.request,
-          "application/pdf",
-        ).then((response) => response || Response.error()),
-      ),
+      fetch(event.request).catch(async () => {
+        // Either extension: the saved copy is named for the reader that
+        // opens it, and this handler doesn't know which one this file is.
+        for (const format of ["pdf", "epub"]) {
+          const cached = await respondFromCache(
+            BOOK_CACHE,
+            `${BOOK_PATH_PREFIX}${contentMatch[1]}.${format}`,
+            event.request,
+            format === "epub" ? "application/epub+zip" : "application/pdf",
+          );
+          if (cached) return cached;
+        }
+        return Response.error();
+      }),
     );
     return;
   }

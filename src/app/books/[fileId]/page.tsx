@@ -50,7 +50,8 @@ export default async function BookPage({ params }: { params: Promise<{ fileId: s
   const navCategory = navCategories.find((category) => category.id === categoryId) ?? null;
   // Saving a book to the device is the same permission as saving a video to
   // it, and a category can turn it off for its own section.
-  const offlineOn = plugins.downloads && readerFormat(file.mimeType, file.bunnyPath) === "pdf";
+  const format = readerFormat(file.mimeType, file.bunnyPath);
+  const offlineOn = plugins.downloads && format !== null;
 
   const backHref = file.series
     ? `/series/${file.series.slug}`
@@ -87,6 +88,7 @@ export default async function BookPage({ params }: { params: Promise<{ fileId: s
             <SaveBookButton
               fileId={file.id}
               title={file.title}
+              format={format ?? "pdf"}
               // Where a tap on this section's icon should find the book when
               // there's no connection: its series if it has one, else its
               // category — the same place the "back" link goes.

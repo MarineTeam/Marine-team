@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "postinstall": "prisma generate && node scripts/copy-offline-pdfjs.mjs",
+    "postinstall": "prisma generate && node scripts/copy-offline-viewers.mjs",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:baseline": "prisma migrate resolve --applied 0_init",

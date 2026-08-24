@@ -52,6 +52,7 @@ export function OfflineBooksManager() {
       await saveBookWithContents({
         id: book.id,
         title: book.title,
+        format: book.format ?? "pdf",
         homeHref: book.homeHref,
         homeLabel: book.homeLabel,
         categoryHref: book.categoryHref,
@@ -134,7 +135,7 @@ export function OfflineBooksManager() {
                     </p>
                   )}
                 </div>
-                {statuses[book.id] === "outdated" && book.kind === "pdf" && (
+                {statuses[book.id] === "outdated" && book.kind === "file" && (
                   <button
                     onClick={() => void update(book)}
                     disabled={updating === book.id}

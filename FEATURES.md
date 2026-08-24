@@ -423,11 +423,19 @@ Saving stores three things, because reading a hymn offline needs all three:
 - **The contents list**, read out of the bytes that were just downloaded
   rather than fetched all over again. Without it there is no way to find hymn
   214 with no connection, which is most of the point.
-- **pdf.js itself.** The offline screen is a static page with no application
-  bundle behind it, so it has no way to draw a page unless the library is
-  already on the device. It's copied out of `pdfjs-dist` into `public/pdfjs`
-  at install and build time (`scripts/copy-offline-pdfjs.mjs`, so it stays the
-  version `package.json` pins) and fetched once, when the first book is saved.
+- **The reader itself.** The offline screen is a static page with no
+  application bundle behind it, so it has no way to render a book unless the
+  library is already on the device: pdf.js for a PDF, epub.js (with JSZip,
+  which its build expects as a global) for an EPUB. They're copied out of
+  `node_modules` into `public/` at install and build time
+  (`scripts/copy-offline-viewers.mjs`, so they stay the versions
+  `package.json` pins) and fetched once, when the first book that needs one is
+  saved — a library of EPUBs never pulls pdf.js's 1.7MB.
+
+**Both kinds of book the reader opens can be saved** — a PDF and an EPUB
+alike. What differs is the fallback when the library can't be loaded: a PDF
+can be handed to the browser's own viewer, while no browser renders an EPUB
+on its own, so that offers the file for whatever reading app the device has.
 
 A **hymn-per-file** book — one whose hymns are separate files rather than one
 PDF — is saved from its own page, and stores something different: there is no
@@ -494,6 +502,10 @@ network, and it is now a small app of its own rather than a list of videos:
   bar naming the hymn you are on. Where a browser can't draw the pages
   itself, the book is handed to that browser's own PDF viewer at the right
   page rather than showing a blank sheet.
+- **Or an EPUB's chapters**, rendered by epub.js exactly as the in-app reader
+  does — scrolling rather than paginated, with the chapter you're in named in
+  the bar. The arrow keys and the swipe are registered inside the frame
+  epub.js owns, which is where the reading actually happens.
 - **Or a hymnal's hymns, then one hymn's lyrics**, for a hymn-per-file book —
   searchable, grouped, and steppable with Back and Next. A link to a single
   hymn (`/hymns/<id>`) opens it directly when its book is on the device.
