@@ -62,6 +62,39 @@ export function hymnReadingOrder<T extends { pageNumber: number | null }>(files:
   return [...numbered, ...files.filter((file) => file.pageNumber === null)];
 }
 
+/**
+ * A short token for "these hymns, as they read right now".
+ *
+ * A device holding a hymn-per-file book offline holds a copy of its lyrics,
+ * and lyrics are corrected and added long after the rest of a book has
+ * settled — so the device needs a way to ask whether what it has is still
+ * what the book says, without downloading the whole thing to find out. This
+ * is that answer: computed the same way on the server (for the current book)
+ * and stored with the copy (for the saved one), and compared.
+ *
+ * FNV-1a rather than a real digest: this is a change detector, not a
+ * security boundary, and it has to run synchronously in both places. It
+ * covers everything that changes what someone reads — the hymns present,
+ * their order, their numbers, their titles and their words.
+ */
+export function fingerprintHymns(
+  hymns: { id: string; title: string; pageNumber: number | null; lyricsText: string }[],
+): string {
+  let hash = 0x811c9dc5;
+  for (const hymn of hymns) {
+    const line = `${hymn.id}|${hymn.pageNumber ?? ""}|${hymn.title}|${hymn.lyricsText}\n`;
+    for (let i = 0; i < line.length; i++) {
+      hash ^= line.charCodeAt(i);
+      // The FNV prime, by shifts: a plain multiply overflows into a float and
+      // stops being the same function.
+      hash = (hash + ((hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24))) >>> 0;
+    }
+  }
+  // The count travels with it so two books can't collide into looking
+  // identical on a hash alone.
+  return `${hymns.length}-${hash.toString(16)}`;
+}
+
 /** The PDFs among a set of files — the only kind of file that can be a book. */
 export function pdfsOf<T extends { mimeType: string | null; bunnyPath: string }>(files: T[]): T[] {
   return files.filter((file) => readerFormat(file.mimeType, file.bunnyPath) === "pdf");

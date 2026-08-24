@@ -146,6 +146,27 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **A book that can't be drawn is handed to the browser instead of showing an
+  error.** pdf.js needs a fairly current browser engine — an older phone can
+  open a PDF perfectly well and still not be able to run the library that
+  draws one — and until now that surfaced in the reader as a raw error
+  message. The reader now offers the book in the browser's own PDF viewer, at
+  the page you were on, with the technical reason kept in small print for
+  whoever gets the support message. The offline screen already did this; the
+  two now behave the same way.
+- **A saved book says when it is out of date.** A copy on a device was
+  previously kept forever, however much the book had moved on. Each saved
+  book now records what it was when it was saved — a PDF's ETag, a hymnal's
+  fingerprint over its hymns and lyrics — and the book's page and
+  `/profile/downloads` compare that against the current one, offering
+  **Update** when they differ and saying so when the book is no longer
+  available to that account.
+  - The check costs almost nothing: a PDF is asked with a conditional request
+    for **one byte**, so an unchanged book answers with a bodyless `304` and a
+    changed one with a single byte and its new validator. A hymnal asks the
+    same route it was saved from for its fingerprint alone (`?probe=1`).
+  - Nothing is ever removed on the strength of that answer. A book leaves a
+    device when the person holding it says so, not because a request failed.
 - **The bottom bar is yours to arrange, and it survives losing the
   connection.** The row of icons in the installed app is the only navigation
   it has, so what belongs there depends on why you opened it. **Bottom bar**

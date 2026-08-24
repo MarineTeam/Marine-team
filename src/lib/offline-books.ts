@@ -79,6 +79,14 @@ export type OfflineBook = {
   sizeBytes: number | null;
   /** Hymn-per-file only: how many hymns were actually stored. */
   hymnCount?: number;
+  /**
+   * What was saved, as the server described it at the time: a PDF's ETag, or
+   * a hymnal's fingerprint (see lib/hymnal.ts). Compared against the server's
+   * current answer to tell a copy that is still the book from one that is a
+   * year out of date — see checkSavedBook. Absent when the server gave no
+   * validator, in which case staleness simply isn't knowable.
+   */
+  version?: string | null;
   /** What was actually stored, which is what the "saved on this device" total counts. */
   bytes: number;
   savedAt: string;
@@ -177,6 +185,7 @@ export async function saveBookOffline(
     at += chunk.byteLength;
   }
 
+  const version = response.headers.get("etag");
   const cache = await caches.open(BOOK_CACHE);
   await cache.put(
     cacheUrl,
@@ -198,6 +207,7 @@ export async function saveBookOffline(
     ...meta,
     kind: "pdf",
     cacheUrl,
+    version,
     bytes: data.byteLength,
     savedAt: new Date().toISOString(),
   };
@@ -216,8 +226,12 @@ export async function saveBookOffline(
  * count on the button says how many were actually kept.
  */
 export async function saveHymnalOffline(
-  meta: Omit<OfflineBook, "kind" | "cacheUrl" | "bytes" | "savedAt" | "hymnCount" | "pageOffset" | "sizeBytes">,
+  meta: Omit<
+    OfflineBook,
+    "kind" | "cacheUrl" | "bytes" | "savedAt" | "hymnCount" | "pageOffset" | "sizeBytes" | "version"
+  >,
   hymns: OfflineHymn[],
+  fingerprint: string | null,
 ): Promise<OfflineBook> {
   const cacheUrl = offlineHymnalUrl(meta.id);
   const body = JSON.stringify({ id: meta.id, title: meta.title, hymns });
@@ -237,10 +251,35 @@ export async function saveHymnalOffline(
     pageOffset: 0,
     sizeBytes: null,
     hymnCount: hymns.length,
+    version: fingerprint,
     bytes: body.length,
     savedAt: new Date().toISOString(),
   };
   writeOfflineBooks([entry, ...readOfflineBooks().filter((item) => item.id !== meta.id)]);
+  return entry;
+}
+
+/**
+ * Saves a PDF book and remembers its contents in one go.
+ *
+ * The two belong together: a book on the device with no contents list opens
+ * at page one and can't be searched for a hymn, which is most of what having
+ * it there is for. The contents are read out of the bytes just downloaded
+ * rather than fetched again, and a book whose outline won't parse is still
+ * kept — it just opens at the first page.
+ */
+export async function saveBookWithContents(
+  meta: Omit<OfflineBook, "kind" | "cacheUrl" | "bytes" | "savedAt" | "version">,
+  onProgress?: (fraction: number, bytes: number) => void,
+): Promise<OfflineBook> {
+  const { entry, data } = await saveBookOffline(meta, onProgress);
+  try {
+    const { loadPdfOutlineFromBytes } = await import("@/lib/pdf-client");
+    const { bookCacheTag, writeCachedToc } = await import("@/lib/reader-cache");
+    writeCachedToc(meta.id, bookCacheTag({ sizeBytes: meta.sizeBytes }), await loadPdfOutlineFromBytes(data));
+  } catch {
+    // See above: a book whose contents won't read is still worth having.
+  }
   return entry;
 }
 
@@ -261,6 +300,65 @@ export async function cacheViewerAssets(): Promise<void> {
   } catch {
     // Never deployed, or the network went away mid-save. The book itself is
     // already stored, and the shell falls back to the browser's PDF viewer.
+  }
+}
+
+/**
+ * Whether what this device is holding is still what the book says.
+ *
+ * - `current` — the copy matches the server's current version.
+ * - `outdated` — the book has changed since it was saved.
+ * - `unavailable` — it isn't there any more, or this account can no longer
+ *   read it. Never acted on automatically: a saved book is removed by the
+ *   person who saved it, not by a failed request.
+ * - `unknown` — no connection, or nothing to compare (a copy saved before
+ *   versions were recorded, or a file the CDN gives no validator for).
+ *
+ * A PDF is asked with a conditional request for a single byte: unchanged
+ * comes back as a bodyless 304, changed as one byte and a new ETag, and
+ * neither costs the megabytes the book actually is. A hymnal is asked for
+ * its fingerprint alone (see the route's ?probe=1).
+ */
+export type SavedBookStatus = "current" | "outdated" | "unavailable" | "unknown";
+
+export async function checkSavedBook(book: OfflineBook): Promise<SavedBookStatus> {
+  try {
+    if (book.kind === "hymnal") {
+      const response = await fetch(`/api/offline/hymnal/${book.id}?probe=1`, {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (response.status === 403 || response.status === 404) return "unavailable";
+      if (!response.ok) return "unknown";
+      const data = await response.json();
+      if (!book.version || typeof data.fingerprint !== "string") return "unknown";
+      return data.fingerprint === book.version ? "current" : "outdated";
+    }
+
+    const response = await fetch(`/api/files/${book.id}/content`, {
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        // One byte, not the book: all that's wanted here is the validator
+        // that comes back with it.
+        Range: "bytes=0-0",
+        ...(book.version ? { "If-None-Match": book.version } : {}),
+      },
+    });
+    // Nothing was sent back, so there is nothing to release; every other
+    // answer carries a byte or an error page that would otherwise be left
+    // hanging on a slow connection.
+    if (response.status !== 304) void response.body?.cancel();
+
+    if (response.status === 304) return "current";
+    if (response.status === 403 || response.status === 404) return "unavailable";
+    if (!response.ok && response.status !== 206) return "unknown";
+    const etag = response.headers.get("etag");
+    if (!book.version || !etag) return "unknown";
+    return etag === book.version ? "current" : "outdated";
+  } catch {
+    // Offline, which is not news about the book.
+    return "unknown";
   }
 }
 

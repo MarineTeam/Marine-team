@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { readDeviceSettings } from "@/lib/device-settings";
-import { loadPdfOutlineFromBytes } from "@/lib/pdf-client";
-import { bookCacheTag, writeCachedToc } from "@/lib/reader-cache";
 import { formatBytes, isLikelyCellular } from "@/lib/offline-downloads";
 import {
-  isBookSaved,
+  checkSavedBook,
   offlineBooksSupported,
+  readOfflineBooks,
   removeOfflineBook,
-  saveBookOffline,
+  saveBookWithContents,
+  type SavedBookStatus,
 } from "@/lib/offline-books";
 
 type State = "idle" | "saving" | "done" | "error";
@@ -19,10 +19,10 @@ type State = "idle" | "saving" | "done" | "error";
  *
  * Saving stores three things, and all three matter: the file's bytes, pdf.js
  * itself (the offline shell is a static page with no bundle to draw pages
- * with), and the book's contents list — read here out of the bytes just
- * downloaded rather than by fetching the file a second time. Without the
- * contents there is no way to find hymn 214 offline, which is the whole
- * point of having the book on the device.
+ * with), and the book's contents list — read out of the bytes just downloaded
+ * rather than by fetching the file a second time. Without the contents there
+ * is no way to find hymn 214 offline, which is the whole point of having the
+ * book on the device.
  *
  * Where it lives in the app (`homeHref`) is stored with it, so the offline
  * shell can answer a tap on the Hymnals icon with the hymnals — it has no
@@ -53,11 +53,19 @@ export function SaveBookButton({
   // Whether Cache Storage exists here is a client-only fact; hidden until
   // it's known rather than flashed and withdrawn, hence the false default.
   const [visible, setVisible] = useState(false);
+  const [status, setStatus] = useState<SavedBookStatus>("unknown");
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setVisible(offlineBooksSupported());
-    if (isBookSaved(fileId)) setState("done");
+    const book = readOfflineBooks().find((item) => item.id === fileId);
+    if (book) {
+      setState("done");
+      // Asked once, on the page where something can be done about it: a copy
+      // of a book that has since been re-scanned is worth knowing about
+      // before the next Sunday it's needed.
+      void checkSavedBook(book).then(setStatus);
+    }
   }, [fileId]);
 
   const save = useCallback(async () => {
@@ -72,16 +80,11 @@ export function SaveBookButton({
     setState("saving");
     setProgress(0);
     try {
-      const { data } = await saveBookOffline(
+      await saveBookWithContents(
         { id: fileId, title, homeHref, homeLabel, categoryHref, categoryLabel, pageOffset, sizeBytes },
         (fraction) => setProgress(fraction),
       );
-      try {
-        writeCachedToc(fileId, bookCacheTag({ sizeBytes }), await loadPdfOutlineFromBytes(data));
-      } catch {
-        // A book whose contents won't read is still worth having offline —
-        // it just opens at page 1 rather than at a hymn.
-      }
+      setStatus("current");
       setState("done");
     } catch (error) {
       setState("error");
@@ -91,6 +94,7 @@ export function SaveBookButton({
 
   async function remove() {
     await removeOfflineBook(fileId);
+    setStatus("unknown");
     setState("idle");
     setProgress(0);
   }
@@ -104,6 +108,16 @@ export function SaveBookButton({
           <span className="rounded-md border border-green-300 px-3 py-1.5 text-green-700 dark:border-green-900 dark:text-green-400">
             ✓ Saved on this device
           </span>
+          {/*
+            Only offered when there is something to update to: a scanned book
+            rarely changes, so a permanent Update button here would be an
+            invitation to re-download 40MB for nothing.
+          */}
+          {status === "outdated" && (
+            <button onClick={save} className="rounded-md btn-primary px-3 py-1.5 text-white">
+              Update available
+            </button>
+          )}
           <button onClick={remove} className="rounded-md border border-sep px-3 py-1.5 hover:bg-hover">
             Remove
           </button>
@@ -121,7 +135,11 @@ export function SaveBookButton({
       )}
       {state === "done" && (
         <p className="text-xs text-sec">
-          Opens with no connection from this book&apos;s icon in the bottom bar, or from the offline screen.
+          {status === "outdated"
+            ? "This book has been replaced since you saved it — Update to get the current one."
+            : status === "unavailable"
+              ? "This book isn't available to this account any more. Your saved copy still opens offline."
+              : "Opens with no connection from this book's icon in the bottom bar, or from the offline screen."}
         </p>
       )}
       {message && <p className="text-xs text-red-600">{message}</p>}

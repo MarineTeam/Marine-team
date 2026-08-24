@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/current-user";
 import { errorResponse } from "@/lib/api-guard";
 import { canViewSeries, publishedNow } from "@/lib/content";
 import { isPluginEnabled } from "@/lib/plugins";
-import { hymnReadingOrder } from "@/lib/hymnal";
+import { fingerprintHymns, hymnReadingOrder } from "@/lib/hymnal";
 
 /**
  * Everything needed to read a hymn-per-file book with no connection: its
@@ -25,8 +25,12 @@ import { hymnReadingOrder } from "@/lib/hymnal";
  * the PDF behind them isn't saved — and the count returned here is what the
  * button reports, so nobody is told they have 420 hymns when 8 of them are
  * empty.
+ *
+ * `?probe=1` answers with the fingerprint alone. A device that already holds
+ * this book asks that to find out whether its copy still says what the book
+ * says — a question that shouldn't cost a second download of every verse.
  */
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ seriesId: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ seriesId: string }> }) {
   try {
     const { seriesId } = await params;
     // The same gate every public listing applies, so a series that is
@@ -85,8 +89,18 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         lyricsText: file.lyricsText as string,
       }));
 
+    // Computed over what is actually being handed out, so a saved copy and
+    // this answer are fingerprinted from the same thing.
+    const fingerprint = fingerprintHymns(hymns);
+    if (request.nextUrl.searchParams.get("probe") === "1") {
+      return NextResponse.json(
+        { seriesId: series.id, fingerprint, hymns: hymns.length },
+        { headers: { "Cache-Control": "private, no-store" } },
+      );
+    }
+
     return NextResponse.json(
-      { seriesId: series.id, title: series.title, hymns },
+      { seriesId: series.id, title: series.title, fingerprint, hymns },
       // Per viewer and only ever fetched deliberately; there is nothing here
       // for a shared cache to hold.
       { headers: { "Cache-Control": "private, no-store" } },

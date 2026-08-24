@@ -407,6 +407,14 @@ this device is holding. Gated by the same **Downloads** plugin as video, with
 the same per-category override, and then by the member choosing to save a
 particular book.
 
+Saved books are checked against the live ones whenever you're on their page
+or on `/profile/downloads`: a book that has been replaced, or a hymnal whose
+lyrics have been corrected, is marked **Update available**, and one that is no
+longer available to your account says so. The check is deliberately cheap — a
+PDF is asked for a single byte with a conditional request, so an unchanged
+book answers with nothing at all — and nothing is ever removed automatically:
+a saved book leaves a device when you say so.
+
 Saving stores three things, because reading a hymn offline needs all three:
 
 - **The file**, streamed into Cache Storage under `/offline-book/<id>.pdf`,
@@ -540,6 +548,11 @@ own section like any other.
   a `?page=` link — stays in PDF pages, so an offset can be corrected later
   without moving anyone's place; front matter itself shows no number, and
   the reader displays the PDF page alongside while an offset is set.
+- **When a browser can't draw the pages** — pdf.js needs a fairly current
+  browser engine, and an older phone can open a PDF perfectly well without
+  being able to run the library that draws one. The reader says so plainly
+  and offers the book in the browser's own PDF viewer, at the page you were
+  on, rather than showing an error. The offline screen behaves the same way.
 - **Read aloud** — speaks the current page or section with a voice and speed
   picker, advancing through the book on its own. **It stops when the app is
   minimised**: browsers suspend speech for a backgrounded page, and no

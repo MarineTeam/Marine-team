@@ -404,10 +404,38 @@ export function PdfReader({
     });
   }, [pageCount, page, pageOffset, goToPage, nextPage, previousPage, onReady]);
 
+  // The reader failing is not the same as the book failing. pdf.js needs a
+  // fairly current browser — an older phone can open a PDF perfectly well and
+  // still not be able to run the library that draws one — so rather than
+  // showing a stack trace to someone looking for a hymn, the book is handed
+  // to the browser's own viewer, at the page they were on. The offline shell
+  // does the same thing for the same reason (public/offline.html).
   if (error) {
     return (
-      <div className="flex h-full items-center justify-center p-8 text-center text-sm text-red-600">
-        {error}
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+        <p className="text-sm font-medium">This browser can&apos;t show the pages here.</p>
+        <p className="max-w-md text-sm text-sec">
+          The book itself is fine — open it in the browser&apos;s own PDF viewer instead. On an older
+          phone or tablet, that is usually the reason.
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <a
+            href={`${fileUrl}#page=${page}`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-md btn-primary px-4 py-2 text-sm text-white"
+          >
+            Open the book
+          </a>
+          <a
+            href={`${fileUrl}?download=1`}
+            className="rounded-md border border-sep px-4 py-2 text-sm hover:bg-hover"
+          >
+            Download
+          </a>
+        </div>
+        {/* Kept, quietly: it is the first thing worth knowing if someone reports this. */}
+        <p className="max-w-md text-xs text-ter">{error}</p>
       </div>
     );
   }

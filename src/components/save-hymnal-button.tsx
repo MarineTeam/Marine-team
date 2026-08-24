@@ -4,12 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { formatBytes, isLikelyCellular } from "@/lib/offline-downloads";
 import { readDeviceSettings } from "@/lib/device-settings";
 import {
+  checkSavedBook,
   isBookSaved,
   offlineBooksSupported,
   readOfflineBooks,
   removeOfflineBook,
   saveHymnalOffline,
   type OfflineHymn,
+  type SavedBookStatus,
 } from "@/lib/offline-books";
 
 type State = "idle" | "saving" | "done" | "error";
@@ -43,13 +45,18 @@ export function SaveHymnalButton({
   const [message, setMessage] = useState<string | null>(null);
   const [saved, setSaved] = useState<{ hymnCount?: number; bytes: number } | null>(null);
   const [visible, setVisible] = useState(false);
+  const [status, setStatus] = useState<SavedBookStatus>("unknown");
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setVisible(offlineBooksSupported());
+    const book = readOfflineBooks().find((item) => item.id === seriesId);
     if (isBookSaved(seriesId)) {
       setState("done");
-      setSaved(readOfflineBooks().find((book) => book.id === seriesId) ?? null);
+      setSaved(book ?? null);
+      // Lyrics get corrected and hymns get added; a copy saved in March
+      // shouldn't quietly still be March's book in December.
+      if (book) void checkSavedBook(book).then(setStatus);
     }
   }, [seriesId]);
 
@@ -75,8 +82,10 @@ export function SaveHymnalButton({
         await saveHymnalOffline(
           { id: seriesId, title, homeHref, homeLabel, categoryHref, categoryLabel },
           hymns,
+          typeof data.fingerprint === "string" ? data.fingerprint : null,
         ),
       );
+      setStatus("current");
       setState("done");
     } catch (error) {
       setState("error");
@@ -87,6 +96,7 @@ export function SaveHymnalButton({
   async function remove() {
     await removeOfflineBook(seriesId);
     setSaved(null);
+    setStatus("unknown");
     setState("idle");
   }
 
@@ -104,8 +114,13 @@ export function SaveHymnalButton({
             Offered where the PDF version isn't: lyrics get corrected and
             added long after a scan of the book would have stopped changing.
           */}
-          <button onClick={save} className="rounded-md border border-sep px-3 py-1.5 hover:bg-hover">
-            Update
+          <button
+            onClick={save}
+            className={`rounded-md border px-3 py-1.5 ${
+              status === "outdated" ? "btn-primary border-transparent text-white" : "border-sep hover:bg-hover"
+            }`}
+          >
+            {status === "outdated" ? "Update available" : "Update"}
           </button>
           <button onClick={remove} className="rounded-md border border-sep px-3 py-1.5 hover:bg-hover">
             Remove
@@ -122,7 +137,11 @@ export function SaveHymnalButton({
       )}
       {state === "done" && (
         <p className="text-xs text-sec">
-          The hymns and their lyrics open with no connection, from this section&apos;s icon in the bottom bar.
+          {status === "outdated"
+            ? "This book has changed since you saved it — Update to get the current hymns and lyrics."
+            : status === "unavailable"
+              ? "This book isn't available to this account any more. Your saved copy still opens offline."
+              : "The hymns and their lyrics open with no connection, from this section's icon in the bottom bar."}
         </p>
       )}
       {message && <p className="text-xs text-red-600">{message}</p>}
