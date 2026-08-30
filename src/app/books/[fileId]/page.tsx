@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getNavCategories, getReadableFile, canViewFile } from "@/lib/content";
+import { getNavCategories, getReadableFile, canViewFile, isFileFavorited } from "@/lib/content";
+import { FavoriteButton } from "@/components/favorite-button";
 import { getCurrentUser } from "@/lib/current-user";
 import { readerFormat } from "@/lib/reader";
 import { BookContents } from "@/components/book-contents";
@@ -39,12 +40,13 @@ export default async function BookPage({ params }: { params: Promise<{ fileId: s
   // Scoped to the file's own category (or its series' one), matching
   // /read/[fileId]: a category can turn the reader off for its section.
   const categoryId = file.category?.id ?? file.series?.categoryId ?? null;
-  const [plugins, navCategories] = await Promise.all([
+  const [plugins, navCategories, favorited] = await Promise.all([
     getPluginStates(categoryId),
     // Only the top-level categories, which is exactly the set the bottom bar
     // can hold an icon for — a book under one is reachable from that icon
     // offline, and one filed deeper simply isn't offered there.
     getNavCategories(),
+    user && !locked ? isFileFavorited(user.id, file.id) : Promise.resolve(false),
   ]);
   const readerOn = plugins["book-reader"];
   const navCategory = navCategories.find((category) => category.id === categoryId) ?? null;
@@ -84,6 +86,11 @@ export default async function BookPage({ params }: { params: Promise<{ fileId: s
         </div>
       ) : (
         <>
+          <div className="flex flex-wrap items-center gap-2">
+            {plugins.favorites && user && (
+              <FavoriteButton type="file" id={file.id} initialFavorited={favorited} />
+            )}
+          </div>
           {offlineOn && (
             <SaveBookButton
               fileId={file.id}

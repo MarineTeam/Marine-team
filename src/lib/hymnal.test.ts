@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fingerprintHymns, hymnReadingOrder } from "./hymnal";
+import { fileHref, fingerprintHymns, hymnReadingOrder } from "./hymnal";
 
 describe("hymnReadingOrder", () => {
   it("puts the book in printed page order", () => {
@@ -66,5 +66,23 @@ describe("fingerprintHymns", () => {
   it("counts the hymns in the token, so a hash collision still can't read as unchanged", () => {
     expect(fingerprintHymns(hymns).startsWith("2-")).toBe(true);
     expect(fingerprintHymns([])).toBe("0-811c9dc5");
+  });
+});
+
+describe("fileHref", () => {
+  const pdf = { id: "f1", mimeType: "application/pdf", bunnyPath: "books/hymnal.pdf" };
+
+  it("sends a hymn in a hymn-per-file book to its lyrics page", () => {
+    expect(fileHref({ ...pdf, series: { hymnPerFile: true } })).toBe("/hymns/f1");
+  });
+
+  it("sends a book to its contents", () => {
+    expect(fileHref({ ...pdf, series: { hymnPerFile: false } })).toBe("/books/f1");
+    expect(fileHref({ id: "f2", mimeType: null, bunnyPath: "books/x.epub" })).toBe("/books/f2");
+  });
+
+  it("has nowhere to send a file that isn't either", () => {
+    // An audio handout is a row with a download button, not a page.
+    expect(fileHref({ id: "f3", mimeType: "audio/mpeg", bunnyPath: "talks/a.mp3" })).toBeNull();
   });
 });

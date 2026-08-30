@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAdjacentHymns, getReadableFile, canViewFile } from "@/lib/content";
+import { getAdjacentHymns, getReadableFile, canViewFile, isFileFavorited } from "@/lib/content";
+import { FavoriteButton } from "@/components/favorite-button";
 import { getCurrentUser } from "@/lib/current-user";
 import { isPluginEnabled } from "@/lib/plugins";
 import { readerFormat } from "@/lib/reader";
@@ -41,7 +42,7 @@ export default async function HymnPage({ params }: { params: Promise<{ fileId: s
 
   const categoryId = file.category?.id ?? file.series?.categoryId ?? null;
   const format = readerFormat(file.mimeType, file.bunnyPath);
-  const [readerOn, { previous, next }] = await Promise.all([
+  const [readerOn, { previous, next }, favoritesOn, favorited] = await Promise.all([
     format ? isPluginEnabled("book-reader", categoryId) : Promise.resolve(false),
     // The hymns either side, in a book whose files are its hymns. Skipped for
     // a hymn this viewer can't open, where the page shows nothing to step
@@ -49,6 +50,8 @@ export default async function HymnPage({ params }: { params: Promise<{ fileId: s
     locked
       ? Promise.resolve({ previous: null, next: null })
       : getAdjacentHymns(file.id, file.seriesId, isLoggedIn),
+    isPluginEnabled("favorites", categoryId),
+    user && !locked ? isFileFavorited(user.id, file.id) : Promise.resolve(false),
   ]);
   const pdfHref = readerOn ? `/read/${file.id}` : `/api/files/${file.id}/content?download=1`;
   const pdfLabel = readerOn ? "View as PDF" : "Download PDF";
@@ -89,6 +92,12 @@ export default async function HymnPage({ params }: { params: Promise<{ fileId: s
               </p>
             )}
           </div>
+
+          {/* Keeping a hymn is the list a worship leader actually wants, and
+              it is the same button the rest of the app uses. */}
+          {favoritesOn && user && (
+            <FavoriteButton type="file" id={file.id} initialFavorited={favorited} />
+          )}
 
           {file.lyricsText ? (
             <>

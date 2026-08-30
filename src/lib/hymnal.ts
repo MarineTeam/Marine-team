@@ -45,6 +45,25 @@ type SeriesLike = {
 };
 
 /**
+ * Where a file's own page is, or null when it hasn't got one.
+ *
+ * The three shapes again (see the note at the top of this file): a hymn
+ * inside a hymnPerFile series has a lyrics page, a PDF or EPUB has a book
+ * page listing its contents, and everything else — an audio handout, a slide
+ * deck — is only ever a row with a download button under whatever it hangs
+ * off. Search uses this to decide what it can honestly link to.
+ */
+export function fileHref(file: {
+  id: string;
+  mimeType: string | null;
+  bunnyPath: string;
+  series?: { hymnPerFile: boolean } | null;
+}): string | null {
+  if (file.series?.hymnPerFile) return `/hymns/${file.id}`;
+  return readerFormat(file.mimeType, file.bunnyPath) ? `/books/${file.id}` : null;
+}
+
+/**
  * A hymn-per-file book's hymns in the order the book prints them: by page
  * number, with any hymn that has none kept in the order an admin arranged
  * them, at the end.
