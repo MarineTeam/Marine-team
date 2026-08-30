@@ -146,6 +146,40 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Service plans** (new plugin): staff publish the hymns for a service, in
+  the order they'll be sung, and members open the list at `/services` and tap
+  straight through to each one. Built in `/admin/services`, gated on
+  `manage_files` — a plan is a list of files, so whoever may arrange the
+  library may arrange a service.
+  - An item is either a **hymn that is its own file** (it opens at its lyrics)
+    or a **number inside a whole-book hymnal**. For the second the admin
+    writes down the number that goes up on the board, and the page it lands on
+    is resolved from the book's own contents when a member opens it — the
+    browser reading that PDF is the only thing that knows which page hymn 214
+    is, so `/books/<id>?hymn=214` is the hand-off.
+  - Deliberately not a playlist: those are a member's own, hold videos and
+    have no date. A plan is one copy everyone in the building opens, drafted
+    unpublished until the order is settled.
+  - A hymn unpublished, or one a signed-out visitor can't open, still shows in
+    the order rather than leaving a gap — it is being sung either way — and
+    says why it doesn't open.
+- **Hymns are searchable, by their words.** Search covered categories, series
+  and videos; files were never looked at, so the hymnal was unfindable by name
+  and its lyrics unfindable at all. Both are searched now, and a lyrics hit
+  comes back with the line it matched — nobody looks a hymn up by a title they
+  can't remember, they look it up by the line they can. Only files with a page
+  of their own are listed (a hymn's lyrics, a book's contents); an audio
+  handout is a row under its series, and search already finds the series.
+- **A hymn can be favourited.** Series and videos have been favouritable from
+  the start and files never were, so the one thing members look up most
+  couldn't be kept in a list. Same button, same plugin, listed under
+  **Hymns & books** on the favourites page.
+- **The screen stays on while a book or a hymn is open.** A phone dimming
+  halfway through the second verse is the most ordinary failure this app has.
+  The wake lock is dropped the moment the page is hidden or the reader closed
+  — nothing keeps a screen on in the background — and it is switchable per
+  device under **Reading**, beside the swipe setting. Browsers without the API
+  behave exactly as they did.
 - **Type the hymn number, land on the hymn.** The number that goes up on the
   board is not the page it is printed on, and until now the reader only took
   pages — so finding hymn 214 meant scrolling a contents list while everyone

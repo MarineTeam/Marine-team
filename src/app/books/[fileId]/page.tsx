@@ -30,8 +30,16 @@ export async function generateMetadata({
   return { title: file.title, description: `Browse ${file.title} on Marine Team.` };
 }
 
-export default async function BookPage({ params }: { params: Promise<{ fileId: string }> }) {
+export default async function BookPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ fileId: string }>;
+  /** ?hymn=214 — a service plan pointing at one hymn inside this book. */
+  searchParams: Promise<{ hymn?: string }>;
+}) {
   const { fileId } = await params;
+  const { hymn } = await searchParams;
   const [file, user] = await Promise.all([getReadableFile(fileId), getCurrentUser()]);
   if (!file) notFound();
   if (!readerFormat(file.mimeType, file.bunnyPath)) notFound();
@@ -112,6 +120,9 @@ export default async function BookPage({ params }: { params: Promise<{ fileId: s
             readerOn={readerOn}
             pageOffset={file.pageOffset}
             cacheTag={bookCacheTag(file)}
+            // Where the number on a service plan is turned into a page: only
+            // the browser reading this PDF knows which page hymn 214 is on.
+            openHymn={Number(hymn) > 0 ? Number(hymn) : null}
           />
         </>
       )}

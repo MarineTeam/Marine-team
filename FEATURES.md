@@ -520,6 +520,31 @@ but only after the network has actually failed, and only for a book this
 device was deliberately given. A cached copy never stands in for an access
 check that said no.
 
+## Services
+
+The hymns for a service, in the order they'll be sung. Staff build a plan in
+`/admin/services` — a title, a day, a note, and the hymns — and publish it;
+members open `/services`, pick the day, and tap straight through to each hymn.
+Gated by the **Service plans** plugin.
+
+A plan holds the two shapes a hymn takes in this app (see the Hymnals notes
+above):
+
+- **A hymn that is its own file** opens at its lyrics page.
+- **A number inside a whole-book hymnal** is written down as the number that
+  goes up on the board. The page it lands on is worked out from that book's
+  own contents when a member opens it — the browser reading the PDF is the
+  only thing that knows which page hymn 214 is on, so the plan links to the
+  book's contents carrying the number and the contents page does the rest.
+
+This is deliberately not a playlist: playlists are a member's own, hold videos
+and have no date. A plan is one copy that everyone in the building opens, and
+it stays a draft until somebody is happy with the order.
+
+A hymn that has since been unpublished, or one a signed-out visitor can't
+open, still appears in the order rather than leaving a gap — it is being sung
+either way — and says why it doesn't open.
+
 ## The bottom bar
 
 In the installed app the row of icons along the bottom is the only navigation
@@ -610,6 +635,12 @@ own section like any other.
   being able to run the library that draws one. The reader says so plainly
   and offers the book in the browser's own PDF viewer, at the page you were
   on, rather than showing an error. The offline screen behaves the same way.
+- **The screen stays on** while a book or a hymn is open, so a phone doesn't
+  dim halfway through the second verse. It's released as soon as you leave the
+  page or switch away from the app — nothing here keeps a screen on in the
+  background — and it can be turned off under **Reading** in
+  `/profile/settings`. Some browsers don't offer this at all, and there the
+  screen behaves as it always has.
 - **Read aloud** — speaks the current page or section with a voice and speed
   picker, advancing through the book on its own. **It stops when the app is
   minimised**: browsers suspend speech for a backgrounded page, and no

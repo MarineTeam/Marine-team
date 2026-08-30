@@ -91,11 +91,18 @@ export function BookContents({
   readerOn,
   pageOffset,
   cacheTag,
+  openHymn = null,
 }: {
   fileId: string;
   readerOn: boolean;
   pageOffset: number;
   cacheTag: string;
+  /**
+   * A hymn number to go straight to, from a link that knew the number but not
+   * the page — a service plan's row, say. Resolved here because this is where
+   * the book's own contents are, and they are the only thing that knows.
+   */
+  openHymn?: number | null;
 }) {
   // Tagged with the book it was read from, so switching books shows the
   // loading state on the very first render rather than the outline of the
@@ -127,6 +134,20 @@ export function BookContents({
       cancelled = true;
     };
   }, [fileId, cacheTag]);
+
+  // A number handed in by a link, the moment there are contents to resolve it
+  // against. Replaces rather than pushes: coming back from the reader should
+  // land on the contents, not bounce straight back into it.
+  useEffect(() => {
+    if (openHymn === null || !entries || entries.length === 0) return;
+    const at = findHymnIndex(entries, openHymn);
+    const entry = at === null ? null : entries[at];
+    if (entry?.location && readerOn) router.replace(`/read/${fileId}?page=${entry.location}`);
+    // The book doesn't list that number — said here rather than leaving
+    // someone looking at a contents list wondering why they were sent to it.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    else setHymnMissing(openHymn);
+  }, [openHymn, entries, readerOn, fileId, router]);
 
   const groups = useMemo<Group[]>(() => {
     if (!entries) return [];
@@ -233,6 +254,17 @@ export function BookContents({
             <span className="text-sec">No hymn {hymnMissing} in this book.</span>
           )}
         </form>
+      )}
+
+      {/* A number that came in on a link, in a book whose contents don't carry
+          numbers at all — there is no box to put the message in, so it stands
+          on its own rather than leaving somebody staring at a list they
+          didn't ask for. */}
+      {hymnMissing !== null && !canJumpToHymn && (
+        <p className="text-sm text-sec">
+          This book&apos;s contents don&apos;t list a hymn {hymnMissing}. It&apos;s below if it&apos;s here
+          under another name.
+        </p>
       )}
 
       <div className="inline-flex rounded-lg border border-sep p-0.5 text-sm">

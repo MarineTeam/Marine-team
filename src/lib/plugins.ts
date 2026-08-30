@@ -24,6 +24,7 @@ export const PLUGIN_META = [
   { slug: "sermon-notes", name: "Sermon notes", description: "Lets members keep their own timestamped notes on a video, exportable as a text file." },
   { slug: "share-links", name: "Share links", description: "Lets members create revocable share links to a series or video, public or emailed to specific people." },
   { slug: "downloads", name: "Downloads", description: "Lets members download videos to their device for offline viewing, with per-category/series/video control at /admin/downloads." },
+  { slug: "service-plans", name: "Service plans", description: "Lets staff publish the running order of hymns for a service, which members open as one list at /services." },
   { slug: "book-reader", name: "Book reader", description: "Opens PDF and EPUB files in an in-app reader with contents, search, highlights and read-aloud, instead of only offering them as downloads." },
 ] as const;
 

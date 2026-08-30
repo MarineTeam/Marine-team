@@ -33,6 +33,7 @@ export type NavIcon =
   | "live"
   | "person"
   | "download"
+  | "calendar"
   | "shield";
 
 export type NavItem = {
@@ -91,6 +92,8 @@ export const getShellNav = cache(async (): Promise<ShellNav> => {
     { href: "/search", label: "Search", icon: "search" },
   ];
   if (plugins["live-streaming"]) browse.push({ href: "/live", label: "Live", icon: "live" });
+  // The running order for a service — what somebody opens on the way in.
+  if (plugins["service-plans"]) browse.push({ href: "/services", label: "Services", icon: "calendar" });
 
   const library: NavItem[] = categories.map((category) => ({
     href: `/categories/${category.slug}`,
