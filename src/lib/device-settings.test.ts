@@ -23,6 +23,7 @@ describe("parseDeviceSettings", () => {
       defaultPlaybackSpeed: 1.5,
       downloadOverCellular: true,
       swipeToTurnPages: false,
+      keepScreenAwake: false,
       tabHrefs: ["/", "/categories/hymnals"],
     };
     expect(parseDeviceSettings(JSON.stringify(stored))).toEqual(stored);
@@ -53,6 +54,12 @@ describe("parseDeviceSettings", () => {
     const settings = parseDeviceSettings(JSON.stringify({ autoplay: "yes", downloadOverCellular: 1 }));
     expect(settings.autoplay).toBe(false);
     expect(settings.downloadOverCellular).toBe(false);
+  });
+
+  it("holds the screen on unless it was deliberately turned off", () => {
+    expect(parseDeviceSettings("{}").keepScreenAwake).toBe(true);
+    expect(parseDeviceSettings(JSON.stringify({ keepScreenAwake: 1 })).keepScreenAwake).toBe(true);
+    expect(parseDeviceSettings(JSON.stringify({ keepScreenAwake: false })).keepScreenAwake).toBe(false);
   });
 
   it("treats a bottom bar that was never customised as unset", () => {

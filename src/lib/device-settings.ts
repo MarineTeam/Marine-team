@@ -37,6 +37,12 @@ export type DeviceSettings = {
    */
   swipeToTurnPages: boolean;
   /**
+   * Whether the screen is held on while a book or a hymn is open. On by
+   * default: a phone dimming mid-verse is what this exists to stop, and the
+   * lock is dropped the moment the page is hidden or the reader closed.
+   */
+  keepScreenAwake: boolean;
+  /**
    * Which icons the bottom bar carries, as hrefs, in order — see
    * lib/nav-tabs.ts. Null means the app's own suggestion, which is what
    * every device starts with.
@@ -51,6 +57,7 @@ export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
   defaultPlaybackSpeed: 1,
   downloadOverCellular: false,
   swipeToTurnPages: true,
+  keepScreenAwake: true,
   tabHrefs: null,
 };
 
@@ -96,6 +103,10 @@ export function parseDeviceSettings(raw: string | null | undefined): DeviceSetti
       typeof value.swipeToTurnPages === "boolean"
         ? value.swipeToTurnPages
         : DEFAULT_DEVICE_SETTINGS.swipeToTurnPages,
+    keepScreenAwake:
+      typeof value.keepScreenAwake === "boolean"
+        ? value.keepScreenAwake
+        : DEFAULT_DEVICE_SETTINGS.keepScreenAwake,
     tabHrefs: parseTabHrefs(value.tabHrefs),
   };
 }

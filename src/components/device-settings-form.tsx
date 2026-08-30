@@ -145,6 +145,22 @@ export function DeviceSettingsForm() {
             </span>
           </span>
         </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={settings.keepScreenAwake}
+            onChange={(e) => update({ keepScreenAwake: e.target.checked })}
+          />
+          <span>
+            Keep the screen on while reading
+            <span className="block text-xs text-sec">
+              Stops the phone dimming halfway through a hymn. Only while a book or a hymn is open — the
+              screen goes back to normal as soon as you leave, or switch away from the app. Not every
+              browser offers this; where it isn&apos;t offered, the screen behaves as it always did.
+            </span>
+          </span>
+        </label>
       </section>
 
       <p className="text-xs text-sec">

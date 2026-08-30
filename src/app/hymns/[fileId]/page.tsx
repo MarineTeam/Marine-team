@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAdjacentHymns, getReadableFile, canViewFile, isFileFavorited } from "@/lib/content";
 import { FavoriteButton } from "@/components/favorite-button";
+import { KeepAwake } from "@/components/keep-awake";
 import { getCurrentUser } from "@/lib/current-user";
 import { isPluginEnabled } from "@/lib/plugins";
 import { readerFormat } from "@/lib/reader";
@@ -92,6 +93,10 @@ export default async function HymnPage({ params }: { params: Promise<{ fileId: s
               </p>
             )}
           </div>
+
+          {/* The lyrics stay on screen for as long as the hymn lasts, and
+              nobody is tapping to keep them there. */}
+          <KeepAwake />
 
           {/* Keeping a hymn is the list a worship leader actually wants, and
               it is the same button the rest of the app uses. */}

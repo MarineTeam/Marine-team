@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PdfReader } from "@/components/pdf-reader";
 import { EpubReader } from "@/components/epub-reader";
 import { ReaderSpeech } from "@/components/reader-speech";
+import { KeepAwake } from "@/components/keep-awake";
 import { ReaderMarks, type ReadingMark } from "@/components/reader-marks";
 import type { ReaderFormat } from "@/lib/reader";
 import { bookCacheTag, loadCachedToc } from "@/lib/reader-cache";
@@ -451,6 +452,7 @@ export function BookReader({
       )}
 
       <ReaderSpeech handleRef={handleRef} />
+      <KeepAwake />
     </div>
   );
 }
