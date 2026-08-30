@@ -86,6 +86,9 @@ describe("hymnNumberOf", () => {
     expect(hymnNumberOf("  12  Rock of Ages")).toBe(12);
     expect(hymnNumberOf("Hymn 45 — Praise")).toBe(45);
     expect(hymnNumberOf("No. 12 Rock of Ages")).toBe(12);
+    // Backtracking earns this one: "hymn" matches first and fails on the
+    // digits, so the longer alternative gets its turn.
+    expect(hymnNumberOf("Hymn No. 12 Rock of Ages")).toBe(12);
     expect(hymnNumberOf("no 12 Rock of Ages")).toBe(12);
     expect(hymnNumberOf("#7 Abide With Me")).toBe(7);
     expect(hymnNumberOf("007 Abide With Me")).toBe(7);

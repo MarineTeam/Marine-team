@@ -80,8 +80,6 @@ export function OfflineBooksManager() {
     return () => window.removeEventListener(OFFLINE_BOOKS_CHANGED_EVENT, refresh);
   }, [refresh]);
 
-  const total = items.reduce((sum, item) => sum + item.bytes, 0);
-
   return (
     <section className="space-y-3" aria-busy={!ready}>
       <div>
@@ -154,7 +152,6 @@ export function OfflineBooksManager() {
             ))}
           </ul>
           <div className="flex items-center gap-3 text-xs text-sec">
-            <span>{formatBytes(total)} in books</span>
             <button
               onClick={() => void removeAllOfflineBooks()}
               className="rounded-md border border-sep px-2 py-1 hover:bg-hover"

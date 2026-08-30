@@ -393,8 +393,10 @@ How a download actually works:
 
 Members manage it all at `/profile/downloads`: whether downloads are available
 to them (and why not, if not), the Wi-Fi-only vs mobile-data preference, how
-much space is used against the admin's suggested cap, and per-video **Play
-offline** / **Remove**. The list self-heals — browsers evict caches silently
+much space is used against the admin's suggested cap — **videos and books
+together**, since they share the device and a hymnal is often the largest
+thing on it, with the browser's own quota shown beside it where the browser
+will report one — and per-video **Play offline** / **Remove**. The list self-heals — browsers evict caches silently
 under storage pressure, so entries whose file has vanished are dropped on
 load rather than offering playback of something that isn't there.
 

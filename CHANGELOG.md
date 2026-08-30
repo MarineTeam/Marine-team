@@ -146,6 +146,21 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **The storage figure counts books.** `/profile/downloads` showed a bar of
+  how full the device was that counted videos only — while a saved hymnal is
+  routinely the largest thing on the phone, sitting in the same cache out of
+  the same allowance. One figure now covers both, with the split underneath
+  and the browser's own quota beside it where the browser will say what it is,
+  since the admin's cap is guidance and that quota is the limit that actually
+  bites.
+- **The offline shell's hand-copied constants are tested against their
+  originals.** `public/offline.html` and `public/sw.js` stand alone with no
+  bundle, so cache names, storage keys, URL prefixes, the icon set and the
+  rule for reading a hymn number are all copied into them by hand — the right
+  trade for those files, and the kind of duplication that rots quietly. A
+  rename now fails in CI rather than emptying somebody's offline screen in a
+  service. The hymn-number copy is checked by running it, not by comparing
+  text, and every branch of it has a case.
 - **Service plans** (new plugin): staff publish the hymns for a service, in
   the order they'll be sung, and members open the list at `/services` and tap
   straight through to each one. Built in `/admin/services`, gated on
