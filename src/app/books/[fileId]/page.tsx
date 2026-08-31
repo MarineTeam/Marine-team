@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getNavCategories, getReadableFile, canViewFile, isFileFavorited } from "@/lib/content";
+import {
+  getNavCategories,
+  getReadableFile,
+  canViewFile,
+  isFileFavorited,
+  presentableHymnNumbers,
+} from "@/lib/content";
 import { FavoriteButton } from "@/components/favorite-button";
 import { getCurrentUser } from "@/lib/current-user";
 import { readerFormat } from "@/lib/reader";
@@ -48,13 +54,16 @@ export default async function BookPage({
   // Scoped to the file's own category (or its series' one), matching
   // /read/[fileId]: a category can turn the reader off for its section.
   const categoryId = file.category?.id ?? file.series?.categoryId ?? null;
-  const [plugins, navCategories, favorited] = await Promise.all([
+  const [plugins, navCategories, favorited, presentable] = await Promise.all([
     getPluginStates(categoryId),
     // Only the top-level categories, which is exactly the set the bottom bar
     // can hold an icon for — a book under one is reachable from that icon
     // offline, and one filed deeper simply isn't offered there.
     getNavCategories(),
     user && !locked ? isFileFavorited(user.id, file.id) : Promise.resolve(false),
+    // The words are the same permission as the book: this only offers a
+    // screen for a hymn the visitor could already read.
+    locked ? Promise.resolve(new Set<number>()) : presentableHymnNumbers(file.id),
   ]);
   const readerOn = plugins["book-reader"];
   const navCategory = navCategories.find((category) => category.id === categoryId) ?? null;
@@ -123,6 +132,7 @@ export default async function BookPage({
             // Where the number on a service plan is turned into a page: only
             // the browser reading this PDF knows which page hymn 214 is on.
             openHymn={Number(hymn) > 0 ? Number(hymn) : null}
+            presentableNumbers={presentable}
           />
         </>
       )}

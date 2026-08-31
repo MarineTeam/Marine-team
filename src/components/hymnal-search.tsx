@@ -11,6 +11,8 @@ type Hymn = {
   href: string;
   bookId: string;
   bookTitle: string;
+  /** The line that matched, when the hymn was found by its words. */
+  excerpt: string | null;
 };
 
 /**
@@ -19,7 +21,9 @@ type Hymn = {
  * The hymns of a scanned hymnal live in its PDF's bookmarks, so this can only
  * answer for books whose contents an admin has indexed (see the file list's
  * indexing pass) — which is why it says so plainly when a section has none
- * rather than looking broken.
+ * rather than looking broken. A hymn whose words have been typed is also
+ * found by a line of them, which is how somebody who remembers the tune but
+ * not the title gets there.
  *
  * Searching as you type, debounced: a hymn gets looked up mid-sentence, and
  * the answer should arrive while the sentence is still going.
@@ -105,6 +109,12 @@ export function HymnalSearch({
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm">{hymn.title}</span>
                       <span className="block truncate text-xs text-sec">{hymn.bookTitle}</span>
+                      {/* Kept below the book rather than instead of it: with
+                          six hymnals on the shelf, which one this is in is
+                          part of the answer. */}
+                      {hymn.excerpt && (
+                        <span className="block truncate text-xs italic text-ter">{hymn.excerpt}</span>
+                      )}
                     </span>
                     <span aria-hidden className="shrink-0 text-ter">
                       →

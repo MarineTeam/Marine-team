@@ -37,6 +37,11 @@ const planItems = {
         hidden: true,
         deletedAt: true,
         series: { select: { title: true, slug: true, hymnPerFile: true } },
+        // Every number in this book that has words typed against it. The
+        // item's own number is matched in memory rather than in the query:
+        // a relation filter can't see the row it hangs off, and a hymnal
+        // has a handful of these, not a table's worth.
+        hymnLyrics: { select: { number: true } },
       },
     },
   },
@@ -115,12 +120,46 @@ export function planItemReadable(
 }
 
 /**
+ * Whether this item has words to put on a screen.
+ *
+ * Two places they can be: on the file's own row, which is a hymn that is its
+ * own file; or against a number inside a whole-book hymnal, which is a hymn
+ * somebody typed out of a scan. The second is why a plan built from book
+ * numbers can be projected at all — see BookHymnLyric.
+ */
+export function planItemPresentable(item: {
+  hymnNumber: number | null;
+  file: { lyricsText: string | null; hymnLyrics: { number: number }[] };
+}): boolean {
+  if (item.file.lyricsText?.trim()) return true;
+  return (
+    item.hymnNumber !== null &&
+    item.file.hymnLyrics.some((lyric) => lyric.number === item.hymnNumber)
+  );
+}
+
+/**
+ * Where present mode opens this item: the file itself, or a numbered hymn
+ * inside it, which the presenter looks up by that number.
+ */
+export function presentHref(
+  item: { hymnNumber: number | null; file: { id: string } },
+  planId: string | null,
+): string {
+  const query = new URLSearchParams();
+  if (item.hymnNumber !== null) query.set("hymn", String(item.hymnNumber));
+  if (planId) query.set("plan", planId);
+  const suffix = query.toString();
+  return `/present/${item.file.id}${suffix ? `?${suffix}` : ""}`;
+}
+
+/**
  * The first hymn in a plan with words to project, which is where "Present
- * this service" starts. A plan of scanned-book numbers has nothing to put on
- * a screen and doesn't offer to.
+ * this service" starts. A plan whose hymns are all un-typed scans has
+ * nothing to put on a screen and doesn't offer to.
  */
 export function firstPresentableItem(plan: ServicePlanWithItems): ServicePlanItemWithFile | null {
-  return plan.items.find((item) => Boolean(item.file.lyricsText?.trim())) ?? null;
+  return plan.items.find(planItemPresentable) ?? null;
 }
 
 /** Files a plan can be built from: hymns and books, the two things with a page. */

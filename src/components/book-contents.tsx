@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { fileContentUrl, loadPdfOutline } from "@/lib/pdf-client";
 import { loadCachedToc } from "@/lib/reader-cache";
 import { printedPage } from "@/lib/page-offset";
-import { countNumberedEntries, findHymnIndex } from "@/lib/toc-nav";
+import { countNumberedEntries, findHymnIndex, hymnNumberOf } from "@/lib/toc-nav";
 import type { TocEntry } from "@/components/reader-types";
 
 type SortMode = "page" | "az" | "category";
@@ -30,16 +30,22 @@ function groupByOutlineSection(entries: TocEntry[]): Group[] {
   return groups;
 }
 
+/** One shared empty set, so a book with no typed hymns doesn't re-render on identity. */
+const EMPTY_NUMBERS: Set<number> = new Set();
+
 function EntryRow({
   entry,
   fileId,
   readerOn,
   pageOffset,
+  presentable,
 }: {
   entry: TocEntry;
   fileId: string;
   readerOn: boolean;
   pageOffset: number;
+  /** Hymn numbers in this book whose words somebody has typed out. */
+  presentable: Set<number>;
 }) {
   // Two different numbers, deliberately: the column shows the page printed
   // in the book, while the link carries the PDF page the bookmark actually
@@ -59,15 +65,31 @@ function EntryRow({
       )}
     </>
   );
-  const className =
-    "flex items-center gap-2 rounded-md px-3 py-2.5 hover:bg-hover";
-  if (!entry.location || !readerOn) {
-    return <div className={`${className} ${entry.location ? "" : "text-ter"}`}>{content}</div>;
-  }
+  const className = "flex items-center gap-2 rounded-md px-3 py-2.5 hover:bg-hover";
+  const number = hymnNumberOf(entry.label);
+  const row =
+    !entry.location || !readerOn ? (
+      <div className={`${className} ${entry.location ? "" : "text-ter"}`}>{content}</div>
+    ) : (
+      <Link href={`/read/${fileId}?page=${entry.location}`} className={className}>
+        {content}
+      </Link>
+    );
+
+  // A scanned page can't be projected, but words typed against this number
+  // can — so the hymns somebody has typed out offer the screen from here,
+  // where a hymn gets chosen, and the rest of the book reads as before.
+  if (number === null || !presentable.has(number)) return row;
   return (
-    <Link href={`/read/${fileId}?page=${entry.location}`} className={className}>
-      {content}
-    </Link>
+    <div className="flex items-center">
+      <div className="min-w-0 flex-1">{row}</div>
+      <Link
+        href={`/present/${fileId}?hymn=${number}`}
+        className="mr-2 shrink-0 rounded border border-sep px-2 py-1 text-xs text-sec hover:bg-hover"
+      >
+        Present
+      </Link>
+    </div>
   );
 }
 
@@ -92,11 +114,18 @@ export function BookContents({
   pageOffset,
   cacheTag,
   openHymn = null,
+  presentableNumbers = EMPTY_NUMBERS,
 }: {
   fileId: string;
   readerOn: boolean;
   pageOffset: number;
   cacheTag: string;
+  /**
+   * Hymn numbers in this book that have words stored — the ones that can go
+   * on a projector. Resolved on the server, because the PDF this component
+   * reads says nothing about them.
+   */
+  presentableNumbers?: Set<number>;
   /**
    * A hymn number to go straight to, from a link that knew the number but not
    * the page — a service plan's row, say. Resolved here because this is where
@@ -305,6 +334,7 @@ export function BookContents({
                   fileId={fileId}
                   readerOn={readerOn}
                   pageOffset={pageOffset}
+                  presentable={presentableNumbers}
                 />
               ))}
             </div>

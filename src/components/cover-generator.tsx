@@ -65,19 +65,26 @@ export function CoverGenerator({
         });
         if (!res.ok) throw new Error((await res.json()).error ?? "Save failed");
 
-        // Sent separately because it is a different shape of thing — rows of
-        // its own, replaced whole — rather than more columns on the row.
-        const indexed = await fetch(`/api/admin/files/${file.id}/contents`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            // An entry whose destination never resolved has no page to send.
-            entries: contents
-              .filter((entry) => entry.location !== null)
-              .map((entry) => ({ title: entry.label, page: Number(entry.location), depth: entry.depth })),
-          }),
-        });
-        if (!indexed.ok) throw new Error((await indexed.json()).error ?? "Indexing failed");
+        // An entry whose destination never resolved has no page to send.
+        const entries = contents
+          .filter((entry) => entry.location !== null)
+          .map((entry) => ({ title: entry.label, page: Number(entry.location), depth: entry.depth }));
+
+        // A PDF with no usable bookmarks has nothing to say about its own
+        // contents — and a book like that is exactly the one somebody will
+        // have typed the contents of by hand. Sending an empty list would
+        // replace that evening's work with nothing, from a button that
+        // says it generates covers.
+        if (entries.length > 0) {
+          // Sent separately because it is a different shape of thing — rows
+          // of its own, replaced whole — rather than more columns on the row.
+          const indexed = await fetch(`/api/admin/files/${file.id}/contents`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ entries }),
+          });
+          if (!indexed.ok) throw new Error((await indexed.json()).error ?? "Indexing failed");
+        }
       } catch {
         problems.push(file.title);
       }

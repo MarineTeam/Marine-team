@@ -36,6 +36,41 @@ const schema = z.object({
     .max(2000),
 });
 
+/**
+ * What is indexed now, for the editor to open.
+ *
+ * Staff-only like the PUT beside it: a book's contents are public through
+ * search, but the editable list — including entries on unpublished books —
+ * is the admin's working copy of them.
+ */
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const user = await ensureStaff();
+    const { id } = await params;
+
+    const file = await prisma.fileAsset.findUnique({
+      where: { id },
+      select: { id: true, seriesId: true, categoryId: true, pageOffset: true, contentsIndexedAt: true },
+    });
+    if (!file) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    await ensureContentAccess(user, { seriesId: file.seriesId, categoryId: file.categoryId });
+
+    const entries = await prisma.bookHymn.findMany({
+      where: { fileId: id },
+      select: { title: true, number: true, page: true },
+      orderBy: { position: "asc" },
+    });
+
+    return NextResponse.json({
+      entries,
+      pageOffset: file.pageOffset,
+      indexedAt: file.contentsIndexedAt,
+    });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await ensureStaff();

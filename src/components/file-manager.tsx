@@ -14,6 +14,8 @@ import {
 import { BunnyStorageImport } from "@/components/bunny-storage-import";
 import { CoverGenerator } from "@/components/cover-generator";
 import { FileReplace } from "@/components/file-replace";
+import { ContentsEditor } from "@/components/contents-editor";
+import { BookHymnLyrics } from "@/components/book-hymn-lyrics";
 import {
   BulkBar,
   BulkButton,
@@ -611,6 +613,20 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
                 >
                   {savingDetails ? "Saving…" : "Save details"}
                 </button>
+
+                {/* Its own thing with its own save, below the row's fields:
+                    a book's contents are hundreds of entries, and typing
+                    them is a sitting rather than an edit. PDFs only —
+                    an EPUB carries its own navigation document. */}
+                {readerFormat(f.mimeType, f.bunnyPath) === "pdf" && (
+                  <>
+                    <ContentsEditor file={f} onSaved={load} />
+                    {/* Below the contents, because it is keyed to them: the
+                        words go against a hymn number, and the numbers come
+                        from the index above. */}
+                    <BookHymnLyrics file={f} />
+                  </>
+                )}
 
                 {/*
                   Last in the panel, behind everything else about the file:

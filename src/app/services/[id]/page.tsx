@@ -5,6 +5,8 @@ import { getCurrentUser } from "@/lib/current-user";
 import { isPluginEnabled } from "@/lib/plugins";
 import {
   firstPresentableItem,
+  planItemPresentable,
+  presentHref,
   getServicePlan,
   planItemHref,
   planItemNumber,
@@ -65,7 +67,7 @@ export default async function ServicePlanPage({ params }: { params: Promise<{ id
             order, so whoever is driving the screen never comes back here. */}
         {presentable && (
           <Link
-            href={`/present/${presentable.file.id}?plan=${plan.id}`}
+            href={presentHref(presentable, plan.id)}
             className="mt-4 inline-block rounded-md border border-sep px-4 py-2 text-sm hover:bg-hover"
           >
             Present this service
@@ -100,13 +102,25 @@ export default async function ServicePlanPage({ params }: { params: Promise<{ id
               </>
             );
             return (
-              <li key={item.id}>
+              <li key={item.id} className="flex items-center">
                 {href && readable ? (
-                  <Link href={href} className="flex items-center gap-3 px-3 py-3 hover:bg-hover">
+                  <Link href={href} className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 hover:bg-hover">
                     {row}
                   </Link>
                 ) : (
-                  <div className="flex items-center gap-3 px-3 py-3 text-ter">{row}</div>
+                  <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-ter">{row}</div>
+                )}
+                {/* Starting mid-service is normal — a hymn gets sung out of
+                    order, or somebody takes over the screen halfway — so each
+                    hymn with words offers its own way onto the projector,
+                    not only the first one. */}
+                {readable && planItemPresentable(item) && (
+                  <Link
+                    href={presentHref(item, plan.id)}
+                    className="mr-3 shrink-0 rounded border border-sep px-2 py-1 text-xs text-sec hover:bg-hover"
+                  >
+                    Present
+                  </Link>
                 )}
               </li>
             );

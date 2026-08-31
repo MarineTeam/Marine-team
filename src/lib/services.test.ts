@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { planItemHref, planItemNumber, planItemReadable } from "./services";
+import {
+  planItemHref,
+  planItemNumber,
+  planItemPresentable,
+  planItemReadable,
+  presentHref,
+} from "./services";
 
 const hymnFile = {
   id: "h1",
@@ -67,5 +73,55 @@ describe("planItemReadable", () => {
     expect(planItemReadable({ file: { ...live, published: false } }, true)).toBe(false);
     expect(planItemReadable({ file: { ...live, hidden: true } }, true)).toBe(false);
     expect(planItemReadable({ file: { ...live, deletedAt: new Date() } }, true)).toBe(false);
+  });
+});
+
+describe("planItemPresentable", () => {
+  it("presents a hymn that is its own file, from the words on its row", () => {
+    expect(
+      planItemPresentable({ hymnNumber: null, file: { lyricsText: "Holy, holy", hymnLyrics: [] } }),
+    ).toBe(true);
+  });
+
+  it("presents a number inside a book when somebody has typed that number's words", () => {
+    expect(
+      planItemPresentable({ hymnNumber: 214, file: { lyricsText: null, hymnLyrics: [{ number: 214 }] } }),
+    ).toBe(true);
+  });
+
+  // The whole point of keying on the number: words for hymn 300 say nothing
+  // about hymn 214, and offering a screen for it would put up the wrong hymn.
+  it("doesn't present a number whose own words are missing", () => {
+    expect(
+      planItemPresentable({ hymnNumber: 214, file: { lyricsText: null, hymnLyrics: [{ number: 300 }] } }),
+    ).toBe(false);
+  });
+
+  it("doesn't present a scanned book nobody has typed anything out of", () => {
+    expect(planItemPresentable({ hymnNumber: 214, file: { lyricsText: null, hymnLyrics: [] } })).toBe(
+      false,
+    );
+  });
+
+  it("doesn't present a whole book listed without a number", () => {
+    expect(
+      planItemPresentable({ hymnNumber: null, file: { lyricsText: null, hymnLyrics: [{ number: 214 }] } }),
+    ).toBe(false);
+  });
+});
+
+describe("presentHref", () => {
+  it("carries the hymn number, so the presenter knows which hymn of the book", () => {
+    expect(presentHref({ hymnNumber: 214, file: { id: "b1" } }, "p1")).toBe(
+      "/present/b1?hymn=214&plan=p1",
+    );
+  });
+
+  it("presents a hymn that is its own file with no number to carry", () => {
+    expect(presentHref({ hymnNumber: null, file: { id: "h1" } }, "p1")).toBe("/present/h1?plan=p1");
+  });
+
+  it("leaves the plan out when the hymn isn't being presented as part of one", () => {
+    expect(presentHref({ hymnNumber: 214, file: { id: "b1" } }, null)).toBe("/present/b1?hymn=214");
   });
 });

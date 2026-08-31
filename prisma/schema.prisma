@@ -507,6 +507,31 @@ model BookHymn {
   @@index([title])
 }
 
+/// The words of a hymn that lives inside a whole-book PDF.
+///
+/// Kept apart from BookHymn on purpose. Those rows are the book's contents,
+/// replaced whole every time the book is indexed — deleted and written again
+/// from the PDF's bookmarks. Lyrics are typed by a person, an evening at a
+/// time, and cannot live somewhere a reindex sweeps away.
+///
+/// So they are keyed by the number on the board rather than by a row id:
+/// hymn 214 of this book is still hymn 214 after the book is re-scanned,
+/// re-indexed, or has its contents retyped. The trade is that an unnumbered
+/// entry — a section heading, a hymn a book prints without a number — has
+/// nothing to key on and can't have words stored here.
+model BookHymnLyric {
+  id         String    @id @default(cuid())
+  file       FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileId     String
+  /// The hymn number as printed in this book. See hymnNumberOf in lib/toc-nav.ts.
+  number     Int
+  lyricsText String
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([fileId, number])
+  @@index([fileId])
+}
+
 // A member's bookmark of a file — a hymn, or a whole book. Series and videos
 // have had this from the start; a hymnal's hymns are the thing this app gets
 // looked things up in most, and had no way to be kept in a list.
@@ -704,6 +729,7 @@ model FileAsset {
   favoritedBy     FileFavorite[]
   servicePlanned  ServicePlanItem[]
   hymns           BookHymn[]
+  hymnLyrics      BookHymnLyric[]
 
   @@index([seriesId])
   @@index([categoryId])
