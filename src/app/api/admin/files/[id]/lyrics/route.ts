@@ -6,19 +6,27 @@ import { ensureStaff, ensureContentAccess } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 
 /**
- * The words of one hymn inside a whole-book hymnal.
+ * What is known about one hymn inside a whole-book hymnal: its words, and
+ * its credits.
  *
- * A hymn that is its own file keeps its lyrics on its row; a hymn inside a
- * six-hundred-page PDF has no row of its own to keep anything on, which is
- * why a service built from book numbers could never be projected. These are
- * stored against the book and the number on the board — see BookHymnLyric
- * for why not against the contents row, which a reindex replaces.
+ * A hymn that is its own file keeps these on its row; a hymn inside a
+ * six-hundred-page PDF has no row of its own, which is why a service built
+ * from book numbers could never be projected and never appeared in a licence
+ * return. They are stored against the book and the number on the board — see
+ * BookHymnDetail for why not against the contents row, which a reindex
+ * replaces.
  */
 const schema = z.object({
   number: z.number().int().min(1).max(9999),
-  // Empty is how a wrong set of words is removed: the row goes rather than
-  // being kept as a blank that reads, to whatever asks, as "has lyrics".
+  // Empty is how a wrong set of words is removed: what is stored is a blank
+  // rather than a row that reads, to whatever asks, as "has lyrics".
   lyricsText: z.string().max(20000),
+  ccliNumber: z.string().max(60).optional(),
+  author: z.string().max(300).optional(),
+  copyright: z.string().max(300).optional(),
+  musicalKey: z.string().max(12).optional(),
+  // A blank box comes through as "", which is not a tempo and not an error.
+  tempoBpm: z.union([z.coerce.number().int().min(20).max(400), z.literal("")]).optional(),
 });
 
 async function bookFor(id: string) {
@@ -49,11 +57,25 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const wanted = request.nextUrl.searchParams.get("number");
     if (wanted !== null) {
       const number = z.coerce.number().int().min(1).parse(wanted);
-      const row = await prisma.bookHymnLyric.findUnique({
+      const row = await prisma.bookHymnDetail.findUnique({
         where: { fileId_number: { fileId: id, number } },
-        select: { lyricsText: true },
+        select: {
+          lyricsText: true,
+          ccliNumber: true,
+          author: true,
+          copyright: true,
+          musicalKey: true,
+          tempoBpm: true,
+        },
       });
-      return NextResponse.json({ lyricsText: row?.lyricsText ?? "" });
+      return NextResponse.json({
+        lyricsText: row?.lyricsText ?? "",
+        ccliNumber: row?.ccliNumber ?? "",
+        author: row?.author ?? "",
+        copyright: row?.copyright ?? "",
+        musicalKey: row?.musicalKey ?? "",
+        tempoBpm: row?.tempoBpm ?? "",
+      });
     }
 
     const [hymns, lyrics] = await Promise.all([
@@ -62,20 +84,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         select: { title: true, number: true, page: true },
         orderBy: [{ number: "asc" }],
       }),
-      prisma.bookHymnLyric.findMany({
+      prisma.bookHymnDetail.findMany({
         where: { fileId: id },
-        select: { number: true, lyricsText: true },
+        select: { number: true, lyricsText: true, ccliNumber: true },
       }),
     ]);
 
-    const words = new Map(lyrics.map((row) => [row.number, row.lyricsText]));
+    const detailed = new Map(lyrics.map((row) => [row.number, row]));
     return NextResponse.json({
-      hymns: hymns.map((hymn) => ({
-        number: hymn.number,
-        title: hymn.title,
-        page: hymn.page,
-        hasLyrics: words.has(hymn.number as number),
-      })),
+      hymns: hymns.map((hymn) => {
+        const detail = detailed.get(hymn.number as number);
+        return {
+          number: hymn.number,
+          title: hymn.title,
+          page: hymn.page,
+          hasLyrics: Boolean(detail?.lyricsText),
+          hasCredits: Boolean(detail?.ccliNumber),
+        };
+      }),
       // Words stored under a number the contents no longer list — a book
       // retyped or re-scanned since. Reported rather than hidden, so an
       // evening's typing can't quietly detach from the book it was for.
@@ -98,25 +124,37 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (!file) return NextResponse.json({ error: "Not found" }, { status: 404 });
     await ensureContentAccess(user, { seriesId: file.seriesId, categoryId: file.categoryId });
 
-    const lyricsText = body.lyricsText.trim();
-    if (lyricsText) {
-      await prisma.bookHymnLyric.upsert({
-        where: { fileId_number: { fileId: id, number: body.number } },
-        create: { fileId: id, number: body.number, lyricsText },
-        update: { lyricsText },
-      });
-    } else {
-      await prisma.bookHymnLyric.deleteMany({ where: { fileId: id, number: body.number } });
+    const text = (value: string | undefined) => value?.trim() || null;
+    const lyricsText = text(body.lyricsText);
+    const fields = {
+      lyricsText,
+      ccliNumber: text(body.ccliNumber),
+      author: text(body.author),
+      copyright: text(body.copyright),
+      musicalKey: text(body.musicalKey),
+      tempoBpm: typeof body.tempoBpm === "number" ? body.tempoBpm : null,
+    };
+
+    // A row with every field empty says nothing; it goes rather than sitting
+    // there as a hymn somebody has "filled in".
+    if (Object.values(fields).every((value) => value === null)) {
+      await prisma.bookHymnDetail.deleteMany({ where: { fileId: id, number: body.number } });
+      await logAudit(user.email, "clear-hymn-detail", "file", id, `${file.title}: hymn ${body.number}`);
+      return NextResponse.json({ ok: true, hasLyrics: false, hasCredits: false });
     }
 
-    await logAudit(
-      user.email,
-      lyricsText ? "edit-hymn-lyrics" : "clear-hymn-lyrics",
-      "file",
-      id,
-      `${file.title}: hymn ${body.number}`,
-    );
-    return NextResponse.json({ ok: true, hasLyrics: Boolean(lyricsText) });
+    await prisma.bookHymnDetail.upsert({
+      where: { fileId_number: { fileId: id, number: body.number } },
+      create: { fileId: id, number: body.number, ...fields },
+      update: fields,
+    });
+
+    await logAudit(user.email, "edit-hymn-detail", "file", id, `${file.title}: hymn ${body.number}`);
+    return NextResponse.json({
+      ok: true,
+      hasLyrics: Boolean(lyricsText),
+      hasCredits: Boolean(fields.ccliNumber),
+    });
   } catch (error) {
     return errorResponse(error);
   }

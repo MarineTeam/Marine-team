@@ -3,7 +3,30 @@
 import { useCallback, useMemo, useState } from "react";
 import { splitVerses } from "@/lib/verses";
 
-type Listed = { number: number; title: string; page: number; hasLyrics: boolean };
+type Listed = {
+  number: number;
+  title: string;
+  page: number;
+  hasLyrics: boolean;
+  hasCredits: boolean;
+};
+
+/** The credits, as the boxes hold them — all strings, since that is what a form has. */
+type Credits = {
+  ccliNumber: string;
+  author: string;
+  copyright: string;
+  musicalKey: string;
+  tempoBpm: string;
+};
+
+const NO_CREDITS: Credits = {
+  ccliNumber: "",
+  author: "",
+  copyright: "",
+  musicalKey: "",
+  tempoBpm: "",
+};
 
 /**
  * Types the words of a hymn that lives inside a whole-book hymnal.
@@ -35,6 +58,7 @@ export function BookHymnLyrics({
 
   const [editing, setEditing] = useState<Listed | null>(null);
   const [text, setText] = useState("");
+  const [credits, setCredits] = useState<Credits>(NO_CREDITS);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -56,10 +80,21 @@ export function BookHymnLyrics({
   async function edit(hymn: Listed) {
     setEditing(hymn);
     setText("");
+    setCredits(NO_CREDITS);
     setError(null);
     try {
       const res = await fetch(`/api/admin/files/${file.id}/lyrics?number=${hymn.number}`);
-      if (res.ok) setText((await res.json()).lyricsText);
+      if (res.ok) {
+        const data = await res.json();
+        setText(data.lyricsText);
+        setCredits({
+          ccliNumber: data.ccliNumber,
+          author: data.author,
+          copyright: data.copyright,
+          musicalKey: data.musicalKey,
+          tempoBpm: String(data.tempoBpm ?? ""),
+        });
+      }
     } catch {
       // An empty box for a hymn that has words would overwrite them on save,
       // so a failed read closes the editor rather than offering that.
@@ -76,12 +111,14 @@ export function BookHymnLyrics({
       const res = await fetch(`/api/admin/files/${file.id}/lyrics`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ number: editing.number, lyricsText: text }),
+        body: JSON.stringify({ number: editing.number, lyricsText: text, ...credits }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Save failed");
-      const { hasLyrics } = await res.json();
+      const { hasLyrics, hasCredits } = await res.json();
       setHymns((current) =>
-        current.map((hymn) => (hymn.number === editing.number ? { ...hymn, hasLyrics } : hymn)),
+        current.map((hymn) =>
+          hymn.number === editing.number ? { ...hymn, hasLyrics, hasCredits } : hymn,
+        ),
       );
       setEditing(null);
       await onSaved?.();
@@ -94,7 +131,7 @@ export function BookHymnLyrics({
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return hymns.filter((hymn) => hymn.hasLyrics);
+    if (!q) return hymns.filter((hymn) => hymn.hasLyrics || hymn.hasCredits);
     return hymns.filter(
       (hymn) => String(hymn.number) === q || hymn.title.toLowerCase().includes(q),
     );
@@ -141,9 +178,10 @@ export function BookHymnLyrics({
       </div>
 
       <p className="text-xs text-sec">
-        Words typed here can be put on the projector and are found by searching for a line of them.
-        They stay with the hymn number, so re-indexing or re-scanning this book doesn&apos;t lose
-        them. A blank line separates verses; a line reading &quot;Chorus&quot; marks one.
+        Words typed here can be put on the projector and are found by searching for a line of them;
+        the credits go into the licence return and onto the screen under the words. Both stay with
+        the hymn number, so re-indexing or re-scanning this book doesn&apos;t lose them. A blank
+        line separates verses; a line reading &quot;Chorus&quot; marks one.
       </p>
 
       {editing ? (
@@ -158,6 +196,58 @@ export function BookHymnLyrics({
             className="w-full rounded-md border border-sep px-2 py-1.5 font-mono text-xs"
             placeholder={"Amazing grace, how sweet the sound\nThat saved a wretch like me\n\nChorus\n..."}
           />
+          {/* The credits, under the words: a licence return needs the CCLI
+              number, and a projector is required to carry the copyright line
+              while the words are up. */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <label className="space-y-1 text-xs">
+              <span className="text-sec">CCLI number</span>
+              <input
+                value={credits.ccliNumber}
+                onChange={(e) => setCredits({ ...credits, ccliNumber: e.target.value })}
+                className="w-full rounded-md border border-sep px-2 py-1.5 text-sm"
+              />
+            </label>
+            <label className="space-y-1 text-xs">
+              <span className="text-sec">Key</span>
+              <input
+                value={credits.musicalKey}
+                onChange={(e) => setCredits({ ...credits, musicalKey: e.target.value })}
+                placeholder="G"
+                className="w-full rounded-md border border-sep px-2 py-1.5 text-sm"
+              />
+            </label>
+            <label className="space-y-1 text-xs">
+              <span className="text-sec">Tempo (bpm)</span>
+              <input
+                type="number"
+                value={credits.tempoBpm}
+                onChange={(e) => setCredits({ ...credits, tempoBpm: e.target.value })}
+                className="w-full rounded-md border border-sep px-2 py-1.5 text-sm"
+              />
+            </label>
+            <label className="space-y-1 text-xs">
+              <span className="text-sec">Words &amp; music</span>
+              <input
+                value={credits.author}
+                onChange={(e) => setCredits({ ...credits, author: e.target.value })}
+                placeholder="John Newton"
+                className="w-full rounded-md border border-sep px-2 py-1.5 text-sm"
+              />
+            </label>
+          </div>
+          <label className="block space-y-1 text-xs">
+            <span className="text-sec">
+              Copyright line — shown on the projector under the words, as a licence requires
+            </span>
+            <input
+              value={credits.copyright}
+              onChange={(e) => setCredits({ ...credits, copyright: e.target.value })}
+              placeholder="© 1779 Public Domain"
+              className="w-full rounded-md border border-sep px-2 py-1.5 text-sm"
+            />
+          </label>
+
           <div className="flex flex-wrap items-center gap-3 text-xs">
             <button
               type="button"
@@ -165,13 +255,13 @@ export function BookHymnLyrics({
               disabled={saving}
               className="rounded-md btn-primary px-3 py-1.5 text-white disabled:opacity-50"
             >
-              {saving ? "Saving…" : "Save words"}
+              {saving ? "Saving…" : "Save"}
             </button>
             <button type="button" onClick={() => setEditing(null)} className="text-sec hover:underline">
               Cancel
             </button>
             <span className="text-sec">
-              {verses === 0 ? "Empty — saving removes this hymn's words" : `${verses} verses`}
+              {verses === 0 ? "No words — the hymn can't be projected" : `${verses} verses`}
             </span>
           </div>
         </div>
@@ -197,6 +287,7 @@ export function BookHymnLyrics({
                     <span className="w-10 shrink-0 tabular-nums text-sec">{hymn.number}</span>
                     <span className="flex-1 truncate">{hymn.title}</span>
                     {hymn.hasLyrics && <span className="shrink-0 text-green-600">words</span>}
+                    {hymn.hasCredits && <span className="shrink-0 text-sec">CCLI</span>}
                   </button>
                 </li>
               ))}

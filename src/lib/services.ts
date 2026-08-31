@@ -38,11 +38,13 @@ const planItems = {
         hidden: true,
         deletedAt: true,
         series: { select: { title: true, slug: true, hymnPerFile: true } },
-        // Every number in this book that has words typed against it. The
-        // item's own number is matched in memory rather than in the query:
-        // a relation filter can't see the row it hangs off, and a hymnal
-        // has a handful of these, not a table's worth.
-        hymnLyrics: { select: { number: true } },
+        // Every number in this book that has words typed against it. Filtered
+        // on the words, not merely on the row: a hymn can now carry credits
+        // with nobody having typed its verses, and that is not something to
+        // put on a screen. The item's own number is matched in memory rather
+        // than in the query — a relation filter can't see the row it hangs
+        // off, and a hymnal has a handful of these, not a table's worth.
+        hymnDetails: { where: { lyricsText: { not: null } }, select: { number: true } },
       },
     },
   },
@@ -169,16 +171,16 @@ export function planItemTitle(
  * Two places they can be: on the file's own row, which is a hymn that is its
  * own file; or against a number inside a whole-book hymnal, which is a hymn
  * somebody typed out of a scan. The second is why a plan built from book
- * numbers can be projected at all — see BookHymnLyric.
+ * numbers can be projected at all — see BookHymnDetail.
  */
 export function planItemPresentable(item: {
   hymnNumber: number | null;
-  file: { lyricsText: string | null; hymnLyrics: { number: number }[] };
+  file: { lyricsText: string | null; hymnDetails: { number: number }[] };
 }): boolean {
   if (item.file.lyricsText?.trim()) return true;
   return (
     item.hymnNumber !== null &&
-    item.file.hymnLyrics.some((lyric) => lyric.number === item.hymnNumber)
+    item.file.hymnDetails.some((detail) => detail.number === item.hymnNumber)
   );
 }
 
@@ -204,6 +206,106 @@ export function presentHref(
  */
 export function firstPresentableItem(plan: ServicePlanWithItems): ServicePlanItemWithFile | null {
   return plan.items.find(planItemPresentable) ?? null;
+}
+
+/**
+ * What was sung between two dates, for a licence return.
+ *
+ * A licence (CCLI and the like) is reported per song per occasion, so this
+ * counts *occasions*: the same hymn in three services is three, which is
+ * what the return asks for. Built from the service plans rather than from
+ * what anybody looked up, because a plan is the record of what was actually
+ * sung — a hymn opened on a phone on Tuesday is not a performance.
+ *
+ * Every plan in the window counts, published or not: a draft that never got
+ * published was still sung if it has a date, and the alternative — silently
+ * under-reporting a licence return — is the worse mistake.
+ *
+ * The credits come from the two places a hymn can keep them (see
+ * BookHymnDetail): the file's own row, or the book-and-number.
+ */
+export async function songsSungBetween(from: Date, to: Date) {
+  const plans = await prisma.servicePlan.findMany({
+    where: { serviceDate: { gte: from, lte: to } },
+    select: {
+      id: true,
+      title: true,
+      serviceDate: true,
+      items: {
+        select: {
+          hymnNumber: true,
+          file: {
+            select: {
+              id: true,
+              title: true,
+              ccliNumber: true,
+              songAuthor: true,
+              songCopyright: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: { serviceDate: "asc" },
+  });
+
+  const numbered = plans.flatMap((plan) =>
+    plan.items.flatMap((item) =>
+      item.hymnNumber === null ? [] : [{ fileId: item.file.id, number: item.hymnNumber }],
+    ),
+  );
+  const details = numbered.length
+    ? await prisma.bookHymnDetail.findMany({
+        where: { OR: numbered },
+        select: { fileId: true, number: true, ccliNumber: true, author: true, copyright: true },
+      })
+    : [];
+  const titles = await planItemTitles(plans.flatMap((plan) => plan.items));
+  const detailByKey = new Map(details.map((row) => [`${row.fileId}:${row.number}`, row]));
+
+  type Row = {
+    key: string;
+    title: string;
+    /** Where it lives, so two hymns with the same name can be told apart. */
+    book: string | null;
+    number: number | null;
+    ccliNumber: string | null;
+    author: string | null;
+    copyright: string | null;
+    /** How many services it was sung in, which is what a return counts. */
+    times: number;
+    dates: string[];
+  };
+
+  const rows = new Map<string, Row>();
+  for (const plan of plans) {
+    for (const item of plan.items) {
+      const key = `${item.file.id}:${item.hymnNumber ?? ""}`;
+      const detail = detailByKey.get(key);
+      const existing = rows.get(key);
+      const day = plan.serviceDate ? plan.serviceDate.toISOString().slice(0, 10) : "";
+
+      if (existing) {
+        existing.times += 1;
+        if (day) existing.dates.push(day);
+        continue;
+      }
+      rows.set(key, {
+        key,
+        title: planItemTitle(item, titles),
+        book: item.hymnNumber === null ? null : item.file.title,
+        number: item.hymnNumber,
+        ccliNumber: detail?.ccliNumber ?? item.file.ccliNumber ?? null,
+        author: detail?.author ?? item.file.songAuthor ?? null,
+        copyright: detail?.copyright ?? item.file.songCopyright ?? null,
+        times: 1,
+        dates: day ? [day] : [],
+      });
+    }
+  }
+
+  // Most sung first: the songs a return spends the most licence on.
+  return [...rows.values()].sort((a, b) => b.times - a.times || a.title.localeCompare(b.title));
 }
 
 /** Files a plan can be built from: hymns and books, the two things with a page. */

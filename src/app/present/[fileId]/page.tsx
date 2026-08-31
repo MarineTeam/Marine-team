@@ -25,7 +25,7 @@ export async function generateMetadata({
  *
  * `?hymn=` presents a numbered hymn inside a whole-book hymnal rather than
  * the file itself — a scanned book has no page of its own per hymn, so the
- * number is the only thing that names one (see BookHymnLyric).
+ * number is the only thing that names one (see BookHymnDetail).
  *
  * `?plan=` presents it as part of a service: the hymns either side come from
  * that plan's order, so whoever is driving moves through the whole thing
@@ -98,6 +98,8 @@ export default async function PresentPage({
       <Presenter
         title={hymn ? hymn.title : file.title}
         subtitle={subtitle}
+        // Stays on screen the whole time the words are up — see the prop.
+        copyright={hymn ? hymn.copyright : file.songCopyright}
         verses={splitVerses(hymn ? hymn.lyricsText : file.lyricsText)}
         // Out of present mode goes back where it was entered from: the service
         // being led, the book the hymn is in, or the hymn's own page.

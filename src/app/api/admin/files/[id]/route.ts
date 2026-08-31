@@ -21,6 +21,14 @@ export const updateSchema = z
     pageNumber: z.number().int().nullable().optional(),
     groupLabel: z.string().nullable().optional(),
     lyricsText: z.string().nullable().optional(),
+    // A hymn's credits. Free text, including the CCLI "number": it is an
+    // identifier printed on a page rather than something to do arithmetic
+    // with, and some songs carry more than one.
+    ccliNumber: z.string().max(60).nullable().optional(),
+    songAuthor: z.string().max(300).nullable().optional(),
+    songCopyright: z.string().max(300).nullable().optional(),
+    musicalKey: z.string().max(12).nullable().optional(),
+    tempoBpm: z.number().int().min(20).max(400).nullable().optional(),
     // How many PDF pages precede the book's printed page 1. Not nullable:
     // the column defaults to 0, and "no front matter" is the same answer
     // as "nobody has set this" — see lib/page-offset.ts. Unbounded in both

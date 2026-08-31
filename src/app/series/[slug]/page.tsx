@@ -381,14 +381,26 @@ export default async function SeriesPage({
                       <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">
                         {bookPdfs.length > 0 ? "Other files" : "Files"}
                       </h2>
-                      <FileList files={otherFiles} isLoggedIn={isLoggedIn} readerOn={readerOn} />
+                      <FileList
+                        files={otherFiles}
+                        isLoggedIn={isLoggedIn}
+                        readerOn={readerOn}
+                        context={series.title}
+                        artworkUrl={series.coverImageUrl}
+                      />
                     </>
                   )}
                 </>
               ) : (
                 <>
                   <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">Files</h2>
-                  <FileList files={series.files} isLoggedIn={isLoggedIn} readerOn={readerOn} />
+                  <FileList
+                    files={series.files}
+                    isLoggedIn={isLoggedIn}
+                    readerOn={readerOn}
+                    context={series.title}
+                    artworkUrl={series.coverImageUrl}
+                  />
                 </>
               )}
             </section>

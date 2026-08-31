@@ -751,7 +751,7 @@ function hymnHref(fileId: string, page: number, number: number | null): string {
  *
  * Two queries rather than one because the words and the contents entry can't
  * be joined in a single filter: lyrics are keyed to (book, number) so a
- * reindex can't sweep them away (see BookHymnLyric), and Prisma can't match a
+ * reindex can't sweep them away (see BookHymnDetail), and Prisma can't match a
  * relation against the parent row's own column. So the words are found first,
  * then the entries they belong to — which is also what carries the page and
  * the title a result needs.
@@ -764,7 +764,7 @@ async function hymnsMatchingWords(
   fileWhere: Prisma.FileAssetWhereInput,
   take: number,
 ) {
-  const words = await prisma.bookHymnLyric.findMany({
+  const words = await prisma.bookHymnDetail.findMany({
     where: { lyricsText: { contains: q, mode: "insensitive" }, file: fileWhere },
     select: { fileId: true, number: true, lyricsText: true },
     take,
@@ -949,7 +949,7 @@ export async function searchHymnsInCategory(
  *
  * The two halves come from different places on purpose. The title and page
  * are contents, rewritten whenever the book is indexed; the words are typed
- * and keyed to the number so a reindex can't take them (see BookHymnLyric).
+ * and keyed to the number so a reindex can't take them (see BookHymnDetail).
  * A hymn whose words exist but whose contents entry has gone still presents,
  * titled by its number alone — which is the honest thing to show when the
  * only thing known about it is the number somebody typed it under.
@@ -961,9 +961,9 @@ export async function getBookHymn(fileId: string, number: number) {
       select: { title: true, page: true },
       orderBy: { position: "asc" },
     }),
-    prisma.bookHymnLyric.findUnique({
+    prisma.bookHymnDetail.findUnique({
       where: { fileId_number: { fileId, number } },
-      select: { lyricsText: true },
+      select: { lyricsText: true, copyright: true, author: true, ccliNumber: true },
     }),
   ]);
   if (!entry && !lyrics) return null;
@@ -972,6 +972,9 @@ export async function getBookHymn(fileId: string, number: number) {
     title: entry?.title ?? `Hymn ${number}`,
     page: entry?.page ?? null,
     lyricsText: lyrics?.lyricsText ?? null,
+    copyright: lyrics?.copyright ?? null,
+    author: lyrics?.author ?? null,
+    ccliNumber: lyrics?.ccliNumber ?? null,
   };
 }
 
@@ -1017,8 +1020,11 @@ export async function searchBookText(fileId: string, query: string, pageOffset: 
  * against in the browser, and what /present/[fileId]?hymn= takes.
  */
 export async function presentableHymnNumbers(fileId: string): Promise<Set<number>> {
-  const rows = await prisma.bookHymnLyric.findMany({
-    where: { fileId },
+  const rows = await prisma.bookHymnDetail.findMany({
+    // The words, not merely a row: a hymn can carry credits with nobody
+    // having typed its verses, and offering a screen for that would put an
+    // empty one at the front of the room.
+    where: { fileId, lyricsText: { not: null } },
     select: { number: true },
   });
   return new Set(rows.map((row) => row.number));

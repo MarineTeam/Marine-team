@@ -55,6 +55,11 @@ type FileAsset = {
   pageNumber: number | null;
   groupLabel: string | null;
   lyricsText: string | null;
+  ccliNumber: string | null;
+  songAuthor: string | null;
+  songCopyright: string | null;
+  musicalKey: string | null;
+  tempoBpm: number | null;
   pageOffset: number;
   series: { id: string; title: string } | null;
   category: { id: string; name: string } | null;
@@ -89,6 +94,11 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
   const [editPageNumber, setEditPageNumber] = useState("");
   const [editGroupLabel, setEditGroupLabel] = useState("");
   const [editLyricsText, setEditLyricsText] = useState("");
+  const [editCcliNumber, setEditCcliNumber] = useState("");
+  const [editSongAuthor, setEditSongAuthor] = useState("");
+  const [editSongCopyright, setEditSongCopyright] = useState("");
+  const [editMusicalKey, setEditMusicalKey] = useState("");
+  const [editTempoBpm, setEditTempoBpm] = useState("");
   const [savingDetails, setSavingDetails] = useState(false);
 
   async function load() {
@@ -216,6 +226,11 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
     setEditPageNumber(f.pageNumber != null ? String(f.pageNumber) : "");
     setEditGroupLabel(f.groupLabel ?? "");
     setEditLyricsText(f.lyricsText ?? "");
+    setEditCcliNumber(f.ccliNumber ?? "");
+    setEditSongAuthor(f.songAuthor ?? "");
+    setEditSongCopyright(f.songCopyright ?? "");
+    setEditMusicalKey(f.musicalKey ?? "");
+    setEditTempoBpm(f.tempoBpm != null ? String(f.tempoBpm) : "");
   }
 
   async function saveDetails(id: string) {
@@ -235,6 +250,11 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
           pageNumber: trimmedPage ? Number(trimmedPage) : null,
           groupLabel: editGroupLabel.trim() || null,
           lyricsText: editLyricsText.trim() || null,
+          ccliNumber: editCcliNumber.trim() || null,
+          songAuthor: editSongAuthor.trim() || null,
+          songCopyright: editSongCopyright.trim() || null,
+          musicalKey: editMusicalKey.trim() || null,
+          tempoBpm: Number(editTempoBpm.trim()) || null,
         }),
       });
       setEditingId(null);
@@ -606,6 +626,56 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
                     onChange={(e) => setEditLyricsText(e.target.value)}
                     rows={6}
                     className="w-full rounded-md border border-sep px-2 py-1.5 font-mono text-sm"
+                  />
+                </label>
+                {/* A hymn's credits: the licence return needs the CCLI
+                    number, and a projector is required to show the copyright
+                    line while the words are up. */}
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <label className="space-y-1 text-xs">
+                    <span className="text-sec">CCLI number</span>
+                    <input
+                      value={editCcliNumber}
+                      onChange={(e) => setEditCcliNumber(e.target.value)}
+                      className="w-full rounded-md border border-sep px-2 py-1.5 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-1 text-xs">
+                    <span className="text-sec">Key</span>
+                    <input
+                      value={editMusicalKey}
+                      onChange={(e) => setEditMusicalKey(e.target.value)}
+                      placeholder="G"
+                      className="w-full rounded-md border border-sep px-2 py-1.5 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-1 text-xs">
+                    <span className="text-sec">Tempo (bpm)</span>
+                    <input
+                      type="number"
+                      value={editTempoBpm}
+                      onChange={(e) => setEditTempoBpm(e.target.value)}
+                      className="w-full rounded-md border border-sep px-2 py-1.5 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-1 text-xs">
+                    <span className="text-sec">Words &amp; music</span>
+                    <input
+                      value={editSongAuthor}
+                      onChange={(e) => setEditSongAuthor(e.target.value)}
+                      placeholder="John Newton"
+                      className="w-full rounded-md border border-sep px-2 py-1.5 text-sm"
+                    />
+                  </label>
+                </div>
+                <label className="block space-y-1 text-xs">
+                  <span className="text-sec">
+                    Copyright line — shown on the projector under the words, as a licence requires
+                  </span>
+                  <input
+                    value={editSongCopyright}
+                    onChange={(e) => setEditSongCopyright(e.target.value)}
+                    className="w-full rounded-md border border-sep px-2 py-1.5 text-sm"
                   />
                 </label>
                 <button

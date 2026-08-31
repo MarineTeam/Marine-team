@@ -79,13 +79,13 @@ describe("planItemReadable", () => {
 describe("planItemPresentable", () => {
   it("presents a hymn that is its own file, from the words on its row", () => {
     expect(
-      planItemPresentable({ hymnNumber: null, file: { lyricsText: "Holy, holy", hymnLyrics: [] } }),
+      planItemPresentable({ hymnNumber: null, file: { lyricsText: "Holy, holy", hymnDetails: [] } }),
     ).toBe(true);
   });
 
   it("presents a number inside a book when somebody has typed that number's words", () => {
     expect(
-      planItemPresentable({ hymnNumber: 214, file: { lyricsText: null, hymnLyrics: [{ number: 214 }] } }),
+      planItemPresentable({ hymnNumber: 214, file: { lyricsText: null, hymnDetails: [{ number: 214 }] } }),
     ).toBe(true);
   });
 
@@ -93,19 +93,27 @@ describe("planItemPresentable", () => {
   // about hymn 214, and offering a screen for it would put up the wrong hymn.
   it("doesn't present a number whose own words are missing", () => {
     expect(
-      planItemPresentable({ hymnNumber: 214, file: { lyricsText: null, hymnLyrics: [{ number: 300 }] } }),
+      planItemPresentable({ hymnNumber: 214, file: { lyricsText: null, hymnDetails: [{ number: 300 }] } }),
     ).toBe(false);
   });
 
   it("doesn't present a scanned book nobody has typed anything out of", () => {
-    expect(planItemPresentable({ hymnNumber: 214, file: { lyricsText: null, hymnLyrics: [] } })).toBe(
+    expect(planItemPresentable({ hymnNumber: 214, file: { lyricsText: null, hymnDetails: [] } })).toBe(
+      false,
+    );
+  });
+
+  // A row can now exist for the credits alone, and the include that feeds
+  // this filters on the words — so anything reaching here has some.
+  it("doesn't present a scanned book whose hymn has credits but no words", () => {
+    expect(planItemPresentable({ hymnNumber: 214, file: { lyricsText: null, hymnDetails: [] } })).toBe(
       false,
     );
   });
 
   it("doesn't present a whole book listed without a number", () => {
     expect(
-      planItemPresentable({ hymnNumber: null, file: { lyricsText: null, hymnLyrics: [{ number: 214 }] } }),
+      planItemPresentable({ hymnNumber: null, file: { lyricsText: null, hymnDetails: [{ number: 214 }] } }),
     ).toBe(false);
   });
 });

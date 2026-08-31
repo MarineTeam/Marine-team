@@ -31,6 +31,7 @@ export type PresentNeighbour = { href: string; title: string; number: number | n
 export function Presenter({
   title,
   subtitle,
+  copyright,
   verses,
   backHref,
   previous,
@@ -38,6 +39,13 @@ export function Presenter({
 }: {
   title: string;
   subtitle: string | null;
+  /**
+   * The song's copyright line. Shown small and permanently at the foot of the
+   * screen — not with the controls, which fade after three seconds — because
+   * a licence requires it to be visible *while the words are*, and something
+   * that disappears on its own does not meet that.
+   */
+  copyright: string | null;
   verses: Verse[];
   /** Where leaving goes: the hymn's own page, or the service it belongs to. */
   backHref: string;
@@ -235,7 +243,7 @@ export function Presenter({
       </div>
 
       <div
-        className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-center justify-between gap-3 p-4 text-sm transition-opacity duration-300 ${
+        className={`pointer-events-none absolute inset-x-0 bottom-5 z-20 flex items-center justify-between gap-3 p-4 text-sm transition-opacity duration-300 ${
           controlsShown ? "opacity-100" : "opacity-0"
         } ${dark ? "text-white/60" : "text-black/60"}`}
       >
@@ -245,6 +253,19 @@ export function Presenter({
         </span>
         <span className="pointer-events-auto truncate">{next ? `next: ${next.title}` : ""}</span>
       </div>
+
+      {/* Always on, unlike everything else here. See the prop's note: a
+          copyright line that fades out after three seconds is not a
+          copyright line that was shown. */}
+      {copyright && (
+        <p
+          className={`pointer-events-none absolute inset-x-0 bottom-0 truncate px-4 pb-1 text-center text-xs ${
+            dark ? "text-white/40" : "text-black/40"
+          }`}
+        >
+          {copyright}
+        </p>
+      )}
     </div>
   );
 }

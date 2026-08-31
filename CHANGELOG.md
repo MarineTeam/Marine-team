@@ -146,6 +146,33 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **A hymn can carry its credits, and the projector shows them.** CCLI
+  number, words &amp; music, copyright line, key and tempo — in both places a
+  hymn lives, its own row or a number inside a book. The **copyright line
+  stays on the projector** the whole time the words are up, rather than
+  fading with the controls after three seconds: a licence requires it to be
+  visible while the words are, and something that disappears on its own
+  doesn't meet that.
+
+- **"What we sang", for a licence return.** `/admin/services → What we sang`
+  counts each song in a service plan dated inside a window and how many
+  services it was sung in, with its CCLI number, author and copyright, and a
+  CSV export. Counted from the plans, since a plan is the record of what was
+  sung — a hymn opened on a phone on Tuesday isn't. Unpublished plans count
+  too: a draft that never got published was still sung, and under-reporting a
+  return is the worse mistake.
+
+- **Audio gets the controls a phone expects.** Playing a talk puts its title,
+  series and cover on the lock screen, with play, pause, a scrubber that
+  moves, and skip buttons — plus a sleep timer and a speed control beside the
+  player. The lock screen is claimed on play rather than on load, so a page of
+  eight talks doesn't have eight players fighting over it.
+  - The **default playback speed** in `/profile/settings` finally does
+    something. It was stored and shown as a reminder because Bunny's embed
+    takes no such parameter; that was never true of audio, which is our own
+    element.
+
+
 - **Reading text size, per device.** A− and A+ beside a hymn's words and in
   the EPUB reader, because the moment anybody discovers a hymn is too small is
   while they are looking at it — in a pew, which is not when somebody goes

@@ -61,6 +61,18 @@ A complete list of what's built. See [README.md](./README.md) for setup and
 - **Related content** — series pages show "More like this" (same category,
   then shared tags); video pages show "More from this series" or "You might
   also like" for standalone videos.
+- **Audio has the controls a phone expects** — playing a talk or a hymn puts
+  its title, its series and its cover on the **lock screen**, with play,
+  pause, a scrubber that actually moves, and skip buttons (15 seconds back,
+  30 forward). A **sleep timer** (15/30/45/60 minutes) stops it on a
+  wall-clock deadline, so pausing to answer the door doesn't extend the
+  night, and a **speed** control sits beside it. The lock screen is claimed on
+  play rather than on load, so a page listing eight talks doesn't have eight
+  players fighting over it.
+  - This is also where the **default playback speed** from `/profile/settings`
+    finally applies. It was stored and shown as a reminder because Bunny's
+    embed takes no such parameter — a reason that never applied to audio,
+    which is our own element.
 - **Backgrounding on Android pauses playback** — minimizing the app stops
   the audio; Android's media notification then resumes it with one tap, and
   from there it keeps playing in the background. That resume notification
@@ -506,6 +518,35 @@ bookmark reading "214 Amazing Grac" can be corrected without re-scanning
 anything; what comes back is written exactly as it was stored, nesting
 included. The bookmark-reading pass will not overwrite a typed list with an
 empty one.
+
+#### A hymn's credits
+
+Five fields sit beside a hymn's words, in the same two places the words do —
+a file's Details panel for a hymn that is its own file, the **Hymn lyrics…**
+picker for one inside a book: **CCLI number**, **words &amp; music**,
+**copyright line**, **key** and **tempo**.
+
+- The **copyright line is shown on the projector**, small, at the foot of the
+  screen, for as long as the words are up. Not with the controls, which fade
+  after three seconds — a licence requires the line to be visible *while* the
+  words are, and something that disappears on its own doesn't meet that.
+- The key and tempo are for whoever is playing, and show on the hymn's page.
+- The CCLI number is what the report below is for.
+
+#### What we sang, for a licence return
+
+`/admin/services → What we sang` counts every song in a service plan dated
+inside a window, and how many services it was sung in — the shape a licence
+return asks for — with its CCLI number, author and copyright beside it, and a
+CSV export.
+
+Counted from the plans rather than from what anybody looked up: a plan is the
+record of what was actually sung, where a hymn opened on a phone on Tuesday
+isn't. **Every plan in the window counts, published or not** — a draft that
+never got published was still sung if it has a date, and under-reporting a
+licence return is the worse mistake. A song with no CCLI number shows an empty
+cell rather than being left out: that blank is the thing somebody has to go
+and look up before the return can be filed.
 
 #### Words for a hymn inside a book
 

@@ -507,18 +507,6 @@ model BookHymn {
   @@index([title])
 }
 
-/// The words of a hymn that lives inside a whole-book PDF.
-///
-/// Kept apart from BookHymn on purpose. Those rows are the book's contents,
-/// replaced whole every time the book is indexed — deleted and written again
-/// from the PDF's bookmarks. Lyrics are typed by a person, an evening at a
-/// time, and cannot live somewhere a reindex sweeps away.
-///
-/// So they are keyed by the number on the board rather than by a row id:
-/// hymn 214 of this book is still hymn 214 after the book is re-scanned,
-/// re-indexed, or has its contents retyped. The trade is that an unnumbered
-/// entry — a section heading, a hymn a book prints without a number — has
-/// nothing to key on and can't have words stored here.
 /// The words on one page of a book, so a scan can be searched.
 ///
 /// A PDF made by a typesetter carries its text; a PDF made by a scanner is
@@ -547,13 +535,43 @@ model BookPage {
   @@index([fileId])
 }
 
-model BookHymnLyric {
+/// What a person has typed about a hymn that lives inside a whole-book PDF:
+/// its words, and the credits a licence return and a projector both need.
+///
+/// Kept apart from BookHymn on purpose. Those rows are the book's contents,
+/// replaced whole every time the book is indexed — deleted and written again
+/// from the PDF's bookmarks. This is typed by hand, an evening at a time, and
+/// cannot live somewhere a reindex sweeps away.
+///
+/// So it is keyed by the number on the board rather than by a row id: hymn
+/// 214 of this book is still hymn 214 after the book is re-scanned,
+/// re-indexed, or has its contents retyped. The trade is that an unnumbered
+/// entry — a section heading, a hymn a book prints without a number — has
+/// nothing to key on and can't be described here.
+///
+/// The same credits sit on FileAsset for a hymn that *is* a file, which is
+/// the split lyrics already make. Two homes rather than one table with a
+/// nullable number, because a unique index over a nullable column constrains
+/// nothing in Postgres — two "the file itself" rows would both be allowed.
+model BookHymnDetail {
   id         String    @id @default(cuid())
   file       FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
   fileId     String
   /// The hymn number as printed in this book. See hymnNumberOf in lib/toc-nav.ts.
   number     Int
-  lyricsText String
+  /// Null for a hymn whose credits are known but whose words nobody has typed.
+  lyricsText String?
+  /// The CCLI song number, for the licence return. Free text: it is an
+  /// identifier printed on a page, not a number to do arithmetic with.
+  ccliNumber String?
+  /// "Words: John Newton. Music: Traditional." — as the book prints it.
+  author     String?
+  /// The copyright line. A licence requires this *on the screen* while the
+  /// words are projected, which is why it travels with them.
+  copyright  String?
+  /// The key it is sung in here ("G", "Eb"), for whoever is playing.
+  musicalKey String?
+  tempoBpm   Int?
   updatedAt  DateTime  @updatedAt
 
   @@unique([fileId, number])
@@ -709,6 +727,15 @@ model FileAsset {
   // Formatted lyrics shown on this hymn's page; when null that page falls
   // back to the PDF reader/download as its primary view.
   lyricsText        String?
+  // The credits for a hymn that *is* a file — the same ones BookHymnDetail
+  // holds for a hymn inside a book. A licence return needs the CCLI number
+  // and the copyright line; a projector is required to show the copyright
+  // line while the words are up; the key and tempo are for whoever plays.
+  ccliNumber        String?
+  songAuthor        String?
+  songCopyright     String?
+  musicalKey        String?
+  tempoBpm          Int?
   // How many PDF pages sit in front of this book's printed page 1 — its
   // front matter. Applies to a whole-book PDF, unlike the three above.
   //
@@ -761,7 +788,7 @@ model FileAsset {
   favoritedBy     FileFavorite[]
   servicePlanned  ServicePlanItem[]
   hymns           BookHymn[]
-  hymnLyrics      BookHymnLyric[]
+  hymnDetails     BookHymnDetail[]
   pages           BookPage[]
   lookups         HymnLookup[]
 

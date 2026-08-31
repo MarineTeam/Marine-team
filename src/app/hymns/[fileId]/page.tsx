@@ -131,6 +131,24 @@ export default async function HymnPage({ params }: { params: Promise<{ fileId: s
             <ShareButtons title={file.title} path={`/hymns/${file.id}`} />
           )}
 
+          {/* The credits, where the words are. The key and tempo are for
+              whoever is playing; the rest is what the licence return and
+              the projector need, and printing it here is how anybody checks
+              it is right. */}
+          {(file.songAuthor || file.songCopyright || file.musicalKey || file.tempoBpm || file.ccliNumber) && (
+            <p className="text-xs text-ter">
+              {[
+                file.songAuthor,
+                file.musicalKey ? `Key of ${file.musicalKey}` : null,
+                file.tempoBpm ? `${file.tempoBpm} bpm` : null,
+                file.songCopyright,
+                file.ccliNumber ? `CCLI ${file.ccliNumber}` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
+
           {file.lyricsText ? (
             <>
               <LyricsText text={file.lyricsText} />

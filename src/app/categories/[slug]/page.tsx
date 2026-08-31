@@ -241,7 +241,13 @@ export default async function CategoryPage({
               <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">
                 {category.hymnalStyle && books.length > 0 ? "Other files" : "Files"}
               </h2>
-              <FileList files={looseFiles} isLoggedIn={isLoggedIn} readerOn={readerOn} />
+              <FileList
+                files={looseFiles}
+                isLoggedIn={isLoggedIn}
+                readerOn={readerOn}
+                context={category.name}
+                artworkUrl={category.coverImageUrl}
+              />
             </section>
           )}
         </>
