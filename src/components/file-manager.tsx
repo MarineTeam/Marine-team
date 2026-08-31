@@ -13,6 +13,7 @@ import {
 } from "@/components/content-target-picker";
 import { BunnyStorageImport } from "@/components/bunny-storage-import";
 import { CoverGenerator } from "@/components/cover-generator";
+import { FileReplace } from "@/components/file-replace";
 import {
   BulkBar,
   BulkButton,
@@ -44,6 +45,7 @@ type FileAsset = {
   podcastPublished: boolean;
   publicPath: string | null;
   bunnyPath: string;
+  sizeBytes: number | null;
   coverDataUrl: string | null;
   pageNumber: number | null;
   groupLabel: string | null;
@@ -608,6 +610,13 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
                 >
                   {savingDetails ? "Saving…" : "Save details"}
                 </button>
+
+                {/*
+                  Last in the panel, behind everything else about the file:
+                  it is the one action here that changes what people are
+                  actually reading.
+                */}
+                <FileReplace file={f} onReplaced={load} />
               </div>
             )}
           </li>

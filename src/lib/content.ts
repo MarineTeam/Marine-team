@@ -4,6 +4,8 @@ import { unstable_cache } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { isPluginEnabled } from "@/lib/plugins";
 import { getShareGrants } from "@/lib/share-access";
+import { fileHref, hymnReadingOrder } from "@/lib/hymnal";
+import { excerptAround, findMatches } from "@/lib/reader";
 
 export function canAccess(memberOnly: boolean, isLoggedIn: boolean): boolean {
   return !memberOnly || isLoggedIn;
@@ -14,7 +16,7 @@ export function canAccess(memberOnly: boolean, isLoggedIn: boolean): boolean {
  * gate (if any) has passed, and whose unpublishAt gate (if any) hasn't
  * passed yet.
  */
-function publishedNow() {
+export function publishedNow() {
   const now = new Date();
   return {
     published: true,
@@ -360,7 +362,7 @@ export async function isVideoFavorited(userId: string, videoId: string) {
 
 /** A logged-in user's bookmarked series and videos, for a "My Favorites" page. */
 export async function getFavorites(userId: string) {
-  const [seriesFavorites, videoFavorites] = await Promise.all([
+  const [seriesFavorites, videoFavorites, fileFavorites] = await Promise.all([
     prisma.seriesFavorite.findMany({
       where: { userId, series: publishedNow() },
       include: { series: true },
@@ -371,8 +373,27 @@ export async function getFavorites(userId: string) {
       include: { video: { include: { series: true } } },
       orderBy: { createdAt: "desc" },
     }),
+    prisma.fileFavorite.findMany({
+      where: { userId, file: publishedNow() },
+      include: {
+        file: {
+          include: {
+            series: { select: { title: true, slug: true, hymnPerFile: true } },
+            category: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
-  return { seriesFavorites, videoFavorites };
+  return { seriesFavorites, videoFavorites, fileFavorites };
+}
+
+/** Whether this member has favourited a file — the hymn/book counterpart of isSeriesFavorited. */
+export async function isFileFavorited(userId: string, fileId: string): Promise<boolean> {
+  return Boolean(
+    await prisma.fileFavorite.findUnique({ where: { userId_fileId: { userId, fileId } } }),
+  );
 }
 
 /** Published series tagged with the given tag (case-insensitive, tags are stored lowercased). */
@@ -468,7 +489,7 @@ export async function getSearchFilterOptions() {
  */
 export async function searchContent(query: string, isLoggedIn: boolean, filters: SearchFilters = {}) {
   const q = query.trim();
-  if (!q) return { categories: [], series: [], videos: [] };
+  if (!q) return { categories: [], series: [], videos: [], files: [] };
   const qLower = q.toLowerCase();
   const where = { ...publishedNow(), ...guestFilter(isLoggedIn) };
   const transcriptsOn = await isPluginEnabled("transcripts");
@@ -479,8 +500,11 @@ export async function searchContent(query: string, isLoggedIn: boolean, filters:
     ? { OR: [{ categoryId: filters.categoryId }, { series: { categoryId: filters.categoryId } }] }
     : {};
   const videoSpeakerFilter: Prisma.VideoWhereInput = filters.speakerId ? { speakerId: filters.speakerId } : {};
+  const fileCategoryFilter: Prisma.FileAssetWhereInput = filters.categoryId
+    ? { OR: [{ categoryId: filters.categoryId }, { series: { categoryId: filters.categoryId } }] }
+    : {};
 
-  const [categories, seriesCandidates, videoCandidates] = await Promise.all([
+  const [categories, seriesCandidates, videoCandidates, fileCandidates] = await Promise.all([
     filters.categoryId || filters.speakerId
       ? Promise.resolve([])
       : prisma.category.findMany({
@@ -534,6 +558,30 @@ export async function searchContent(query: string, isLoggedIn: boolean, filters:
       include: { series: true, speaker: true },
       take: 50,
     }),
+    // Hymns and books. A hymn's *words* are searchable, which is how anybody
+    // actually looks one up — by the line they can remember, not by a title
+    // they can't. Speakers get a boost above; a lyrics hit gets one below.
+    filters.speakerId
+      ? Promise.resolve([])
+      : prisma.fileAsset.findMany({
+          where: {
+            AND: [
+              where,
+              fileCategoryFilter,
+              {
+                OR: [
+                  { title: { contains: q, mode: "insensitive" } },
+                  { lyricsText: { contains: q, mode: "insensitive" } },
+                ],
+              },
+            ],
+          },
+          include: {
+            series: { select: { title: true, slug: true, hymnPerFile: true } },
+            category: { select: { name: true, slug: true } },
+          },
+          take: 50,
+        }),
   ]);
 
   let series = seriesCandidates
@@ -551,6 +599,36 @@ export async function searchContent(query: string, isLoggedIn: boolean, filters:
     .sort((a, b) => b.score - a.score)
     .slice(0, 20)
     .map((r) => r.item);
+
+  // Only the files with a page of their own: a hymn's lyrics page, a book's
+  // contents. An audio handout is a row with a download button under its
+  // series — search already finds that series, and a result that led nowhere
+  // in particular would be worse than none.
+  const files = fileCandidates
+    .map((file) => {
+      const href = fileHref(file);
+      if (!href) return null;
+      const inLyrics = file.lyricsText ? findMatches(file.lyricsText, q) : [];
+      return {
+        item: {
+          id: file.id,
+          title: file.title,
+          href,
+          pageNumber: file.pageNumber,
+          context: file.series?.title ?? file.category?.name ?? null,
+          // The line they half-remembered, in the words the book prints.
+          excerpt:
+            inLyrics.length > 0 && file.lyricsText
+              ? excerptAround(file.lyricsText.replace(/\s+/g, " "), inLyrics[0], q.length)
+              : null,
+        },
+        score: relevanceScore(q, file.title, null) + (inLyrics.length > 0 ? 10 : 0),
+      };
+    })
+    .filter((hit): hit is NonNullable<typeof hit> => hit !== null)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20)
+    .map((hit) => hit.item);
 
   // The exact/substring search above finds nothing on a typo ("chruch" never
   // matches "Church" via `contains`). Only kicks in when that pass came back
@@ -581,8 +659,11 @@ export async function searchContent(query: string, isLoggedIn: boolean, filters:
     videos = [...videos].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
-  return { categories, series, videos };
+  return { categories, series, videos, files };
 }
+
+/** One hymn or book in a set of search results. */
+export type FileSearchHit = Awaited<ReturnType<typeof searchContent>>["files"][number];
 
 // --- Comments ----------------------------------------------------------------
 
@@ -1545,6 +1626,46 @@ export const getReadableFile = cache(async function getReadableFile(id: string) 
 export type ReadableFile = NonNullable<Awaited<ReturnType<typeof getReadableFile>>>;
 
 /**
+ * The hymn before and after this one in its book, for the arrows on a hymn's
+ * page — the equivalent, for a book whose files are its hymns, of stepping
+ * through a single PDF's contents in the reader.
+ *
+ * Only answers for a `hymnPerFile` series: anywhere else the files sitting
+ * beside this one are a series' attachments, not a sequence anybody reads in
+ * order. Steps in `hymnReadingOrder`, the same order the book's own list
+ * shows, and skips hymns this viewer can't open so "next" always leads
+ * somewhere they can go.
+ */
+export const getAdjacentHymns = cache(async function getAdjacentHymns(
+  fileId: string,
+  seriesId: string | null,
+  isLoggedIn: boolean,
+) {
+  const nowhere = { previous: null, next: null };
+  if (!seriesId) return nowhere;
+
+  const series = await prisma.series.findFirst({
+    where: { id: seriesId, hymnPerFile: true, ...publishedNow() },
+    select: {
+      files: {
+        where: { ...publishedNow(), ...guestFilter(isLoggedIn) },
+        orderBy: fileOrder,
+        select: { id: true, title: true, pageNumber: true },
+      },
+    },
+  });
+  if (!series) return nowhere;
+
+  const hymns = hymnReadingOrder(series.files);
+  const at = hymns.findIndex((hymn) => hymn.id === fileId);
+  // -1 covers the hymn this viewer can't see itself (a member-only hymn read
+  // through a share link, say): the neighbours of a place in the list it
+  // isn't in would be guesswork.
+  if (at === -1) return nowhere;
+  return { previous: hymns[at - 1] ?? null, next: hymns[at + 1] ?? null };
+});
+
+/**
  * Whether this viewer may read a file's *bytes*.
  *
  * Deliberately stricter than the `canAccess(file.memberOnly, ...)` check
@@ -1663,7 +1784,9 @@ async function getNavCategoriesUncached() {
   return prisma.category.findMany({
     where: { parentId: null, ...publishedNow() },
     orderBy: categoryOrder,
-    select: { id: true, name: true, slug: true },
+    // hymnalStyle so the nav can badge a hymnal section with a book rather
+    // than a folder — see lib/nav.ts.
+    select: { id: true, name: true, slug: true, hymnalStyle: true },
   });
 }
 

@@ -44,6 +44,76 @@ type SeriesLike = {
   files: FileLike[];
 };
 
+/**
+ * Where a file's own page is, or null when it hasn't got one.
+ *
+ * The three shapes again (see the note at the top of this file): a hymn
+ * inside a hymnPerFile series has a lyrics page, a PDF or EPUB has a book
+ * page listing its contents, and everything else — an audio handout, a slide
+ * deck — is only ever a row with a download button under whatever it hangs
+ * off. Search uses this to decide what it can honestly link to.
+ */
+export function fileHref(file: {
+  id: string;
+  mimeType: string | null;
+  bunnyPath: string;
+  series?: { hymnPerFile: boolean } | null;
+}): string | null {
+  if (file.series?.hymnPerFile) return `/hymns/${file.id}`;
+  return readerFormat(file.mimeType, file.bunnyPath) ? `/books/${file.id}` : null;
+}
+
+/**
+ * A hymn-per-file book's hymns in the order the book prints them: by page
+ * number, with any hymn that has none kept in the order an admin arranged
+ * them, at the end.
+ *
+ * Shared between the list on the book's page and the "next hymn" arrows on a
+ * hymn's own page, so the two can't disagree about what comes next.
+ * `pageNumber` is the number printed in the book and `position` is the
+ * admin's drag order — related but not the same sequence, since printed
+ * numbers skip.
+ */
+export function hymnReadingOrder<T extends { pageNumber: number | null }>(files: T[]): T[] {
+  const numbered = files
+    .filter((file) => file.pageNumber !== null)
+    .sort((a, b) => a.pageNumber! - b.pageNumber!);
+  return [...numbered, ...files.filter((file) => file.pageNumber === null)];
+}
+
+/**
+ * A short token for "these hymns, as they read right now".
+ *
+ * A device holding a hymn-per-file book offline holds a copy of its lyrics,
+ * and lyrics are corrected and added long after the rest of a book has
+ * settled — so the device needs a way to ask whether what it has is still
+ * what the book says, without downloading the whole thing to find out. This
+ * is that answer: computed the same way on the server (for the current book)
+ * and stored with the copy (for the saved one), and compared.
+ *
+ * FNV-1a rather than a real digest: this is a change detector, not a
+ * security boundary, and it has to run synchronously in both places. It
+ * covers everything that changes what someone reads — the hymns present,
+ * their order, their numbers, their titles and their words.
+ */
+export function fingerprintHymns(
+  hymns: { id: string; title: string; pageNumber: number | null; lyricsText: string }[],
+): string {
+  let hash = 0x811c9dc5;
+  for (const hymn of hymns) {
+    const line = `${hymn.id}|${hymn.pageNumber ?? ""}|${hymn.title}|${hymn.lyricsText}\n`;
+    for (let i = 0; i < line.length; i++) {
+      hash ^= line.charCodeAt(i);
+      // The FNV prime, by shifts: a plain multiply overflows into a float and
+      // stops being the same function.
+      hash = (hash + ((hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24))) >>> 0;
+    }
+  }
+  // The count travels with it so two books can't collide into looking
+  // identical on a hash alone.
+  return `${hymns.length}-${hash.toString(16)}`;
+}
+
 /** The PDFs among a set of files — the only kind of file that can be a book. */
 export function pdfsOf<T extends { mimeType: string | null; bunnyPath: string }>(files: T[]): T[] {
   return files.filter((file) => readerFormat(file.mimeType, file.bunnyPath) === "pdf");

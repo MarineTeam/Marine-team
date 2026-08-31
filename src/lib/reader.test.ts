@@ -2,10 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   clampPercent,
   contentDispositionFilename,
+  etagMatches,
   excerptAround,
   findMatches,
+  isCompatibleReplacement,
   readerFormat,
+  shouldFetchWholeBook,
   toSpeechChunks,
+  WHOLE_BOOK_MAX_BYTES,
 } from "./reader";
 
 describe("readerFormat", () => {
@@ -144,5 +148,73 @@ describe("excerptAround", () => {
 
   it("adds no ellipsis when the whole string already fits", () => {
     expect(excerptAround("short text", 0, 5, 60)).toBe("short text");
+  });
+});
+
+describe("shouldFetchWholeBook", () => {
+  it("fetches an ordinary book in one cacheable request", () => {
+    expect(shouldFetchWholeBook(8 * 1024 * 1024)).toBe(true);
+    expect(shouldFetchWholeBook(WHOLE_BOOK_MAX_BYTES)).toBe(true);
+  });
+
+  it("leaves a very large scan streaming, so its first page still opens quickly", () => {
+    expect(shouldFetchWholeBook(WHOLE_BOOK_MAX_BYTES + 1)).toBe(false);
+  });
+
+  it("treats an unrecorded size as too big rather than guessing", () => {
+    expect(shouldFetchWholeBook(null)).toBe(false);
+    expect(shouldFetchWholeBook(undefined)).toBe(false);
+    expect(shouldFetchWholeBook(0)).toBe(false);
+  });
+});
+
+describe("etagMatches", () => {
+  it("matches the tag the client already holds", () => {
+    expect(etagMatches('"abc"', '"abc"')).toBe(true);
+    expect(etagMatches('"abc"', '"def"')).toBe(false);
+  });
+
+  it("compares weakly, so a validator marked weak still counts as the same bytes", () => {
+    expect(etagMatches('W/"abc"', '"abc"')).toBe(true);
+    expect(etagMatches('"abc"', 'W/"abc"')).toBe(true);
+  });
+
+  it("accepts any tag in a list, and the wildcard", () => {
+    expect(etagMatches('"x", "abc" , W/"y"', '"abc"')).toBe(true);
+    expect(etagMatches("*", '"abc"')).toBe(true);
+  });
+
+  it("is false when either side has nothing to compare", () => {
+    expect(etagMatches(null, '"abc"')).toBe(false);
+    expect(etagMatches('"abc"', null)).toBe(false);
+    expect(etagMatches("", "")).toBe(false);
+  });
+});
+
+describe("isCompatibleReplacement", () => {
+  const pdf = { mimeType: "application/pdf", path: "books/hymnal.pdf" };
+
+  it("allows a re-scan of the same kind of book", () => {
+    expect(isCompatibleReplacement(pdf, { mimeType: null, path: "books/hymnal-2026.pdf" })).toBe(true);
+  });
+
+  it("refuses swapping one reader's format for the other's", () => {
+    // Every saved place in a PDF is a page number; in an EPUB it's a CFI.
+    expect(isCompatibleReplacement(pdf, { mimeType: "application/epub+zip", path: "x" })).toBe(false);
+  });
+
+  it("refuses turning a book into something no reader opens, and the reverse", () => {
+    const audio = { mimeType: "audio/mpeg", path: "sermons/talk.mp3" };
+    expect(isCompatibleReplacement(pdf, audio)).toBe(false);
+    expect(isCompatibleReplacement(audio, pdf)).toBe(false);
+  });
+
+  it("leaves files with no reader positions interchangeable", () => {
+    expect(
+      isCompatibleReplacement(
+        { mimeType: "audio/mpeg", path: "a.mp3" },
+        { mimeType: "audio/mp4", path: "a.m4a" },
+      ),
+    ).toBe(true);
   });
 });

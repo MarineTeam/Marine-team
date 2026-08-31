@@ -1,8 +1,10 @@
 import { getCurrentUser, getSessionIdentity } from "@/lib/current-user";
 import { prisma } from "@/lib/db";
 import { isPluginEnabled } from "@/lib/plugins";
+import { getShellNav } from "@/lib/nav";
 import { ProfileForm } from "@/components/profile-form";
 import { DeviceSettingsForm } from "@/components/device-settings-form";
+import { BottomNavEditor } from "@/components/bottom-nav-editor";
 import { DeleteAccount } from "@/components/delete-account";
 import { SignInMethods } from "@/components/sign-in-methods";
 
@@ -15,11 +17,14 @@ export default async function ProfileSettingsPage() {
   const user = await getCurrentUser();
   if (!user) return null; // The layout already gates on login.
 
-  const [profilesOn, notificationsOn, identities, identity] = await Promise.all([
+  const [profilesOn, notificationsOn, identities, identity, nav] = await Promise.all([
     isPluginEnabled("profiles"),
     isPluginEnabled("notifications"),
     prisma.userIdentity.findMany({ where: { userId: user.id }, orderBy: { lastLoginAt: "desc" } }),
     getSessionIdentity(),
+    // Already resolved once for the chrome on this same request, so the
+    // picker's list of destinations costs nothing extra.
+    getShellNav(),
   ]);
 
   return (
@@ -30,6 +35,7 @@ export default async function ProfileSettingsPage() {
           <p className="mt-1 text-sm text-sec">Saved in this browser, not on your account.</p>
         </div>
         <DeviceSettingsForm />
+        <BottomNavEditor options={nav.tabOptions} suggested={nav.tabs} />
       </section>
 
       <section className="space-y-3 border-t border-sep pt-6">

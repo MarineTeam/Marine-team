@@ -2,8 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { fileContentUrl, loadPdfOutline } from "@/lib/pdf-client";
+import { loadCachedToc } from "@/lib/reader-cache";
 import { printedPage } from "@/lib/page-offset";
+import { countNumberedEntries, findHymnIndex } from "@/lib/toc-nav";
 import type { TocEntry } from "@/components/reader-types";
 
 type SortMode = "page" | "az" | "category";
@@ -77,15 +80,29 @@ function EntryRow({
  * `pageOffset` is the book's front matter (FileAsset.pageOffset), so the
  * numbers listed here are the ones printed in the book rather than the PDF
  * pages the bookmarks resolve to.
+ *
+ * Reading those bookmarks means opening the PDF and resolving every one of
+ * them to a page, which on a hymnal is the slowest thing this page does — so
+ * the result is cached on the device, tagged with `cacheTag` so a replaced
+ * book is read afresh. See lib/reader-cache.ts.
  */
 export function BookContents({
   fileId,
   readerOn,
   pageOffset,
+  cacheTag,
+  openHymn = null,
 }: {
   fileId: string;
   readerOn: boolean;
   pageOffset: number;
+  cacheTag: string;
+  /**
+   * A hymn number to go straight to, from a link that knew the number but not
+   * the page — a service plan's row, say. Resolved here because this is where
+   * the book's own contents are, and they are the only thing that knows.
+   */
+  openHymn?: number | null;
 }) {
   // Tagged with the book it was read from, so switching books shows the
   // loading state on the very first render rather than the outline of the
@@ -96,13 +113,16 @@ export function BookContents({
     error: string | null;
   }>({ fileId, entries: null, error: null });
   const [sort, setSort] = useState<SortMode>("page");
+  const [hymnQuery, setHymnQuery] = useState("");
+  const [hymnMissing, setHymnMissing] = useState<number | null>(null);
+  const router = useRouter();
 
   const { entries, error } =
     outline.fileId === fileId ? outline : { entries: null, error: null };
 
   useEffect(() => {
     let cancelled = false;
-    loadPdfOutline(fileContentUrl(fileId))
+    loadCachedToc(fileId, cacheTag, () => loadPdfOutline(fileContentUrl(fileId)))
       .then((result) => {
         if (!cancelled) setOutline({ fileId, entries: result, error: null });
       })
@@ -113,7 +133,21 @@ export function BookContents({
     return () => {
       cancelled = true;
     };
-  }, [fileId]);
+  }, [fileId, cacheTag]);
+
+  // A number handed in by a link, the moment there are contents to resolve it
+  // against. Replaces rather than pushes: coming back from the reader should
+  // land on the contents, not bounce straight back into it.
+  useEffect(() => {
+    if (openHymn === null || !entries || entries.length === 0) return;
+    const at = findHymnIndex(entries, openHymn);
+    const entry = at === null ? null : entries[at];
+    if (entry?.location && readerOn) router.replace(`/read/${fileId}?page=${entry.location}`);
+    // The book doesn't list that number — said here rather than leaving
+    // someone looking at a contents list wondering why they were sent to it.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    else setHymnMissing(openHymn);
+  }, [openHymn, entries, readerOn, fileId, router]);
 
   const groups = useMemo<Group[]>(() => {
     if (!entries) return [];
@@ -169,8 +203,70 @@ export function BookContents({
     );
   }
 
+  /**
+   * Straight to the hymn printed under a number, which is what someone
+   * standing up to sing actually has: the number on the board, not the page
+   * it happens to be on.
+   */
+  function goToHymn(event: React.FormEvent) {
+    event.preventDefault();
+    const wanted = Number(hymnQuery.trim());
+    // `entries` is non-null by the time this renders — the loading and empty
+    // states return above — but the closure doesn't carry that narrowing.
+    if (!entries || !Number.isInteger(wanted) || wanted < 1) return;
+    const at = findHymnIndex(entries, wanted);
+    const entry = at === null ? null : entries[at];
+    if (!entry?.location) {
+      setHymnMissing(wanted);
+      return;
+    }
+    router.push(`/read/${fileId}?page=${entry.location}`);
+  }
+
+  // Only where the book numbers its own contents, and only when there is a
+  // reader to open at that hymn.
+  const canJumpToHymn = readerOn && countNumberedEntries(entries ?? []) > 1;
+
   return (
     <div className="space-y-3">
+      {canJumpToHymn && (
+        <form onSubmit={goToHymn} className="flex flex-wrap items-center gap-2 text-sm">
+          <label htmlFor="contents-hymn-number" className="text-sec">
+            Go to hymn
+          </label>
+          <input
+            id="contents-hymn-number"
+            value={hymnQuery}
+            onChange={(e) => {
+              setHymnQuery(e.target.value);
+              setHymnMissing(null);
+            }}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            aria-label="Hymn number"
+            aria-invalid={hymnMissing !== null}
+            className="w-20 rounded-md border border-sep px-2 py-1.5 text-center tabular-nums"
+          />
+          <button type="submit" className="rounded-md border border-sep px-3 py-1.5 hover:bg-hover">
+            Open
+          </button>
+          {hymnMissing !== null && (
+            <span className="text-sec">No hymn {hymnMissing} in this book.</span>
+          )}
+        </form>
+      )}
+
+      {/* A number that came in on a link, in a book whose contents don't carry
+          numbers at all — there is no box to put the message in, so it stands
+          on its own rather than leaving somebody staring at a list they
+          didn't ask for. */}
+      {hymnMissing !== null && !canJumpToHymn && (
+        <p className="text-sm text-sec">
+          This book&apos;s contents don&apos;t list a hymn {hymnMissing}. It&apos;s below if it&apos;s here
+          under another name.
+        </p>
+      )}
+
       <div className="inline-flex rounded-lg border border-sep p-0.5 text-sm">
         {(
           [

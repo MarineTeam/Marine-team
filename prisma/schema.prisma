@@ -146,6 +146,7 @@ model User {
   watchProgress         WatchProgress[]
   seriesFavorites       SeriesFavorite[]
   videoFavorites        VideoFavorite[]
+  fileFavorites         FileFavorite[]
   comments              Comment[]
   commentReports        CommentReport[]
   sermonNotes           SermonNote[]
@@ -473,6 +474,64 @@ model VideoFavorite {
   @@index([videoId])
 }
 
+// A member's bookmark of a file — a hymn, or a whole book. Series and videos
+// have had this from the start; a hymnal's hymns are the thing this app gets
+// looked things up in most, and had no way to be kept in a list.
+model FileFavorite {
+  id        String    @id @default(cuid())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  file      FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileId    String
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, fileId])
+  @@index([fileId])
+}
+
+/// The hymns for one service, in the order they will be sung.
+///
+/// Deliberately not a Playlist: those are a member's own, hold videos, and
+/// have no date. This is a staff-published running order that everyone in the
+/// building opens the same copy of — closer to the board at the front of the
+/// room than to anybody's library.
+model ServicePlan {
+  id          String            @id @default(cuid())
+  title       String
+  /// The day it is for. Nullable because a plan is often drafted before the
+  /// date is settled, and the list sorts undated plans by when they were made.
+  serviceDate DateTime?
+  notes       String?
+  /// Drafts stay off the members' list until someone is happy with the order.
+  published   Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  items       ServicePlanItem[]
+
+  @@index([serviceDate])
+}
+
+/// One hymn in a service, which is one of the two shapes a hymn takes here
+/// (see lib/hymnal.ts): a file of its own, or a number inside a whole-book
+/// PDF. `hymnNumber` is set for the second — the number that goes up on the
+/// board — and resolved to a page against the book's own contents when
+/// someone opens it, so an admin never has to know which PDF page that is.
+model ServicePlanItem {
+  id         String      @id @default(cuid())
+  plan       ServicePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  planId     String
+  file       FileAsset   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileId     String
+  hymnNumber Int?
+  /// A line for the congregation: "after the reading", "verses 1 and 4 only".
+  note       String?
+  position   Int         @default(0)
+  createdAt  DateTime    @default(now())
+
+  @@index([planId])
+  @@index([fileId])
+}
+
 // A member's comment on a series or a video (exactly one of seriesId/videoId is set).
 // Threading is one level deep: a reply's parentId always points at a
 // top-level comment (see the flattening logic in the comments API), so
@@ -605,6 +664,8 @@ model FileAsset {
 
   readingProgress ReadingProgress[]
   readingMarks    ReadingMark[]
+  favoritedBy     FileFavorite[]
+  servicePlanned  ServicePlanItem[]
 
   @@index([seriesId])
   @@index([categoryId])

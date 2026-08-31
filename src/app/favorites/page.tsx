@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { getCurrentUser } from "@/lib/current-user";
 import { getFavorites } from "@/lib/content";
 import { SeriesTile } from "@/components/series-tile";
 import { MenuTile } from "@/components/menu-tile";
 import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
+import { fileHref } from "@/lib/hymnal";
 
 export default async function FavoritesPage() {
   const user = await getCurrentUser();
@@ -21,16 +23,54 @@ export default async function FavoritesPage() {
     );
   }
 
-  const { seriesFavorites, videoFavorites } = await getFavorites(user.id);
+  const { seriesFavorites, videoFavorites, fileFavorites } = await getFavorites(user.id);
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-8">
       <h1 className="text-3xl font-bold tracking-tight text-ink">My Favorites</h1>
 
-      {seriesFavorites.length === 0 && videoFavorites.length === 0 && (
+      {seriesFavorites.length === 0 && videoFavorites.length === 0 && fileFavorites.length === 0 && (
         <p className="text-sec">
-          Nothing favorited yet — look for the ☆ Favorite button on a series or video.
+          Nothing favorited yet — look for the ☆ Favorite button on a hymn, a series or a video.
         </p>
+      )}
+
+      {fileFavorites.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">Hymns &amp; books</h2>
+          <ul className="divide-y divide-sep rounded-lg border border-sep">
+            {fileFavorites.map((favorite) => {
+              const href = fileHref(favorite.file);
+              const row = (
+                <>
+                  <span className="w-8 shrink-0 text-right text-sm tabular-nums text-ter">
+                    {favorite.file.pageNumber ?? ""}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{favorite.file.title}</span>
+                    <span className="block text-xs text-sec">
+                      {favorite.file.series?.title ?? favorite.file.category?.name ?? ""}
+                    </span>
+                  </span>
+                </>
+              );
+              return (
+                <li key={favorite.id}>
+                  {/* A favourited file whose page has since gone (its series
+                      stopped being hymn-per-file, say) still lists — it just
+                      doesn't pretend to lead anywhere. */}
+                  {href ? (
+                    <Link href={href} className="flex items-center gap-3 px-3 py-2.5 hover:bg-hover">
+                      {row}
+                    </Link>
+                  ) : (
+                    <div className="flex items-center gap-3 px-3 py-2.5">{row}</div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       )}
 
       {seriesFavorites.length > 0 && (

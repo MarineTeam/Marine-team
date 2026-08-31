@@ -496,6 +496,41 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     file link now goes through, readers and downloads alike. See **File
     access** below for why. Range requests are forwarded so pdf.js can chunk
     large documents.
+  - Books (and only books) are served `private, no-cache` rather than
+    `private, no-store`, and conditional requests are forwarded to Bunny, so
+    a re-open revalidates into a bodyless `304` instead of re-downloading —
+    the access check still runs on every request, which `max-age` would have
+    given up. A PDF under `WHOLE_BOOK_MAX_BYTES` is fetched whole rather
+    than in ranges so there is a single cacheable resource to revalidate.
+  - A resolved contents list is cached per device in `localStorage`
+    (`src/lib/reader-cache.ts`), tagged with the file's size, because
+    resolving a hymnal's bookmarks to page numbers is hundreds of round
+    trips. `ReaderHandle.order` maps each engine's opaque locations onto one
+    number line so `src/lib/toc-nav.ts` can step between contents entries
+    without knowing which engine produced them.
+  - A book can also be **saved to the device** (`src/lib/offline-books.ts`),
+    which stores its bytes under `/offline-book/<id>.pdf` in Cache Storage,
+    its contents list, and a copy of the reader it needs — pdf.js from
+    `public/pdfjs`, or epub.js plus JSZip from `public/epubjs`, since the
+    offline shell has no bundle to render with.
+    `scripts/copy-offline-viewers.mjs` puts those there at install and build
+    time so they track the pinned versions rather than being committed, and
+    only the library a saved book actually needs is fetched.
+  - A **hymn-per-file** book has no document to store, so
+    `/api/offline/hymnal/[seriesId]` returns its hymns and lyrics (same view
+    and plugin checks as the page) and they are cached as JSON under
+    `/offline-hymnal/<id>.json`. Both kinds share one index, discriminated by
+    `kind`.
+- **The bottom bar** is per device: `getShellNav` returns both the app's
+  suggested `tabs` and every destination this viewer could choose
+  (`tabOptions`), and `src/lib/nav-tabs.ts` resolves a stored list of hrefs
+  against the latter — so a destination that disappears drops out instead of
+  404ing. `BottomNav` also writes a snapshot of what it drew to
+  `localStorage`, which is the only way `public/offline.html` can draw the
+  same icons with no server. That file is a standalone offline app: the tab
+  bar, the books and videos saved on the device, a book's cached contents,
+  and a pdf.js page view, all from Cache Storage and `localStorage`, with the
+  browser's own PDF viewer as the fallback where it can't render.
   - pdf.js's worker is resolved via `new URL(..., import.meta.url)` so it
     stays version-locked instead of needing a copy in `/public`; the build
     emits it to `.next/static/media`.

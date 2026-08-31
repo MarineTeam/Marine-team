@@ -147,7 +147,23 @@ export async function loadPdfOutline(fileUrl: string): Promise<TocEntry[]> {
   // worker running). Destroying the task is what stops the worker and
   // aborts in-flight range requests — the same distinction PdfReader's own
   // load effect draws.
-  const task = await openPdfMetadataTask(fileUrl);
+  return readOutline(await openPdfMetadataTask(fileUrl));
+}
+
+/**
+ * The same, from bytes already in hand — used when a book has just been
+ * saved to the device, where fetching the whole file again over ranges to
+ * read a list that's sitting in memory would be silly.
+ */
+export async function loadPdfOutlineFromBytes(data: Uint8Array): Promise<TocEntry[]> {
+  const pdfjs = await getPdfjs();
+  return readOutline(pdfjs.getDocument({ data }));
+}
+
+async function readOutline(task: {
+  promise: Promise<PDFDocumentProxy>;
+  destroy: () => Promise<void>;
+}): Promise<TocEntry[]> {
   try {
     const doc = await task.promise;
     const outline = await doc.getOutline();

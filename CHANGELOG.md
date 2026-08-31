@@ -146,6 +146,241 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Present mode**: a hymn's words on the screen at the front of the room —
+  one verse at a time, as large as it will go, white on black with a light
+  option. **Present** on a hymn's page, or **Present this service** on a
+  service plan, which then carries on into the next hymn of the order rather
+  than sending whoever is driving back to a list between hymns.
+  - Verses come from the shape the lyrics were typed in: a blank line
+    separates them, and a block that names itself ("Chorus", "Refrain:") is
+    that rather than a numbered verse, so the numbering skips it the way the
+    printed book does.
+  - A presenter's clicker is a keyboard — PageDown/PageUp move a verse, as do
+    the arrows and the space bar — and the whole surface is a control, since
+    whoever is driving is standing at a laptop and not looking at it. The
+    chrome fades after three seconds and comes back on the first touch, key or
+    nudge of the mouse.
+  - The screen is held on (the same wake lock as the reader), text size and
+    palette are remembered per device — the projector in the hall and the
+    phone in your hand want different answers — and a hymn with no lyrics says
+    so rather than showing an empty screen.
+- **The storage figure counts books.** `/profile/downloads` showed a bar of
+  how full the device was that counted videos only — while a saved hymnal is
+  routinely the largest thing on the phone, sitting in the same cache out of
+  the same allowance. One figure now covers both, with the split underneath
+  and the browser's own quota beside it where the browser will say what it is,
+  since the admin's cap is guidance and that quota is the limit that actually
+  bites.
+- **The offline shell's hand-copied constants are tested against their
+  originals.** `public/offline.html` and `public/sw.js` stand alone with no
+  bundle, so cache names, storage keys, URL prefixes, the icon set and the
+  rule for reading a hymn number are all copied into them by hand — the right
+  trade for those files, and the kind of duplication that rots quietly. A
+  rename now fails in CI rather than emptying somebody's offline screen in a
+  service. The hymn-number copy is checked by running it, not by comparing
+  text, and every branch of it has a case.
+- **Service plans** (new plugin): staff publish the hymns for a service, in
+  the order they'll be sung, and members open the list at `/services` and tap
+  straight through to each one. Built in `/admin/services`, gated on
+  `manage_files` — a plan is a list of files, so whoever may arrange the
+  library may arrange a service.
+  - An item is either a **hymn that is its own file** (it opens at its lyrics)
+    or a **number inside a whole-book hymnal**. For the second the admin
+    writes down the number that goes up on the board, and the page it lands on
+    is resolved from the book's own contents when a member opens it — the
+    browser reading that PDF is the only thing that knows which page hymn 214
+    is, so `/books/<id>?hymn=214` is the hand-off.
+  - Deliberately not a playlist: those are a member's own, hold videos and
+    have no date. A plan is one copy everyone in the building opens, drafted
+    unpublished until the order is settled.
+  - A hymn unpublished, or one a signed-out visitor can't open, still shows in
+    the order rather than leaving a gap — it is being sung either way — and
+    says why it doesn't open.
+- **Hymns are searchable, by their words.** Search covered categories, series
+  and videos; files were never looked at, so the hymnal was unfindable by name
+  and its lyrics unfindable at all. Both are searched now, and a lyrics hit
+  comes back with the line it matched — nobody looks a hymn up by a title they
+  can't remember, they look it up by the line they can. Only files with a page
+  of their own are listed (a hymn's lyrics, a book's contents); an audio
+  handout is a row under its series, and search already finds the series.
+- **A hymn can be favourited.** Series and videos have been favouritable from
+  the start and files never were, so the one thing members look up most
+  couldn't be kept in a list. Same button, same plugin, listed under
+  **Hymns & books** on the favourites page.
+- **The screen stays on while a book or a hymn is open.** A phone dimming
+  halfway through the second verse is the most ordinary failure this app has.
+  The wake lock is dropped the moment the page is hidden or the reader closed
+  — nothing keeps a screen on in the background — and it is switchable per
+  device under **Reading**, beside the swipe setting. Browsers without the API
+  behave exactly as they did.
+- **Type the hymn number, land on the hymn.** The number that goes up on the
+  board is not the page it is printed on, and until now the reader only took
+  pages — so finding hymn 214 meant scrolling a contents list while everyone
+  else was standing up to sing. A **Hymn** box now sits in the reader's
+  contents bar, on a book's contents page, and on the offline screen; a
+  number and Enter is the whole interaction, and phones get a numeric keypad
+  for it.
+  - The number is read from the book's own contents entries — "214", "1.
+    Holy, Holy, Holy", "Hymn 45", "No. 12", "#7" — and only from the *front*
+    of an entry. A number anywhere else belongs to the title, and following
+    one would send someone to the wrong hymn while looking like it worked.
+  - Offered only where a book actually numbers its entries, so a contents
+    list of chapter titles doesn't grow a box with nothing to type in it, and
+    a number the book doesn't list says so rather than jumping somewhere
+    close.
+- **EPUBs save for offline too, not just PDFs.** The asymmetry was an
+  accident of which reader came first. A saved EPUB stores its bytes, its
+  contents (read out of those bytes with epub.js rather than fetched again)
+  and the library needed to render it, and the offline screen opens it the
+  way the in-app reader does: scrolling, chapter by chapter, with the arrow
+  keys and the swipe registered inside the frame epub.js owns and the current
+  chapter named in the bar. Where a PDF can fall back to the browser's own
+  viewer, an EPUB can't — no browser renders one — so that case offers the
+  file for whatever reading app the device has.
+- **A file can be replaced without becoming a different file.** A re-scanned
+  hymnal used to have to be uploaded as a *new* file, which quietly stranded
+  everything that referred to the old one: members' saved places and marks,
+  the `?page=` links on its contents list, its podcast episode, and every
+  copy saved to a phone for offline reading. **Replace the file** (in a
+  file's Details panel in `/admin/files`) points the existing row at new
+  bytes instead, so all of that follows the book.
+  - Two ways in, because the app's own upload runs through a serverless
+    function capped at 4MB: a small file straight from the panel, or an
+    object already uploaded to Bunny Storage, chosen from the same listing
+    the importer uses.
+  - The replacement must be **the same kind of book** — a PDF for a PDF, an
+    EPUB for an EPUB. Every saved place is in that format's own terms (a page
+    number, a CFI), so swapping one for the other would turn them all into
+    nonsense while looking like an ordinary edit.
+  - The new bytes go to a **new storage path**, never over the old one: a
+    pull zone caches by URL, so overwriting in place would leave the CDN
+    serving last year's scan. The old object is left in Bunny — replacing is
+    destructive enough, and storage has no undo — where the importer lists it
+    for whoever wants to clean it up.
+  - The cover and hymn count are cleared, since they described the previous
+    file; re-run **Generate covers**. A mirrored podcast episode is
+    re-copied. Devices holding the book offline see **Update available** on
+    their next visit, which is exactly what that check was built for.
+- **A book that can't be drawn is handed to the browser instead of showing an
+  error.** pdf.js needs a fairly current browser engine — an older phone can
+  open a PDF perfectly well and still not be able to run the library that
+  draws one — and until now that surfaced in the reader as a raw error
+  message. The reader now offers the book in the browser's own PDF viewer, at
+  the page you were on, with the technical reason kept in small print for
+  whoever gets the support message. The offline screen already did this; the
+  two now behave the same way.
+- **A saved book says when it is out of date.** A copy on a device was
+  previously kept forever, however much the book had moved on. Each saved
+  book now records what it was when it was saved — a PDF's ETag, a hymnal's
+  fingerprint over its hymns and lyrics — and the book's page and
+  `/profile/downloads` compare that against the current one, offering
+  **Update** when they differ and saying so when the book is no longer
+  available to that account.
+  - The check costs almost nothing: a PDF is asked with a conditional request
+    for **one byte**, so an unchanged book answers with a bodyless `304` and a
+    changed one with a single byte and its new validator. A hymnal asks the
+    same route it was saved from for its fingerprint alone (`?probe=1`).
+  - Nothing is ever removed on the strength of that answer. A book leaves a
+    device when the person holding it says so, not because a request failed.
+- **The bottom bar is yours to arrange, and it survives losing the
+  connection.** The row of icons in the installed app is the only navigation
+  it has, so what belongs there depends on why you opened it. **Bottom bar**
+  in `/profile/settings` adds, removes and reorders up to five destinations —
+  Home, Search, New, any section of the library, your own lists, Profile —
+  stored per device with the other device settings and applied the moment you
+  change it. A device that has chosen nothing keeps exactly the bar it had.
+  - A choice is stored as hrefs and re-resolved against what you may
+    currently see, so a category that is unpublished, or a page whose plugin
+    is switched off, drops out of the bar instead of leading nowhere.
+  - **The icons are drawn offline too.** They used to vanish the moment the
+    connection did: the offline screen had no navigation at all. The app now
+    leaves a snapshot of the bar where the offline screen can find it, and
+    that screen draws the same icons — with the sections that have something
+    saved on this device shown in full colour.
+- **Hymnals can be saved to the device and read with no connection at all.**
+  "Save for offline" on a book's page stores the PDF in Cache Storage, the
+  same place a downloaded video lives, and the book then opens from its own
+  icon in the bottom bar with the network off — contents list, hymn numbers,
+  page turning and all.
+  - Saving stores three things, because all three are needed to actually read
+    a hymn offline: the file's bytes, the book's **contents list** (read out
+    of the bytes just downloaded rather than fetched again), and a copy of
+    **pdf.js**, since the offline screen is a static page with no application
+    bundle to draw pages with. The library is copied out of `pdfjs-dist` at
+    install/build time into `public/pdfjs` (`scripts/copy-offline-pdfjs.mjs`)
+    and fetched once, when the first book is saved.
+  - The offline screen is now a small reader: the books saved on this device,
+    each book's contents with the page numbers printed in it, and a page view
+    with swipe, arrow keys and zoom. Where a browser can't draw the pages
+    itself, the book is handed to that browser's own PDF viewer at the right
+    page rather than showing a blank sheet.
+  - Tapping an icon offline shows what is saved under it — the Hymnals icon
+    shows the hymnals, including books filed under a series inside that
+    section — and a link straight to `/books/<id>` or `/read/<id>` opens that
+    book. Saved books are listed and removable in `/profile/downloads`
+    alongside saved videos.
+  - The **in-app** reader also survives the connection dropping while it is
+    open: the service worker answers `/api/files/<id>/content` from the saved
+    copy, but only after the network has actually failed and only for a book
+    this device was deliberately given — a cached copy never stands in for an
+    access check that said no.
+  - **A hymn-per-file book saves too** — one whose hymns are separate files
+    rather than one PDF. There is no document to store for a book like that,
+    so what's kept is the list of hymns with their lyrics
+    (`/api/offline/hymnal/[seriesId]`, behind the same view and plugin checks
+    as the page itself), and the offline screen renders them: hymns in
+    printed-page order under their group headings, a find box that matches a
+    number, a title or a line of the lyrics, and **Back**/**Next** stepping
+    hymn to hymn. A link straight to `/hymns/<id>` opens that hymn. Lyrics
+    are corrected and added long after a scan would have stopped changing, so
+    this one offers **Update** as well as Remove. Hymns with no lyrics text
+    aren't saved — offline they would be blank — and the button says how many
+    were actually kept.
+  - Gated by the existing **Downloads** plugin, per category like the rest of
+    it, and by the member choosing to save a particular book.
+- **Books are cached on the device that reads them, and hymns can be stepped
+  through.** Several changes that matter to the same person: someone
+  finding hymn 214 in a scanned hymnal on a phone, on a Sunday.
+  - **A book is no longer re-downloaded every time it is opened.**
+    `/api/files/[id]/content` serves PDFs and EPUBs as `private, no-cache`
+    rather than `private, no-store`, and passes a conditional request
+    (`If-None-Match`/`If-Modified-Since`) through to Bunny — so a re-open
+    revalidates and comes back as a bodyless `304`, with the file itself
+    read from disk. `no-cache` is the deliberate choice over a `max-age`:
+    the browser must still ask, so **`canViewFile` runs against the live
+    session on every open** and losing access still takes effect on the next
+    one. Everything that isn't a book keeps `no-store`.
+  - A PDF small enough to hold (48 MB) is now fetched **whole, in one
+    request**, instead of in the byte ranges pdf.js asks for as it goes. A
+    ranged response is a poor thing for a browser cache to hold, so the
+    ranged path is what made re-opens cost full price; larger scans keep it,
+    since there the wait for the whole file before the first page would be
+    worse. The fetch is aborted if the reader is closed while it runs.
+  - **A book's contents list is remembered per device.** Reading it means
+    opening the PDF and resolving every bookmark to a page — for a hymnal,
+    hundreds of lookups, and the slowest thing the book's page does. The
+    resolved list is now cached in `localStorage`, tagged with the file's
+    size so a replaced book is read afresh, and dropped after a month. Both
+    the book's contents page and the reader's own Contents panel use it.
+  - **"Back" and "Next" step by hymn, not by page.** A bar along the bottom
+    of the reader names the entry being read and moves to the neighbouring
+    one, driven by the book's own contents — the PDF's bookmarks or the
+    EPUB's navigation document. Back goes to the start of the hymn being
+    read before it goes to the previous one, the way a track skip does.
+    Readers place their own locations on a comparable number line
+    (`ReaderHandle.order`), so this works for a PDF's page numbers and an
+    EPUB's CFIs without the chrome learning either.
+  - In a **hymn-per-file** book, whose hymns are separate files rather than
+    one PDF, a hymn's page now carries the same arrows, stepping in the
+    order the book's list shows and skipping hymns the viewer can't open.
+- **Swipe left and right to turn the page** in the PDF reader, with the
+  arrow keys (and PageUp/PageDown) doing the same on a desktop. The gesture
+  commits to an axis before it claims a touch, so scrolling still scrolls,
+  and a second finger is a pinch-zoom rather than a page turn. Zoomed in past
+  the width of the screen — where a sideways drag is how you pan — the page
+  pans instead. On by default; switched off from the reader's toolbar or
+  **Reading** in `/profile/settings`, per device like the other settings
+  there.
 - **Page offset for a book PDF** — a scanned hymnal usually opens with a
   title page and several pages of table of contents before printed page 1,
   so the PDF's page 55 is the book's page 45. A **Page offset** on the

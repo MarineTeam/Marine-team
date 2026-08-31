@@ -40,3 +40,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Copied out of pdfjs-dist, epubjs and jszip at install/build time for the
+# offline shell (scripts/copy-offline-viewers.mjs) — version-locked to
+# package.json, so they are generated rather than committed.
+/public/pdfjs
+/public/epubjs

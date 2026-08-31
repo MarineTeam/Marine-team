@@ -12,6 +12,7 @@ import {
   BookIcon,
   ClockIcon,
   DownloadIcon,
+  CalendarIcon,
   FolderIcon,
   HomeIcon,
   LiveIcon,
@@ -43,6 +44,7 @@ export const NAV_ICONS: Record<NavIcon, (props: { className?: string }) => React
   live: LiveIcon,
   person: PersonIcon,
   download: DownloadIcon,
+  calendar: CalendarIcon,
   shield: ShieldIcon,
 };
 

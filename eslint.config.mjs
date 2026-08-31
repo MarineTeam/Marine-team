@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendor builds copied out of node_modules at install/build time for the
+    // offline shell (scripts/copy-offline-viewers.mjs). Minified third-party
+    // bundles are not this project's code to lint, and CI lints the whole
+    // tree — keep these in step with the same paths in .gitignore.
+    "public/pdfjs/**",
+    "public/epubjs/**",
   ]),
 ]);
 

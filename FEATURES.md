@@ -393,10 +393,212 @@ How a download actually works:
 
 Members manage it all at `/profile/downloads`: whether downloads are available
 to them (and why not, if not), the Wi-Fi-only vs mobile-data preference, how
-much space is used against the admin's suggested cap, and per-video **Play
-offline** / **Remove**. The list self-heals — browsers evict caches silently
+much space is used against the admin's suggested cap — **videos and books
+together**, since they share the device and a hymnal is often the largest
+thing on it, with the browser's own quota shown beside it where the browser
+will report one — and per-video **Play offline** / **Remove**. The list self-heals — browsers evict caches silently
 under storage pressure, so entries whose file has vanished are dropped on
 load rather than offering playback of something that isn't there.
+
+### Books on the device
+
+A hymnal can be saved the same way, and then read with no connection at all.
+**Save for offline** on a book's page (`/books/[fileId]`) stores it; the same
+page's **Remove** takes it back off, and `/profile/downloads` lists every book
+this device is holding. Gated by the same **Downloads** plugin as video, with
+the same per-category override, and then by the member choosing to save a
+particular book.
+
+Saved books are checked against the live ones whenever you're on their page
+or on `/profile/downloads`: a book that has been replaced, or a hymnal whose
+lyrics have been corrected, is marked **Update available**, and one that is no
+longer available to your account says so. The check is deliberately cheap — a
+PDF is asked for a single byte with a conditional request, so an unchanged
+book answers with nothing at all — and nothing is ever removed automatically:
+a saved book leaves a device when you say so.
+
+Saving stores three things, because reading a hymn offline needs all three:
+
+- **The file**, streamed into Cache Storage under `/offline-book/<id>.pdf`,
+  fetched through the app's own content route so access is checked exactly as
+  it is for reading the book online.
+- **The contents list**, read out of the bytes that were just downloaded
+  rather than fetched all over again. Without it there is no way to find hymn
+  214 with no connection, which is most of the point.
+- **The reader itself.** The offline screen is a static page with no
+  application bundle behind it, so it has no way to render a book unless the
+  library is already on the device: pdf.js for a PDF, epub.js (with JSZip,
+  which its build expects as a global) for an EPUB. They're copied out of
+  `node_modules` into `public/` at install and build time
+  (`scripts/copy-offline-viewers.mjs`, so they stay the versions
+  `package.json` pins) and fetched once, when the first book that needs one is
+  saved — a library of EPUBs never pulls pdf.js's 1.7MB.
+
+**Both kinds of book the reader opens can be saved** — a PDF and an EPUB
+alike. What differs is the fallback when the library can't be loaded: a PDF
+can be handed to the browser's own viewer, while no browser renders an EPUB
+on its own, so that offers the file for whatever reading app the device has.
+
+A **hymn-per-file** book — one whose hymns are separate files rather than one
+PDF — is saved from its own page, and stores something different: there is no
+document to keep, so what goes on the device is the list of hymns with their
+lyrics. Offline it reads as the book does online — hymns in printed-page order
+under their group headings, a find box that matches a number, a title or a
+line of the lyrics, and Back/Next stepping hymn to hymn. Two things follow
+from what it stores: hymns with **no lyrics text aren't saved** (offline they
+would be blank pages, since the file behind them isn't stored), and because
+lyrics get corrected long after a scan would have settled, the button offers
+**Update** as well as Remove.
+
+### Replacing a book
+
+A re-scanned hymnal is the same book, so it keeps the same row. **Replace the
+file**, in a file's Details panel in `/admin/files`, points that row at new
+bytes: a small file uploaded straight from the panel, or — for anything past
+the app's 4MB upload cap, which a scan always is — an object uploaded to
+Bunny Storage and chosen from the same listing the importer uses.
+
+Doing it this way rather than adding the new scan as a new file is the whole
+point. Everything that refers to a book refers to its row: where each member
+got to, their marks, the `?page=` links on its contents list, its podcast
+episode, and every copy saved to a phone. A new row leaves all of that on the
+old book with nothing to say it has been superseded.
+
+What it does and doesn't touch:
+
+- The title, series or category, page offset and every other setting stay.
+  **Check the page offset** if the new scan's front matter differs — the
+  stored page numbers are unchanged, so the printed numbers shown beside them
+  follow whatever the offset says.
+- Saved places and marks stay, and they are page numbers: a scan with
+  different pagination will move where they land.
+- The cover and hymn count are cleared, because they described the old file —
+  re-run **Generate covers**.
+- A podcast episode is re-copied to the public zone from the new bytes.
+- Devices holding this book offline show **Update available** the next time
+  they're on its page or `/profile/downloads`.
+- The replacement has to be the same kind of book — a PDF for a PDF, an EPUB
+  for an EPUB — since every saved place is in that format's own terms.
+- The old object stays in Bunny Storage, at its own path (the new bytes never
+  overwrite the old ones, or the CDN would keep serving the old file). It
+  turns up in the storage importer, where it can be dealt with once the new
+  scan has been checked.
+
+### What the offline screen shows
+
+`public/offline.html` is served for any navigation that can't reach the
+network, and it is now a small app of its own rather than a list of videos:
+
+- **The same bottom bar the app draws.** The app leaves a snapshot of its
+  tabs where this page can read it, so losing the connection no longer loses
+  the icons. Sections holding something saved on this device are shown in
+  full colour; the icons are the app's own.
+- **What is saved, under the icon you tapped.** The page is served *at the URL
+  that was asked for*, so it knows whether you tapped Hymnals or Home. Tapping
+  Hymnals lists the hymnals — including books filed under a series inside that
+  section — and a link straight to a book (`/books/<id>` or `/read/<id>`)
+  opens that book.
+- **The hymn number, typed.** The same **Go to hymn** box as online, above a
+  saved book's contents — the one moment it matters most, since a service
+  with no signal is exactly when nobody wants to scroll a list.
+- **A book's contents, then its pages.** Entries are listed with the numbers
+  printed in the book (the page offset is stored with it), and opening one
+  draws that page with pdf.js: swipe left and right, arrow keys, zoom, and a
+  bar naming the hymn you are on. Where a browser can't draw the pages
+  itself, the book is handed to that browser's own PDF viewer at the right
+  page rather than showing a blank sheet.
+- **Or an EPUB's chapters**, rendered by epub.js exactly as the in-app reader
+  does — scrolling rather than paginated, with the chapter you're in named in
+  the bar. The arrow keys and the swipe are registered inside the frame
+  epub.js owns, which is where the reading actually happens.
+- **Or a hymnal's hymns, then one hymn's lyrics**, for a hymn-per-file book —
+  searchable, grouped, and steppable with Back and Next. A link to a single
+  hymn (`/hymns/<id>`) opens it directly when its book is on the device.
+- **Downloaded videos**, exactly as before.
+
+The **in-app** reader survives the connection dropping while it is open, too:
+the service worker answers `/api/files/[id]/content` from the saved copy —
+but only after the network has actually failed, and only for a book this
+device was deliberately given. A cached copy never stands in for an access
+check that said no.
+
+## Services
+
+The hymns for a service, in the order they'll be sung. Staff build a plan in
+`/admin/services` — a title, a day, a note, and the hymns — and publish it;
+members open `/services`, pick the day, and tap straight through to each hymn.
+Gated by the **Service plans** plugin.
+
+A plan holds the two shapes a hymn takes in this app (see the Hymnals notes
+above):
+
+- **A hymn that is its own file** opens at its lyrics page.
+- **A number inside a whole-book hymnal** is written down as the number that
+  goes up on the board. The page it lands on is worked out from that book's
+  own contents when a member opens it — the browser reading the PDF is the
+  only thing that knows which page hymn 214 is on, so the plan links to the
+  book's contents carrying the number and the contents page does the rest.
+
+This is deliberately not a playlist: playlists are a member's own, hold videos
+and have no date. A plan is one copy that everyone in the building opens, and
+it stays a draft until somebody is happy with the order.
+
+A hymn that has since been unpublished, or one a signed-out visitor can't
+open, still appears in the order rather than leaving a gap — it is being sung
+either way — and says why it doesn't open.
+
+## Present mode
+
+A hymn's words on the screen at the front of the room. **Present** sits on a
+hymn's page; **Present this service** sits on a service plan and starts at its
+first hymn with words, carrying on through the order — whoever is driving
+never goes back to a list between hymns.
+
+- **One verse at a time**, as large as it will go, white on black with a light
+  option for a bright room. Verses come from the shape the lyrics were typed
+  in: a blank line separates them, and a block that names itself ("Chorus",
+  "Refrain:") is that rather than a numbered verse, so the numbering skips it
+  the way the printed book does.
+- **Driven from anywhere.** A presenter's clicker is a keyboard, so
+  PageDown/PageUp turn a verse, as do the arrows and the space bar; tapping
+  the right of the screen moves on, the left goes back. The chrome fades after
+  three seconds and returns on the first touch, key or nudge of the mouse.
+- **It stays awake and stays put** — the same screen lock as the reader, and
+  full screen is one button (or `F`).
+- Text size and palette are remembered **per device**, because the projector
+  in the hall and the phone in your hand want different answers.
+
+Only lyrics can be presented: a scanned book has pages, not text, so a plan
+made of book numbers offers no Present button, and a hymn with no lyrics saved
+says so rather than showing an empty screen.
+
+## The bottom bar
+
+In the installed app the row of icons along the bottom is the only navigation
+there is, so what belongs in it depends on why someone opened the app. **This
+device → Bottom bar** in `/profile/settings` adds, removes and reorders the
+destinations it holds: Home, Search, New, any section of the library (a
+Hymnals category included), your own lists, Profile, and Admin for staff.
+
+- **Five across, then it scrolls.** Five is what fits on a phone before the
+  labels stop being readable, so up to five share the width the way a tab bar
+  normally does. Add more — up to ten — and the icons keep a thumb-sized
+  width of their own and the row scrolls sideways instead of squeezing, with
+  the section you are in scrolled into view. The picker marks the ones that
+  sit past the fold.
+
+- Stored **per device**, with the theme and playback preferences — the same
+  member can have the hymnal on their phone and the default set on the church
+  computer — and applied the moment it changes, with no reload.
+- A device that has never touched it keeps exactly the bar it had.
+- A choice is stored as destinations, not positions, and re-resolved against
+  what that viewer may currently see: a category that gets unpublished, or a
+  page whose plugin is switched off, drops out of the bar rather than sitting
+  there leading nowhere. If nothing survives, the app's own suggestion is
+  drawn, because an installed app with an empty bar has no way to get
+  anywhere.
+- The bar is snapshotted for the offline screen each time it renders, which
+  is what lets those icons still be there with no connection.
 
 Limits worth knowing: the Wi-Fi-only preference relies on the Network
 Information API, which only Chromium implements — where the connection type
@@ -415,10 +617,35 @@ own section like any other.
 
 - **Reading** — PDFs render page by page with zoom and a page jump box;
   EPUBs reflow as a scrolling document, which reads better on a phone.
+- **Swipe to turn the page** — in a PDF, a swipe left or right turns the
+  page, and the arrow keys do the same on a desktop. Scrolling still
+  scrolls: the gesture decides which way it is going before it claims the
+  touch, a second finger is a pinch-zoom, and once you have zoomed in past
+  the width of the screen a sideways drag pans the page instead. Turn it off
+  from the reader's toolbar or under **Reading** in `/profile/settings` —
+  per device, like the other settings there.
 - **Contents** — the PDF outline or the EPUB navigation document, nested,
   each entry jumping straight to its place. A contents entry whose
   destination doesn't resolve is shown greyed rather than dropped, so a
   half-broken outline doesn't look like an empty one.
+- **Go to hymn 214** — a **Hymn** box in the reader's contents bar takes the
+  number on the board and opens that hymn, which in most books is not the
+  page it is printed on. The same box sits on a book's contents page (it
+  opens the reader there) and on the offline screen. The number is read from
+  the front of each contents entry — "214", "1. Holy, Holy, Holy", "Hymn 45",
+  "No. 12", "#7" — never from inside a title, since following a number that
+  happens to end a title would look like it worked and be wrong. Books whose
+  contents aren't numbered don't show the box.
+- **Back and Next, by hymn rather than by page** — a bar along the bottom of
+  the reader names the entry being read and steps to the one either side of
+  it, using the book's own contents. **Back** goes to the start of the hymn
+  being read before it goes to the hymn before it, which is what you want
+  after paging past the first verse. A book with only one contents entry, or
+  none that resolve, shows no bar.
+  - In a **hymn-per-file** book — one whose hymns are separate files rather
+    than one PDF — the same arrows sit at the foot of each hymn's page,
+    stepping in the order that book's list shows and skipping any hymn the
+    viewer can't open.
 - **Search in the book** — matches across every page (PDF) or spine section
   (EPUB), listed with a snippet of surrounding text.
 - **Page offset** — a scanned book whose printed page 1 sits behind a title
@@ -430,6 +657,17 @@ own section like any other.
   a `?page=` link — stays in PDF pages, so an offset can be corrected later
   without moving anyone's place; front matter itself shows no number, and
   the reader displays the PDF page alongside while an offset is set.
+- **When a browser can't draw the pages** — pdf.js needs a fairly current
+  browser engine, and an older phone can open a PDF perfectly well without
+  being able to run the library that draws one. The reader says so plainly
+  and offers the book in the browser's own PDF viewer, at the page you were
+  on, rather than showing an error. The offline screen behaves the same way.
+- **The screen stays on** while a book or a hymn is open, so a phone doesn't
+  dim halfway through the second verse. It's released as soon as you leave the
+  page or switch away from the app — nothing here keeps a screen on in the
+  background — and it can be turned off under **Reading** in
+  `/profile/settings`. Some browsers don't offer this at all, and there the
+  screen behaves as it always has.
 - **Read aloud** — speaks the current page or section with a voice and speed
   picker, advancing through the book on its own. **It stops when the app is
   minimised**: browsers suspend speech for a backgrounded page, and no
@@ -441,6 +679,16 @@ own section like any other.
 - **Your place is kept** — reopening a book returns to where you stopped,
   stored per account (not per device), so it follows you between phone and
   desktop. Signed-out readers can still open a public book; nothing is saved.
+- **Opening a book a second time is cheap** — a hymnal is tens of megabytes
+  that never change, and it used to arrive again in full every time somebody
+  looked up a hymn. Now the browser keeps its copy and only asks whether it
+  is still current, which comes back as a few hundred bytes; the book itself
+  is read off the device. Access is still checked on every open, so this
+  costs nothing in control: a member who loses access is refused on their
+  next open exactly as before. Its contents list — the hymn numbers and
+  titles, which are read out of the PDF's bookmarks and are the slow part of
+  a book's page — is remembered on the device too, for a month, and re-read
+  from scratch whenever the file is replaced.
 
 ### How file access actually works
 
@@ -504,8 +752,21 @@ Limits worth knowing: a **highlight of selected text only works in a PDF**.
 An EPUB's pages live in an iframe the reader library owns, and the selection
 inside it isn't readable from the surrounding page — so marking in an EPUB
 saves a bookmark at the current position rather than pretending to capture
-text it can't see. Reading also needs a connection: unlike video downloads,
-books aren't cached for offline use.
+text it can't see.
+
+Reading still needs a connection. The caching above makes a re-open cheap,
+not free: the browser has to ask whether its copy is current before it may
+use it, which is what keeps access checks immediate — so with no signal at
+all a book won't open. That is a different thing from a downloaded video,
+which plays with the network off. A very large PDF (over 48 MB) also keeps
+streaming in pieces as it always did, since waiting for the whole file
+before the first page appears would be the worse trade.
+
+Stepping by contents entry is as good as the book's own contents. A PDF
+whose bookmarks were never added has nothing to step through, and an EPUB
+that packs several hymns into one section file steps by section rather than
+by hymn — there is no ordering for anchors inside a document to do better
+with.
 
 ## Auth
 

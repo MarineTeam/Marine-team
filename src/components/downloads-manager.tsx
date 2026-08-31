@@ -21,17 +21,19 @@ import {
  * never learns what's been downloaded, so it can't render this and doesn't
  * try. Playback is an ordinary `<video>` pointing at the cached URL, which
  * the service worker answers with no network at all.
+ *
+ * How full the device is lives in DeviceStorage above this, not here: books
+ * are kept on the same device out of the same allowance, and a bar that
+ * counted only videos said something untrue.
  */
 export function DownloadsManager({
   pluginOn,
   permitted,
   platform,
-  maxDeviceGb,
 }: {
   pluginOn: boolean;
   permitted: boolean;
   platform: "WEB" | "PWA" | "BOTH";
-  maxDeviceGb: number;
 }) {
   const [overCellular, setOverCellular] = useState(false);
   const [items, setItems] = useState<DownloadedVideo[]>([]);
@@ -71,9 +73,6 @@ export function DownloadsManager({
     await removeAllDownloads();
     await refresh();
   }
-
-  const usedBytes = items.reduce((total, item) => total + item.bytes, 0);
-  const usedFraction = Math.min(1, usedBytes / (maxDeviceGb * 1024 ** 3));
 
   return (
     <div className="space-y-6">
@@ -163,15 +162,6 @@ export function DownloadsManager({
           </div>
         ) : (
           <>
-            <div className="space-y-1">
-              <div className="h-1.5 overflow-hidden rounded-full bg-chip">
-                <div className="h-full bg-accent" style={{ width: `${Math.round(usedFraction * 100)}%` }} />
-              </div>
-              <p className="text-xs text-sec">
-                {formatBytes(usedBytes)} used of a suggested {maxDeviceGb} GB · {items.length} video
-                {items.length === 1 ? "" : "s"}
-              </p>
-            </div>
 
             {playing && (
               <div className="space-y-1">

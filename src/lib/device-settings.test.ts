@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_DEVICE_SETTINGS,
+  MAX_PRESENT_SCALE,
+  MIN_PRESENT_SCALE,
   DEVICE_SETTINGS_KEY,
   parseDeviceSettings,
   THEME_INIT_SCRIPT,
@@ -22,6 +24,11 @@ describe("parseDeviceSettings", () => {
       autoplay: true,
       defaultPlaybackSpeed: 1.5,
       downloadOverCellular: true,
+      swipeToTurnPages: false,
+      keepScreenAwake: false,
+      presentTextScale: 1.4,
+      presentTheme: "light",
+      tabHrefs: ["/", "/categories/hymnals"],
     };
     expect(parseDeviceSettings(JSON.stringify(stored))).toEqual(stored);
   });
@@ -51,6 +58,42 @@ describe("parseDeviceSettings", () => {
     const settings = parseDeviceSettings(JSON.stringify({ autoplay: "yes", downloadOverCellular: 1 }));
     expect(settings.autoplay).toBe(false);
     expect(settings.downloadOverCellular).toBe(false);
+  });
+
+  it("holds the screen on unless it was deliberately turned off", () => {
+    expect(parseDeviceSettings("{}").keepScreenAwake).toBe(true);
+    expect(parseDeviceSettings(JSON.stringify({ keepScreenAwake: 1 })).keepScreenAwake).toBe(true);
+    expect(parseDeviceSettings(JSON.stringify({ keepScreenAwake: false })).keepScreenAwake).toBe(false);
+  });
+
+  it("pulls a present-mode text size back into range rather than resetting it", () => {
+    // It is nudged by a button, sometimes mid-service; landing back inside
+    // the range beats jumping to the middle.
+    expect(parseDeviceSettings(JSON.stringify({ presentTextScale: 99 })).presentTextScale).toBe(
+      MAX_PRESENT_SCALE,
+    );
+    expect(parseDeviceSettings(JSON.stringify({ presentTextScale: 0 })).presentTextScale).toBe(
+      MIN_PRESENT_SCALE,
+    );
+    expect(parseDeviceSettings(JSON.stringify({ presentTextScale: "big" })).presentTextScale).toBe(1);
+    expect(parseDeviceSettings(JSON.stringify({ presentTheme: "sepia" })).presentTheme).toBe("dark");
+  });
+
+  it("treats a bottom bar that was never customised as unset", () => {
+    // Null means "use the app's suggestion", which is not the same as an
+    // empty bar — see lib/nav-tabs.ts.
+    expect(parseDeviceSettings("{}").tabHrefs).toBeNull();
+    expect(parseDeviceSettings(JSON.stringify({ tabHrefs: "/" })).tabHrefs).toBeNull();
+    expect(parseDeviceSettings(JSON.stringify({ tabHrefs: ["/", "/search"] })).tabHrefs).toEqual([
+      "/",
+      "/search",
+    ]);
+  });
+
+  it("keeps page swiping on unless it was deliberately turned off", () => {
+    expect(parseDeviceSettings("{}").swipeToTurnPages).toBe(true);
+    expect(parseDeviceSettings(JSON.stringify({ swipeToTurnPages: "no" })).swipeToTurnPages).toBe(true);
+    expect(parseDeviceSettings(JSON.stringify({ swipeToTurnPages: false })).swipeToTurnPages).toBe(false);
   });
 });
 

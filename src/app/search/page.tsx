@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CategoryTile } from "@/components/category-tile";
 import { SeriesTile } from "@/components/series-tile";
 import { MenuTile } from "@/components/menu-tile";
@@ -23,9 +24,9 @@ export default async function SearchPage({
         speakerId: speaker || undefined,
         sort: sortValue,
       })
-    : { categories: [], series: [], videos: [] };
+    : { categories: [], series: [], videos: [], files: [] };
   const hasResults =
-    results.categories.length + results.series.length + results.videos.length > 0;
+    results.categories.length + results.series.length + results.videos.length + results.files.length > 0;
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
@@ -36,7 +37,7 @@ export default async function SearchPage({
             type="search"
             name="q"
             defaultValue={query}
-            placeholder="Search series, videos, categories…"
+            placeholder="Search hymns, series, videos…"
             className="w-full rounded-md border border-sep px-3 py-2 text-sm"
           />
           <div className="flex flex-wrap items-center gap-2">
@@ -104,6 +105,35 @@ export default async function SearchPage({
               <SeriesTile key={series.id} series={series} />
             ))}
           </div>
+        </section>
+      )}
+
+      {results.files.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">Hymns &amp; books</h2>
+          <ul className="divide-y divide-sep rounded-lg border border-sep">
+            {results.files.map((file) => (
+              <li key={file.id}>
+                <Link href={file.href} className="flex items-start gap-3 px-3 py-2.5 hover:bg-hover">
+                  {/* The printed number, where the book has one — it is how
+                      this hymn is asked for out loud. */}
+                  <span className="w-8 shrink-0 pt-0.5 text-right text-sm tabular-nums text-ter">
+                    {file.pageNumber ?? ""}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{file.title}</span>
+                    {file.context && <span className="block text-xs text-sec">{file.context}</span>}
+                    {/* The line they searched for, in the words the book
+                        prints — which is usually all the confirmation
+                        anybody needs that this is the right hymn. */}
+                    {file.excerpt && (
+                      <span className="mt-0.5 block text-xs text-sec italic">{file.excerpt}</span>
+                    )}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

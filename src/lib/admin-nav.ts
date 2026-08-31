@@ -68,6 +68,9 @@ export const ADMIN_GROUPS: AdminGroup[] = [
       { href: "/admin/speakers", label: "Speakers", visible: (a) => a.canManageVideosSiteWide },
       { href: "/admin/live", label: "Live streaming", visible: (a) => a.canManageVideosSiteWide },
       { href: "/admin/files", label: "Files", visible: always },
+      // A plan is a list of files, so whoever may arrange the library may
+      // arrange a service — see the services API for why that's the gate.
+      { href: "/admin/services", label: "Services", visible: (a) => a.canManageFiles },
     ],
   },
   {

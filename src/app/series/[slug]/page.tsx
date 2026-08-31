@@ -38,8 +38,11 @@ import { MenuTile } from "@/components/menu-tile";
 import { FileList } from "@/components/file-list";
 import { HymnalBookGrid } from "@/components/hymnal-book-grid";
 import { BookContents } from "@/components/book-contents";
+import { SaveBookButton } from "@/components/save-book-button";
+import { SaveHymnalButton } from "@/components/save-hymnal-button";
 import { HymnList } from "@/components/hymn-list";
 import { fileBook, pdfsOf } from "@/lib/hymnal";
+import { bookCacheTag } from "@/lib/reader-cache";
 import { CommentSection } from "@/components/comment-section";
 import { ViewEventBeacon } from "@/components/view-event-beacon";
 
@@ -148,6 +151,7 @@ export default async function SeriesPage({
     "likes-dislikes": likesOn,
     "share-links": shareLinksOn,
     "book-reader": readerOn,
+    downloads: downloadsOn,
   } = plugins;
 
   const [ratingSummary, myRating, reactionSummary, myReaction, related, comments, shareOptions] = await Promise.all([
@@ -312,18 +316,60 @@ export default async function SeriesPage({
           {series.files.length > 0 && (
             <section className="space-y-3">
               {hymnPerFile ? (
-                <HymnList hymns={series.files} isLoggedIn={isLoggedIn} />
+                <>
+                  {/*
+                    A book whose files are its hymns has no PDF to save, so
+                    what goes on the device is the hymns themselves — see
+                    SaveHymnalButton.
+                  */}
+                  {downloadsOn && !seriesLocked && (
+                    <SaveHymnalButton
+                      seriesId={series.id}
+                      title={series.title}
+                      homeHref={`/series/${series.slug}`}
+                      homeLabel={series.title}
+                      categoryHref={series.category ? `/categories/${series.category.slug}` : null}
+                      categoryLabel={series.category?.name ?? null}
+                    />
+                  )}
+                  <HymnList hymns={series.files} isLoggedIn={isLoggedIn} />
+                </>
               ) : hymnalStyle ? (
                 <>
                   {soleBook ? (
                     soleBookLocked ? (
                       <p className="text-sm text-sec">This book is for members only.</p>
                     ) : (
-                      <BookContents
-                        fileId={soleBook.id}
-                        readerOn={readerOn}
-                        pageOffset={soleBook.pageOffset}
-                      />
+                      <>
+                        {/*
+                          A series holding one PDF *is* that book, and its
+                          contents are listed here rather than on the book's
+                          own page — so the way to keep it on the device has
+                          to be here too.
+                        */}
+                        {downloadsOn && (
+                          <SaveBookButton
+                            fileId={soleBook.id}
+                            title={soleBook.title}
+                            // pdfsOf() already narrowed this list to PDFs.
+                            format="pdf"
+                            homeHref={`/series/${series.slug}`}
+                            homeLabel={series.title}
+                            categoryHref={
+                              series.category ? `/categories/${series.category.slug}` : null
+                            }
+                            categoryLabel={series.category?.name ?? null}
+                            pageOffset={soleBook.pageOffset}
+                            sizeBytes={soleBook.sizeBytes}
+                          />
+                        )}
+                        <BookContents
+                          fileId={soleBook.id}
+                          readerOn={readerOn}
+                          pageOffset={soleBook.pageOffset}
+                          cacheTag={bookCacheTag(soleBook)}
+                        />
+                      </>
                     )
                   ) : (
                     bookPdfs.length > 0 && (

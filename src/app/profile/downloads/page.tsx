@@ -1,6 +1,8 @@
 import { getCurrentUser } from "@/lib/current-user";
 import { getDownloadAccessSummary } from "@/lib/downloads";
 import { DownloadsManager } from "@/components/downloads-manager";
+import { OfflineBooksManager } from "@/components/offline-books-manager";
+import { DeviceStorage } from "@/components/device-storage";
 
 /**
  * The member's downloads: whether they may download at all (resolved
@@ -19,16 +21,18 @@ export default async function ProfileDownloadsPage() {
       <div>
         <h2 className="text-lg font-semibold text-ink">Downloads</h2>
         <p className="mt-1 text-sm text-sec">
-          Videos saved to this device play without a connection. They&apos;re stored per device, so what you
-          download on your phone won&apos;t appear here on a computer.
+          Videos and books saved to this device open without a connection. They&apos;re stored per device, so
+          what you save on your phone won&apos;t appear here on a computer.
         </p>
       </div>
-      <DownloadsManager
-        pluginOn={pluginOn}
-        permitted={permitted}
-        platform={platform}
-        maxDeviceGb={maxDeviceGb}
-      />
+      {/* Videos and books share the device, so they share the figure. */}
+      <DeviceStorage maxDeviceGb={maxDeviceGb} />
+      <DownloadsManager pluginOn={pluginOn} permitted={permitted} platform={platform} />
+      {pluginOn && (
+        <div className="border-t border-sep pt-6">
+          <OfflineBooksManager />
+        </div>
+      )}
     </div>
   );
 }

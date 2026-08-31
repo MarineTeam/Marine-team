@@ -7,7 +7,7 @@ export function FavoriteButton({
   id,
   initialFavorited,
 }: {
-  type: "series" | "video";
+  type: "series" | "video" | "file";
   id: string;
   initialFavorited: boolean;
 }) {

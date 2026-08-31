@@ -38,4 +38,15 @@ export type ReaderHandle = {
    * than looping on the last page forever.
    */
   advance: () => boolean;
+  /**
+   * Places opaque locations on one comparable number line, in reading order.
+   *
+   * This is how the chrome works out which contents entry is being read —
+   * and so which one "next hymn" and "back" should go to — without learning
+   * to tell a page number from a CFI. Null for a location this reader can't
+   * place: a contents entry whose destination never resolved, or a spot in a
+   * section the book doesn't list. Positions are only ever compared with
+   * each other, never displayed.
+   */
+  order: (locations: (string | null)[]) => (number | null)[];
 };

@@ -5,11 +5,18 @@ import { getCurrentUser } from "@/lib/current-user";
 import { isPluginEnabled } from "@/lib/plugins";
 
 const schema = z.object({
-  type: z.enum(["series", "video"]),
+  type: z.enum(["series", "video", "file"]),
   id: z.string().min(1),
 });
 
-/** Toggles a logged-in user's bookmark of a series or video on/off, returning the new state. */
+/**
+ * Toggles a logged-in user's bookmark of a series, video or file on/off,
+ * returning the new state.
+ *
+ * A file is usually a hymn, which is the one people most want a list of —
+ * and, like the other two, it answers to the favourites plugin as its own
+ * section has it set.
+ */
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -30,6 +37,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ favorited: false });
     }
     await prisma.seriesFavorite.create({ data: { userId: user.id, seriesId: id } });
+    return NextResponse.json({ favorited: true });
+  }
+
+  if (type === "file") {
+    const file = await prisma.fileAsset.findUnique({
+      where: { id },
+      select: { categoryId: true, series: { select: { categoryId: true } } },
+    });
+    if (!file) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    // A file hangs off either a series or a category; the plugin is scoped to
+    // whichever it is (see getPluginStates).
+    if (!(await isPluginEnabled("favorites", file.categoryId ?? file.series?.categoryId ?? null))) {
+      return NextResponse.json({ error: "Favorites are disabled here" }, { status: 403 });
+    }
+    const existing = await prisma.fileFavorite.findUnique({
+      where: { userId_fileId: { userId: user.id, fileId: id } },
+    });
+    if (existing) {
+      await prisma.fileFavorite.delete({ where: { id: existing.id } });
+      return NextResponse.json({ favorited: false });
+    }
+    await prisma.fileFavorite.create({ data: { userId: user.id, fileId: id } });
     return NextResponse.json({ favorited: true });
   }
 

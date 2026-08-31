@@ -26,6 +26,24 @@ export function readerFormat(mimeType: string | null | undefined, path: string):
 }
 
 /**
+ * Whether new bytes may take the place of an existing file's.
+ *
+ * The rule is that a book stays the same kind of book. Everything stored
+ * about where someone got to is in that format's own terms — a PDF page
+ * number, an EPUB CFI — so putting an EPUB behind what was a PDF turns every
+ * saved place, mark and `?page=` link into nonsense while looking like an
+ * ordinary edit. Files that neither reader opens (audio, a slide deck) have
+ * no such positions to invalidate, so they're interchangeable with each
+ * other and never with a book.
+ */
+export function isCompatibleReplacement(
+  before: { mimeType: string | null; path: string },
+  after: { mimeType: string | null; path: string },
+): boolean {
+  return readerFormat(before.mimeType, before.path) === readerFormat(after.mimeType, after.path);
+}
+
+/**
  * Percentages are stored as a whole number 0-100; anything outside that is a
  * bug upstream, not a value to persist.
  *
@@ -130,4 +148,49 @@ export function excerptAround(text: string, at: number, length: number, radius =
   const start = Math.max(0, at - radius);
   const end = Math.min(text.length, at + length + radius);
   return `${start > 0 ? "…" : ""}${text.slice(start, end).trim()}${end < text.length ? "…" : ""}`;
+}
+
+/**
+ * The size below which a book is fetched whole rather than streamed in
+ * ranges.
+ *
+ * pdf.js asks for byte ranges as it needs them, which is the right way to
+ * open a document quickly — but a ranged response is a poor thing for a
+ * browser cache to hold, so every re-open of a hymnal pulls the same
+ * megabytes down again. One plain GET of the whole file is a single
+ * cacheable resource: revalidated on the next open (see the content route's
+ * `no-cache`) and answered from disk with no bytes on the wire.
+ *
+ * The limit is where that trade stops paying: the whole file has to arrive,
+ * and sit in memory, before the first page is drawn. Hymnals and most books
+ * are comfortably under it; a large scanned volume keeps the streaming
+ * behaviour it has always had.
+ */
+export const WHOLE_BOOK_MAX_BYTES = 48 * 1024 * 1024;
+
+/**
+ * An unknown size is treated as too big on purpose: it is the case where the
+ * file could be anything, and streaming is the option that degrades
+ * gracefully.
+ */
+export function shouldFetchWholeBook(sizeBytes: number | null | undefined): boolean {
+  return typeof sizeBytes === "number" && sizeBytes > 0 && sizeBytes <= WHOLE_BOOK_MAX_BYTES;
+}
+
+/**
+ * Whether a client's `If-None-Match` covers the entity we would send back —
+ * i.e. whether it already holds this exact file and can be told so with a
+ * bodyless 304 instead of the megabytes.
+ *
+ * Compares weakly (RFC 9110 §8.8.3.2): `W/"abc"` and `"abc"` identify the
+ * same bytes, and only a byte-range or a partial-content merge would need
+ * the strong comparison neither this nor the caller performs.
+ */
+export function etagMatches(ifNoneMatch: string | null | undefined, etag: string | null | undefined): boolean {
+  if (!ifNoneMatch || !etag) return false;
+  const strip = (value: string) => value.trim().replace(/^W\//, "");
+  const held = ifNoneMatch.split(",").map(strip);
+  // "*" means "any current representation", which by definition includes the
+  // one we are about to send.
+  return held.includes("*") || held.includes(strip(etag));
 }

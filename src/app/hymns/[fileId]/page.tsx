@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getReadableFile, canViewFile } from "@/lib/content";
+import { getAdjacentHymns, getReadableFile, canViewFile, isFileFavorited } from "@/lib/content";
+import { FavoriteButton } from "@/components/favorite-button";
+import { KeepAwake } from "@/components/keep-awake";
 import { getCurrentUser } from "@/lib/current-user";
 import { isPluginEnabled } from "@/lib/plugins";
 import { readerFormat } from "@/lib/reader";
@@ -41,7 +43,17 @@ export default async function HymnPage({ params }: { params: Promise<{ fileId: s
 
   const categoryId = file.category?.id ?? file.series?.categoryId ?? null;
   const format = readerFormat(file.mimeType, file.bunnyPath);
-  const readerOn = format ? await isPluginEnabled("book-reader", categoryId) : false;
+  const [readerOn, { previous, next }, favoritesOn, favorited] = await Promise.all([
+    format ? isPluginEnabled("book-reader", categoryId) : Promise.resolve(false),
+    // The hymns either side, in a book whose files are its hymns. Skipped for
+    // a hymn this viewer can't open, where the page shows nothing to step
+    // away from anyway.
+    locked
+      ? Promise.resolve({ previous: null, next: null })
+      : getAdjacentHymns(file.id, file.seriesId, isLoggedIn),
+    isPluginEnabled("favorites", categoryId),
+    user && !locked ? isFileFavorited(user.id, file.id) : Promise.resolve(false),
+  ]);
   const pdfHref = readerOn ? `/read/${file.id}` : `/api/files/${file.id}/content?download=1`;
   const pdfLabel = readerOn ? "View as PDF" : "Download PDF";
 
@@ -82,6 +94,27 @@ export default async function HymnPage({ params }: { params: Promise<{ fileId: s
             )}
           </div>
 
+          {/* The lyrics stay on screen for as long as the hymn lasts, and
+              nobody is tapping to keep them there. */}
+          <KeepAwake />
+
+          {/* Keeping a hymn is the list a worship leader actually wants, and
+              it is the same button the rest of the app uses. */}
+          <div className="flex flex-wrap items-center gap-2">
+            {favoritesOn && user && (
+              <FavoriteButton type="file" id={file.id} initialFavorited={favorited} />
+            )}
+            {/* Only where there are words to put on a wall. */}
+            {file.lyricsText && (
+              <Link
+                href={`/present/${file.id}`}
+                className="rounded-md border border-sep px-3 py-1.5 text-sm hover:bg-hover"
+              >
+                Present
+              </Link>
+            )}
+          </div>
+
           {file.lyricsText ? (
             <>
               <div className="whitespace-pre-wrap rounded-lg border border-sep p-5 text-[15px] leading-relaxed">
@@ -104,6 +137,38 @@ export default async function HymnPage({ params }: { params: Promise<{ fileId: s
                 {pdfLabel}
               </a>
             </div>
+          )}
+
+          {(previous || next) && (
+            <nav
+              aria-label="Hymns in this book"
+              className="flex items-center gap-3 border-t border-sep pt-4 text-sm"
+            >
+              {previous ? (
+                <Link
+                  href={`/hymns/${previous.id}`}
+                  rel="prev"
+                  className="min-w-0 flex-1 truncate text-sec hover:underline"
+                >
+                  ‹ {previous.pageNumber != null ? `${previous.pageNumber}. ` : ""}
+                  {previous.title}
+                </Link>
+              ) : (
+                <span className="flex-1" />
+              )}
+              {next ? (
+                <Link
+                  href={`/hymns/${next.id}`}
+                  rel="next"
+                  className="min-w-0 flex-1 truncate text-right text-sec hover:underline"
+                >
+                  {next.pageNumber != null ? `${next.pageNumber}. ` : ""}
+                  {next.title} ›
+                </Link>
+              ) : (
+                <span className="flex-1" />
+              )}
+            </nav>
           )}
         </>
       )}
