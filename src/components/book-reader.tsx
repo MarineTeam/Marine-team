@@ -13,11 +13,13 @@ import {
   countNumberedEntries,
   currentTocIndex,
   findHymnIndex,
+  hymnNumberOf,
   nextTocIndex,
   previousTocIndex,
   type TocPosition,
 } from "@/lib/toc-nav";
 import type { ReaderHandle, SearchHit, TocEntry } from "@/components/reader-types";
+import { CopyHymnLink } from "@/components/copy-hymn-link";
 
 type Panel = "contents" | "search" | "marks";
 
@@ -477,6 +479,15 @@ export function BookReader({
           >
             Next ›
           </button>
+          {/* Sending somebody the hymn you are looking at, from where you are
+              looking at it — the bar already knows which hymn that is. */}
+          <CopyHymnLink
+            fileId={fileId}
+            hymnNumber={currentEntry ? hymnNumberOf(currentEntry.label) : null}
+            currentPage={() =>
+              format === "pdf" ? (handleRef.current?.currentLocation() ?? null) : null
+            }
+          />
         </nav>
       )}
 

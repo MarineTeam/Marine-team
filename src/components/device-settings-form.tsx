@@ -11,6 +11,7 @@ import {
   type DeviceSettings,
   type ThemePreference,
 } from "@/lib/device-settings";
+import { ReadingSizeControls } from "@/components/reading-size";
 
 const THEME_OPTIONS: { value: ThemePreference; label: string; hint: string }[] = [
   { value: "system", label: "System", hint: "Follow this device's setting" },
@@ -161,6 +162,21 @@ export function DeviceSettingsForm() {
             </span>
           </span>
         </label>
+        <div className="space-y-1 text-sm">
+          <div className="flex flex-wrap items-center gap-3">
+            <span>Reading text size</span>
+            <ReadingSizeControls
+              scale={settings.readingTextScale}
+              onChange={(next) => update({ readingTextScale: next })}
+            />
+          </div>
+          <p className="text-xs text-sec">
+            The size of a hymn&apos;s words and of an EPUB&apos;s pages. The same buttons sit beside
+            the words themselves, which is usually where you notice. A scanned book isn&apos;t
+            affected — its pages are pictures, and the reader zooms them instead. Present mode keeps
+            its own size, since a projector and a phone never want the same answer.
+          </p>
+        </div>
       </section>
 
       <p className="text-xs text-sec">

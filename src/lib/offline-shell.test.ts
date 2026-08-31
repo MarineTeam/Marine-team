@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import { BOOK_CACHE, VIEWER_ASSETS, offlineBookUrl, offlineHymnalUrl } from "./offline-books";
 import { DOWNLOAD_CACHE, downloadCacheUrl } from "./offline-downloads";
 import { SERVICE_CACHE, offlineServiceUrl } from "./offline-services";
-import { DEVICE_SETTINGS_KEY } from "./device-settings";
+import {
+  DEVICE_SETTINGS_KEY,
+  MAX_READING_SCALE,
+  MIN_READING_SCALE,
+  READING_SCALE_STEP,
+} from "./device-settings";
 import { NAV_TABS_SNAPSHOT_KEY } from "./nav-tabs";
 import { hymnNumberOf } from "./toc-nav";
 
@@ -41,6 +46,15 @@ describe("the offline shell's copied constants", () => {
     expect(shell).toContain(`"${NAV_TABS_SNAPSHOT_KEY}"`);
     expect(shell).toContain('"marine-toc-v1:"');
     expect(shell).toContain(`"${DEVICE_SETTINGS_KEY}"`);
+  });
+
+  // The shell writes this setting as well as reading it, so its bounds have
+  // to be the app's: a size stored outside them would come back to the app as
+  // one nobody chose, and the app would clamp it to something else again.
+  it("clamps the reading size to the same range the app does", () => {
+    expect(shell).toContain(`const MIN_READING_SCALE = ${MIN_READING_SCALE};`);
+    expect(shell).toContain(`const MAX_READING_SCALE = ${MAX_READING_SCALE};`);
+    expect(shell).toContain(`const READING_SCALE_STEP = ${READING_SCALE_STEP};`);
   });
 
   it("answers for the paths saved media is stored under", () => {

@@ -559,6 +559,12 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   what is actually handed out, so a `?probe=1` request answers "is the order I
   saved still the order" without re-fetching it. The offline shell renders it,
   and opens a hymn whose book is also saved.
+- **Reading text size** (`readingTextScale` in `lib/device-settings.ts`) is one
+  per-device value shared by the lyrics view, the EPUB reader and the offline
+  shell — which both reads and writes it, so its clamp bounds are copied there
+  and pinned by `offline-shell.test.ts`. EPUB scaling goes through
+  `rendition.themes.fontSize` as a percentage: the book's pages live in an
+  iframe with their own stylesheet, so a size set outside it reaches nothing.
 - **Hymn openings are counted in the browser** (`HymnLookup` + the beacon
   component of the same name), not on render: Next prefetches links on hover,
   so a server-side count would largely count hovering. Feeds "most looked-up

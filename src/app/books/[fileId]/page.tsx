@@ -9,6 +9,7 @@ import {
   presentableHymnNumbers,
 } from "@/lib/content";
 import { FavoriteButton } from "@/components/favorite-button";
+import { ShareButtons } from "@/components/share-buttons";
 import { getCurrentUser } from "@/lib/current-user";
 import { readerFormat } from "@/lib/reader";
 import { BookContents } from "@/components/book-contents";
@@ -109,6 +110,11 @@ export default async function BookPage({
               <FavoriteButton type="file" id={file.id} initialFavorited={favorited} />
             )}
           </div>
+          {/* Not offered for a members-only book: a link a stranger can't
+              open is worse than no button. */}
+          {plugins["social-share"] && !file.memberOnly && (
+            <ShareButtons title={file.title} path={`/books/${file.id}`} />
+          )}
           {offlineOn && (
             <SaveBookButton
               fileId={file.id}

@@ -71,6 +71,8 @@
   #epub-view { height: 70vh; background: #fff; border: 1px solid var(--sep); border-radius: 10px; overflow: hidden; }
   .lyrics { white-space: pre-wrap; line-height: 1.6; font-size: 15px; border: 1px solid var(--sep); border-radius: 10px; padding: 16px; }
   .hymn-nav { display: flex; gap: 10px; align-items: center; margin-top: 14px; font-size: 13px; }
+  .size-controls { display: flex; gap: 6px; justify-content: flex-end; margin-bottom: 8px; }
+  .size-controls button { padding: 4px 10px; font-size: 13px; }
   .hymn-nav .spacer { flex: 1; }
   .group { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--sec); padding: 8px 14px; background: var(--chip); border-bottom: 1px solid var(--sep); }
 
@@ -119,6 +121,7 @@
  *   marine-offline-books   books saved to this device (lib/offline-books.ts)
  *   marine-downloads-index videos saved to this device (lib/offline-downloads.ts)
  *   marine-offline-services service orders saved here (lib/offline-services.ts)
+ *   marine-device-settings this device's settings (lib/device-settings.ts)
  *   marine-toc-v1:<id>     a book's contents list (lib/reader-cache.ts)
  *
  * Those constants are literals rather than imports for the same reason the
@@ -136,6 +139,14 @@ const BOOK_CACHE = "marine-team-books-v1";
 const SERVICE_INDEX_KEY = "marine-offline-services";
 const SERVICE_CACHE = "marine-team-services-v1";
 const TABS_KEY = "marine-nav-tabs";
+const SETTINGS_KEY = "marine-device-settings";
+// The same bounds as MIN_READING_SCALE / MAX_READING_SCALE in
+// lib/device-settings.ts. Clamped here too, because this page writes the
+// setting as well as reading it, and a value it stored outside the range
+// would come back to the app as one nobody chose.
+const MIN_READING_SCALE = 0.75;
+const MAX_READING_SCALE = 2;
+const READING_SCALE_STEP = 0.1;
 const TOC_PREFIX = "marine-toc-v1:";
 const PDFJS_URL = "/pdfjs/pdf.min.mjs";
 const PDFJS_WORKER_URL = "/pdfjs/pdf.worker.min.mjs";
@@ -213,6 +224,33 @@ function writeServices(items) {
   try {
     localStorage.setItem(SERVICE_INDEX_KEY, JSON.stringify(items));
   } catch (e) {}
+}
+
+/**
+ * The reading text size this device chose, shared with the app.
+ *
+ * Offline is where the size matters most — a pew, a dim hall, no connection
+ * to go and change a setting from — so this both reads it and writes it,
+ * rather than only honouring what the app was last told.
+ */
+function readingScale() {
+  var raw = readJson(SETTINGS_KEY, null);
+  var value = raw && typeof raw.readingTextScale === "number" ? raw.readingTextScale : 1;
+  if (!isFinite(value)) return 1;
+  return Math.min(MAX_READING_SCALE, Math.max(MIN_READING_SCALE, value));
+}
+
+function setReadingScale(next) {
+  var clamped = Math.min(MAX_READING_SCALE, Math.max(MIN_READING_SCALE, next));
+  var rounded = Math.round(clamped * 100) / 100;
+  try {
+    // Merged into whatever else is stored: this page must never be the reason
+    // somebody's theme or tab bar goes back to the default.
+    var current = readJson(SETTINGS_KEY, {}) || {};
+    current.readingTextScale = rounded;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(current));
+  } catch (e) {}
+  return rounded;
 }
 
 /** The day a service is for, as a person reads it. */
@@ -745,7 +783,29 @@ function renderHymn(book, hymns, index) {
   const heading = el("h1", null, hymn.title || "");
   view.appendChild(heading);
   if (hymn.pageNumber != null) view.appendChild(el("p", "sub", "Page " + hymn.pageNumber));
-  view.appendChild(el("div", "lyrics", hymn.lyricsText || ""));
+
+  const words = el("div", "lyrics", hymn.lyricsText || "");
+  // The same 15px base the app's lyrics use, times whatever this device set.
+  const applySize = (scale) => {
+    words.style.fontSize = 15 * scale + "px";
+  };
+  applySize(readingScale());
+
+  const sizing = el("div", "size-controls");
+  const smaller = el("button", null, "A−");
+  const larger = el("button", null, "A+");
+  smaller.setAttribute("aria-label", "Smaller text");
+  larger.setAttribute("aria-label", "Larger text");
+  const nudge = (by) => {
+    applySize(setReadingScale(readingScale() + by));
+  };
+  smaller.addEventListener("click", () => nudge(-READING_SCALE_STEP));
+  larger.addEventListener("click", () => nudge(READING_SCALE_STEP));
+  sizing.appendChild(smaller);
+  sizing.appendChild(larger);
+  view.appendChild(sizing);
+
+  view.appendChild(words);
 
   const nav = el("div", "hymn-nav");
   const previous = hymns[index - 1];

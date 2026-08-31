@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { getAdjacentHymns, getReadableFile, canViewFile, isFileFavorited } from "@/lib/content";
 import { FavoriteButton } from "@/components/favorite-button";
 import { HymnLookup } from "@/components/hymn-lookup";
+import { LyricsText } from "@/components/lyrics-text";
+import { ShareButtons } from "@/components/share-buttons";
 import { KeepAwake } from "@/components/keep-awake";
 import { getCurrentUser } from "@/lib/current-user";
 import { isPluginEnabled } from "@/lib/plugins";
@@ -44,7 +46,7 @@ export default async function HymnPage({ params }: { params: Promise<{ fileId: s
 
   const categoryId = file.category?.id ?? file.series?.categoryId ?? null;
   const format = readerFormat(file.mimeType, file.bunnyPath);
-  const [readerOn, { previous, next }, favoritesOn, favorited] = await Promise.all([
+  const [readerOn, { previous, next }, favoritesOn, favorited, shareOn] = await Promise.all([
     format ? isPluginEnabled("book-reader", categoryId) : Promise.resolve(false),
     // The hymns either side, in a book whose files are its hymns. Skipped for
     // a hymn this viewer can't open, where the page shows nothing to step
@@ -54,6 +56,7 @@ export default async function HymnPage({ params }: { params: Promise<{ fileId: s
       : getAdjacentHymns(file.id, file.seriesId, isLoggedIn),
     isPluginEnabled("favorites", categoryId),
     user && !locked ? isFileFavorited(user.id, file.id) : Promise.resolve(false),
+    isPluginEnabled("social-share", categoryId),
   ]);
   const pdfHref = readerOn ? `/read/${file.id}` : `/api/files/${file.id}/content?download=1`;
   const pdfLabel = readerOn ? "View as PDF" : "Download PDF";
@@ -119,11 +122,18 @@ export default async function HymnPage({ params }: { params: Promise<{ fileId: s
             )}
           </div>
 
+          {/* A hymn is the thing in this app most worth sending somebody —
+              "we're singing this on Sunday" — and it had no way to be sent.
+              Gated by the same switch as a video's, and only where the hymn
+              isn't members-only: a link a stranger can't open is worse than
+              no button. */}
+          {shareOn && !file.memberOnly && (
+            <ShareButtons title={file.title} path={`/hymns/${file.id}`} />
+          )}
+
           {file.lyricsText ? (
             <>
-              <div className="whitespace-pre-wrap rounded-lg border border-sep p-5 text-[15px] leading-relaxed">
-                {file.lyricsText}
-              </div>
+              <LyricsText text={file.lyricsText} />
               <a
                 href={pdfHref}
                 className="inline-block rounded-md border border-sep px-4 py-2 text-sm hover:bg-hover"

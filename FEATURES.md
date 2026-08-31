@@ -133,6 +133,16 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   There's no "share from where I'm currently watching" yet — Bunny's embed
   does support reading live playback position via Player.js, just not
   wired up for this.
+  - **Hymns and books share too.** A hymn is the thing in this app most worth
+    sending somebody — "we're singing this on Sunday" — and had no way to be
+    sent. The same buttons now sit on a hymn's page and a book's, and the
+    reader's bottom bar has a **Link** button for the hymn open in front of
+    you. That one links by *number* (`/books/<id>?hymn=214`) rather than by
+    page, because a page number means nothing to somebody holding a different
+    edition and stops meaning anything here the moment the book is re-scanned;
+    only an unnumbered spot falls back to its page.
+  - Not offered on a members-only hymn or book: a link a stranger can't open
+    is worse than no button.
 - **Announcements** — a dismissible (per browser session) site-wide banner,
   optionally scheduled (start/expiry time) and targeted to guests, members,
   or everyone.
@@ -792,6 +802,19 @@ own section like any other.
   being able to run the library that draws one. The reader says so plainly
   and offers the book in the browser's own PDF viewer, at the page you were
   on, rather than showing an error. The offline screen behaves the same way.
+- **Reading text size** — A− and A+ beside a hymn's words and in the EPUB
+  reader's bar, remembered per device. The moment anybody discovers a hymn is
+  too small to read is while they are looking at it, in a pew, which is not
+  when somebody goes hunting through a settings page — though it is under
+  **Reading** in `/profile/settings` as well. An EPUB is scaled as a
+  percentage so the book's own headings and verses stay in proportion rather
+  than all collapsing to one size. A scanned PDF is left out: its pages are
+  pictures, and the reader has zoomed them from the start. Present mode keeps
+  its own separate size, because a projector across a hall and a phone in a
+  hand are never the same answer.
+  - **It works offline too.** The offline screen reads the same setting and
+    can change it, since a hall with no signal is exactly where the size
+    matters and there is no settings page to reach.
 - **The screen stays on** while a book or a hymn is open, so a phone doesn't
   dim halfway through the second verse. It's released as soon as you leave the
   page or switch away from the app — nothing here keeps a screen on in the

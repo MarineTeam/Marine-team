@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_DEVICE_SETTINGS,
   MAX_PRESENT_SCALE,
+  MAX_READING_SCALE,
   MIN_PRESENT_SCALE,
+  MIN_READING_SCALE,
   DEVICE_SETTINGS_KEY,
   parseDeviceSettings,
   THEME_INIT_SCRIPT,
@@ -28,6 +30,7 @@ describe("parseDeviceSettings", () => {
       keepScreenAwake: false,
       presentTextScale: 1.4,
       presentTheme: "light",
+      readingTextScale: 1.2,
       tabHrefs: ["/", "/categories/hymnals"],
     };
     expect(parseDeviceSettings(JSON.stringify(stored))).toEqual(stored);
@@ -77,6 +80,25 @@ describe("parseDeviceSettings", () => {
     );
     expect(parseDeviceSettings(JSON.stringify({ presentTextScale: "big" })).presentTextScale).toBe(1);
     expect(parseDeviceSettings(JSON.stringify({ presentTheme: "sepia" })).presentTheme).toBe("dark");
+  });
+
+  it("does the same for the reading text size, which has its own range", () => {
+    expect(parseDeviceSettings(JSON.stringify({ readingTextScale: 99 })).readingTextScale).toBe(
+      MAX_READING_SCALE,
+    );
+    expect(parseDeviceSettings(JSON.stringify({ readingTextScale: 0.1 })).readingTextScale).toBe(
+      MIN_READING_SCALE,
+    );
+    expect(parseDeviceSettings(JSON.stringify({ readingTextScale: "big" })).readingTextScale).toBe(1);
+  });
+
+  // The two sizes are for different screens — a wall across a hall, and a
+  // phone in a hand — and sharing a value would make each one wrong wherever
+  // the other was set.
+  it("keeps the reading size and the present size apart", () => {
+    const stored = parseDeviceSettings(JSON.stringify({ presentTextScale: 2.5, readingTextScale: 1 }));
+    expect(stored.presentTextScale).toBe(2.5);
+    expect(stored.readingTextScale).toBe(1);
   });
 
   it("treats a bottom bar that was never customised as unset", () => {

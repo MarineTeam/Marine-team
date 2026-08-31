@@ -146,6 +146,31 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Reading text size, per device.** A− and A+ beside a hymn's words and in
+  the EPUB reader, because the moment anybody discovers a hymn is too small is
+  while they are looking at it — in a pew, which is not when somebody goes
+  hunting through a settings page. It is under **Reading** in
+  `/profile/settings` as well, and the offline screen both reads it and can
+  change it, since a hall with no signal is where the size matters most.
+  - An EPUB is scaled as a percentage, so the book's own headings and verses
+    stay in proportion instead of all collapsing to one size. A scanned PDF is
+    deliberately left out — its pages are pictures, and the reader has zoomed
+    them from the start. Present mode keeps its own separate size: a projector
+    across a hall and a phone in a hand are never the same answer.
+
+- **A hymn or a book can be shared.** A hymn is the thing here most worth
+  sending somebody — "we're singing this on Sunday" — and had no way to be
+  sent. The same buttons videos have now sit on a hymn's page and a book's,
+  and the reader's bottom bar has a **Link** button for the hymn open in front
+  of you.
+  - That one links by **number** (`/books/<id>?hymn=214`), not by page: a page
+    number means nothing to somebody holding a different edition, and stops
+    meaning anything here the moment the book is re-scanned. Only an
+    unnumbered spot falls back to its page.
+  - Not offered on a members-only hymn or book, where a link a stranger
+    can't open would be worse than no button.
+
+
 - **A service's running order can be kept on the device.** The books could
   already be saved; the sheet saying which hymns to open could not — the wrong
   way round for a hall with no signal, since the order is the thing you need
@@ -681,6 +706,14 @@ All notable changes to this project are documented here. Format follows
   the inbox, shared links, and account settings, which a member always needs.
 
 ### Fixed
+
+- **Share links carried a relative URL.** The X and Facebook buttons built
+  their href during render, where on the server there is no `location` — so
+  the markup a person actually clicked sent `/videos/some-slug` to a site with
+  no idea what that is. The origin is now learned on mount, which keeps the
+  server's markup and the first client render agreeing and corrects the links
+  before anything can be clicked. Affected series, videos and playlists, and
+  was found by putting the same buttons on hymns.
 
 - **Fixed a production `P2037` "too many connections" error** caused by
   runtime traffic sharing a direct database connection sized for a
