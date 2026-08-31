@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
+import { assignmentRole, getPlanAssignments, personName } from "@/lib/rota";
 import { PrintButton } from "@/components/print-button";
 import { SaveServiceButton } from "@/components/save-service-button";
 import { isPluginEnabled } from "@/lib/plugins";
@@ -46,14 +47,26 @@ export default async function ServicePlanPage({ params }: { params: Promise<{ id
   ]);
   if (!pluginOn || !plan) notFound();
 
-  const [downloadsOn, titles] = await Promise.all([
+  const [downloadsOn, titles, assignments] = await Promise.all([
     // Keeping the order on the device is the same permission as keeping a
     // book or a video on it. A plan belongs to no section, so this is the
     // site-wide setting rather than a scoped one.
     isPluginEnabled("downloads"),
     // A book's own title names the book, not the hymn — see planItemTitles.
     planItemTitles(plan.items),
+    getPlanAssignments(plan.id),
   ]);
+
+  // Accepted only. Somebody who hasn't answered yet, or said they can't, is
+  // not serving — and printing "asked" beside a name on a public page turns a
+  // private conversation into a notice board.
+  const serving = assignments
+    .filter((assignment) => assignment.status === "ACCEPTED")
+    .map((assignment) => ({
+      id: assignment.id,
+      name: personName(assignment.user),
+      role: assignmentRole(assignment),
+    }));
 
   const isLoggedIn = Boolean(user);
   const presentable = firstPresentableItem(plan);
@@ -104,6 +117,23 @@ export default async function ServicePlanPage({ params }: { params: Promise<{ id
           </div>
         )}
       </div>
+
+      {/* Who is serving, for everyone who opens the plan — the people are as
+          much a part of a service as the hymns. Only those who have said yes:
+          an outstanding ask is a conversation between the rota builder and
+          one person, not an announcement. */}
+      {serving.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">Serving</h2>
+          <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-sec">
+            {serving.map((person) => (
+              <li key={person.id}>
+                <span className="text-ink">{person.name}</span> — {person.role}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {plan.items.length === 0 ? (
         <p className="rounded-lg border border-dashed border-sep p-8 text-center text-sm text-sec">

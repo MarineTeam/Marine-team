@@ -23,6 +23,7 @@ import {
   getComments,
   getVideoChapters,
   getSermonNotes,
+  getOutlineAnswers,
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
@@ -47,6 +48,7 @@ import { CastButton } from "@/components/cast-button";
 import { MenuTile } from "@/components/menu-tile";
 import { CommentSection } from "@/components/comment-section";
 import { SermonNotesPanel } from "@/components/sermon-notes-panel";
+import { SermonOutline } from "@/components/sermon-outline";
 import { UpNextPanel } from "@/components/up-next-panel";
 import { PremiereCountdown } from "@/components/premiere-countdown";
 import { ViewEventBeacon } from "@/components/view-event-beacon";
@@ -204,6 +206,7 @@ export default async function VideoPage({
     upNext,
     chapters,
     sermonNotes,
+    outlineSheet,
     shareOptions,
     downloadAvailability,
   ] = await Promise.all([
@@ -216,6 +219,11 @@ export default async function VideoPage({
       upNextOn ? getUpNextVideo(video, isLoggedIn) : Promise.resolve(null),
       chaptersOn ? getVideoChapters(video.id) : Promise.resolve([]),
       sermonNotesOn && user ? getSermonNotes(user.id, video.id) : Promise.resolve([]),
+      // The sheet itself is public where the video is: a visitor can read and
+      // print it, and is told that keeping their answers needs an account.
+      sermonNotesOn && video.noteOutline && user
+        ? getOutlineAnswers(user.id, video.id, video.noteOutline)
+        : Promise.resolve({ answers: {} as Record<string, string>, outlineChanged: false }),
       shareLinksOn
         ? getShareOptions(user, {
             type: "video",
@@ -388,6 +396,19 @@ export default async function VideoPage({
             ))}
           </div>
         </section>
+      )}
+
+      {/* The sheet with gaps in it, above the member's own free notes: it is
+          the thing being filled in *during* the talk. */}
+      {sermonNotesOn && video.noteOutline && (
+        <SermonOutline
+          videoId={video.id}
+          videoTitle={video.title}
+          outline={video.noteOutline}
+          initialAnswers={outlineSheet.answers}
+          outlineChanged={outlineSheet.outlineChanged}
+          canSave={Boolean(user)}
+        />
       )}
 
       {sermonNotesOn && user && (

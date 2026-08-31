@@ -7,6 +7,7 @@ import { getShareGrants } from "@/lib/share-access";
 import { fileHref, hymnReadingOrder } from "@/lib/hymnal";
 import { excerptAround, findMatches } from "@/lib/reader";
 import { printedPage } from "@/lib/page-offset";
+import { fingerprintOutline } from "@/lib/outline";
 
 export function canAccess(memberOnly: boolean, isLoggedIn: boolean): boolean {
   return !memberOnly || isLoggedIn;
@@ -1601,6 +1602,35 @@ export async function getAnalyticsSummary(days = 30) {
       ];
     }),
   };
+}
+
+/**
+ * A member's answers to a video's note sheet, and whether the sheet has been
+ * edited since they wrote them.
+ *
+ * The comparison is what makes the answers safe to show: a gap is identified
+ * by its position, so an outline edited afterwards can leave answer three
+ * sitting against a gap it was never written for. Rather than guess, the page
+ * says so — see SermonOutlineAnswer.
+ */
+export async function getOutlineAnswers(userId: string, videoId: string, outline: string) {
+  const row = await prisma.sermonOutlineAnswer.findUnique({
+    where: { userId_videoId: { userId, videoId } },
+    select: { answers: true, outlineVersion: true },
+  });
+  if (!row) return { answers: {}, outlineChanged: false };
+
+  // Stored as JSON, so anything could be in the column; only string values
+  // are answers, and a corrupted row should read as an empty sheet rather
+  // than crash the page it is on.
+  const answers: Record<string, string> = {};
+  if (row.answers && typeof row.answers === "object" && !Array.isArray(row.answers)) {
+    for (const [key, value] of Object.entries(row.answers as Record<string, unknown>)) {
+      if (typeof value === "string") answers[key] = value;
+    }
+  }
+
+  return { answers, outlineChanged: row.outlineVersion !== fingerprintOutline(outline) };
 }
 
 // --- Recommendations -----------------------------------------------------

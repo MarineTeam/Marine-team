@@ -20,6 +20,9 @@ export const updateSchema = z
       .optional(),
     description: z.string().optional(),
     transcript: z.string().optional().nullable(),
+    // The fill-in-the-blank note sheet. Capped like the transcript is: it is
+    // a page of prose, not a book.
+    noteOutline: z.string().max(20000).optional().nullable(),
     scriptureRefs: z.array(z.string().min(1)).optional(),
     speakerId: z.string().optional().nullable(),
     seriesId: z.string().optional().nullable(),

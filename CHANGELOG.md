@@ -146,6 +146,45 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **A rota: who is serving, and whether they said yes.** A running order says
+  what is being sung; it had no way to say who is there to do it. Teams
+  (`/admin/teams`) are the groups you schedule from; the rota is built on the
+  plan itself, under the hymns.
+  - **Asking somebody notifies them**, and they answer on `/profile/rota` with
+    yes or no — a decline carrying a reason, because a "no" without one just
+    moves the conversation to text message. That answer beside each name is
+    the whole difference between a rota and a list.
+  - **Blockouts**: a member records when they're away, and whoever builds the
+    rota is warned *before* they ask rather than after. A warning, not a bar —
+    sometimes a rota is a conversation.
+  - The service page lists who is serving, **only those who said yes**: an
+    outstanding ask is a conversation between two people, not a notice board.
+  - An unanswered ask stays on a member's page after its date has passed. It
+    doesn't stop being unanswered because the day went by.
+
+- **Sermon note sheets with blanks.** The fill-in-the-blank sheet handed out at
+  the door in a great many churches, as a page in the app: an admin writes the
+  outline as plain text with underscores for the gaps, and the congregation
+  fills it in while the talk is going on and keeps it.
+  - Saved as it is typed, not on a button — somebody filling this in is
+    listening to something else, and a Save they forget loses the lot.
+  - A gap is identified by its position, so an outline edited afterwards can
+    leave an answer against a gap it was never written for. The sheet says it
+    has changed rather than quietly shuffling somebody's notes.
+
+- **Transcripts can be written automatically.** They have been hand-typed
+  since they shipped, which in practice means most videos have none and the
+  search that reads them finds nothing. **Transcribe it for me** queues a
+  video; a scheduled job takes one per run, because an hour of audio takes
+  minutes and that is longer than a request may live.
+  - It needs a speech-to-text service (`TRANSCRIBE_API_URL`) — hosted, or a
+    Whisper server in the church office, in which case no audio leaves the
+    building. Unset, the button is refused and says why.
+  - The audio goes through this server rather than the service being handed a
+    media URL: those URLs are signed and short-lived, and giving a third party
+    a key to the library is a different thing from giving it one file.
+
+
 - **A hymn can carry its credits, and the projector shows them.** CCLI
   number, words &amp; music, copyright line, key and tempo — in both places a
   hymn lives, its own row or a number inside a book. The **copyright line

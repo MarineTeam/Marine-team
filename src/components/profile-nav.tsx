@@ -7,6 +7,7 @@ import { isActivePath } from "@/lib/active-path";
 const SECTIONS = [
   { href: "/profile", label: "Overview", exact: true },
   { href: "/profile/inbox", label: "Inbox", exact: false },
+  { href: "/profile/rota", label: "Rota", exact: false },
   { href: "/profile/shared-links", label: "Shared links", exact: false },
   { href: "/profile/downloads", label: "Downloads", exact: false },
   { href: "/profile/settings", label: "Settings", exact: false },

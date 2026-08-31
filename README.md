@@ -565,6 +565,21 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   and pinned by `offline-shell.test.ts`. EPUB scaling goes through
   `rendition.themes.fontSize` as a percentage: the book's pages live in an
   iframe with their own stylesheet, so a size set outside it reaches nothing.
+- **A rota lives beside the running order**: `ServiceTeam` / `ServiceTeamMember`
+  are the pick-list, `ServiceAssignment` is one ask with its answer, and
+  `ServiceBlockout` is when somebody is away. The job is free text on the
+  assignment rather than a positions table — every church names those
+  differently — and it defaults to `""` rather than null so the unique index
+  over `(planId, userId, position)` actually constrains anything.
+- **Automatic transcription is a queue on the video row** (`transcriptStatus`),
+  drained one at a time by `/api/cron/transcribe`: an hour of audio takes
+  minutes, which outlives a request. `lib/transcribe.ts` speaks the multipart
+  `file` + `{ text }` shape every speech-to-text service implements, so the
+  deployment picks the provider — including one on its own network.
+- **A sermon note sheet is text with `___` in it** (`lib/outline.ts`), parsed
+  into segments at render. Answers are keyed by a gap's position, and the
+  outline's fingerprint travels with them so an edited sheet is reported
+  rather than silently misaligned.
 - **Hymn openings are counted in the browser** (`HymnLookup` + the beacon
   component of the same name), not on render: Next prefetches links on hover,
   so a server-side count would largely count hovering. Feeds "most looked-up

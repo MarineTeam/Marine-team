@@ -71,6 +71,9 @@ export const ADMIN_GROUPS: AdminGroup[] = [
       // A plan is a list of files, so whoever may arrange the library may
       // arrange a service — see the services API for why that's the gate.
       { href: "/admin/services", label: "Services", visible: (a) => a.canManageFiles },
+      // The people who serve at those services — same gate, since whoever
+      // arranges a service arranges who is at it.
+      { href: "/admin/teams", label: "Teams", visible: (a) => a.canManageFiles },
     ],
   },
   {

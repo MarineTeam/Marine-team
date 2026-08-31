@@ -10,6 +10,7 @@ import { ThumbnailManager } from "@/components/thumbnail-manager";
 import { CaptionsManager } from "@/components/captions-manager";
 import { ChapterManager } from "@/components/chapter-manager";
 import { TranscriptManager } from "@/components/transcript-manager";
+import { OutlineManager } from "@/components/outline-manager";
 import { ScriptureManager } from "@/components/scripture-manager";
 import {
   TargetSelect,
@@ -50,6 +51,9 @@ type Video = {
   scriptureRefs: string[];
   thumbnailPreviewUrl: string;
   transcript: string | null;
+  transcriptStatus: string | null;
+  transcriptError: string | null;
+  noteOutline: string | null;
 };
 type BunnyLibraryVideo = {
   guid: string;
@@ -765,7 +769,17 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
           )}
           {managingTranscriptId === v.id && (
             <div className="px-4 pb-4">
-              <TranscriptManager videoId={v.id} currentTranscript={v.transcript} onChange={load} />
+              <TranscriptManager
+                videoId={v.id}
+                currentTranscript={v.transcript}
+                transcriptStatus={v.transcriptStatus}
+                transcriptError={v.transcriptError}
+                onChange={load}
+              />
+              {/* The sheet the congregation fills in while this is preached.
+                  Beside the transcript because both are one block of text
+                  belonging to this talk. */}
+              <OutlineManager videoId={v.id} currentOutline={v.noteOutline} onChange={load} />
             </div>
           )}
           {managingScriptureId === v.id && (

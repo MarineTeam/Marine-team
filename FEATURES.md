@@ -195,12 +195,26 @@ A complete list of what's built. See [README.md](./README.md) for setup and
   video; the video page shows a jump-to-section list underneath the player.
   Clicking a chapter reloads the embed starting at that timestamp (Bunny's
   iframe has no seek API — see the technical note below).
-- **Transcripts** — an admin-pasted full-text transcript per video, shown in
-  a collapsible panel; when this plugin is on, `/search` also matches
-  against transcript text (weighted below a title/description match).
+- **Transcripts** — a full-text transcript per video, shown in a collapsible
+  panel; when this plugin is on, `/search` also matches against transcript
+  text (weighted below a title/description match). Pasted by an admin, or
+  **written automatically**: see below.
 - **Recommendations** — a homepage "Because you watched X" row for logged-in
   members, anchored on the series of their most recently watched video and
   reusing the same same-category/shared-tag logic as related content.
+- **Sermon note sheets** — the fill-in-the-blank sheet handed out at the door
+  in a great many churches, as a page in the app. An admin writes the outline
+  as plain text with three or more underscores marking each gap; the
+  congregation fills it in while the talk is going on, and keeps their copy.
+  - **Saved as it is typed**, not on a button: somebody filling this in is
+    listening to something else at the time, and a Save they forget is the
+    whole sheet lost.
+  - A gap is identified by its position, so an outline edited afterwards can
+    leave an answer against a gap it was never written for. Rather than guess,
+    the sheet **says it has changed** — the version it was filled in under is
+    stored with the answers.
+  - Signed-out visitors get the sheet to read, print and copy; keeping answers
+    needs an account, and it says so.
 - **Sermon notes** — a member's own private, timestamped notes on a video
   (e.g. "12:03 — great point about grace"), added while watching and
   exportable as a plain text file. The timestamp is manually entered, the
@@ -722,6 +736,33 @@ nobody has indexed still falls back to its own title.
   badges left off. Gated by the same **Downloads** switch as saving anything
   else to a device.
 
+### Who is serving (the rota)
+
+A running order says what is being sung; a rota says who is there to do it.
+Both live on the same plan.
+
+- **Teams** (`/admin/teams`) are the groups you schedule from — musicians,
+  welcome, sound, readers — each with its members and what each of them
+  usually does, which is offered as the default when they're scheduled.
+- **Building the rota** happens on the plan itself, under the hymns: pick a
+  team, pick a person, name the job. **Asking somebody sends them a
+  notification** on the same three channels as everything else (push, email if
+  they opted in, and the profile inbox that works whatever they allowed).
+- **They answer.** `/profile/rota` lists what a member has been asked to do,
+  with **Yes, I can** and **Can't make it** — and a decline can carry a
+  reason, because a "no" without one just moves the conversation to text
+  message. That answer is what the person building the rota sees beside each
+  name, and it is the whole difference between a rota and a list.
+- **When you're away.** A member can record dates they can't serve. Whoever
+  builds the rota is warned that somebody is away *before* they ask — it does
+  not stop them asking, because sometimes a rota is a conversation.
+- **On the service page**, the people serving are listed for everyone who
+  opens it — but **only those who have said yes**. An outstanding ask is a
+  conversation between two people, not a notice board.
+
+An unanswered ask stays on a member's rota page even after its date has
+passed: it doesn't stop being unanswered because the day went by.
+
 ## Present mode
 
 A hymn's words on the screen at the front of the room. **Present** sits on a
@@ -1167,6 +1208,27 @@ link.
   Transcripts plugin, which is a searchable text panel beside the video
   rather than subtitles on it.
 
+- **Automatic transcription** — **Transcribe it for me**, beside the
+  transcript box on a video. Transcripts have been hand-typed since they
+  shipped, which in practice means most videos have none and the search that
+  reads them finds nothing.
+  - It **queues rather than transcribes**: an hour of audio takes minutes,
+    which is longer than a request may live. A scheduled job takes one video
+    per run, so a backlog drains over successive runs instead of one request
+    being killed halfway. An attempt that dies leaves the video in RUNNING;
+    anything stuck there for half an hour is queued again by the next run.
+  - It needs a **speech-to-text service**, named by `TRANSCRIBE_API_URL`.
+    Any service taking a multipart POST with a `file` field and answering
+    `{ "text": ... }` works — hosted, or a Whisper server on a machine in the
+    office, in which case no audio leaves the building. Unset, the button is
+    refused and says so.
+  - The audio sent is the video's **MP4 rendition**, passed through this
+    server rather than the service being pointed at a media URL: those URLs
+    are signed and short-lived, and handing a third party a key to the library
+    is a different thing from handing it one file. A video with no MP4
+    rendition says so rather than failing obscurely, and a file over the
+    service's size limit is refused here — with the size, in a sentence —
+    rather than by somebody else's server.
 - **Comment moderation** (`/admin/comments`, needs `moderate_comments`) — a
   queue of every reported and/or hidden comment, scoped to a moderator's own
   categories/series unless they hold a site-wide `moderate_comments` grant

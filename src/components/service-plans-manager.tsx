@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { RotaBuilder } from "@/components/rota-builder";
 
 type PlannableFile = {
   id: string;
@@ -368,6 +369,13 @@ export function ServicePlansManager() {
                     />
                     Published — members can see this
                   </label>
+                </div>
+
+                {/* Below the hymns, because the order comes first and the
+                    people serving it come from it: you know you need a
+                    pianist once you know what is being sung. */}
+                <div className="border-t border-sep pt-3">
+                  <RotaBuilder planId={plan.id} />
                 </div>
               </div>
             )}

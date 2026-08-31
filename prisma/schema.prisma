@@ -150,6 +150,10 @@ model User {
   comments              Comment[]
   commentReports        CommentReport[]
   sermonNotes           SermonNote[]
+  outlineAnswers        SermonOutlineAnswer[]
+  serviceTeams          ServiceTeamMember[]
+  serviceAssignments    ServiceAssignment[]
+  serviceBlockouts      ServiceBlockout[]
   groupAssignments      GroupAssignment[]
   ratings               Rating[]
   seriesWatchLater      SeriesWatchLater[]
@@ -341,17 +345,17 @@ model Series {
 }
 
 model Video {
-  id                String             @id @default(cuid())
-  title             String
-  slug              String             @unique
-  description       String?
-  bunnyVideoId      String
-  bunnyLibraryId    String
+  id                  String                @id @default(cuid())
+  title               String
+  slug                String                @unique
+  description         String?
+  bunnyVideoId        String
+  bunnyLibraryId      String
   // Bunny stores the thumbnail under a per-video file name, which is only
   // "thumbnail.jpg" for auto-generated ones — setting a custom thumbnail
   // (via our admin UI or Bunny's dashboard) changes it. Synced from the
   // Bunny API; null falls back to the "thumbnail.jpg" default.
-  thumbnailFileName String?
+  thumbnailFileName   String?
   // Bunny's MP4-fallback state for this video, cached from the Stream API by
   // the sync routes so the download endpoint reads Postgres instead of
   // calling Bunny on every tap. Null means "never synced" — the download
@@ -360,59 +364,79 @@ model Video {
   // Per-video, not per-library: enabling MP4 Fallback in Bunny's encoding
   // settings only affects later uploads, so an older video sits at false
   // until it's re-uploaded or repackaged.
-  hasMp4Fallback    Boolean?
+  hasMp4Fallback      Boolean?
   // Bunny's `availableResolutions`, verbatim (e.g. "240p,360p,480p"). Kept as
   // the raw string so it survives Bunny adding renditions we don't know yet;
   // parseBunnyResolutions is what interprets it.
-  mp4Resolutions    String?
+  mp4Resolutions      String?
   // Full text transcript, admin-entered. Shown in a collapsible panel by
   // the Transcripts plugin and matched by search when that plugin is on.
-  transcript        String?
+  transcript          String?
+  /// Where an automatic transcription of this video has got to: null for a
+  /// video nobody has asked to transcribe, then QUEUED → RUNNING → DONE, or
+  /// FAILED with the reason in `transcriptError`.
+  ///
+  /// A column rather than a job table because there is at most one of these
+  /// per video and the video is what anybody looks at to find out. See
+  /// /api/cron/transcribe for why a queue exists at all: transcribing an hour
+  /// of audio takes minutes, which is longer than a request may live.
+  transcriptStatus    String?
+  transcriptError     String?
+  /// When the current attempt started, so one that died mid-run — a function
+  /// killed at its timeout writes nothing — can be noticed and retried rather
+  /// than sitting in RUNNING for ever.
+  transcriptStartedAt DateTime?
+  // A fill-in-the-blank note outline for this talk, written by an admin as
+  // plain text with three-or-more underscores marking each gap. Held here
+  // rather than in a table of its own for the same reason as the transcript:
+  // it is one piece of text belonging to one video. See lib/outline.ts.
+  noteOutline         String?
   // Free-form Bible references entered by the admin (e.g. "John 3:16-18"),
   // shown as chips on the video page and matched by search; also powers
   // /scripture/[book] listings, matching Series.tags' book-of-a-verse-first
   // token as the "book" for that route.
-  scriptureRefs     String[]           @default([])
-  durationSeconds   Int?
-  status            VideoStatus        @default(PROCESSING)
-  memberOnly        Boolean            @default(false)
+  scriptureRefs       String[]              @default([])
+  durationSeconds     Int?
+  status              VideoStatus           @default(PROCESSING)
+  memberOnly          Boolean               @default(false)
   // Tri-state download override — see Category.downloadEnabled. The most
   // specific level, so this wins over its series and category.
-  downloadEnabled   Boolean?
-  hidden            Boolean            @default(false)
-  published         Boolean            @default(false)
-  publishAt         DateTime?
-  unpublishAt       DateTime?
+  downloadEnabled     Boolean?
+  hidden              Boolean               @default(false)
+  published           Boolean               @default(false)
+  publishAt           DateTime?
+  unpublishAt         DateTime?
   // Soft delete — see Category.deletedAt. The Bunny Stream asset itself
   // isn't removed until the trash entry is permanently purged.
-  deletedAt         DateTime?
-  isPremiere        Boolean            @default(false)
-  position          Int                @default(0)
-  series            Series?            @relation(fields: [seriesId], references: [id], onDelete: SetNull)
-  seriesId          String?
+  deletedAt           DateTime?
+  isPremiere          Boolean               @default(false)
+  position            Int                   @default(0)
+  series              Series?               @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  seriesId            String?
   // Set only when seriesId is null: a video attached straight to a category,
   // skipping the series layer for categories that don't need it (see FileAsset.categoryId too).
-  category          Category?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  categoryId        String?
+  category            Category?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId          String?
   // Who preached/presented this video; optional since not every video is a sermon.
-  speaker           Speaker?           @relation(fields: [speakerId], references: [id], onDelete: SetNull)
-  speakerId         String?
-  watchProgress     WatchProgress[]
-  favoritedBy       VideoFavorite[]
-  comments          Comment[]
-  ratings           Rating[]
-  watchLaterBy      VideoWatchLater[]
-  viewCount         Int                @default(0)
-  reactions         Reaction[]
-  viewEvents        ViewEvent[]
-  playlistItems     PlaylistItem[]
-  viewerGroups      VideoViewerGroup[]
-  viewers           VideoViewer[]
-  chapters          Chapter[]
-  sermonNotes       SermonNote[]
-  shareLinks        ShareLink[]
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  speaker             Speaker?              @relation(fields: [speakerId], references: [id], onDelete: SetNull)
+  speakerId           String?
+  watchProgress       WatchProgress[]
+  favoritedBy         VideoFavorite[]
+  comments            Comment[]
+  ratings             Rating[]
+  watchLaterBy        VideoWatchLater[]
+  viewCount           Int                   @default(0)
+  reactions           Reaction[]
+  viewEvents          ViewEvent[]
+  playlistItems       PlaylistItem[]
+  viewerGroups        VideoViewerGroup[]
+  viewers             VideoViewer[]
+  chapters            Chapter[]
+  sermonNotes         SermonNote[]
+  outlineAnswers      SermonOutlineAnswer[]
+  shareLinks          ShareLink[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
 
   @@index([seriesId])
   @@index([categoryId])
@@ -600,19 +624,110 @@ model FileFavorite {
 /// building opens the same copy of — closer to the board at the front of the
 /// room than to anybody's library.
 model ServicePlan {
-  id          String            @id @default(cuid())
+  id          String              @id @default(cuid())
   title       String
   /// The day it is for. Nullable because a plan is often drafted before the
   /// date is settled, and the list sorts undated plans by when they were made.
   serviceDate DateTime?
   notes       String?
   /// Drafts stay off the members' list until someone is happy with the order.
-  published   Boolean           @default(false)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  published   Boolean             @default(false)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
   items       ServicePlanItem[]
+  assignments ServiceAssignment[]
 
   @@index([serviceDate])
+}
+
+/// A team that serves at a service: musicians, welcome, sound, readers.
+///
+/// Teams are the unit somebody is scheduled *on*; the job they do that week
+/// is free text on the assignment ("Piano", "Second reading"), because every
+/// church names those differently and a table of positions would be a second
+/// thing to maintain for no extra answer.
+model ServiceTeam {
+  id        String              @id @default(cuid())
+  name      String
+  /// Ordering on the admin page and on a plan, so the list reads the way the
+  /// church thinks of it rather than alphabetically.
+  position  Int                 @default(0)
+  createdAt DateTime            @default(now())
+  members   ServiceTeamMember[]
+  roles     ServiceAssignment[]
+}
+
+/// Somebody who can be scheduled on a team.
+///
+/// Membership is separate from the assignment so the scheduler has a list to
+/// pick from — the point of a rota is not typing names — and so that leaving
+/// a team doesn't erase the record of having served.
+model ServiceTeamMember {
+  id       String      @id @default(cuid())
+  team     ServiceTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId   String
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String
+  /// What they usually do, offered as the default when scheduling them.
+  position String?
+  joinedAt DateTime    @default(now())
+
+  @@unique([teamId, userId])
+  @@index([userId])
+}
+
+/// One person, on for one job, at one service.
+///
+/// The status is the whole point of a rota over a list: somebody is asked,
+/// and they say yes or no, and the person building it can see which. A
+/// decline carries its reason, because "no" without one just means the same
+/// conversation happens by text message instead.
+model ServiceAssignment {
+  id          String           @id @default(cuid())
+  plan        ServicePlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  planId      String
+  team        ServiceTeam      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  /// Empty rather than null when unspecified: a unique index over a nullable
+  /// column constrains nothing in Postgres, and this one is what stops the
+  /// same person being asked twice for the same job.
+  position    String           @default("")
+  status      AssignmentStatus @default(INVITED)
+  /// Why they said no, in their words.
+  note        String?
+  respondedAt DateTime?
+  createdAt   DateTime         @default(now())
+
+  @@unique([planId, userId, position])
+  @@index([planId])
+  @@index([userId, status])
+}
+
+enum AssignmentStatus {
+  INVITED
+  ACCEPTED
+  DECLINED
+}
+
+/// Days somebody has said they can't serve.
+///
+/// Stored as a range because that is how people say it — "we're away the
+/// first two weeks of August" — and checked when scheduling so the person
+/// building a rota is told before they ask rather than after. It is a warning
+/// and not a bar: a rota is a conversation, and sometimes you ask anyway.
+model ServiceBlockout {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  /// Inclusive, both ends: somebody away "the 3rd to the 5th" means all three.
+  startDate DateTime
+  endDate   DateTime
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, startDate])
 }
 
 /// One hymn in a service, which is one of the two shapes a hymn takes here
@@ -1291,6 +1406,32 @@ model VideoViewer {
 // while watching). The timestamp is manually entered, not synced to actual
 // playback — the same limitation as Chapters, since Bunny's embed has no
 // postMessage API to read real playback position from.
+/// One member's answers to a video's fill-in-the-blank note outline.
+///
+/// The outline is on the Video (`noteOutline`), like the transcript: it is
+/// one piece of text an admin writes. The answers are per member and stored
+/// as a map from a gap's position to what they typed.
+///
+/// Position is the only identity a gap has, which is exactly the risk when an
+/// outline is edited afterwards — insert a gap at the top and every answer
+/// below belongs to the wrong one. `outlineVersion` records what the outline
+/// said when these were written (see fingerprintOutline), so the page can say
+/// the sheet changed rather than quietly shuffling somebody's notes.
+model SermonOutlineAnswer {
+  id             String   @id @default(cuid())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  video          Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId        String
+  /// `{ "0": "unearned", "3": "free" }` — only the gaps actually filled in.
+  answers        Json
+  outlineVersion String
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, videoId])
+  @@index([videoId])
+}
+
 model SermonNote {
   id               String   @id @default(cuid())
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
