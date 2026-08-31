@@ -146,6 +146,24 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Present mode**: a hymn's words on the screen at the front of the room —
+  one verse at a time, as large as it will go, white on black with a light
+  option. **Present** on a hymn's page, or **Present this service** on a
+  service plan, which then carries on into the next hymn of the order rather
+  than sending whoever is driving back to a list between hymns.
+  - Verses come from the shape the lyrics were typed in: a blank line
+    separates them, and a block that names itself ("Chorus", "Refrain:") is
+    that rather than a numbered verse, so the numbering skips it the way the
+    printed book does.
+  - A presenter's clicker is a keyboard — PageDown/PageUp move a verse, as do
+    the arrows and the space bar — and the whole surface is a control, since
+    whoever is driving is standing at a laptop and not looking at it. The
+    chrome fades after three seconds and comes back on the first touch, key or
+    nudge of the mouse.
+  - The screen is held on (the same wake lock as the reader), text size and
+    palette are remembered per device — the projector in the hall and the
+    phone in your hand want different answers — and a hymn with no lyrics says
+    so rather than showing an empty screen.
 - **The storage figure counts books.** `/profile/downloads` showed a bar of
   how full the device was that counted videos only — while a saved hymnal is
   routinely the largest thing on the phone, sitting in the same cache out of

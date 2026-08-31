@@ -3,7 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { isPluginEnabled } from "@/lib/plugins";
-import { getServicePlan, planItemHref, planItemNumber, planItemReadable } from "@/lib/services";
+import {
+  firstPresentableItem,
+  getServicePlan,
+  planItemHref,
+  planItemNumber,
+  planItemReadable,
+} from "@/lib/services";
 
 export async function generateMetadata({
   params,
@@ -35,6 +41,7 @@ export default async function ServicePlanPage({ params }: { params: Promise<{ id
   if (!pluginOn || !plan) notFound();
 
   const isLoggedIn = Boolean(user);
+  const presentable = firstPresentableItem(plan);
   const day = plan.serviceDate
     ? plan.serviceDate.toLocaleDateString("en-GB", {
         weekday: "long",
@@ -54,6 +61,16 @@ export default async function ServicePlanPage({ params }: { params: Promise<{ id
         <h1 className="text-3xl font-bold tracking-tight text-ink">{plan.title}</h1>
         {day && <p className="mt-1 text-sm text-sec">{day}</p>}
         {plan.notes && <p className="mt-3 whitespace-pre-wrap text-sm text-sec">{plan.notes}</p>}
+        {/* Starts at the first hymn with words and carries on through the
+            order, so whoever is driving the screen never comes back here. */}
+        {presentable && (
+          <Link
+            href={`/present/${presentable.file.id}?plan=${plan.id}`}
+            className="mt-4 inline-block rounded-md border border-sep px-4 py-2 text-sm hover:bg-hover"
+          >
+            Present this service
+          </Link>
+        )}
       </div>
 
       {plan.items.length === 0 ? (

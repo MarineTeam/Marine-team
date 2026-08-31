@@ -12,6 +12,10 @@ import { parseTabHrefs } from "@/lib/nav-tabs";
 
 export type ThemePreference = "system" | "light" | "dark";
 
+/** How far present mode's type can be nudged either way (see presentTextScale). */
+export const MIN_PRESENT_SCALE = 0.5;
+export const MAX_PRESENT_SCALE = 2.5;
+
 /** Speeds offered in the settings UI; the stored value is validated against these. */
 export const PLAYBACK_SPEEDS = [0.75, 1, 1.25, 1.5, 1.75, 2] as const;
 
@@ -43,6 +47,14 @@ export type DeviceSettings = {
    */
   keepScreenAwake: boolean;
   /**
+   * How big the words are in present mode, as a multiplier on what fits the
+   * screen. Per device because it belongs to the screen: the projector in the
+   * hall and the phone in your hand want different answers.
+   */
+  presentTextScale: number;
+  /** Present mode's own palette — light on dark carries further in a dark room. */
+  presentTheme: "dark" | "light";
+  /**
    * Which icons the bottom bar carries, as hrefs, in order — see
    * lib/nav-tabs.ts. Null means the app's own suggestion, which is what
    * every device starts with.
@@ -58,6 +70,8 @@ export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
   downloadOverCellular: false,
   swipeToTurnPages: true,
   keepScreenAwake: true,
+  presentTextScale: 1,
+  presentTheme: "dark",
   tabHrefs: null,
 };
 
@@ -107,6 +121,14 @@ export function parseDeviceSettings(raw: string | null | undefined): DeviceSetti
       typeof value.keepScreenAwake === "boolean"
         ? value.keepScreenAwake
         : DEFAULT_DEVICE_SETTINGS.keepScreenAwake,
+    // Clamped rather than rejected: this is nudged by a button, and a stored
+    // value slightly outside the range should land back inside it, not reset
+    // to the default in the middle of a service.
+    presentTextScale:
+      typeof value.presentTextScale === "number" && Number.isFinite(value.presentTextScale)
+        ? Math.min(MAX_PRESENT_SCALE, Math.max(MIN_PRESENT_SCALE, value.presentTextScale))
+        : DEFAULT_DEVICE_SETTINGS.presentTextScale,
+    presentTheme: value.presentTheme === "light" ? "light" : DEFAULT_DEVICE_SETTINGS.presentTheme,
     tabHrefs: parseTabHrefs(value.tabHrefs),
   };
 }

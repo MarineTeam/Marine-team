@@ -547,6 +547,31 @@ A hymn that has since been unpublished, or one a signed-out visitor can't
 open, still appears in the order rather than leaving a gap — it is being sung
 either way — and says why it doesn't open.
 
+## Present mode
+
+A hymn's words on the screen at the front of the room. **Present** sits on a
+hymn's page; **Present this service** sits on a service plan and starts at its
+first hymn with words, carrying on through the order — whoever is driving
+never goes back to a list between hymns.
+
+- **One verse at a time**, as large as it will go, white on black with a light
+  option for a bright room. Verses come from the shape the lyrics were typed
+  in: a blank line separates them, and a block that names itself ("Chorus",
+  "Refrain:") is that rather than a numbered verse, so the numbering skips it
+  the way the printed book does.
+- **Driven from anywhere.** A presenter's clicker is a keyboard, so
+  PageDown/PageUp turn a verse, as do the arrows and the space bar; tapping
+  the right of the screen moves on, the left goes back. The chrome fades after
+  three seconds and returns on the first touch, key or nudge of the mouse.
+- **It stays awake and stays put** — the same screen lock as the reader, and
+  full screen is one button (or `F`).
+- Text size and palette are remembered **per device**, because the projector
+  in the hall and the phone in your hand want different answers.
+
+Only lyrics can be presented: a scanned book has pages, not text, so a plan
+made of book numbers offers no Present button, and a hymn with no lyrics saved
+says so rather than showing an empty screen.
+
 ## The bottom bar
 
 In the installed app the row of icons along the bottom is the only navigation

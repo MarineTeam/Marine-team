@@ -100,9 +100,20 @@ export default async function HymnPage({ params }: { params: Promise<{ fileId: s
 
           {/* Keeping a hymn is the list a worship leader actually wants, and
               it is the same button the rest of the app uses. */}
-          {favoritesOn && user && (
-            <FavoriteButton type="file" id={file.id} initialFavorited={favorited} />
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {favoritesOn && user && (
+              <FavoriteButton type="file" id={file.id} initialFavorited={favorited} />
+            )}
+            {/* Only where there are words to put on a wall. */}
+            {file.lyricsText && (
+              <Link
+                href={`/present/${file.id}`}
+                className="rounded-md border border-sep px-3 py-1.5 text-sm hover:bg-hover"
+              >
+                Present
+              </Link>
+            )}
+          </div>
 
           {file.lyricsText ? (
             <>

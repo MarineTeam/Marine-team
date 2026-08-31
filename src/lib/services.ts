@@ -27,6 +27,10 @@ const planItems = {
         title: true,
         pageNumber: true,
         memberOnly: true,
+        // Only for the question "is there anything to put on a screen?" —
+        // this is a server component's data and never reaches the browser
+        // unless something renders it.
+        lyricsText: true,
         mimeType: true,
         bunnyPath: true,
         published: true,
@@ -108,6 +112,15 @@ export function planItemReadable(
   const file = item.file;
   if (!file.published || file.hidden || file.deletedAt) return false;
   return isLoggedIn || !file.memberOnly;
+}
+
+/**
+ * The first hymn in a plan with words to project, which is where "Present
+ * this service" starts. A plan of scanned-book numbers has nothing to put on
+ * a screen and doesn't offer to.
+ */
+export function firstPresentableItem(plan: ServicePlanWithItems): ServicePlanItemWithFile | null {
+  return plan.items.find((item) => Boolean(item.file.lyricsText?.trim())) ?? null;
 }
 
 /** Files a plan can be built from: hymns and books, the two things with a page. */

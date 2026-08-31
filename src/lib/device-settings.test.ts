@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_DEVICE_SETTINGS,
+  MAX_PRESENT_SCALE,
+  MIN_PRESENT_SCALE,
   DEVICE_SETTINGS_KEY,
   parseDeviceSettings,
   THEME_INIT_SCRIPT,
@@ -24,6 +26,8 @@ describe("parseDeviceSettings", () => {
       downloadOverCellular: true,
       swipeToTurnPages: false,
       keepScreenAwake: false,
+      presentTextScale: 1.4,
+      presentTheme: "light",
       tabHrefs: ["/", "/categories/hymnals"],
     };
     expect(parseDeviceSettings(JSON.stringify(stored))).toEqual(stored);
@@ -60,6 +64,19 @@ describe("parseDeviceSettings", () => {
     expect(parseDeviceSettings("{}").keepScreenAwake).toBe(true);
     expect(parseDeviceSettings(JSON.stringify({ keepScreenAwake: 1 })).keepScreenAwake).toBe(true);
     expect(parseDeviceSettings(JSON.stringify({ keepScreenAwake: false })).keepScreenAwake).toBe(false);
+  });
+
+  it("pulls a present-mode text size back into range rather than resetting it", () => {
+    // It is nudged by a button, sometimes mid-service; landing back inside
+    // the range beats jumping to the middle.
+    expect(parseDeviceSettings(JSON.stringify({ presentTextScale: 99 })).presentTextScale).toBe(
+      MAX_PRESENT_SCALE,
+    );
+    expect(parseDeviceSettings(JSON.stringify({ presentTextScale: 0 })).presentTextScale).toBe(
+      MIN_PRESENT_SCALE,
+    );
+    expect(parseDeviceSettings(JSON.stringify({ presentTextScale: "big" })).presentTextScale).toBe(1);
+    expect(parseDeviceSettings(JSON.stringify({ presentTheme: "sepia" })).presentTheme).toBe("dark");
   });
 
   it("treats a bottom bar that was never customised as unset", () => {
