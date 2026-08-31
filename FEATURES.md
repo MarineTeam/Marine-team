@@ -496,8 +496,9 @@ What it does and doesn't touch:
   follow whatever the offset says.
 - Saved places and marks stay, and they are page numbers: a scan with
   different pagination will move where they land.
-- The cover and hymn count are cleared, because they described the old file —
-  re-run **Generate covers**.
+- The cover, hymn count and indexed contents are cleared, because they
+  described the old file — re-run **Index books**. Until then the book's hymns
+  are absent from search rather than pointing at the wrong pages.
 - A podcast episode is re-copied to the public zone from the new bytes.
 - Devices holding this book offline show **Update available** the next time
   they're on its page or `/profile/downloads`.

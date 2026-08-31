@@ -101,7 +101,7 @@ export function countOutlineLeaves(items: PdfOutlineItems): number {
 const COVER_WIDTH = 240;
 const COVER_QUALITY = 0.6;
 
-/** What an admin's "Generate covers" pass derives from a book, for storing on its row. */
+/** What an admin's "Index books" pass derives from a book, for storing on its row. */
 export type DerivedBookCard = { coverDataUrl: string; hymnCount: number };
 
 /** Everything that pass derives in one opening of the book: the card, and its contents. */

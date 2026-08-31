@@ -13,7 +13,7 @@ export type BookCardData = {
   locked: boolean;
   /** An uploaded cover, which wins over everything below. */
   coverImageUrl: string | null;
-  /** A cover already derived from the PDF and stored on the row — see "Generate covers". */
+  /** A cover already derived from the PDF and stored on the row — see "Index books". */
   coverDataUrl: string | null;
   /** The PDF to fall back to, drawing the cover and counting hymns live; null when there's nothing to read. */
   coverFileId: string | null;

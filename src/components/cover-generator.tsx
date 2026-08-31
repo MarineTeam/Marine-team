@@ -86,7 +86,7 @@ export function CoverGenerator({
 
     setFailed(problems);
     setResult(
-      `Generated ${targets.length - problems.length} of ${targets.length}` +
+      `Indexed ${targets.length - problems.length} of ${targets.length}` +
         (problems.length > 0 ? ` — ${problems.length} couldn't be read` : ""),
     );
     setRunning(false);
@@ -95,7 +95,11 @@ export function CoverGenerator({
 
   return (
     <div className="rounded-lg border border-sep p-4">
-      <div className="flex flex-wrap items-center gap-3">
+      <h3 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">
+        Book covers &amp; hymn index
+      </h3>
+
+      <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={() => generate(missing)}
@@ -103,10 +107,10 @@ export function CoverGenerator({
           className="rounded-md border border-sep px-3 py-1.5 text-sm disabled:opacity-50"
         >
           {running
-            ? `Generating… ${done}/${missing.length}`
+            ? `Indexing… ${done}/${missing.length}`
             : missing.length === 0
-              ? "All covers generated"
-              : `Generate ${missing.length} cover${missing.length === 1 ? "" : "s"}`}
+              ? "All books indexed"
+              : `Index ${missing.length} book${missing.length === 1 ? "" : "s"}`}
         </button>
         {!running && files.length > missing.length && (
           <button
@@ -121,10 +125,11 @@ export function CoverGenerator({
       </div>
 
       <p className="mt-2 text-xs text-sec">
-        Draws each PDF&apos;s first page as its cover, counts its bookmarked hymns, and reads its
-        contents into the search index — so a hymn inside a scanned book can be found by name from
-        anywhere, and visitors get a thumbnail with the page instead of each browser opening the PDF
-        to work it out.
+        Reads each PDF&apos;s contents into the search index — so a hymn inside a scanned book can be
+        found by name or number from its hymnal section and from search — and draws its first page as
+        a cover, so visitors get a thumbnail with the page instead of each browser opening the PDF to
+        work it out. Run this once after adding a book; a hymnal section shows no search box until at
+        least one of its books has been indexed.
       </p>
 
       {failed.length > 0 && (

@@ -82,7 +82,7 @@ export function FileReplace({
       setPicked(null);
       setObjects(null);
       setChosenPath("");
-      setDone("Replaced. Re-run “Generate covers” to redraw this book's cover and hymn count.");
+      setDone("Replaced. Re-run “Index books” to redraw this book's cover and re-read its contents.");
       await onReplaced();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't replace this file");
