@@ -2,6 +2,7 @@ import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { publishedNow } from "@/lib/content";
 import { fileHref } from "@/lib/hymnal";
+import { hymnLabelWithout } from "@/lib/toc-nav";
 
 /**
  * The running order of hymns for a service.
@@ -117,6 +118,49 @@ export function planItemReadable(
   const file = item.file;
   if (!file.published || file.hidden || file.deletedAt) return false;
   return isLoggedIn || !file.memberOnly;
+}
+
+/**
+ * What each hymn in a plan is actually called.
+ *
+ * A plan item points at a file and, for a whole-book hymnal, a number. The
+ * file's title is the *book's* — so a running order built from one reads
+ * "214 Church Hymn Book, 302 Church Hymn Book", which is no use on a printed
+ * sheet or in a hall with no signal. The book's indexed contents know the
+ * hymn's name, so they are asked, once, for the whole plan.
+ *
+ * Keyed `fileId:number`. A book that has never been indexed simply isn't in
+ * the map and the caller falls back to the file's title, which is what was
+ * shown before there was anything better.
+ */
+export async function planItemTitles(
+  items: { hymnNumber: number | null; file: { id: string } }[],
+): Promise<Map<string, string>> {
+  const wanted = items.filter((item) => item.hymnNumber !== null);
+  if (wanted.length === 0) return new Map();
+
+  const entries = await prisma.bookHymn.findMany({
+    where: { OR: wanted.map((item) => ({ fileId: item.file.id, number: item.hymnNumber })) },
+    select: { fileId: true, number: true, title: true },
+  });
+
+  return new Map(
+    entries.map((entry) => [
+      `${entry.fileId}:${entry.number}`,
+      // The number is shown in its own column beside this everywhere a plan
+      // is listed, so it comes off the label here.
+      hymnLabelWithout(entry.title, entry.number as number),
+    ]),
+  );
+}
+
+/** What to call one item, given the map above. */
+export function planItemTitle(
+  item: { hymnNumber: number | null; file: { id: string; title: string } },
+  titles: Map<string, string>,
+): string {
+  if (item.hymnNumber === null) return item.file.title;
+  return titles.get(`${item.file.id}:${item.hymnNumber}`) ?? item.file.title;
 }
 
 /**

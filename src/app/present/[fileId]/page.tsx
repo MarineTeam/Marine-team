@@ -6,6 +6,7 @@ import { getServicePlan, planItemNumber, presentHref } from "@/lib/services";
 import { splitVerses } from "@/lib/verses";
 import { hymnNumberOf } from "@/lib/toc-nav";
 import { Presenter, type PresentNeighbour } from "@/components/presenter";
+import { HymnLookup } from "@/components/hymn-lookup";
 
 export async function generateMetadata({
   params,
@@ -90,15 +91,20 @@ export default async function PresentPage({
       .join(" · ") || null;
 
   return (
-    <Presenter
-      title={hymn ? hymn.title : file.title}
-      subtitle={subtitle}
-      verses={splitVerses(hymn ? hymn.lyricsText : file.lyricsText)}
-      // Out of present mode goes back where it was entered from: the service
-      // being led, the book the hymn is in, or the hymn's own page.
-      backHref={plan ? `/services/${plan.id}` : hymn ? `/books/${file.id}` : `/hymns/${file.id}`}
-      previous={neighbour(-1)}
-      next={neighbour(1)}
-    />
+    <>
+      {/* Putting a hymn on the wall is the strongest signal there is that it
+          was sung; counted like any other opening. */}
+      <HymnLookup fileId={file.id} number={hymn?.number ?? null} source="present" />
+      <Presenter
+        title={hymn ? hymn.title : file.title}
+        subtitle={subtitle}
+        verses={splitVerses(hymn ? hymn.lyricsText : file.lyricsText)}
+        // Out of present mode goes back where it was entered from: the service
+        // being led, the book the hymn is in, or the hymn's own page.
+        backHref={plan ? `/services/${plan.id}` : hymn ? `/books/${file.id}` : `/hymns/${file.id}`}
+        previous={neighbour(-1)}
+        next={neighbour(1)}
+      />
+    </>
   );
 }

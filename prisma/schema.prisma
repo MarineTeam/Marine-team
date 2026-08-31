@@ -763,6 +763,7 @@ model FileAsset {
   hymns           BookHymn[]
   hymnLyrics      BookHymnLyric[]
   pages           BookPage[]
+  lookups         HymnLookup[]
 
   @@index([seriesId])
   @@index([categoryId])
@@ -1170,6 +1171,36 @@ model ViewEvent {
   @@index([seriesId, createdAt])
   @@index([videoId, createdAt])
   @@index([createdAt])
+}
+
+/// A hymn somebody actually opened.
+///
+/// Distinct from ViewEvent, which counts series and videos: a hymn is neither.
+/// It is also two different things — a file of its own, or a number inside a
+/// whole-book hymnal — so both are recorded here, `number` telling them apart
+/// (see lib/hymnal.ts for the split).
+///
+/// Written from the browser rather than when a page renders, because Next
+/// prefetches links on hover: a server-side count would mostly measure mice
+/// moving over a list. What that costs is honesty about the failure — an ad
+/// blocker or a closed tab means a lookup goes unrecorded — which is the
+/// right trade for a number nothing depends on except an admin's sense of
+/// what the congregation sings.
+model HymnLookup {
+  id        String    @id @default(cuid())
+  file      FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileId    String
+  /// The number on the board, for a hymn inside a book; null for a hymn that
+  /// is its own file, which the file itself identifies.
+  number    Int?
+  /// Where it was opened from — "hymn", "book", "reader", "present" — so a
+  /// count can be read knowing what kind of opening it counts.
+  source    String
+  userId    String?
+  createdAt DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([fileId, number, createdAt])
 }
 
 // Granular content-viewing access, layered on top of the plain `memberOnly`

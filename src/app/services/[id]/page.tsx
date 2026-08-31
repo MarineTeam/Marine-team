@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
+import { PrintButton } from "@/components/print-button";
+import { SaveServiceButton } from "@/components/save-service-button";
 import { isPluginEnabled } from "@/lib/plugins";
 import {
   firstPresentableItem,
@@ -11,6 +13,8 @@ import {
   planItemHref,
   planItemNumber,
   planItemReadable,
+  planItemTitle,
+  planItemTitles,
 } from "@/lib/services";
 
 export async function generateMetadata({
@@ -42,6 +46,15 @@ export default async function ServicePlanPage({ params }: { params: Promise<{ id
   ]);
   if (!pluginOn || !plan) notFound();
 
+  const [downloadsOn, titles] = await Promise.all([
+    // Keeping the order on the device is the same permission as keeping a
+    // book or a video on it. A plan belongs to no section, so this is the
+    // site-wide setting rather than a scoped one.
+    isPluginEnabled("downloads"),
+    // A book's own title names the book, not the hymn — see planItemTitles.
+    planItemTitles(plan.items),
+  ]);
+
   const isLoggedIn = Boolean(user);
   const presentable = firstPresentableItem(plan);
   const day = plan.serviceDate
@@ -55,7 +68,7 @@ export default async function ServicePlanPage({ params }: { params: Promise<{ id
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-10">
-      <Link href="/services" className="text-sm text-sec hover:underline">
+      <Link href="/services" className="no-print text-sm text-sec hover:underline">
         ← Services
       </Link>
 
@@ -65,13 +78,30 @@ export default async function ServicePlanPage({ params }: { params: Promise<{ id
         {plan.notes && <p className="mt-3 whitespace-pre-wrap text-sm text-sec">{plan.notes}</p>}
         {/* Starts at the first hymn with words and carries on through the
             order, so whoever is driving the screen never comes back here. */}
-        {presentable && (
-          <Link
-            href={presentHref(presentable, plan.id)}
-            className="mt-4 inline-block rounded-md border border-sep px-4 py-2 text-sm hover:bg-hover"
-          >
-            Present this service
-          </Link>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {presentable && (
+            <Link
+              href={presentHref(presentable, plan.id)}
+              className="no-print rounded-md border border-sep px-4 py-2 text-sm hover:bg-hover"
+            >
+              Present this service
+            </Link>
+          )}
+          {/* For whoever would rather hand out the numbers than a phone.
+              The sheet is this page without the app around it — see the
+              print rules in globals.css. */}
+          {plan.items.length > 0 && <PrintButton label="Print the order" />}
+        </div>
+        {/* Below the row of actions rather than in it: it has its own state
+            to report — saved, changed since, removed — and a button that
+            grows a sentence underneath doesn't belong in a row of buttons. */}
+        {plan.items.length > 0 && downloadsOn && (
+          <div className="mt-3">
+            <SaveServiceButton
+              planId={plan.id}
+              hasBooks={plan.items.some((item) => item.hymnNumber !== null)}
+            />
+          </div>
         )}
       </div>
 
@@ -80,7 +110,7 @@ export default async function ServicePlanPage({ params }: { params: Promise<{ id
           No hymns listed for this service yet.
         </p>
       ) : (
-        <ol className="divide-y divide-sep rounded-lg border border-sep">
+        <ol className="print-plain divide-y divide-sep rounded-lg border border-sep">
           {plan.items.map((item) => {
             const href = planItemHref(item);
             const number = planItemNumber(item);
@@ -91,11 +121,15 @@ export default async function ServicePlanPage({ params }: { params: Promise<{ id
                   {number ?? ""}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">{item.file.title}</span>
+                  <span className="block truncate text-sm font-medium">
+                    {planItemTitle(item, titles)}
+                  </span>
                   {item.note && <span className="block text-xs text-sec">{item.note}</span>}
                 </span>
+                {/* Why a row doesn't open is a fact about the app, not about
+                    the service, so it stays off the printed sheet. */}
                 {!readable && (
-                  <span className="shrink-0 text-xs text-ter">
+                  <span className="no-print shrink-0 text-xs text-ter">
                     {item.file.memberOnly && !isLoggedIn ? "Members only" : "Unavailable"}
                   </span>
                 )}
@@ -117,7 +151,7 @@ export default async function ServicePlanPage({ params }: { params: Promise<{ id
                 {readable && planItemPresentable(item) && (
                   <Link
                     href={presentHref(item, plan.id)}
-                    className="mr-3 shrink-0 rounded border border-sep px-2 py-1 text-xs text-sec hover:bg-hover"
+                    className="no-print mr-3 shrink-0 rounded border border-sep px-2 py-1 text-xs text-sec hover:bg-hover"
                   >
                     Present
                   </Link>

@@ -2,8 +2,9 @@
 // notifications. Deliberately does NOT cache pages/API responses — this
 // site's content is dynamic and often auth-gated, so an aggressive cache
 // would risk showing stale or wrong-audience content offline. It only
-// caches its own static shell assets, plus the videos and books a member
-// explicitly saved (see the /offline-video/ and /offline-book/ handlers
+// caches its own static shell assets, plus the videos, books and service
+// orders a member explicitly saved (see the /offline-video/, /offline-book/
+// and /offline-service/ handlers
 // below), which are deliberate, member-initiated copies rather than
 // opportunistic caching.
 //
@@ -28,6 +29,11 @@ const BOOK_PATH_PREFIX = "/offline-book/";
 // A hymn-per-file book is saved as its list of hymns rather than as a file,
 // and lives in the same cache under its own path.
 const HYMNAL_PATH_PREFIX = "/offline-hymnal/";
+// A service's running order (src/lib/offline-services.ts). Its own cache
+// rather than the books' one: a plan is kept for a particular Sunday and
+// thrown away after it, and clearing one shouldn't take the other with it.
+const SERVICE_CACHE = "marine-team-services-v1";
+const SERVICE_PATH_PREFIX = "/offline-service/";
 // The reader libraries, saved into the book cache alongside the first book
 // that needs them so the offline shell has something to draw a page with.
 const VIEWER_PATH_PREFIXES = ["/pdfjs/", "/epubjs/"];
@@ -49,7 +55,13 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key !== CACHE_NAME && key !== DOWNLOAD_CACHE && key !== BOOK_CACHE)
+            .filter(
+              (key) =>
+                key !== CACHE_NAME &&
+                key !== DOWNLOAD_CACHE &&
+                key !== BOOK_CACHE &&
+                key !== SERVICE_CACHE,
+            )
             .map((key) => caches.delete(key)),
         ),
       )
@@ -100,18 +112,20 @@ self.addEventListener("fetch", (event) => {
   if (
     url.pathname.startsWith(DOWNLOAD_PATH_PREFIX) ||
     url.pathname.startsWith(BOOK_PATH_PREFIX) ||
-    url.pathname.startsWith(HYMNAL_PATH_PREFIX)
+    url.pathname.startsWith(HYMNAL_PATH_PREFIX) ||
+    url.pathname.startsWith(SERVICE_PATH_PREFIX)
   ) {
     const isVideo = url.pathname.startsWith(DOWNLOAD_PATH_PREFIX);
-    const isHymnal = url.pathname.startsWith(HYMNAL_PATH_PREFIX);
+    const isService = url.pathname.startsWith(SERVICE_PATH_PREFIX);
+    const isJson = isService || url.pathname.startsWith(HYMNAL_PATH_PREFIX);
     event.respondWith(
       respondFromCache(
-        isVideo ? DOWNLOAD_CACHE : BOOK_CACHE,
+        isVideo ? DOWNLOAD_CACHE : isService ? SERVICE_CACHE : BOOK_CACHE,
         url.pathname,
         event.request,
         isVideo
           ? "video/mp4"
-          : isHymnal
+          : isJson
             ? "application/json"
             : url.pathname.endsWith(".epub")
               ? "application/epub+zip"

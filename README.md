@@ -552,6 +552,17 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   book nobody has read), and `hymnsMatchingPages` attributes a matching page
   to the contents entry it falls inside, so a section search still returns
   hymns rather than page numbers.
+- **A service's running order can be kept on the device** (`lib/offline-services.ts`,
+  `/api/offline/service/[id]`): its own Cache Storage cache and localStorage
+  index rather than the books' ones, since a plan is kept for one Sunday and
+  thrown away after it. Fingerprinted with the shared `lib/fingerprint.ts` over
+  what is actually handed out, so a `?probe=1` request answers "is the order I
+  saved still the order" without re-fetching it. The offline shell renders it,
+  and opens a hymn whose book is also saved.
+- **Hymn openings are counted in the browser** (`HymnLookup` + the beacon
+  component of the same name), not on render: Next prefetches links on hover,
+  so a server-side count would largely count hovering. Feeds "most looked-up
+  hymns" in the admin analytics.
 - **The bottom bar** is per device: `getShellNav` returns both the app's
   suggested `tabs` and every destination this viewer could choose
   (`tabOptions`), and `src/lib/nav-tabs.ts` resolves a stored list of hrefs

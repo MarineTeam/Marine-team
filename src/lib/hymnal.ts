@@ -1,4 +1,5 @@
 import { readerFormat } from "@/lib/reader";
+import { fingerprintLines } from "@/lib/fingerprint";
 import type { BookCardData } from "@/components/book-card";
 
 /**
@@ -91,27 +92,17 @@ export function hymnReadingOrder<T extends { pageNumber: number | null }>(files:
  * is that answer: computed the same way on the server (for the current book)
  * and stored with the copy (for the saved one), and compared.
  *
- * FNV-1a rather than a real digest: this is a change detector, not a
- * security boundary, and it has to run synchronously in both places. It
- * covers everything that changes what someone reads — the hymns present,
- * their order, their numbers, their titles and their words.
+ * What it covers is the point: everything that changes what somebody reads —
+ * the hymns present, their order, their numbers, their titles and their
+ * words. The hashing itself is shared with anything else kept on a device
+ * (see lib/fingerprint.ts).
  */
 export function fingerprintHymns(
   hymns: { id: string; title: string; pageNumber: number | null; lyricsText: string }[],
 ): string {
-  let hash = 0x811c9dc5;
-  for (const hymn of hymns) {
-    const line = `${hymn.id}|${hymn.pageNumber ?? ""}|${hymn.title}|${hymn.lyricsText}\n`;
-    for (let i = 0; i < line.length; i++) {
-      hash ^= line.charCodeAt(i);
-      // The FNV prime, by shifts: a plain multiply overflows into a float and
-      // stops being the same function.
-      hash = (hash + ((hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24))) >>> 0;
-    }
-  }
-  // The count travels with it so two books can't collide into looking
-  // identical on a hash alone.
-  return `${hymns.length}-${hash.toString(16)}`;
+  return fingerprintLines(
+    hymns.map((hymn) => `${hymn.id}|${hymn.pageNumber ?? ""}|${hymn.title}|${hymn.lyricsText}\n`),
+  );
 }
 
 /** The PDFs among a set of files — the only kind of file that can be a book. */

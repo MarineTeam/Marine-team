@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BOOK_CACHE, VIEWER_ASSETS, offlineBookUrl, offlineHymnalUrl } from "./offline-books";
 import { DOWNLOAD_CACHE, downloadCacheUrl } from "./offline-downloads";
+import { SERVICE_CACHE, offlineServiceUrl } from "./offline-services";
 import { DEVICE_SETTINGS_KEY } from "./device-settings";
 import { NAV_TABS_SNAPSHOT_KEY } from "./nav-tabs";
 import { hymnNumberOf } from "./toc-nav";
@@ -25,8 +26,10 @@ describe("the offline shell's copied constants", () => {
   it("opens the caches the app writes", () => {
     expect(shell).toContain(`"${DOWNLOAD_CACHE}"`);
     expect(shell).toContain(`"${BOOK_CACHE}"`);
+    expect(shell).toContain(`"${SERVICE_CACHE}"`);
     expect(worker).toContain(`"${DOWNLOAD_CACHE}"`);
     expect(worker).toContain(`"${BOOK_CACHE}"`);
+    expect(worker).toContain(`"${SERVICE_CACHE}"`);
   });
 
   it("reads the storage keys the app writes", () => {
@@ -34,6 +37,7 @@ describe("the offline shell's copied constants", () => {
     // and the theme — every localStorage key the shell touches.
     expect(shell).toContain('"marine-downloads-index"');
     expect(shell).toContain('"marine-offline-books"');
+    expect(shell).toContain('"marine-offline-services"');
     expect(shell).toContain(`"${NAV_TABS_SNAPSHOT_KEY}"`);
     expect(shell).toContain('"marine-toc-v1:"');
     expect(shell).toContain(`"${DEVICE_SETTINGS_KEY}"`);
@@ -45,9 +49,11 @@ describe("the offline shell's copied constants", () => {
     expect(offlineBookUrl("x")).toBe("/offline-book/x.pdf");
     expect(offlineBookUrl("x", "epub")).toBe("/offline-book/x.epub");
     expect(offlineHymnalUrl("x")).toBe("/offline-hymnal/x.json");
+    expect(offlineServiceUrl("x")).toBe("/offline-service/x.json");
     expect(worker).toContain('"/offline-video/"');
     expect(worker).toContain('"/offline-book/"');
     expect(worker).toContain('"/offline-hymnal/"');
+    expect(worker).toContain('"/offline-service/"');
   });
 
   it("loads the reader libraries from where they are saved", () => {

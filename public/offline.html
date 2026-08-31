@@ -118,6 +118,7 @@
  *   marine-nav-tabs        the bottom bar the app last drew (lib/nav-tabs.ts)
  *   marine-offline-books   books saved to this device (lib/offline-books.ts)
  *   marine-downloads-index videos saved to this device (lib/offline-downloads.ts)
+ *   marine-offline-services service orders saved here (lib/offline-services.ts)
  *   marine-toc-v1:<id>     a book's contents list (lib/reader-cache.ts)
  *
  * Those constants are literals rather than imports for the same reason the
@@ -132,6 +133,8 @@ const VIDEO_INDEX_KEY = "marine-downloads-index";
 const DOWNLOAD_CACHE = "marine-team-downloads-v1";
 const BOOK_INDEX_KEY = "marine-offline-books";
 const BOOK_CACHE = "marine-team-books-v1";
+const SERVICE_INDEX_KEY = "marine-offline-services";
+const SERVICE_CACHE = "marine-team-services-v1";
 const TABS_KEY = "marine-nav-tabs";
 const TOC_PREFIX = "marine-toc-v1:";
 const PDFJS_URL = "/pdfjs/pdf.min.mjs";
@@ -199,6 +202,29 @@ function writeBooks(items) {
   try {
     localStorage.setItem(BOOK_INDEX_KEY, JSON.stringify(items));
   } catch (e) {}
+}
+
+function readServices() {
+  const items = readJson(SERVICE_INDEX_KEY, []);
+  return Array.isArray(items) ? items.filter((item) => item && item.id && item.cacheUrl) : [];
+}
+
+function writeServices(items) {
+  try {
+    localStorage.setItem(SERVICE_INDEX_KEY, JSON.stringify(items));
+  } catch (e) {}
+}
+
+/** The day a service is for, as a person reads it. */
+function formatServiceDate(iso) {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 }
 
 /**
@@ -312,6 +338,7 @@ function renderLibrary() {
   const scoped = booksIn(scopePath);
   const books = scoped.length > 0 ? scoped : readBooks();
   const videos = readVideos();
+  const plans = readServices();
   const scopeLabel = scoped.length > 0 ? labelFor(scoped[0], scopePath) : null;
 
   view.appendChild(el("h1", null, scopeLabel || "Saved on this device"));
@@ -319,7 +346,7 @@ function renderLibrary() {
     el(
       "p",
       "sub",
-      books.length > 0 || videos.length > 0
+      books.length > 0 || videos.length > 0 || plans.length > 0
         ? "These open with no connection at all."
         : "Nothing is saved here yet.",
     ),
@@ -332,6 +359,13 @@ function renderLibrary() {
     view.appendChild(list);
   }
 
+  if (plans.length > 0) {
+    view.appendChild(el("h2", null, plans.length === 1 ? "Service" : "Services"));
+    const list = el("ul");
+    plans.forEach((plan) => list.appendChild(serviceRow(plan)));
+    view.appendChild(list);
+  }
+
   if (videos.length > 0) {
     view.appendChild(el("h2", null, "Videos"));
     view.appendChild(playerNode());
@@ -340,12 +374,12 @@ function renderLibrary() {
     view.appendChild(list);
   }
 
-  if (books.length === 0 && videos.length === 0) {
+  if (books.length === 0 && videos.length === 0 && plans.length === 0) {
     view.appendChild(
       el(
         "p",
         "empty",
-        "Connect, then use “Save for offline” on a book, or the download button on a video, to keep it here.",
+        "Connect, then use “Save for offline” on a book, “Keep this order offline” on a service, or the download button on a video, to keep it here.",
       ),
     );
   } else if (scoped.length > 0 && readBooks().length > scoped.length) {
@@ -396,6 +430,121 @@ function bookRow(book) {
   actions.appendChild(remove);
   li.appendChild(actions);
   return li;
+}
+
+// -------------------------------------------------------- one service --
+function serviceRow(plan) {
+  const li = el("li");
+  const open = el("button", "rowlink");
+  const meta = el("div", "meta");
+  meta.appendChild(el("div", "title", plan.title || "Service"));
+  const bits = [];
+  const day = formatServiceDate(plan.serviceDate);
+  if (day) bits.push(day);
+  if (plan.itemCount) bits.push(plan.itemCount + (plan.itemCount === 1 ? " hymn" : " hymns"));
+  meta.appendChild(el("div", "detail", bits.join(" · ")));
+  open.appendChild(meta);
+  open.addEventListener("click", () => renderService(plan));
+
+  const remove = el("button", "remove", "Remove");
+  remove.addEventListener("click", async () => {
+    if (!window.confirm('Remove "' + (plan.title || "this service") + '" from this device?')) return;
+    try {
+      const cache = await caches.open(SERVICE_CACHE);
+      await cache.delete(plan.cacheUrl);
+    } catch (e) {}
+    writeServices(readServices().filter((item) => item.id !== plan.id));
+    renderLibrary();
+  });
+
+  li.appendChild(open);
+  const actions = el("div", "actions");
+  actions.appendChild(remove);
+  li.appendChild(actions);
+  return li;
+}
+
+/**
+ * The running order, and as much of each hymn as this device actually holds.
+ *
+ * The plan is two kilobytes and the books are forty megabytes, so the common
+ * case is a device that has the order but not everything in it. Each row says
+ * which it is rather than offering a button that would do nothing.
+ */
+async function renderService(plan) {
+  teardownReader();
+  view.innerHTML = "";
+  const back = el("button", null, "← Back");
+  back.addEventListener("click", renderLibrary);
+  view.appendChild(back);
+
+  view.appendChild(el("h1", null, plan.title || "Service"));
+  const day = formatServiceDate(plan.serviceDate);
+  if (day) view.appendChild(el("p", "sub", day));
+
+  let saved;
+  try {
+    saved = await (await fetch(plan.cacheUrl)).json();
+  } catch (e) {
+    // The browser evicted it under storage pressure; the index still lists it.
+    view.appendChild(el("p", "empty", "This service's order is no longer on this device."));
+    return;
+  }
+
+  if (saved.notes) view.appendChild(el("p", "sub", saved.notes));
+
+  const items = Array.isArray(saved.items) ? saved.items : [];
+  if (items.length === 0) {
+    view.appendChild(el("p", "empty", "No hymns were listed for this service."));
+    return;
+  }
+
+  const books = readBooks();
+  const list = el("ul");
+  list.style.marginTop = "12px";
+
+  items.forEach((item) => {
+    const li = el("li");
+    const row = el("button", "rowlink");
+    const meta = el("div", "meta");
+    const heading = el("div", "title");
+    // The number on the board leads the row, the way it does on the sheet.
+    heading.textContent = (item.number ? item.number + ". " : "") + (item.title || "Hymn");
+    meta.appendChild(heading);
+
+    // A hymn inside a whole book: the book has to be on the device, and its
+    // contents have to have been saved with it, or there is no page to open.
+    const book = item.hymnNumber !== null && item.hymnNumber !== undefined
+      ? books.find((candidate) => candidate.id === item.fileId && candidate.kind === "file")
+      : null;
+    const toc = book ? readToc(book) : null;
+    const entry =
+      toc && item.hymnNumber
+        ? toc.find((candidate) => hymnNumberOf(candidate.label) === item.hymnNumber && candidate.location !== null)
+        : null;
+
+    const bits = [];
+    if (item.note) bits.push(item.note);
+    if (item.hymnNumber !== null && item.hymnNumber !== undefined) {
+      if (!book) bits.push("Book not on this device");
+      else if (!entry) bits.push("Saved, but its contents weren't");
+    }
+    if (bits.length > 0) meta.appendChild(el("div", "detail", bits.join(" · ")));
+    row.appendChild(meta);
+
+    if (entry && book) {
+      row.addEventListener("click", () => openBook(book, entry.location, toc));
+    } else {
+      // Nothing to open: a hymn of its own is a lyrics page this shell has no
+      // copy of, and a book that isn't here can't be opened by wanting it.
+      row.disabled = true;
+    }
+
+    li.appendChild(row);
+    list.appendChild(li);
+  });
+
+  view.appendChild(list);
 }
 
 // ----------------------------------------------------------- one book --

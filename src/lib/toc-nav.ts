@@ -104,6 +104,22 @@ export function hymnNumberOf(label: string): number | null {
 }
 
 /**
+ * A contents label with its leading hymn number taken off.
+ *
+ * A book prints "214 Amazing Grace" in its contents and its number in a
+ * column beside the title everywhere the app lists one, so showing the label
+ * as stored puts the number twice. Only the number this asks about is
+ * removed — a label that starts with a different number is left alone rather
+ * than silently retitled, since the mismatch means the assumption is wrong.
+ */
+export function hymnLabelWithout(label: string, hymnNumber: number): string {
+  if (hymnNumberOf(label) !== hymnNumber) return label;
+  // The same shapes hymnNumberOf reads, plus the punctuation a contents page
+  // separates the number from the title with.
+  return label.replace(/^\s*(?:hymn\s+no\.?|hymn|no\.?|#)?\s*\d{1,4}\s*[.)\-—:]?\s*/i, "").trim() || label;
+}
+
+/**
  * Which contents entry is that hymn, or null if the book doesn't list one.
  *
  * The first match wins: a book that numbers two entries the same (a hymn and

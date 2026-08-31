@@ -13,7 +13,7 @@ function toCsv(rows: Record<string, unknown>[]): string {
   return [headers.join(","), ...rows.map((row) => headers.map((h) => escape(row[h])).join(","))].join("\n");
 }
 
-/** Exports the top-series/top-videos analytics for a given window as CSV or JSON. */
+/** Exports the top series, videos and hymns for a given window as CSV or JSON. */
 export async function GET(request: NextRequest) {
   try {
     const user = await ensureStaff();
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const days = Number(searchParams.get("days")) || 30;
     const format = searchParams.get("format") === "csv" ? "csv" : "json";
 
-    const { totalViews, topSeries, topVideos } = await getAnalyticsSummary(days);
+    const { totalViews, topSeries, topVideos, topHymns } = await getAnalyticsSummary(days);
     const rows = [
       ...topSeries.map((r) => ({ type: "series", title: r.series.title, views: r.views, watchThroughRate: "" })),
       ...topVideos.map((r) => ({
@@ -30,6 +30,14 @@ export async function GET(request: NextRequest) {
         title: r.video.title,
         views: r.views,
         watchThroughRate: r.completionRate != null ? Math.round(r.completionRate * 100) : "",
+      })),
+      // Openings, not views — the same column because it is the same
+      // question ("what gets used"), asked of a third kind of thing.
+      ...topHymns.map((r) => ({
+        type: "hymn",
+        title: r.book ? `${r.title} — ${r.book}` : r.title,
+        views: r.lookups,
+        watchThroughRate: "",
       })),
     ];
 

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAdjacentHymns, getReadableFile, canViewFile, isFileFavorited } from "@/lib/content";
 import { FavoriteButton } from "@/components/favorite-button";
+import { HymnLookup } from "@/components/hymn-lookup";
 import { KeepAwake } from "@/components/keep-awake";
 import { getCurrentUser } from "@/lib/current-user";
 import { isPluginEnabled } from "@/lib/plugins";
@@ -79,6 +80,9 @@ export default async function HymnPage({ params }: { params: Promise<{ fileId: s
         </div>
       ) : (
         <>
+          {/* Counted in the browser rather than on the server: a hymn list
+              prefetches its links, and a render is not an opening. */}
+          <HymnLookup fileId={file.id} source="hymn" />
           <div>
             <div className="flex flex-wrap items-baseline gap-2">
               <h1 className="text-3xl font-bold tracking-tight text-ink">{file.title}</h1>

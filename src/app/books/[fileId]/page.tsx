@@ -12,6 +12,7 @@ import { FavoriteButton } from "@/components/favorite-button";
 import { getCurrentUser } from "@/lib/current-user";
 import { readerFormat } from "@/lib/reader";
 import { BookContents } from "@/components/book-contents";
+import { HymnLookup } from "@/components/hymn-lookup";
 import { SaveBookButton } from "@/components/save-book-button";
 import { bookCacheTag } from "@/lib/reader-cache";
 import { getPluginStates } from "@/lib/plugins";
@@ -123,6 +124,11 @@ export default async function BookPage({
               pageOffset={file.pageOffset}
               sizeBytes={file.sizeBytes}
             />
+          )}
+          {/* A link that named a hymn — a service plan's row — is somebody
+              looking that hymn up, whatever page it turns out to be on. */}
+          {Number(hymn) > 0 && (
+            <HymnLookup fileId={file.id} number={Number(hymn)} source="book" />
           )}
           <BookContents
             fileId={file.id}

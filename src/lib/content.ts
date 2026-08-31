@@ -651,7 +651,7 @@ export async function searchContent(query: string, isLoggedIn: boolean, filters:
     item: {
       id: hymn.id,
       title: hymn.title,
-      href: `/read/${hymn.fileId}?page=${hymn.page}`,
+      href: hymnHref(hymn.fileId, hymn.page, hymn.number),
       // The number on the board where the book prints one; the page it is on
       // otherwise.
       pageNumber: hymn.number ?? printedPage(hymn.page, hymn.file.pageOffset),
@@ -741,6 +741,11 @@ export type FileSearchHit = Awaited<ReturnType<typeof searchContent>>["files"][n
  * an outline's depth-0 entries in a nested book are "Praise", "Advent", and
  * you can't sing those.
  */
+/** Where a hymn inside a book opens: its page, and which hymn that page is. */
+function hymnHref(fileId: string, page: number, number: number | null): string {
+  return `/read/${fileId}?page=${page}${number === null ? "" : `&hymn=${number}`}`;
+}
+
 /**
  * Hymns inside whole-book hymnals whose *words* match, with the line that did.
  *
@@ -927,7 +932,10 @@ export async function searchHymnsInCategory(
     number: hymn.number,
     // Stored in PDF pages; shown as the book prints them.
     printedPage: printedPage(hymn.page, hymn.file.pageOffset),
-    href: `/read/${hymn.fileId}?page=${hymn.page}`,
+    // The number rides along so the reader knows *which hymn* was opened and
+    // not merely which page — see HymnLookup. It changes nothing about where
+    // the link lands.
+    href: hymnHref(hymn.fileId, hymn.page, hymn.number),
     bookId: hymn.fileId,
     bookTitle: hymn.file.series?.title ?? hymn.file.title,
     /** The line that matched, for a hymn found by its words rather than its title. */
@@ -1474,7 +1482,7 @@ export const getTrendingSeries = unstable_cache(getTrendingSeriesUncached, ["tre
 export async function getAnalyticsSummary(days = 30) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-  const [totalViews, topSeriesGrouped, topVideosGrouped] = await Promise.all([
+  const [totalViews, topSeriesGrouped, topVideosGrouped, topHymnsGrouped] = await Promise.all([
     prisma.viewEvent.count({ where: { createdAt: { gte: since } } }),
     prisma.viewEvent.groupBy({
       by: ["seriesId"],
@@ -1488,6 +1496,17 @@ export async function getAnalyticsSummary(days = 30) {
       where: { videoId: { not: null }, createdAt: { gte: since } },
       _count: { videoId: true },
       orderBy: { _count: { videoId: "desc" } },
+      take: 10,
+    }),
+    // A hymn is neither a series nor a video, and is counted separately (see
+    // HymnLookup). Grouped by both columns because the two shapes of hymn
+    // share this table: a file on its own has no number, and a book has one
+    // row per number rather than one for the whole book.
+    prisma.hymnLookup.groupBy({
+      by: ["fileId", "number"],
+      where: { createdAt: { gte: since } },
+      _count: { _all: true },
+      orderBy: { _count: { id: "desc" } },
       take: 10,
     }),
   ]);
@@ -1509,6 +1528,26 @@ export async function getAnalyticsSummary(days = 30) {
   ]);
   const seriesMap = new Map(seriesById.map((s) => [s.id, s]));
   const videoMap = new Map(videosById.map((v) => [v.id, v]));
+
+  // What to call each looked-up hymn. A file of its own is titled by its row;
+  // a number inside a book is titled by that book's contents, and falls back
+  // to the number when the book has since been re-indexed without it.
+  const [hymnFiles, hymnEntries] = await Promise.all([
+    prisma.fileAsset.findMany({
+      where: { id: { in: [...new Set(topHymnsGrouped.map((g) => g.fileId))] } },
+      select: { id: true, title: true, series: { select: { title: true } } },
+    }),
+    prisma.bookHymn.findMany({
+      where: {
+        OR: topHymnsGrouped
+          .filter((g) => g.number !== null)
+          .map((g) => ({ fileId: g.fileId, number: g.number })),
+      },
+      select: { fileId: true, number: true, title: true },
+    }),
+  ]);
+  const hymnFileMap = new Map(hymnFiles.map((file) => [file.id, file]));
+  const hymnEntryMap = new Map(hymnEntries.map((entry) => [`${entry.fileId}:${entry.number}`, entry.title]));
   // Fraction of this window's watchers who reached the end, per video —
   // reuses the same heartbeat data that already powers "Continue watching"
   // and resume-on-return, so this costs one extra groupBy pair, not a new
@@ -1536,6 +1575,25 @@ export async function getAnalyticsSummary(days = 30) {
         (r): r is { video: NonNullable<typeof r.video>; views: number; completionRate: number | null } =>
           Boolean(r.video),
       ),
+    topHymns: topHymnsGrouped.flatMap((group) => {
+      const file = hymnFileMap.get(group.fileId);
+      // A hymn whose file has been deleted since keeps no row here: there is
+      // nothing left to name it by.
+      if (!file) return [];
+      const title =
+        group.number === null
+          ? file.title
+          : (hymnEntryMap.get(`${group.fileId}:${group.number}`) ?? `Hymn ${group.number}`);
+      return [
+        {
+          key: `${group.fileId}:${group.number ?? ""}`,
+          title,
+          number: group.number,
+          book: group.number === null ? (file.series?.title ?? null) : file.title,
+          lookups: group._count._all,
+        },
+      ];
+    }),
   };
 }
 

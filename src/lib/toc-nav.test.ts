@@ -3,6 +3,7 @@ import {
   countNumberedEntries,
   currentTocIndex,
   findHymnIndex,
+  hymnLabelWithout,
   hymnNumberOf,
   nextTocIndex,
   previousTocIndex,
@@ -134,5 +135,25 @@ describe("countNumberedEntries", () => {
   it("counts only the entries a number can be typed for", () => {
     expect(countNumberedEntries([{ label: "Praise" }, { label: "1. Holy" }, { label: "2 Grace" }])).toBe(2);
     expect(countNumberedEntries([{ label: "Chapter One" }, { label: "Chapter Two" }])).toBe(0);
+  });
+});
+
+describe("hymnLabelWithout", () => {
+  it("takes the number off a contents label, so it isn't shown twice", () => {
+    expect(hymnLabelWithout("214 Amazing Grace", 214)).toBe("Amazing Grace");
+    expect(hymnLabelWithout("214. Amazing Grace", 214)).toBe("Amazing Grace");
+    expect(hymnLabelWithout("No. 214 — Amazing Grace", 214)).toBe("Amazing Grace");
+    expect(hymnLabelWithout("Hymn 214: Amazing Grace", 214)).toBe("Amazing Grace");
+  });
+
+  // The mismatch means the caller's assumption about this label is wrong, and
+  // guessing would retitle somebody's hymn.
+  it("leaves a label alone when it starts with a different number", () => {
+    expect(hymnLabelWithout("215 Amazing Grace", 214)).toBe("215 Amazing Grace");
+    expect(hymnLabelWithout("Amazing Grace", 214)).toBe("Amazing Grace");
+  });
+
+  it("keeps a label that is nothing but its number", () => {
+    expect(hymnLabelWithout("214", 214)).toBe("214");
   });
 });

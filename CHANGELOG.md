@@ -146,6 +146,43 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **A service's running order can be kept on the device.** The books could
+  already be saved; the sheet saying which hymns to open could not — the wrong
+  way round for a hall with no signal, since the order is the thing you need
+  first and it is two kilobytes against a hymnal's forty megabytes.
+  - **Keep this order offline** on a service's page saves it; the offline
+    screen then lists it with its day, its notes and every hymn, and a hymn
+    whose book is also on the device opens that book at it. One whose book
+    isn't says so on the row instead of offering a button that does nothing.
+  - A running order gets reordered up to Saturday night, so a saved copy is
+    checked when the page is opened: one that has changed since says **Order
+    changed — update** rather than being quietly wrong in somebody's hands.
+  - Its own cache and index rather than the books' ones, so clearing one kind
+    of saved thing never takes another with it.
+
+- **A service order can be printed.** For whoever would rather hand out the
+  numbers than a phone: the plan, its day, its notes and the hymns, with the
+  app's header, rail, tab bar, buttons and "members only" badges left off the
+  sheet.
+
+- **Each row of a plan is named by the hymn, not the book it is in.** A plan
+  item points at a file and a number, and a file's title is the book's — so an
+  order built from one hymnal read "214 Church Hymn Book, 302 Church Hymn
+  Book" on screen, on paper and offline. The book's indexed contents know what
+  214 is called, so they are asked; a book nobody has indexed still falls back
+  to its own title.
+
+- **Most looked-up hymns, in the admin analytics.** What a hymn list can't
+  tell you is what the congregation actually sings. Counted when a hymn is
+  genuinely opened — its own page, a book opened at its number, or put on the
+  projector — and named by the book's contents rather than by the book.
+  - Counted in the browser rather than when a page renders, because Next
+    prefetches links on hover and a server-side count would largely be a
+    count of mice. The cost is the other direction: a blocked request means
+    an opening goes uncounted, which is the right way round for a number
+    nothing depends on. Included in the analytics CSV export.
+
+
 - **A book with no bookmarks can have its contents typed in.** Most cheaply
   scanned hymnals are six hundred images and nothing else: the indexing pass
   finds no outline, stores nothing, and the section stays without a search

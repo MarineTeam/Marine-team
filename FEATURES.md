@@ -610,6 +610,11 @@ network, and it is now a small app of its own rather than a list of videos:
 - **Or a hymnal's hymns, then one hymn's lyrics**, for a hymn-per-file book —
   searchable, grouped, and steppable with Back and Next. A link to a single
   hymn (`/hymns/<id>`) opens it directly when its book is on the device.
+- **A saved service's running order.** The books are forty megabytes; the
+  sheet saying which hymns to open is two kilobytes, and it is the thing you
+  need first. Each hymn is listed with its number, its name and any note, and
+  a hymn whose book is on this device opens that book at it. One whose book
+  isn't says so on the row rather than offering a button that does nothing.
 - **Downloaded videos**, exactly as before.
 
 The **in-app** reader survives the connection dropping while it is open, too:
@@ -642,6 +647,29 @@ it stays a draft until somebody is happy with the order.
 A hymn that has since been unpublished, or one a signed-out visitor can't
 open, still appears in the order rather than leaving a gap — it is being sung
 either way — and says why it doesn't open.
+
+Each row is named by the **hymn**, not the book it is in. A plan item points
+at a file and a number, and the file's title is the book's — so an order built
+from one hymnal used to read "214 Church Hymn Book, 302 Church Hymn Book". The
+book's indexed contents know what 214 is called, so they are asked. A book
+nobody has indexed still falls back to its own title.
+
+### Taking the order with you
+
+- **Keep this order offline** saves the running order to the device. It is a
+  couple of kilobytes against a hymnal's forty megabytes, so it is worth doing
+  on the way out of the house; the books themselves are saved separately, from
+  their own pages, and the button says so rather than implying it took them
+  too. With no connection, the plan is on the offline screen, and a hymn whose
+  book is also saved opens straight to it.
+- A running order gets reordered up to Saturday night, so a saved copy is
+  checked against the server whenever the page is opened: a plan that has
+  changed since says **Order changed — update** rather than being quietly
+  wrong in somebody's hands.
+- **Print the order** hands the whole thing to paper — the numbers, the names
+  and the notes, with the app's chrome, its buttons and its "members only"
+  badges left off. Gated by the same **Downloads** switch as saving anything
+  else to a device.
 
 ## Present mode
 
@@ -1159,7 +1187,17 @@ link.
   omitted entirely (not shown as 0%) for a video with no progress recorded
   in the window, so a stale view count can't be paired with a misleadingly
   precise 0%.
-- **Export CSV** downloads the same top-series/top-videos data for the
+- **Most looked-up hymns** answers the question a hymn list can't: what does
+  this congregation actually sing? Counted when a hymn is really opened — its
+  own page, a book opened at its number, or put on the projector — and named
+  by the book's indexed contents, so a whole-book hymn reads as itself rather
+  than as its book.
+  - Counted **in the browser**, not when a page renders: hovering a link
+    prefetches it, so a server-side count would largely be a count of mice.
+    The honest cost is the other direction — a blocked request means an
+    opening goes uncounted — which is the right way round for a number
+    nothing depends on.
+- **Export CSV** downloads the same top series, videos and hymns for the
   selected window as a CSV (or JSON) file, for pulling into a spreadsheet or
   a board report.
 

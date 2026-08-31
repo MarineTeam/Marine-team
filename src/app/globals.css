@@ -193,3 +193,61 @@ body {
 .btn-primary:hover:not(:disabled) {
   filter: brightness(1.08);
 }
+
+/*
+ * Printing.
+ *
+ * One page in this app is genuinely printed: a service's running order, for
+ * the people who would rather hold the numbers than a phone. Everything that
+ * is chrome on screen is noise on paper — the header, the rail, the tab bar,
+ * the buttons that do nothing once printed — so this hides them rather than
+ * asking that page to know about all of them.
+ *
+ * `print-only` is the inverse: a heading or a line of credit that is worth
+ * having on the sheet and would be clutter on the screen.
+ */
+@media print {
+  /* The app's own furniture, by element rather than by class: the header,
+     the rail and the footer are each one of these, and naming the elements
+     means a page's chrome doesn't have to be tagged to be left off paper. */
+  body > div > aside,
+  header,
+  footer,
+  .app-tabbar,
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .app-main {
+    padding: 0 !important;
+  }
+
+  /* Paper is white whatever the reader's theme is, and a dark background
+     printed is a page of ink nobody asked for. */
+  :root {
+    background: #fff;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  /* Rules that carry meaning on screen are heavy on paper at full strength. */
+  .print-plain {
+    border-color: #ccc !important;
+  }
+
+  /* A hymn and its number belong on the same sheet as each other. */
+  li {
+    break-inside: avoid;
+  }
+}
+
+.print-only {
+  display: none;
+}
