@@ -6,6 +6,7 @@ import { isPluginEnabled } from "@/lib/plugins";
 import { getShareGrants } from "@/lib/share-access";
 import { fileHref, hymnReadingOrder } from "@/lib/hymnal";
 import { excerptAround, findMatches } from "@/lib/reader";
+import { printedPage } from "@/lib/page-offset";
 
 export function canAccess(memberOnly: boolean, isLoggedIn: boolean): boolean {
   return !memberOnly || isLoggedIn;
@@ -504,7 +505,8 @@ export async function searchContent(query: string, isLoggedIn: boolean, filters:
     ? { OR: [{ categoryId: filters.categoryId }, { series: { categoryId: filters.categoryId } }] }
     : {};
 
-  const [categories, seriesCandidates, videoCandidates, fileCandidates] = await Promise.all([
+  const [categories, seriesCandidates, videoCandidates, fileCandidates, bookHymnCandidates] =
+    await Promise.all([
     filters.categoryId || filters.speakerId
       ? Promise.resolve([])
       : prisma.category.findMany({
@@ -582,6 +584,27 @@ export async function searchContent(query: string, isLoggedIn: boolean, filters:
           },
           take: 50,
         }),
+    // Hymns *inside* a scanned book, from the contents an admin indexed.
+    // Without these, searching "It Is Well" finds it only where somebody has
+    // typed the lyrics — never in the hymnal it is actually printed in.
+    filters.speakerId
+      ? Promise.resolve([])
+      : prisma.bookHymn.findMany({
+          where: {
+            AND: [
+              { file: { ...where, ...fileCategoryFilter } },
+              /^\d{1,4}$/.test(q)
+                ? { OR: [{ number: Number(q) }, { title: { contains: q, mode: "insensitive" } }] }
+                : { title: { contains: q, mode: "insensitive" } },
+            ],
+          },
+          include: {
+            file: {
+              select: { id: true, title: true, pageOffset: true, series: { select: { title: true } } },
+            },
+          },
+          take: 30,
+        }),
   ]);
 
   let series = seriesCandidates
@@ -604,6 +627,20 @@ export async function searchContent(query: string, isLoggedIn: boolean, filters:
   // contents. An audio handout is a row with a download button under its
   // series — search already finds that series, and a result that led nowhere
   // in particular would be worse than none.
+  const bookHymnHits = bookHymnCandidates.map((hymn) => ({
+    item: {
+      id: hymn.id,
+      title: hymn.title,
+      href: `/read/${hymn.fileId}?page=${hymn.page}`,
+      // The number on the board where the book prints one; the page it is on
+      // otherwise.
+      pageNumber: hymn.number ?? printedPage(hymn.page, hymn.file.pageOffset),
+      context: hymn.file.series?.title ?? hymn.file.title,
+      excerpt: null as string | null,
+    },
+    score: relevanceScore(q, hymn.title, null),
+  }));
+
   const files = fileCandidates
     .map((file) => {
       const href = fileHref(file);
@@ -626,6 +663,9 @@ export async function searchContent(query: string, isLoggedIn: boolean, filters:
       };
     })
     .filter((hit): hit is NonNullable<typeof hit> => hit !== null)
+    // One list, because to whoever is searching they are all hymns: some have
+    // their own page with the words on it, some are a line in a scanned book.
+    .concat(bookHymnHits)
     .sort((a, b) => b.score - a.score)
     .slice(0, 20)
     .map((hit) => hit.item);
@@ -664,6 +704,83 @@ export async function searchContent(query: string, isLoggedIn: boolean, filters:
 
 /** One hymn or book in a set of search results. */
 export type FileSearchHit = Awaited<ReturnType<typeof searchContent>>["files"][number];
+
+/**
+ * Hymns inside the books of one section, by name or by number.
+ *
+ * This is the search a hymnal category needs and couldn't have: a hymn in a
+ * scanned book exists only in that PDF's bookmarks, so before those were
+ * resolved and stored (see BookHymn) there was nothing to look in — six books
+ * meant six PDFs to parse, and nobody waits for that to find out which one
+ * has "It Is Well".
+ *
+ * A number is matched as a number: typing 214 finds hymn 214 rather than
+ * everything with 214 anywhere in its title. Section headings are skipped —
+ * an outline's depth-0 entries in a nested book are "Praise", "Advent", and
+ * you can't sing those.
+ */
+export async function searchHymnsInCategory(
+  categoryId: string,
+  query: string,
+  isLoggedIn: boolean,
+  limit = 40,
+) {
+  const q = query.trim();
+  if (!q) return [];
+  const asNumber = /^\d{1,4}$/.test(q) ? Number(q) : null;
+
+  const hymns = await prisma.bookHymn.findMany({
+    where: {
+      AND: [
+        {
+          file: {
+            ...publishedNow(),
+            ...guestFilter(isLoggedIn),
+            OR: [{ categoryId }, { series: { categoryId } }],
+          },
+        },
+        asNumber === null
+          ? { title: { contains: q, mode: "insensitive" } }
+          : { OR: [{ number: asNumber }, { title: { contains: q, mode: "insensitive" } }] },
+      ],
+    },
+    include: {
+      file: {
+        select: { id: true, title: true, pageOffset: true, series: { select: { title: true } } },
+      },
+    },
+    // The number first when there is one, so hymn 214 leads its own results.
+    orderBy: [{ number: "asc" }, { position: "asc" }],
+    take: limit,
+  });
+
+  // Section headings are left in rather than guessed at: they carry a page
+  // like anything else, "Advent" is a reasonable thing to search for, and the
+  // only way to tell a heading from a hymn in a flat outline is whether it
+  // has a number — which is what the number search already keys on.
+  return hymns.map((hymn) => ({
+    id: hymn.id,
+    title: hymn.title,
+    number: hymn.number,
+    // Stored in PDF pages; shown as the book prints them.
+    printedPage: printedPage(hymn.page, hymn.file.pageOffset),
+    href: `/read/${hymn.fileId}?page=${hymn.page}`,
+    bookId: hymn.fileId,
+    bookTitle: hymn.file.series?.title ?? hymn.file.title,
+  }));
+}
+
+/** Whether a section has any book contents to search yet, for what the box says when it doesn't. */
+export async function categoryHasIndexedBooks(categoryId: string): Promise<boolean> {
+  const indexed = await prisma.fileAsset.count({
+    where: {
+      ...publishedNow(),
+      contentsIndexedAt: { not: null },
+      OR: [{ categoryId }, { series: { categoryId } }],
+    },
+  });
+  return indexed > 0;
+}
 
 // --- Comments ----------------------------------------------------------------
 

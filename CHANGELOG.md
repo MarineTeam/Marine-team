@@ -146,6 +146,24 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **A hymnal section can be searched, across every book in it.** The hymns of
+  a scanned hymnal live in that PDF's own bookmarks, which only a browser with
+  the file open can resolve — so a category holding six books couldn't be
+  searched at all, and nobody waits for six PDFs to be parsed to find out
+  which one has "It Is Well". An admin now resolves each book's contents once
+  (the file list's indexing pass, which already opens every book to draw its
+  cover) and they are stored as `BookHymn` rows.
+  - **One box on the section's page** searches every indexed book in it, as
+    you type, by name or by number — 214 finds hymn 214 rather than everything
+    with "214" in it — and each result opens the reader at that page. Section
+    headings are searchable too; "Advent" is a place worth going.
+  - **The site search finds them as well.** "It Is Well" used to be findable
+    only where somebody had typed the lyrics out; now it is found in the
+    hymnal it is actually printed in, in the same **Hymns & books** list.
+  - Pages are stored as PDF pages like everything else about a position in a
+    book, so correcting a book's page offset relabels the results without
+    reindexing. A section whose books haven't been indexed shows no box rather
+    than an empty one.
 - **Present mode**: a hymn's words on the screen at the front of the room —
   one verse at a time, as large as it will go, white on black with a light
   option. **Present** on a hymn's page, or **Present this service** on a

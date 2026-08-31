@@ -104,12 +104,21 @@ const COVER_QUALITY = 0.6;
 /** What an admin's "Generate covers" pass derives from a book, for storing on its row. */
 export type DerivedBookCard = { coverDataUrl: string; hymnCount: number };
 
+/** Everything that pass derives in one opening of the book: the card, and its contents. */
+export type DerivedBook = DerivedBookCard & { contents: TocEntry[] };
+
 /**
- * Draws a book's first page to a JPEG data URL and counts its bookmarks —
- * the same two things a BookCard works out live when nothing is stored,
- * done once so every later visitor is served the results instead.
+ * Draws a book's first page to a JPEG data URL, counts its bookmarks, and
+ * resolves its contents to page numbers — everything a book's row can hold,
+ * from one opening of the file.
+ *
+ * The first two a BookCard works out live when nothing is stored; the third
+ * nobody could, at least not usefully. Resolving a contents list means a
+ * lookup per bookmark into the PDF's page tree, which is why it is done here,
+ * once, by an admin, rather than by every browser that wants to search a
+ * shelf of hymnals.
  */
-export async function derivePdfBookCard(fileUrl: string): Promise<DerivedBookCard> {
+export async function derivePdfBook(fileUrl: string): Promise<DerivedBook> {
   const task = await openPdfMetadataTask(fileUrl);
   try {
     const doc = await task.promise;
@@ -130,6 +139,7 @@ export async function derivePdfBookCard(fileUrl: string): Promise<DerivedBookCar
     return {
       coverDataUrl: canvas.toDataURL("image/jpeg", COVER_QUALITY),
       hymnCount: outline ? countOutlineLeaves(outline) : 0,
+      contents: outline ? await resolvePdfOutline(doc, outline) : [],
     };
   } finally {
     void task.destroy();

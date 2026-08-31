@@ -474,6 +474,39 @@ model VideoFavorite {
   @@index([videoId])
 }
 
+/// One line of a book's own contents — a hymn in a scanned hymnal — resolved
+/// once and stored, so it can be searched.
+///
+/// Every browser could read these itself (and `/books/[id]` still does, from
+/// the PDF's embedded bookmarks) but only for a book it has already opened,
+/// after seconds of resolving destinations. A hymnal category holding six
+/// books can't be searched that way at all: nobody waits for six PDFs to be
+/// parsed to find out which one has "It Is Well". So an admin resolves them
+/// once — in a browser, since that is where pdf.js runs — and the result
+/// lives here, where a query can reach every book at once.
+///
+/// `page` is a PDF page, like everything else stored about a book's position
+/// (see lib/page-offset.ts): the printed number is worked out for display, so
+/// correcting a book's offset relabels these without reindexing.
+model BookHymn {
+  id       String    @id @default(cuid())
+  file     FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileId   String
+  /// The label exactly as the book's contents print it.
+  title    String
+  /// The number in front of that label, when it has one — what goes up on the
+  /// board, and what somebody types. See hymnNumberOf in lib/toc-nav.ts.
+  number   Int?
+  page     Int
+  /// Nesting in the outline, so a section heading can be told from a hymn.
+  depth    Int       @default(0)
+  position Int
+
+  @@index([fileId])
+  @@index([number])
+  @@index([title])
+}
+
 // A member's bookmark of a file — a hymn, or a whole book. Series and videos
 // have had this from the start; a hymnal's hymns are the thing this app gets
 // looked things up in most, and had no way to be kept in a list.
@@ -594,21 +627,21 @@ model WatchProgress {
 }
 
 model FileAsset {
-  id               String    @id @default(cuid())
-  title            String
-  bunnyPath        String
-  url              String
-  sizeBytes        Int?
-  mimeType         String?
-  memberOnly       Boolean   @default(false)
-  hidden           Boolean   @default(false)
-  published        Boolean   @default(true)
-  publishAt        DateTime?
-  unpublishAt      DateTime?
+  id                String    @id @default(cuid())
+  title             String
+  bunnyPath         String
+  url               String
+  sizeBytes         Int?
+  mimeType          String?
+  memberOnly        Boolean   @default(false)
+  hidden            Boolean   @default(false)
+  published         Boolean   @default(true)
+  publishAt         DateTime?
+  unpublishAt       DateTime?
   // Soft delete — see Category.deletedAt. The Bunny Storage object itself
   // isn't removed until the trash entry is permanently purged.
-  deletedAt        DateTime?
-  position         Int       @default(0)
+  deletedAt         DateTime?
+  position          Int       @default(0)
   // The three below apply only inside a hymnPerFile series, where this file
   // is one hymn rather than a whole book.
   //
@@ -616,13 +649,13 @@ model FileAsset {
   // hymn-list.tsx and driving its "Page" sort — distinct from `position`
   // above, which drives drag-reorder and isn't necessarily the same
   // sequence (printed page numbers can skip).
-  pageNumber       Int?
+  pageNumber        Int?
   // Free-text topical grouping (e.g. "Praise", "Prayer") for hymn-list's
   // "Category" sort. Unrelated to the Category model.
-  groupLabel       String?
+  groupLabel        String?
   // Formatted lyrics shown on this hymn's page; when null that page falls
   // back to the PDF reader/download as its primary view.
-  lyricsText       String?
+  lyricsText        String?
   // How many PDF pages sit in front of this book's printed page 1 — its
   // front matter. Applies to a whole-book PDF, unlike the three above.
   //
@@ -631,7 +664,7 @@ model FileAsset {
   // where a number is shown to or typed by a person, so a hymn on the
   // book's page 45 is listed and reached as 45 rather than as 55. See
   // lib/page-offset.ts.
-  pageOffset       Int       @default(0)
+  pageOffset        Int       @default(0)
   // A small JPEG data URL of this book's first page, and how many hymns its
   // bookmarks list — both derived from the PDF once by an admin (see
   // "Generate covers" in the file manager) rather than by every visitor's
@@ -641,31 +674,36 @@ model FileAsset {
   // the row: a deleted file takes its thumbnail with it, with no orphan
   // left in Bunny for a later purge to miss. Kept small for the same reason
   // — these travel with every listing that renders a book grid.
-  coverDataUrl     String?
-  hymnCount        Int?
+  coverDataUrl      String?
+  hymnCount         Int?
+  /// When this book's own contents were last read into BookHymn rows, or
+  /// null for a book nobody has indexed yet. Shown in the admin so it is
+  /// obvious which books are searchable.
+  contentsIndexedAt DateTime?
   // The admin's *intent* to publish this as a podcast episode, set from the
   // admin file list. Deliberately separate from publicPath below, which is
   // the *state*: a file can be intended for the podcast while temporarily
   // not mirrored (its series was flipped members-only, it was unpublished),
   // and flipping that back restores it without the admin re-ticking anything.
-  podcastPublished Boolean   @default(false)
+  podcastPublished  Boolean   @default(false)
   // Where this file's public copy lives in the separate public storage zone,
   // or null when it isn't mirrored. Never derived from bunnyPath — a
   // podcast enclosure URL is only ever built from a value actually written
   // here after a successful copy, so a file that failed to mirror is absent
   // from the feed rather than advertised at a URL that 404s.
-  publicPath       String?
-  series           Series?   @relation(fields: [seriesId], references: [id], onDelete: SetNull)
-  seriesId         String?
+  publicPath        String?
+  series            Series?   @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  seriesId          String?
   // Set only when seriesId is null: a file attached straight to a category (see Video.categoryId).
-  category         Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  categoryId       String?
-  createdAt        DateTime  @default(now())
+  category          Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId        String?
+  createdAt         DateTime  @default(now())
 
   readingProgress ReadingProgress[]
   readingMarks    ReadingMark[]
   favoritedBy     FileFavorite[]
   servicePlanned  ServicePlanItem[]
+  hymns           BookHymn[]
 
   @@index([seriesId])
   @@index([categoryId])

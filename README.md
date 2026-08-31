@@ -521,6 +521,14 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     and plugin checks as the page) and they are cached as JSON under
     `/offline-hymnal/<id>.json`. Both kinds share one index, discriminated by
     `kind`.
+- **A book's contents are indexed server-side** into `BookHymn` rows by the
+  admin's cover/index pass (`derivePdfBook` resolves the outline in the
+  browser, since that is where pdf.js runs, and PUTs it to
+  `/api/admin/files/[id]/contents`, which parses the hymn number with the same
+  `hymnNumberOf` the reader uses). That is what lets `searchHymnsInCategory`
+  answer across a whole shelf, and lets `searchContent` find a hymn printed
+  inside a scanned book. Pages are stored as PDF pages; the printed number is
+  derived at the edge, as everywhere else.
 - **The bottom bar** is per device: `getShellNav` returns both the app's
   suggested `tabs` and every destination this viewer could choose
   (`tabOptions`), and `src/lib/nav-tabs.ts` resolves a stored list of hrefs

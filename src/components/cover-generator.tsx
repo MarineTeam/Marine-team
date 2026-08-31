@@ -1,26 +1,33 @@
 "use client";
 
 import { useState } from "react";
-import { derivePdfBookCard, fileContentUrl } from "@/lib/pdf-client";
+import { derivePdfBook, fileContentUrl } from "@/lib/pdf-client";
 
 export type CoverCandidate = {
   id: string;
   title: string;
   coverDataUrl: string | null;
+  /** Null for a book whose contents have never been read into the index. */
+  contentsIndexedAt: string | null;
 };
 
 /**
- * Derives book covers and hymn counts once, here, instead of in every
- * visitor's browser.
+ * Derives what a book's row can hold — its cover, its hymn count and its
+ * contents — once, here, instead of in every visitor's browser.
  *
  * Without a stored cover a book card opens its PDF to draw the first page
  * and count bookmarks — cheap per card, but paid again by every visitor on
  * every page load, since file bytes are deliberately served uncacheable.
  * Running this once turns that into a thumbnail that ships with the page.
  *
- * Deliberately client-side: rendering a PDF page needs a canvas, and doing
- * it in a serverless function would mean shipping a headless canvas build
- * to run what the admin's browser can already do.
+ * The contents are the reason this now matters more than a thumbnail: a
+ * hymn inside a scanned book exists only in that PDF's bookmarks, so until
+ * they are resolved and stored, no search can see it and a category of six
+ * hymnals can't be searched at all.
+ *
+ * Deliberately client-side: rendering a page and resolving an outline both
+ * need pdf.js, and doing it in a serverless function would mean shipping a
+ * headless canvas build to run what the admin's browser can already do.
  */
 export function CoverGenerator({
   files,
@@ -34,7 +41,9 @@ export function CoverGenerator({
   const [failed, setFailed] = useState<string[]>([]);
   const [result, setResult] = useState<string | null>(null);
 
-  const missing = files.filter((f) => !f.coverDataUrl);
+  // A book missing either half needs the pass: they come from one opening of
+  // the file, so there is no sense in doing them separately.
+  const missing = files.filter((f) => !f.coverDataUrl || !f.contentsIndexedAt);
   if (files.length === 0) return null;
 
   async function generate(targets: CoverCandidate[]) {
@@ -48,13 +57,27 @@ export function CoverGenerator({
     // once would compete for memory and the same connection for no gain.
     for (const file of targets) {
       try {
-        const derived = await derivePdfBookCard(fileContentUrl(file.id));
+        const { contents, ...card } = await derivePdfBook(fileContentUrl(file.id));
         const res = await fetch(`/api/admin/files/${file.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(derived),
+          body: JSON.stringify(card),
         });
         if (!res.ok) throw new Error((await res.json()).error ?? "Save failed");
+
+        // Sent separately because it is a different shape of thing — rows of
+        // its own, replaced whole — rather than more columns on the row.
+        const indexed = await fetch(`/api/admin/files/${file.id}/contents`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            // An entry whose destination never resolved has no page to send.
+            entries: contents
+              .filter((entry) => entry.location !== null)
+              .map((entry) => ({ title: entry.label, page: Number(entry.location), depth: entry.depth })),
+          }),
+        });
+        if (!indexed.ok) throw new Error((await indexed.json()).error ?? "Indexing failed");
       } catch {
         problems.push(file.title);
       }
@@ -91,15 +114,17 @@ export function CoverGenerator({
             onClick={() => generate(files)}
             className="text-sm text-sec hover:underline"
           >
-            Regenerate all {files.length}
+            Reindex all {files.length}
           </button>
         )}
         {result && <span className="text-sm text-green-600">{result}</span>}
       </div>
 
       <p className="mt-2 text-xs text-sec">
-        Draws each PDF&apos;s first page as its cover and counts its bookmarked hymns, so visitors
-        get a thumbnail with the page instead of each browser opening the PDF to work it out.
+        Draws each PDF&apos;s first page as its cover, counts its bookmarked hymns, and reads its
+        contents into the search index — so a hymn inside a scanned book can be found by name from
+        anywhere, and visitors get a thumbnail with the page instead of each browser opening the PDF
+        to work it out.
       </p>
 
       {failed.length > 0 && (

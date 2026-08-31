@@ -450,6 +450,30 @@ would be blank pages, since the file behind them isn't stored), and because
 lyrics get corrected long after a scan would have settled, the button offers
 **Update** as well as Remove.
 
+### Searching a hymnal section
+
+The hymns of a scanned hymnal exist only in that PDF's embedded bookmarks, so
+they were invisible to search: a category with six books offered six books and
+no way to ask which one has the hymn you want.
+
+An admin fixes that once per book, with the same pass that draws the covers
+(**/admin/files → Index books**): it opens each PDF, resolves its contents to
+page numbers and stores them. After that:
+
+- **The section's own page carries a search box** across every indexed book in
+  it — by name, or by the number on the board — answering as you type, with
+  each result opening the reader at that page.
+- **The site-wide search finds them too**, listed with the hymns that have
+  their own lyrics page under **Hymns & books**.
+- Section headings ("Advent", "Communion") are searchable as well: they have a
+  page like anything else, and are worth going to.
+
+Two things follow from how it's stored. Pages are kept as **PDF pages**, like
+every other stored position in a book, so correcting a book's page offset
+relabels every result without reindexing. And a book that has never been
+indexed simply isn't in the results — the box doesn't appear at all in a
+section where nothing has been indexed, rather than looking broken.
+
 ### Replacing a book
 
 A re-scanned hymnal is the same book, so it keeps the same row. **Replace the

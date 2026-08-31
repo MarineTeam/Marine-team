@@ -47,6 +47,7 @@ type FileAsset = {
   bunnyPath: string;
   sizeBytes: number | null;
   coverDataUrl: string | null;
+  contentsIndexedAt: string | null;
   pageNumber: number | null;
   groupLabel: string | null;
   lyricsText: string | null;

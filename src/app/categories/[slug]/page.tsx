@@ -7,7 +7,9 @@ import { Breadcrumbs } from "@/components/breadcrumbs";
 import { CategoryTile } from "@/components/category-tile";
 import { SeriesTile } from "@/components/series-tile";
 import { HymnalBookGrid } from "@/components/hymnal-book-grid";
+import { HymnalSearch } from "@/components/hymnal-search";
 import { fileBook, pdfsOf, seriesBook } from "@/lib/hymnal";
+import { categoryHasIndexedBooks } from "@/lib/content";
 import { SubscribeButton } from "@/components/subscribe-button";
 import { WatchLaterButton } from "@/components/watch-later-button";
 import { MenuTile } from "@/components/menu-tile";
@@ -190,6 +192,16 @@ export default async function CategoryPage({
                     </Link>
                   ))}
                 </div>
+              )}
+              {/* One box across every book in the section — the hymn in a
+                  scanned hymnal is only findable because an admin indexed
+                  its contents, so this shows nothing until one has. */}
+              {books.length > 0 && !locked && (
+                <HymnalSearch
+                  categoryId={category.id}
+                  indexed={await categoryHasIndexedBooks(category.id)}
+                  bookCount={books.length}
+                />
               )}
               {books.length > 0 && <HymnalBookGrid books={books} />}
             </>
