@@ -36,3 +36,14 @@ export const prisma = globalForPrisma.prisma ?? createClient();
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
+
+/**
+ * The client handed to a `prisma.$transaction` callback.
+ *
+ * Spelled out rather than written as `Prisma.TransactionClient` because this
+ * app's client is extended (see above), and the extension changes the type:
+ * a helper typed against the plain one won't accept either the extended
+ * client or its transaction. Deriving it from `$transaction` keeps the two
+ * in step whatever the extension does next.
+ */
+export type PrismaTransaction = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];

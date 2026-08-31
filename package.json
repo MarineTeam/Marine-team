@@ -19,6 +19,7 @@
     "@prisma/client": "^6.19.3",
     "@tesseract.js-data/eng": "^1.0.0",
     "epubjs": "^0.3.93",
+    "google-auth-library": "^11.0.2",
     "jszip": "^3.10.1",
     "next": "16.2.11",
     "pdfjs-dist": "^6.2.108",

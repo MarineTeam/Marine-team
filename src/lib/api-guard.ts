@@ -14,6 +14,26 @@ export async function ensureAdmin(): Promise<User> {
 }
 
 /**
+ * An error a route means to show the caller: a status, a stable code and a
+ * sentence written for a person.
+ *
+ * Came across with the schedules port, which had its own HTTP layer. Kept as
+ * one class understood by `errorResponse` below rather than a second error
+ * path, so every route in the app still answers the same shapes.
+ */
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+    readonly details?: unknown,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+/**
  * Maps a thrown value to a client-safe response.
  *
  * Only errors describing the *caller's own request* carry detail back:
@@ -26,6 +46,14 @@ export async function ensureAdmin(): Promise<User> {
 export function errorResponse(error: unknown): NextResponse {
   // Guards (ensureStaff, ensureCategoryAccess, ...) throw a ready response.
   if (error instanceof NextResponse) return error;
+
+  // Raised deliberately, with a message meant for whoever asked.
+  if (error instanceof ApiError) {
+    return NextResponse.json(
+      { error: error.message, code: error.code, ...(error.details ? { details: error.details } : {}) },
+      { status: error.status },
+    );
+  }
 
   if (error instanceof z.ZodError) {
     return NextResponse.json(
