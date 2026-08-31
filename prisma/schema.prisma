@@ -154,6 +154,9 @@ model User {
   serviceTeams          ServiceTeamMember[]
   serviceAssignments    ServiceAssignment[]
   serviceBlockouts      ServiceBlockout[]
+  /// The name this account appears under on a rota, when they are the same
+  /// person — see Person.
+  person                Person?
   groupAssignments      GroupAssignment[]
   ratings               Rating[]
   seriesWatchLater      SeriesWatchLater[]
@@ -1716,4 +1719,218 @@ model BrandSettings {
   brandLight String   @default("#4fc3f7")
   logoUrl    String?
   updatedAt  DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Schedules — the rotas a group runs, from a spreadsheet or from the admin
+// interface. Ported from the calendar app; see FEATURES.md → Schedules.
+//
+// Deliberately separate from ServicePlan and its rota. That one schedules
+// *accounts* against a service's running order; this one schedules *names*,
+// most of which never log in, against any number of recurring rotas — and
+// takes them from a Google Sheet somebody is already maintaining. They answer
+// different questions and are not worth forcing into one model.
+// ---------------------------------------------------------------------------
+
+enum ScheduleSourceType {
+  WEB
+  GOOGLE_SHEETS
+}
+
+/// Layout of the spreadsheet a Google Sheets schedule points at.
+enum SheetFormat {
+  /// `Date | Names` where Names is a delimited list ("Devin, Cindy").
+  DATE_NAMES
+  /// `Date | Devin | Cindy | ...` where each person is a column marked "x".
+  NAME_COLUMNS
+}
+
+enum ScheduleSyncStatus {
+  NEVER
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+enum CalendarEventStatus {
+  CONFIRMED
+  TENTATIVE
+  CANCELLED
+}
+
+model Schedule {
+  id           String             @id @default(cuid())
+  /// URL/filter friendly key, e.g. "breakbread". Stable across renames.
+  slug         String             @unique
+  name         String
+  description  String?
+  /// Emoji or short icon token rendered by the UI.
+  icon         String             @default("calendar")
+  /// Accent token resolved by src/lib/schedules/colors.ts.
+  color        String             @default("slate")
+  enabled      Boolean            @default(true)
+  displayOrder Int                @default(0)
+  sourceType   ScheduleSourceType @default(WEB)
+
+  source ScheduleSource?
+  events CalendarEvent[]
+
+  /// Soft delete, so a device syncing incrementally is told to drop its
+  /// cached rows rather than keeping a schedule that has gone.
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([enabled, displayOrder])
+  @@index([updatedAt])
+}
+
+/// Per-schedule source configuration, in its own table so a schedule can
+/// switch source type without carrying dead columns around.
+model ScheduleSource {
+  id         String   @id @default(cuid())
+  scheduleId String   @unique
+  schedule   Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  type ScheduleSourceType
+
+  // --- Google Sheets fields (null for WEB schedules) ---
+  spreadsheetId String?
+  sheetName     String?
+  /// Optional A1 range within the sheet, e.g. "A1:F200".
+  range         String?
+  format        SheetFormat?
+
+  /// Parser tuning: header row, column mapping, name delimiter, truthy
+  /// markers, default year, timezone. Shape validated by Zod before it is
+  /// ever read — see src/lib/sheets/config.ts.
+  parserConfig Json @default("{}")
+
+  /// 0 disables automatic sync for this schedule.
+  syncIntervalMinutes Int @default(60)
+
+  lastSyncedAt   DateTime?
+  lastSyncStatus ScheduleSyncStatus @default(NEVER)
+  lastSyncError  String?
+  /// Hash of the last successfully imported payload, so a sync that finds
+  /// nothing changed upstream does no writes.
+  lastSyncHash   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Somebody who appears on a rota.
+///
+/// Not a User: most people on a church rota never log in, and the names come
+/// out of a spreadsheet. `userId` links the two where they are the same
+/// person, which is what lets a signed-in member see "only mine" without
+/// being asked who they are.
+model Person {
+  id String @id @default(cuid())
+
+  /// Lowercased, whitespace-collapsed, accent-folded. The matching key.
+  normalizedName String  @unique
+  /// Preferred spelling, shown in the UI.
+  displayName    String
+  active         Boolean @default(true)
+
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId String? @unique
+
+  aliases PersonAlias[]
+  events  CalendarEventPerson[]
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([active, displayName])
+  @@index([updatedAt])
+}
+
+/// Extra spellings that resolve to the same person, so renaming somebody in a
+/// spreadsheet doesn't split their history across two records.
+model PersonAlias {
+  id             String @id @default(cuid())
+  personId       String
+  person         Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+  normalizedName String @unique
+
+  createdAt DateTime @default(now())
+
+  @@index([personId])
+}
+
+model CalendarEvent {
+  id         String   @id @default(cuid())
+  scheduleId String
+  schedule   Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  /// Stable key derived from the source row, so re-syncing a sheet updates
+  /// rows rather than duplicating them. Null for events added by hand.
+  externalId String?
+
+  /// A calendar day, stored without a time so it can't drift by a timezone.
+  date      DateTime  @db.Date
+  /// The last day, for something spanning more than one.
+  endDate   DateTime? @db.Date
+  allDay    Boolean   @default(true)
+  /// "HH:mm" local to the schedule; null when allDay.
+  startTime String?
+  endTime   String?
+
+  title    String?
+  notes    String?
+  location String?
+  status   CalendarEventStatus @default(CONFIRMED)
+
+  // --- recurrence: modelled, but the admin writes single occurrences ---
+  /// An RFC 5545 RRULE, e.g. "FREQ=WEEKLY;BYDAY=SU". Null for a one-off.
+  recurrenceRule    String?
+  recurrenceEndDate DateTime?       @db.Date
+  /// Set on an occurrence that overrides or cancels one instance of a series.
+  parentEventId     String?
+  parent            CalendarEvent?  @relation("CalendarEventSeries", fields: [parentEventId], references: [id], onDelete: Cascade)
+  occurrences       CalendarEvent[] @relation("CalendarEventSeries")
+
+  /// Where this row came from, recorded at write time so a sync never
+  /// clobbers an event somebody added by hand.
+  origin    ScheduleSourceType @default(WEB)
+  /// 1-based row in the source sheet, for telling an admin where a problem is.
+  sourceRow Int?
+
+  people CalendarEventPerson[]
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([scheduleId, externalId])
+  @@index([scheduleId, date])
+  @@index([date])
+  @@index([updatedAt])
+  @@index([parentEventId])
+}
+
+model CalendarEventPerson {
+  id       String        @id @default(cuid())
+  eventId  String
+  event    CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  personId String
+  person   Person        @relation(fields: [personId], references: [id], onDelete: Cascade)
+  /// An optional job, e.g. "Bread", "Cup", "Driver".
+  role     String?
+
+  /// Order within the event, as the source listed them. On a bread-and-cup
+  /// rota "Devin & Cindy" is not the same as "Cindy & Devin", so this is
+  /// displayed order rather than a sort key.
+  position Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, personId])
+  @@index([personId])
+  @@index([eventId, position])
 }
