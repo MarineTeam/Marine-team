@@ -461,8 +461,8 @@ An admin fixes that once per book, with the same pass that draws the covers
 page numbers and stores them. After that:
 
 - **The section's own page carries a search box** across every indexed book in
-  it — by name, or by the number on the board — answering as you type, with
-  each result opening the reader at that page.
+  it — by name, by the number on the board, or by a line of the hymn —
+  answering as you type, with each result opening the reader at that page.
 - **The site-wide search finds them too**, listed with the hymns that have
   their own lyrics page under **Hymns & books**.
 - Section headings ("Advent", "Communion") are searchable as well: they have a
@@ -473,6 +473,77 @@ every other stored position in a book, so correcting a book's page offset
 relabels every result without reindexing. And a book that has never been
 indexed simply isn't in the results — the box doesn't appear at all in a
 section where nothing has been indexed, rather than looking broken.
+
+#### When a PDF has no bookmarks
+
+Most cheaply scanned hymnals have none: the file is six hundred images and
+nothing else, so the indexing pass finds nothing and the whole section stays
+without a search box. The contents are printed in the front of the book, so
+they can be typed instead — **Type contents…** in a file's Details panel in
+`/admin/files`.
+
+One hymn a line: its label, then the page it starts on. `214 Amazing Grace |
+230` — a tab or a pipe separates them, and so does the last number on the
+line, so a column pasted out of a spreadsheet works as it is. Indent two
+spaces to put hymns under a section heading. Pages are the ones **printed in
+the book**; the book's page offset is applied for you, and `pdf:2` names a
+page of front matter, which has no printed number.
+
+A line that can't be read is listed with its number rather than dropped — a
+silently missing hymn is the failure this exists to fix — and the box counts
+what it will save as you type. It opens an already-indexed book too, so a
+bookmark reading "214 Amazing Grac" can be corrected without re-scanning
+anything; what comes back is written exactly as it was stored, nesting
+included. The bookmark-reading pass will not overwrite a typed list with an
+empty one.
+
+#### Words for a hymn inside a book
+
+A hymn that is its own file keeps its lyrics on its row. A hymn inside a
+six-hundred-page scan has no row of its own, so its words had nowhere to live
+— and a service built from book numbers offered no **Present** button at all.
+
+**Hymn lyrics…**, in the same Details panel, is a picker over the book's
+indexed contents: find the number, paste the words, move on. Typing six
+hundred hymns isn't the expectation; typing the twenty a congregation actually
+sings is.
+
+The words are kept against the **book and the hymn number**, not against the
+contents row — so re-indexing the book, re-scanning it, or retyping its
+contents doesn't lose them. The trade is that an unnumbered entry has nothing
+to key on and can't have words stored. Once typed, a hymn:
+
+- offers **Present** on the book's contents page and on every service plan row
+  that names it, not only the first one — a hymn gets sung out of order;
+- is found by **a line of its words**, in the section box and in the
+  site-wide search, with the line that matched shown under it.
+
+#### Reading a scanned book's text
+
+Search-in-the-book and read-aloud both work off a PDF's text layer, and a scan
+has none — so on most hymnals they quietly did nothing. **Read this book's
+text…**, again in Details, reads every page: from the file's own text layer
+where there is one, and by OCR off the image where there isn't.
+
+- A typeset book is read in seconds. A scan takes a few seconds a page, so a
+  hymnal is the better part of an hour — leave the tab open.
+- **Stop whenever you like.** Pages are stored in tens as they are read, and
+  starting again carries on from the first page not yet held. A book only
+  counts as finished when a run reaches its last page.
+- Once read, **searching inside the book** answers from the stored text
+  instead of parsing the open document — one request, and it works on a
+  photograph. Results read off a scan say so, since OCR misreads a word here
+  and there.
+- The **section search** uses it too: a page that matches is attributed to the
+  hymn it falls inside (the last contents entry at or before that page), so
+  what comes back is still a hymn to open rather than a page number. This is
+  the only way a hymn nobody has typed the words of is findable by its words.
+- Replacing the file throws the reading away with the rest of what described
+  the old bytes.
+
+The OCR engine (tesseract.js) is served from this app's own `/tesseract`, not
+a public CDN — copied out of `node_modules` at install time like the offline
+readers, so it works on a filtered office connection.
 
 ### Replacing a book
 
@@ -593,9 +664,11 @@ never goes back to a list between hymns.
 - Text size and palette are remembered **per device**, because the projector
   in the hall and the phone in your hand want different answers.
 
-Only lyrics can be presented: a scanned book has pages, not text, so a plan
-made of book numbers offers no Present button, and a hymn with no lyrics saved
-says so rather than showing an empty screen.
+Only words can be presented — a scanned page is a photograph, not text. They
+can be the lyrics on a hymn's own row, or words typed against a number inside
+a whole-book hymnal (see **Words for a hymn inside a book** above), so a plan
+built from book numbers is projectable once somebody has typed those hymns
+out. A hymn with nothing saved says so rather than showing an empty screen.
 
 ## The bottom bar
 
@@ -672,7 +745,11 @@ own section like any other.
     stepping in the order that book's list shows and skipping any hymn the
     viewer can't open.
 - **Search in the book** — matches across every page (PDF) or spine section
-  (EPUB), listed with a snippet of surrounding text.
+  (EPUB), listed with a snippet of surrounding text. Where an admin has read
+  the book's pages (see **Reading a scanned book's text** above), the search
+  answers from that instead: one request rather than six hundred pages parsed
+  in the browser, and it finds words on a scan, which searching the open
+  document never could. Results read by OCR say so.
 - **Page offset** — a scanned book whose printed page 1 sits behind a title
   page and ten pages of contents would otherwise be listed by its PDF page
   numbers, which match nothing in the paper copy. Setting **Page offset** on

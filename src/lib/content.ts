@@ -792,6 +792,77 @@ async function hymnsMatchingWords(
   });
 }
 
+/**
+ * Hymns found by words on the *pages* of a scanned book.
+ *
+ * The words come from BookPage — what an admin's OCR pass read off the
+ * images — and a page is not a thing to hand somebody as a result. So each
+ * matching page is attributed to the hymn it falls inside: the last contents
+ * entry at or before that page, which is how a book works. A hit before the
+ * first entry belongs to the front matter and is dropped; there is no hymn
+ * to name it by.
+ *
+ * This is the only way a hymn nobody has typed the words of can be found by
+ * its words, which on a shelf of scanned hymnals is most of them.
+ */
+async function hymnsMatchingPages(
+  q: string,
+  fileWhere: Prisma.FileAssetWhereInput,
+  take: number,
+) {
+  const pages = await prisma.bookPage.findMany({
+    where: { text: { contains: q, mode: "insensitive" }, file: fileWhere },
+    select: { fileId: true, page: true, text: true },
+    orderBy: [{ fileId: "asc" }, { page: "asc" }],
+    // Bounded well below the result limit: each matched book costs a read of
+    // its contents below, and twenty pages is already more than anybody
+    // scrolls through.
+    take: 25,
+  });
+  if (pages.length === 0) return [];
+
+  const entries = await prisma.bookHymn.findMany({
+    where: { fileId: { in: [...new Set(pages.map((page) => page.fileId))] } },
+    include: {
+      file: {
+        select: { id: true, title: true, pageOffset: true, series: { select: { title: true } } },
+      },
+    },
+    orderBy: [{ fileId: "asc" }, { page: "asc" }],
+  });
+
+  const byFile = new Map<string, typeof entries>();
+  for (const entry of entries) {
+    const list = byFile.get(entry.fileId);
+    if (list) list.push(entry);
+    else byFile.set(entry.fileId, [entry]);
+  }
+
+  const found = new Map<string, (typeof entries)[number] & { excerpt: string | null }>();
+  for (const page of pages) {
+    const list = byFile.get(page.fileId);
+    if (!list) continue;
+    // The last entry starting at or before this page — the hymn the page is
+    // part of. The list is ordered by page, so this is the one before the
+    // first entry that starts after it.
+    let containing: (typeof entries)[number] | null = null;
+    for (const entry of list) {
+      if (entry.page > page.page) break;
+      containing = entry;
+    }
+    if (!containing || found.has(containing.id)) continue;
+
+    const at = findMatches(page.text, q);
+    found.set(containing.id, {
+      ...containing,
+      excerpt: at.length > 0 ? excerptAround(page.text, at[0], q.length) : null,
+    });
+    if (found.size >= take) break;
+  }
+
+  return [...found.values()];
+}
+
 export async function searchHymnsInCategory(
   categoryId: string,
   query: string,
@@ -808,7 +879,7 @@ export async function searchHymnsInCategory(
     OR: [{ categoryId }, { series: { categoryId } }],
   };
 
-  const [byTitle, byWords] = await Promise.all([
+  const [byTitle, byWords, byPages] = await Promise.all([
     prisma.bookHymn.findMany({
       where: {
         AND: [
@@ -830,12 +901,21 @@ export async function searchHymnsInCategory(
     // A number is a number, not a line of a hymn: searching 214 shouldn't
     // return every hymn whose words happen to contain it.
     asNumber === null ? hymnsMatchingWords(q, fileWhere, limit) : Promise.resolve([]),
+    asNumber === null ? hymnsMatchingPages(q, fileWhere, limit) : Promise.resolve([]),
   ]);
 
-  // Title first, then the ones found by their words — somebody who typed a
-  // title meant the title, and a hymn found both ways is one hymn.
-  const seen = new Set(byTitle.map((hymn) => hymn.id));
-  const hymns = [...byTitle, ...byWords.filter((hymn) => !seen.has(hymn.id))].slice(0, limit);
+  // Title first, then typed words, then words read off the page. Somebody who
+  // typed a title meant the title; and where a hymn has been typed out, those
+  // words are exact where the scan's are a machine's best reading of a
+  // photograph. A hymn found more than one way is one hymn.
+  const seen = new Set<string>();
+  const hymns = [];
+  for (const hymn of [...byTitle, ...byWords, ...byPages]) {
+    if (seen.has(hymn.id)) continue;
+    seen.add(hymn.id);
+    hymns.push(hymn);
+    if (hymns.length === limit) break;
+  }
 
   // Section headings are left in rather than guessed at: they carry a page
   // like anything else, "Advent" is a reasonable thing to search for, and the
@@ -885,6 +965,40 @@ export async function getBookHymn(fileId: string, number: number) {
     page: entry?.page ?? null,
     lyricsText: lyrics?.lyricsText ?? null,
   };
+}
+
+/**
+ * Matches inside one book, from the text read out of its pages.
+ *
+ * Shaped as the reader's own search hits are (see SearchHit), so the panel
+ * that lists them doesn't need to know which of the two answered — a page
+ * label, a line of context, and the location to jump to.
+ *
+ * One hit per page: a common word would otherwise return a thousand rows on
+ * a long book, and a page is the unit anybody navigates by anyway.
+ */
+export async function searchBookText(fileId: string, query: string, pageOffset: number) {
+  const pages = await prisma.bookPage.findMany({
+    where: { fileId, text: { contains: query, mode: "insensitive" } },
+    select: { page: true, text: true, source: true },
+    orderBy: { page: "asc" },
+    take: 100,
+  });
+
+  return pages.map((row) => {
+    const at = findMatches(row.text, query);
+    const printed = printedPage(row.page, pageOffset);
+    return {
+      // Labelled by the page printed in the book, falling back to the PDF
+      // page (and saying so) for a hit in the front matter, which has no
+      // printed number to quote — matching the reader's own labels.
+      label: printed === null ? `PDF page ${row.page}` : `Page ${printed}`,
+      excerpt: at.length > 0 ? excerptAround(row.text, at[0], query.length) : "",
+      location: String(row.page),
+      /** Whether these words were read off a photograph, and so may be imperfect. */
+      ocr: row.source === "ocr",
+    };
+  });
 }
 
 /**

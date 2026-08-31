@@ -528,7 +528,30 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   `hymnNumberOf` the reader uses). That is what lets `searchHymnsInCategory`
   answer across a whole shelf, and lets `searchContent` find a hymn printed
   inside a scanned book. Pages are stored as PDF pages; the printed number is
-  derived at the edge, as everywhere else.
+  derived at the edge, as everywhere else. A PDF with no bookmarks indexes to
+  nothing, so the same rows can be typed by hand instead — `ContentsEditor`
+  parses the box with `lib/book-contents.ts` (printed pages in, PDF pages
+  stored, indentation as nesting) and PUTs to the same route; the outline pass
+  declines to send an empty list, which would otherwise replace a typed one.
+- **A hymn inside a book can have words**, in `BookHymnLyric`, keyed by
+  `(fileId, number)` rather than by a `BookHymn` row — those are deleted and
+  rewritten on every reindex, and these are typed by hand. That is what makes
+  a whole-book hymn presentable (`planItemPresentable`, `presentHref`,
+  `/present/[fileId]?hymn=`) and findable by a line of its words
+  (`hymnsMatchingWords`, which reads the words first and then the contents
+  entries they belong to, since Prisma can't match a relation against the
+  parent row's own column).
+- **A scanned book's pages can be read** into `BookPage` — the file's own text
+  layer where there is one, OCR off the image where there isn't
+  (`BookTextReader` in the admin's browser; `lib/ocr-client.ts` points
+  tesseract.js at this app's own `/tesseract`, vendored by
+  `scripts/copy-offline-viewers.mjs`, rather than at a CDN). Stored a page at
+  a time so an hour-long run is resumable and interruptible; `textIndexedAt`
+  is set only by a run that reaches the last page. `searchBookText` then backs
+  the reader's in-book search (falling back to parsing the open document for a
+  book nobody has read), and `hymnsMatchingPages` attributes a matching page
+  to the contents entry it falls inside, so a section search still returns
+  hymns rather than page numbers.
 - **The bottom bar** is per device: `getShellNav` returns both the app's
   suggested `tabs` and every destination this viewer could choose
   (`tabOptions`), and `src/lib/nav-tabs.ts` resolves a stored list of hrefs

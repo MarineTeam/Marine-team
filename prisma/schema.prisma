@@ -519,6 +519,34 @@ model BookHymn {
 /// re-indexed, or has its contents retyped. The trade is that an unnumbered
 /// entry — a section heading, a hymn a book prints without a number — has
 /// nothing to key on and can't have words stored here.
+/// The words on one page of a book, so a scan can be searched.
+///
+/// A PDF made by a typesetter carries its text; a PDF made by a scanner is
+/// photographs, and everything the reader offers over text — search in the
+/// book, read aloud — silently does nothing on one. Which is most hymnals.
+///
+/// So the text is read once, by an admin's browser, and kept: from the file's
+/// own text layer where there is one, and off the image with OCR where there
+/// isn't. Per page rather than per book because a page is what a result has
+/// to send somebody to, and because reading six hundred pages is a job that
+/// gets interrupted — stored a page at a time, it resumes where it stopped.
+model BookPage {
+  id     String    @id @default(cuid())
+  file   FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileId String
+  /// A PDF page, like everything else stored about a position in a book.
+  page   Int
+  text   String
+  /// How it was read: "text" from the file's own layer, "ocr" off the image.
+  /// Kept because they are not equally trustworthy — OCR of a tight scan
+  /// misreads letters, and a search that finds nothing on such a book should
+  /// be explicable rather than mysterious.
+  source String
+
+  @@unique([fileId, page])
+  @@index([fileId])
+}
+
 model BookHymnLyric {
   id         String    @id @default(cuid())
   file       FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
@@ -705,6 +733,10 @@ model FileAsset {
   /// null for a book nobody has indexed yet. Shown in the admin so it is
   /// obvious which books are searchable.
   contentsIndexedAt DateTime?
+  /// When this book's pages were last read for their text, or null for a book
+  /// nobody has read. Set when a pass reaches the last page, so a run stopped
+  /// halfway leaves it null and the button still offers to finish.
+  textIndexedAt     DateTime?
   // The admin's *intent* to publish this as a podcast episode, set from the
   // admin file list. Deliberately separate from publicPath below, which is
   // the *state*: a file can be intended for the podcast while temporarily
@@ -730,6 +762,7 @@ model FileAsset {
   servicePlanned  ServicePlanItem[]
   hymns           BookHymn[]
   hymnLyrics      BookHymnLyric[]
+  pages           BookPage[]
 
   @@index([seriesId])
   @@index([categoryId])

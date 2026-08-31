@@ -146,6 +146,62 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **A book with no bookmarks can have its contents typed in.** Most cheaply
+  scanned hymnals are six hundred images and nothing else: the indexing pass
+  finds no outline, stores nothing, and the section stays without a search
+  box. The contents are printed in the front of the book, so **Type
+  contents…** (a file's Details panel in `/admin/files`) takes them a line at
+  a time — label, then page, separated by a tab, a pipe, or just the trailing
+  number, with two spaces of indent for a hymn under a heading.
+  - Pages are the ones **printed in the book**; the book's own offset is
+    applied, and `pdf:2` names a page of front matter, which has no printed
+    number.
+  - A line that can't be read is reported with its number instead of being
+    dropped, and the box counts what it will save as you type.
+  - It opens an already-indexed book too, writing back exactly what was
+    stored, nesting included — so one wrong bookmark can be corrected without
+    re-scanning. The bookmark-reading pass no longer sends an empty contents
+    list, which would have replaced a typed one with nothing.
+
+- **A hymn inside a whole-book hymnal can have words, and be projected.** A
+  hymn that is its own file kept its lyrics on its row; a hymn inside a
+  scanned book had no row, so a service built from book numbers offered no
+  **Present** button — the projector worked for one kind of hymnal and not the
+  other. **Hymn lyrics…** is a picker over the book's indexed contents: find
+  the number, paste the words.
+  - The words are stored against the **book and the hymn number**, not the
+    contents row, which every reindex replaces — so re-indexing, re-scanning
+    or retyping a book's contents doesn't lose an evening's typing. An
+    unnumbered entry has nothing to key on and can't have words.
+  - **Present** now sits on the book's contents page and on *every* service
+    plan row that has words, not only the first — a hymn gets sung out of
+    order, and somebody takes over the screen halfway through.
+  - A line of those words finds the hymn, in the section box and in the
+    site-wide search, with the line that matched shown under the result.
+
+- **A scanned book's pages can be read for their text, so they can be
+  searched.** Search-in-the-book and read-aloud both work off a PDF's text
+  layer, and a scan has none — so on most hymnals they quietly did nothing.
+  **Read this book's text…** reads every page: the file's own text layer where
+  there is one, OCR off the image where there isn't.
+  - **Resumable and interruptible**, because a hymnal takes the better part of
+    an hour and a laptop sleeps. Pages are stored in tens as they are read,
+    and starting again carries on from the first page not yet held; a book
+    only counts as read when a run reaches its last page.
+  - **In-book search then answers from the stored text** — one request rather
+    than six hundred pages parsed in the browser, and it finds words on a
+    photograph. A book nobody has read still searches as it always did, rather
+    than reporting "no matches" for a book that was never read. Results read
+    by OCR say so.
+  - **The section search uses it too**: a matching page is attributed to the
+    hymn it falls inside, so what comes back is a hymn to open rather than a
+    page number. This is the only way a hymn nobody has typed out is findable
+    by its words.
+  - The OCR engine is served from the app's own `/tesseract`, copied out of
+    `node_modules` at install time like the offline readers, rather than from
+    a public CDN that a filtered office connection may not reach.
+
+
 - **A hymnal section can be searched, across every book in it.** The hymns of
   a scanned hymnal live in that PDF's own bookmarks, which only a browser with
   the file open can resolve — so a category holding six books couldn't be

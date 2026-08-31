@@ -85,7 +85,9 @@ export function HymnalSearch({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder={
-          bookCount === 1 ? "Find a hymn — by name or number" : `Find a hymn across ${bookCount} books`
+          bookCount === 1
+            ? "Find a hymn — by name, number or a line of it"
+            : `Find a hymn across ${bookCount} books`
         }
         className="w-full rounded-md border border-sep px-3 py-2 text-sm"
       />

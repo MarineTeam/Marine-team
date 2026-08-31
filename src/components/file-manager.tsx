@@ -16,6 +16,7 @@ import { CoverGenerator } from "@/components/cover-generator";
 import { FileReplace } from "@/components/file-replace";
 import { ContentsEditor } from "@/components/contents-editor";
 import { BookHymnLyrics } from "@/components/book-hymn-lyrics";
+import { BookTextReader } from "@/components/book-text-reader";
 import {
   BulkBar,
   BulkButton,
@@ -50,6 +51,7 @@ type FileAsset = {
   sizeBytes: number | null;
   coverDataUrl: string | null;
   contentsIndexedAt: string | null;
+  textIndexedAt: string | null;
   pageNumber: number | null;
   groupLabel: string | null;
   lyricsText: string | null;
@@ -625,6 +627,7 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
                         words go against a hymn number, and the numbers come
                         from the index above. */}
                     <BookHymnLyrics file={f} />
+                    <BookTextReader file={f} />
                   </>
                 )}
 
