@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { isPluginEnabled } from "@/lib/plugins";
 import { listEvents, listPeople, listPublicSchedules } from "@/lib/schedules/query";
 import { CalendarView } from "@/components/calendar-view";
+import { SaveCalendarButton } from "@/components/save-calendar-button";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,10 @@ export default async function CalendarPage() {
       </div>
 
       {schedules.length > 0 && (
-        <CalendarView schedules={schedules} events={events} people={people} />
+        <>
+          <CalendarView schedules={schedules} events={events} people={people} />
+          <SaveCalendarButton />
+        </>
       )}
     </div>
   );

@@ -813,6 +813,29 @@ Gated by the **Schedules** plugin.
   record and keeps the other spelling as an alias, so the next sync resolves
   to the right person instead of recreating the duplicate.
 
+### On the device
+
+**Keep the calendar on this device** puts the whole year of rotas on the
+phone. It is the smallest thing this app can save — a few kilobytes of text
+against a hymnal's forty megabytes — and the only one that keeps itself
+current: once saved, opening the calendar with a connection quietly asks the
+server for *what has changed since last time* and folds it in. Nobody has to
+remember to press update to find out they are on for Sunday.
+
+With no connection at all, it appears on the offline screen beside the saved
+books, videos and service orders: pick your name — the same name the app
+uses, so choosing it in one place settles it in both — and see what you are on
+for, with the day named the way the app names it.
+
+Two things the payload never says, the device works out for itself, because
+getting either wrong means somebody turning up when they shouldn't:
+
+- **A schedule that was turned off takes its dates with it.** Disabling a
+  schedule doesn't touch one event row, so those dates are never reported as
+  changed or deleted. They would otherwise sit on the phone for good.
+- **Days that fall out behind the window are dropped**, for the same reason:
+  nothing deletes them, they simply stop being sent.
+
 ### Reminders, and what didn't come across
 
 A daily job tells people what they are on for tomorrow, one message however
@@ -824,12 +847,6 @@ account gets no reminder.** The calendar app reached them through anonymous
 per-device subscriptions; this app's push is keyed to an account. Linking a
 name to a member's account is what turns reminders on for them, and everyone
 else still has the calendar, which is the source of truth.
-
-The calendar app also cached its snapshot in IndexedDB so the whole thing
-worked offline. `/api/sync/snapshot` came across and answers, but nothing
-reads it yet — this app has its own offline shell, and wiring the calendar
-into that is a separate piece of work rather than a second offline mechanism
-bolted alongside.
 
 ## Present mode
 

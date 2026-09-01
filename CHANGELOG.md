@@ -163,6 +163,16 @@ All notable changes to this project are documented here. Format follows
   - Reminders go through this app's existing push rather than a second stack,
     which means somebody on a rota **without** an account doesn't get one.
     The calendar remains the source of truth for them.
+  - **Keep the calendar on this device** puts the year of rotas — a few
+    kilobytes of text — beside the saved books, videos and service orders, on
+    the same offline screen, filtered to the name you already chose. Once
+    saved it keeps itself current: opening the calendar with a connection
+    asks only for what has changed since last time, which is what
+    `/api/sync/snapshot` was built for. Two things the payload can never say,
+    the device works out itself — a schedule that was turned off takes its
+    dates with it, and days that fall out behind the window are dropped —
+    because otherwise both would sit on the phone for good and somebody would
+    turn up for a rota that had been withdrawn.
 
 
 - **A rota: who is serving, and whether they said yes.** A running order says

@@ -578,6 +578,15 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     in-memory rate limiter dropped for this app's database-backed one, and
     `lib/schedules/http.ts` keeps the four idioms its twenty route handlers
     were written against so they port without a rewrite.
+  - **The calendar goes on the device incrementally** (`lib/offline-calendar.ts`,
+    `/api/sync/snapshot`): Cache Storage under `/offline-calendar/snapshot.json`
+    like everything else saved here, rather than the calendar app's IndexedDB,
+    so the static offline shell can read it with no bundle. What is stored is
+    the *merge* rather than the server's bytes — `mergeSnapshot` is pure and
+    carries the two rules a delta can't state, since disabling a schedule
+    doesn't touch its events' `updatedAt` and a day leaving the window is
+    never reported deleted. `Snapshot` lives in `lib/schedules/types.ts`, not
+    beside the query that builds it, because the merging runs in a browser.
 - **A rota lives beside the running order**: `ServiceTeam` / `ServiceTeamMember`
   are the pick-list, `ServiceAssignment` is one ask with its answer, and
   `ServiceBlockout` is when somebody is away. The job is free text on the

@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { addIsoDays, fromIsoDate, todayIso, toIsoDate, type IsoDate } from "@/lib/dates";
 import { prisma } from "@/lib/db";
-import type { CalendarEvent, Person, Schedule } from "@/lib/schedules/types";
+import type { CalendarEvent, Person, Schedule, Snapshot } from "@/lib/schedules/types";
 
 /**
  * The read layer.
@@ -155,23 +155,15 @@ export async function getEvent(eventId: string): Promise<CalendarEvent | null> {
  * With `since` it returns only rows touched afterwards, plus the ids of things
  * that were deleted -- so a phone that has been offline for a week catches up
  * with a payload measured in kilobytes rather than re-downloading the lot.
+ *
+ * `Snapshot` itself lives in `types.ts`, because the device that merges one
+ * into its cache (lib/offline-calendar.ts) runs in a browser and must not
+ * reach anywhere near Prisma to find out what shape it is.
  */
 export interface SnapshotOptions {
   since?: Date | null;
   pastWindowDays?: number;
   futureWindowDays?: number;
-}
-
-export interface Snapshot {
-  schedules: Schedule[];
-  people: Person[];
-  events: CalendarEvent[];
-  deleted: { scheduleIds: string[]; eventIds: string[]; personIds: string[] };
-  /** Server time this snapshot was taken; the client sends it back as `since`. */
-  syncedAt: string;
-  /** True when the client must discard its cache first (full refresh). */
-  full: boolean;
-  window: { from: IsoDate; to: IsoDate };
 }
 
 export async function buildSnapshot(options: SnapshotOptions = {}): Promise<Snapshot> {

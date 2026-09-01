@@ -121,6 +121,7 @@
  *   marine-offline-books   books saved to this device (lib/offline-books.ts)
  *   marine-downloads-index videos saved to this device (lib/offline-downloads.ts)
  *   marine-offline-services service orders saved here (lib/offline-services.ts)
+ *   marine-offline-calendar the rota calendar (lib/offline-calendar.ts)
  *   marine-device-settings this device's settings (lib/device-settings.ts)
  *   marine-toc-v1:<id>     a book's contents list (lib/reader-cache.ts)
  *
@@ -138,6 +139,8 @@ const BOOK_INDEX_KEY = "marine-offline-books";
 const BOOK_CACHE = "marine-team-books-v1";
 const SERVICE_INDEX_KEY = "marine-offline-services";
 const SERVICE_CACHE = "marine-team-services-v1";
+const CALENDAR_INDEX_KEY = "marine-offline-calendar";
+const CALENDAR_CACHE = "marine-team-calendar-v1";
 const TABS_KEY = "marine-nav-tabs";
 const SETTINGS_KEY = "marine-device-settings";
 // The same bounds as MIN_READING_SCALE / MAX_READING_SCALE in
@@ -226,6 +229,41 @@ function writeServices(items) {
   } catch (e) {}
 }
 
+/** There is one calendar, so its index is one entry rather than a list. */
+function readCalendar() {
+  const entry = readJson(CALENDAR_INDEX_KEY, null);
+  return entry && entry.cacheUrl ? entry : null;
+}
+
+function writeCalendar(entry) {
+  try {
+    if (entry) localStorage.setItem(CALENDAR_INDEX_KEY, JSON.stringify(entry));
+    else localStorage.removeItem(CALENDAR_INDEX_KEY);
+  } catch (e) {}
+}
+
+/**
+ * Whose calendar this device shows, shared with the app.
+ *
+ * The same setting under the same key as CalendarView writes
+ * (lib/device-settings.ts), so a name picked here with no signal is the name
+ * the app agrees on the moment there is one — and the other way round.
+ */
+function calendarPerson() {
+  const raw = readJson(SETTINGS_KEY, null);
+  return raw && typeof raw.calendarPersonId === "string" ? raw.calendarPersonId : null;
+}
+
+function setCalendarPerson(id) {
+  try {
+    // Merged, like the reading size: this page must never be the reason
+    // somebody's theme or tab bar goes back to the default.
+    const current = readJson(SETTINGS_KEY, {}) || {};
+    current.calendarPersonId = id;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(current));
+  } catch (e) {}
+}
+
 /**
  * The reading text size this device chose, shared with the app.
  *
@@ -263,6 +301,51 @@ function formatServiceDate(iso) {
     day: "numeric",
     month: "long",
   });
+}
+
+/** Today, as the app's own todayIso() sees it: this device's local day. */
+function todayIso() {
+  const now = new Date();
+  return (
+    now.getFullYear() +
+    "-" +
+    String(now.getMonth() + 1).padStart(2, "0") +
+    "-" +
+    String(now.getDate()).padStart(2, "0")
+  );
+}
+
+/**
+ * "Today", "Tomorrow", "Sunday", or a date — the same wording as
+ * relativeDayLabel in src/lib/dates.ts, so a rota reads the same whether the
+ * app drew it or this page did. Self-contained on purpose: it is lifted out
+ * whole and run against the app's version in the drift test.
+ */
+function relativeDay(value, today) {
+  const day = new Date(value + "T00:00:00Z");
+  const now = new Date(today + "T00:00:00Z");
+  if (isNaN(day.getTime()) || isNaN(now.getTime())) return "";
+  const difference = Math.round((day.getTime() - now.getTime()) / 86400000);
+  if (difference === 0) return "Today";
+  if (difference === 1) return "Tomorrow";
+  if (difference === -1) return "Yesterday";
+  const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  if (difference > 1 && difference < 7) return weekdays[day.getUTCDay()];
+  const label =
+    weekdays[day.getUTCDay()].slice(0, 3) + ", " + months[day.getUTCMonth()] + " " + day.getUTCDate();
+  return value.slice(0, 4) !== today.slice(0, 4) ? label + " " + day.getUTCFullYear() : label;
+}
+
+/** How long ago the calendar last caught up with the server. */
+function formatSyncedAt(iso) {
+  const at = new Date(iso);
+  if (isNaN(at.getTime())) return "";
+  const days = Math.floor((Date.now() - at.getTime()) / 86400000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 30) return days + " days ago";
+  return "on " + at.toLocaleDateString(undefined, { day: "numeric", month: "long" });
 }
 
 /**
@@ -377,6 +460,7 @@ function renderLibrary() {
   const books = scoped.length > 0 ? scoped : readBooks();
   const videos = readVideos();
   const plans = readServices();
+  const calendar = readCalendar();
   const scopeLabel = scoped.length > 0 ? labelFor(scoped[0], scopePath) : null;
 
   view.appendChild(el("h1", null, scopeLabel || "Saved on this device"));
@@ -384,7 +468,7 @@ function renderLibrary() {
     el(
       "p",
       "sub",
-      books.length > 0 || videos.length > 0 || plans.length > 0
+      books.length > 0 || videos.length > 0 || plans.length > 0 || calendar
         ? "These open with no connection at all."
         : "Nothing is saved here yet.",
     ),
@@ -404,6 +488,13 @@ function renderLibrary() {
     view.appendChild(list);
   }
 
+  if (calendar) {
+    view.appendChild(el("h2", null, "Calendar"));
+    const list = el("ul");
+    list.appendChild(calendarRow(calendar));
+    view.appendChild(list);
+  }
+
   if (videos.length > 0) {
     view.appendChild(el("h2", null, "Videos"));
     view.appendChild(playerNode());
@@ -412,12 +503,12 @@ function renderLibrary() {
     view.appendChild(list);
   }
 
-  if (books.length === 0 && videos.length === 0 && plans.length === 0) {
+  if (books.length === 0 && videos.length === 0 && plans.length === 0 && !calendar) {
     view.appendChild(
       el(
         "p",
         "empty",
-        "Connect, then use “Save for offline” on a book, “Keep this order offline” on a service, or the download button on a video, to keep it here.",
+        "Connect, then use “Save for offline” on a book, “Keep this order offline” on a service, “Keep the calendar on this device” on the calendar, or the download button on a video, to keep it here.",
       ),
     );
   } else if (scoped.length > 0 && readBooks().length > scoped.length) {
@@ -583,6 +674,149 @@ async function renderService(plan) {
   });
 
   view.appendChild(list);
+}
+
+// ------------------------------------------------------- the calendar --
+function calendarRow(entry) {
+  const li = el("li");
+  const open = el("button", "rowlink");
+  const meta = el("div", "meta");
+  meta.appendChild(el("div", "title", "Calendar"));
+  const bits = [];
+  if (entry.eventCount) bits.push(entry.eventCount + (entry.eventCount === 1 ? " date" : " dates"));
+  const when = formatSyncedAt(entry.syncedAt);
+  if (when) bits.push("updated " + when);
+  meta.appendChild(el("div", "detail", bits.join(" · ")));
+  open.appendChild(meta);
+  open.addEventListener("click", () => renderCalendar(entry));
+
+  const remove = el("button", "remove", "Remove");
+  remove.addEventListener("click", async () => {
+    if (!window.confirm("Remove the calendar from this device?")) return;
+    try {
+      const cache = await caches.open(CALENDAR_CACHE);
+      await cache.delete(entry.cacheUrl);
+    } catch (e) {}
+    writeCalendar(null);
+    renderLibrary();
+  });
+
+  li.appendChild(open);
+  const actions = el("div", "actions");
+  actions.appendChild(remove);
+  li.appendChild(actions);
+  return li;
+}
+
+/**
+ * What you are on for, with no connection.
+ *
+ * The calendar is the one saved thing that is a few kilobytes of text, so
+ * unlike a book there is never a question of whether enough of it is here —
+ * the whole year is. The only question is whose it is, and that is answered
+ * the same way the app answers it: pick a name once, stored against this
+ * device, changeable right here because standing in a hall with no signal is
+ * exactly when somebody first wants to.
+ */
+async function renderCalendar(entry) {
+  teardownReader();
+  view.innerHTML = "";
+  const back = el("button", null, "← Back");
+  back.addEventListener("click", renderLibrary);
+  view.appendChild(back);
+  view.appendChild(el("h1", null, "Calendar"));
+
+  let saved;
+  try {
+    saved = await (await fetch(entry.cacheUrl)).json();
+  } catch (e) {
+    // The browser evicted it under storage pressure; the index still lists it.
+    view.appendChild(el("p", "empty", "The calendar is no longer on this device."));
+    return;
+  }
+
+  const people = Array.isArray(saved.people) ? saved.people : [];
+  const events = Array.isArray(saved.events) ? saved.events : [];
+  const scheduleNames = {};
+  (Array.isArray(saved.schedules) ? saved.schedules : []).forEach((schedule) => {
+    scheduleNames[schedule.id] = schedule.name;
+  });
+
+  const chooser = el("p", "sub");
+  chooser.appendChild(el("span", null, "You are "));
+  const select = document.createElement("select");
+  select.setAttribute("aria-label", "Your name");
+  select.style.cssText = "font:inherit;padding:2px 4px";
+  const everyone = el("option", null, "Everyone");
+  everyone.value = "";
+  select.appendChild(everyone);
+  people.forEach((person) => {
+    const option = el("option", null, person.displayName);
+    option.value = person.id;
+    select.appendChild(option);
+  });
+  select.value = calendarPerson() || "";
+  select.addEventListener("change", () => {
+    setCalendarPerson(select.value || null);
+    draw();
+  });
+  chooser.appendChild(select);
+  view.appendChild(chooser);
+
+  const list = el("ul");
+  view.appendChild(list);
+
+  function draw() {
+    list.innerHTML = "";
+    const today = todayIso();
+    const personId = select.value || null;
+    const mine = events
+      .filter((item) => {
+        if (item.status === "CANCELLED") return false;
+        if (personId && !(item.people || []).some((who) => who.personId === personId)) return false;
+        // A multi-day event is still on while it runs.
+        return (item.endDate || item.date) >= today;
+      })
+      .sort((a, b) =>
+        a.date === b.date
+          ? (a.startTime || "") < (b.startTime || "")
+            ? -1
+            : 1
+          : a.date < b.date
+            ? -1
+            : 1,
+      )
+      .slice(0, 40);
+
+    if (mine.length === 0) {
+      const name = people.find((person) => person.id === personId);
+      list.appendChild(
+        el("p", "empty", name ? "Nothing coming up for " + name.displayName + "." : "Nothing coming up."),
+      );
+      return;
+    }
+
+    mine.forEach((item) => {
+      const li = el("li");
+      // Plain rows rather than the buttons the other lists use: a date is a
+      // date, there is nothing behind it to open, and a list of buttons that
+      // all refuse to be pressed reads as a list of things gone wrong.
+      const meta = el("div", "meta");
+      const names = (item.people || []).map((who) => who.displayName).join(", ");
+      meta.appendChild(
+        el("div", "title", names || item.title || scheduleNames[item.scheduleId] || "Scheduled"),
+      );
+      const bits = [scheduleNames[item.scheduleId], relativeDay(item.date, today)];
+      if (item.startTime) bits.push(item.startTime);
+      if (item.location) bits.push(item.location);
+      if (item.notes) bits.push(item.notes);
+      meta.appendChild(el("div", "detail", bits.filter(Boolean).join(" · ")));
+      li.appendChild(meta);
+      list.appendChild(li);
+    });
+  }
+
+  draw();
 }
 
 // ----------------------------------------------------------- one book --

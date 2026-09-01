@@ -189,3 +189,33 @@ export interface SyncResult {
   issues: SourceIssue[];
   error: string | null;
 }
+
+/**
+ * What the device is handed to keep the calendar without a connection.
+ *
+ * Called with no `since` it is everything: the client throws away whatever it
+ * had and stores this. Called with one it is only what changed afterwards,
+ * plus the ids of what went away -- so a phone that has been in a drawer for
+ * a week catches up in kilobytes. `lib/offline-calendar.ts` does the merging;
+ * `buildSnapshot` in `query.ts` does the reading.
+ *
+ * It lives here rather than beside the query that builds it because the
+ * merging happens in a browser, and a type is the only part of the read layer
+ * a browser may see.
+ */
+export interface Snapshot {
+  schedules: Schedule[];
+  people: Person[];
+  events: CalendarEvent[];
+  deleted: { scheduleIds: string[]; eventIds: string[]; personIds: string[] };
+  /** Server time this snapshot was taken; the client sends it back as `since`. */
+  syncedAt: string;
+  /** True when the client must discard its cache first (full refresh). */
+  full: boolean;
+  /**
+   * The span of days this snapshot speaks for. It slides forward daily, so a
+   * client prunes to it: a day that has fallen off the back is never reported
+   * deleted, it simply stops being sent.
+   */
+  window: { from: IsoDate; to: IsoDate };
+}
