@@ -146,6 +146,30 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Forms, built here rather than in code.** The connect card in the pew, a
+  camp application, a request for a visit — questions are rows an admin adds,
+  because they change every term and a deploy is the wrong unit of change for
+  "add a box for dietary requirements".
+  - **An answer belongs to the question, not to its wording.** Rename "Phone"
+    to "Mobile" and every answer already given is still an answer to it.
+  - **A question is never really deleted, only stopped.** Removing the row
+    would leave a year of responses with a column nobody can name, so a
+    retired question keeps labelling the answers people gave it and the export
+    still carries them, after the live ones.
+  - **The server decides what a valid answer is.** `required` and
+    `type="email"` in the browser are a courtesy a crafted POST walks past; in
+    particular an option nobody offered is refused rather than appearing in the
+    export as though somebody had chosen it.
+  - Responses can be marked dealt with, **by name** — the way follow-up fails
+    is two people each assuming the other rang.
+
+- **A test that no client component can reach the database.** `lib/db.ts`
+  builds a PrismaClient; one *value* imported from a module that transitively
+  imports it drags the whole client into the browser bundle, where it throws on
+  sight and the page renders "This page couldn't load". Nothing catches that —
+  it type-checks, lints and builds. It caught two real cases the moment it was
+  written.
+
 - **Events, with sign-up that can run out.** Published at `/events` with a
   date, a place and a description; the interesting part is the number.
   - **The last place is given to one person.** Everything that decides "is

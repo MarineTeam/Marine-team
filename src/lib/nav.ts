@@ -35,6 +35,7 @@ export type NavIcon =
   | "download"
   | "calendar"
   | "ticket"
+  | "card"
   | "shield";
 
 export type NavItem = {
@@ -98,6 +99,8 @@ export const getShellNav = cache(async (): Promise<ShellNav> => {
   // What's on. Public, because the people it most wants to reach are the ones
   // who have never made an account.
   if (plugins.events) browse.push({ href: "/events", label: "Events", icon: "ticket" });
+  // The connect card, and whatever else there is to fill in.
+  if (plugins.forms) browse.push({ href: "/forms", label: "Forms", icon: "card" });
 
   const library: NavItem[] = categories.map((category) => ({
     href: `/categories/${category.slug}`,

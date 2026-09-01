@@ -124,6 +124,15 @@ export function TicketIcon({ className }: IconProps) {
   );
 }
 
+export function CardIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <rect x="3.5" y="5" width="17" height="14" rx="2" />
+      <path d="M7.5 10h5M7.5 14h9" />
+    </Icon>
+  );
+}
+
 export function BookIcon({ className }: IconProps) {
   return (
     <Icon className={className}>

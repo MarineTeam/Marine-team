@@ -878,6 +878,29 @@ What's on, at `/events`, and who is coming.
   mail-merge or a spreadsheet — with a column saying who is a member, which is
   the one thing the sign-up form didn't ask.
 
+## Forms and connect cards
+
+A form is built at `/admin/forms` and filled in at `/forms/<name>`. The
+questions are rows somebody adds, not code somebody deploys — they change every
+term, and "add a box for dietary requirements" shouldn't need a release.
+
+- **Ten kinds of question**: short and long answers, email, phone, number,
+  date, a drop-down, choose-one, choose-any, and a single tick box.
+- **You don't need an account**, which is the whole point of a connect card:
+  the person it is for walked in twenty minutes ago. **Members only** closes
+  that where it matters, and such a form is invisible rather than refused.
+- **Renaming a question doesn't rewrite history.** An answer belongs to the
+  question, not to the words it was asked in.
+- **Stopping a question keeps its answers.** A question is retired rather than
+  deleted, so the responses from March can still say what they were answering,
+  and the export keeps that column — after the live ones.
+- **The server has the last word on what a valid answer is.** A crafted request
+  can't invent a fourth answer to a three-way question.
+- **Somebody is told**, at the addresses the form itself names — different forms
+  reach different people, and the person who knows which is the one editing it.
+- **Responses are marked dealt with, by name.** The way follow-up fails is two
+  people each assuming the other rang.
+
 ## Present mode
 
 A hymn's words on the screen at the front of the room. **Present** sits on a

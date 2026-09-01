@@ -22,6 +22,7 @@ import {
   ShieldIcon,
   SparkleIcon,
   StarIcon,
+  CardIcon,
   TicketIcon,
 } from "@/components/icons";
 
@@ -43,6 +44,7 @@ export const NAV_ICONS: Record<NavIcon, (props: { className?: string }) => React
   playlist: PlaylistIcon,
   book: BookIcon,
   ticket: TicketIcon,
+  card: CardIcon,
   live: LiveIcon,
   person: PersonIcon,
   download: DownloadIcon,

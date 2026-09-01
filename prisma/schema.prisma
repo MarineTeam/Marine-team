@@ -176,6 +176,7 @@ model User {
   identities            UserIdentity[]
   authorizedEmailsAdded AuthorizedEmail[]     @relation("AuthorizedEmailAddedBy")
   eventRegistrations    EventRegistration[]
+  formSubmissions       FormSubmission[]
 }
 
 /**
@@ -2021,4 +2022,111 @@ model EventRegistration {
   @@unique([eventId, userId])
   @@index([eventId, status, createdAt])
   @@index([userId])
+}
+
+/// A form somebody fills in: the connect card in the pew, a "would you like a
+/// visit", a camp application.
+///
+/// Built by an admin rather than by a developer, because the questions change
+/// every term and a deploy is the wrong unit of change for "add a box for
+/// dietary requirements".
+model Form {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  title       String
+  description String?
+
+  published    Boolean @default(false)
+  /// Only signed-in members may open it. Off by default: the whole point of a
+  /// connect card is the person who has just walked in.
+  memberOnly   Boolean @default(false)
+  /// Whether the same person may send it more than once. A connect card, yes;
+  /// a camp application, generally not.
+  multiple     Boolean @default(true)
+  /// Shown after sending, in place of the form.
+  confirmation String?
+  /// Addresses told about a submission, comma-separated. Kept on the form
+  /// rather than in an env var: different forms reach different people, and
+  /// the person who knows which is the one editing the form.
+  notifyEmails String?
+
+  fields      FormField[]
+  submissions FormSubmission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum FormFieldType {
+  TEXT
+  TEXTAREA
+  EMAIL
+  PHONE
+  NUMBER
+  DATE
+  SELECT
+  RADIO
+  CHECKBOX
+  CHECKBOXES
+}
+
+/// One question.
+///
+/// Soft-deleted rather than removed: an answer points at the field it answered,
+/// so deleting the row outright would leave a year of submissions with a column
+/// nobody can name. A deleted field simply stops being asked.
+model FormField {
+  id       String        @id @default(cuid())
+  form     Form          @relation(fields: [formId], references: [id], onDelete: Cascade)
+  formId   String
+  label    String
+  type     FormFieldType @default(TEXT)
+  /// A line under the question, for the thing the label can't say briefly.
+  help     String?
+  required Boolean       @default(false)
+  /// One option per line, for the types that offer a choice.
+  options  String?
+  position Int           @default(0)
+
+  deletedAt DateTime?
+  createdAt DateTime     @default(now())
+  answers   FormAnswer[]
+
+  @@index([formId, position])
+}
+
+model FormSubmission {
+  id     String  @id @default(cuid())
+  form   Form    @relation(fields: [formId], references: [id], onDelete: Cascade)
+  formId String
+  /// Null when a visitor sent it, which is most of them.
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId String?
+
+  /// Whoever has read it, so a card doesn't get followed up twice or not at all.
+  handledAt DateTime?
+  handledBy String?
+
+  answers   FormAnswer[]
+  createdAt DateTime     @default(now())
+
+  @@index([formId, createdAt])
+  @@index([userId])
+}
+
+/// One answer, tied to the field it answered rather than to the label it was
+/// asked under — so renaming a question doesn't rewrite history.
+model FormAnswer {
+  id           String         @id @default(cuid())
+  submission   FormSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submissionId String
+  field        FormField      @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  fieldId      String
+  /// Every answer is text. A number typed into a form is a number somebody
+  /// typed, and a checkbox list is its chosen options joined by a newline —
+  /// which keeps one shape to read, export and search.
+  value        String
+
+  @@unique([submissionId, fieldId])
+  @@index([fieldId])
 }

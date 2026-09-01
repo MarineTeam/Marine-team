@@ -88,6 +88,7 @@ export const ADMIN_GROUPS: AdminGroup[] = [
       // registration list carries names and phone numbers that /admin/videos
       // never does.
       { href: "/admin/events", label: "Events", visible: (a) => a.canManageEvents },
+      { href: "/admin/forms", label: "Forms", visible: (a) => a.canManageEvents },
     ],
   },
   {

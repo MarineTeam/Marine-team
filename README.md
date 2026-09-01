@@ -602,6 +602,19 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   - `manage_events` is a new capability rather than a reuse of
     `manage_files`: a registration list carries names, phone numbers and
     addresses that the media library never does.
+- **A form's questions are rows, and its answers point at those rows**
+  (`lib/forms.ts` for the rules, `lib/forms-query.ts` for the reads). Two
+  consequences are the design: renaming a question can't detach its answers,
+  and deleting one is replaced by `deletedAt` — a hard delete would cascade a
+  year of answers away, or leave them under a column nobody can name.
+  `columnsFor` puts live questions first and retired ones after, so an export
+  never silently drops what somebody actually said.
+  - The split between those two files is load-bearing rather than tidiness:
+    the fill-in component is `"use client"`, and one value imported from a
+    module that reaches `lib/db` bundles PrismaClient into the browser.
+    `client-bundle.test.ts` walks every client component's value imports
+    transitively and fails on any that reach it — a class of bug that
+    type-checks, lints and builds, and only shows up as a blank page.
 - **A rota lives beside the running order**: `ServiceTeam` / `ServiceTeamMember`
   are the pick-list, `ServiceAssignment` is one ask with its answer, and
   `ServiceBlockout` is when somebody is away. The job is free text on the
