@@ -615,6 +615,20 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     `client-bundle.test.ts` walks every client component's value imports
     transitively and fails on any that reach it — a class of bug that
     type-checks, lints and builds, and only shows up as a blank page.
+- **The prayer wall's two decisions are one function each** (`lib/prayer.ts`):
+  `canSee` for whether a reader may see a request at all, `bylineFor` for what
+  they may be told about who wrote it. Every read path — the wall, the
+  moderation queue, the API — goes through `visibleTo`, which composes them.
+  The alternative is a `where` clause copied between four queries that
+  eventually disagree, and here disagreement means somebody's name on
+  something they asked to post anonymously.
+  - Anonymity is not a missing column: the row keeps `userId` so the writer
+    can delete their own and a moderator can act on abuse. It is enforced by
+    `bylineFor` being the only place a name is allowed out, and by
+    `VisiblePrayer` having no `userId` field to populate.
+  - The narrowing `where` in `listPrayers` exists for the query planner;
+    `visibleTo` is still what decides, so widening it cannot widen who sees
+    what.
 - **A rota lives beside the running order**: `ServiceTeam` / `ServiceTeamMember`
   are the pick-list, `ServiceAssignment` is one ask with its answer, and
   `ServiceBlockout` is when somebody is away. The job is free text on the

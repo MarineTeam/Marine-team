@@ -133,6 +133,15 @@ export function CardIcon({ className }: IconProps) {
   );
 }
 
+export function HandsIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M12 20.5c-3 0-5.5-2-6.5-4.5L4 12a1.5 1.5 0 0 1 2.6-1.4L8 12V5a1.5 1.5 0 0 1 3 0v5" />
+      <path d="M12 20.5c3 0 5.5-2 6.5-4.5L20 12a1.5 1.5 0 0 0-2.6-1.4L16 12V5a1.5 1.5 0 0 0-3 0v5" />
+    </Icon>
+  );
+}
+
 export function BookIcon({ className }: IconProps) {
   return (
     <Icon className={className}>

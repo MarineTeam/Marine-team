@@ -30,6 +30,8 @@ export type AdminAccess = {
   canShareContent: boolean;
   /** The diary, the sign-up sheets and the group list — one job, one grant. */
   canManageEvents: boolean;
+  /** Pastoral rather than administrative, so deliberately its own grant. */
+  canModeratePrayer: boolean;
   /** Anyone who can manage something that lands in the trash can empty it. */
   canSeeTrash: boolean;
 };
@@ -89,6 +91,10 @@ export const ADMIN_GROUPS: AdminGroup[] = [
       // never does.
       { href: "/admin/events", label: "Events", visible: (a) => a.canManageEvents },
       { href: "/admin/forms", label: "Forms", visible: (a) => a.canManageEvents },
+      // Its own gate, not canManageEvents: approving a request somebody wrote
+      // about their marriage is pastoral work, and often not the person who
+      // books the hall.
+      { href: "/admin/prayer", label: "Prayer wall", visible: (a) => a.canModeratePrayer },
     ],
   },
   {

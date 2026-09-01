@@ -901,6 +901,29 @@ term, and "add a box for dietary requirements" shouldn't need a release.
 - **Responses are marked dealt with, by name.** The way follow-up fails is two
   people each assuming the other rang.
 
+## Prayer wall
+
+Ask for prayer at `/prayer`, and pray for what others have asked.
+
+- **Nothing appears until somebody reads it.** Every request waits in a queue.
+  This is deliberately not a setting to turn off: an unmoderated prayer wall on
+  a church website is a liability with a "post" button.
+- **Anonymous means anonymous.** A request can be posted without a name. The
+  row still knows whose it is — so the writer can take it down and a moderator
+  can act if it is abusive — but no screen anywhere shows it, **including the
+  moderator's own queue**, because that screen gets left open on an office
+  laptop and a photograph of it is how an anonymous request stops being one.
+- **Three audiences**: anyone who visits the site, members, or only the people
+  who look after prayer — for the ones that shouldn't be a wall at all.
+- **You always see your own**, even while it is waiting. Otherwise writing one
+  and hearing nothing looks exactly like it having been thrown away.
+- **"I prayed for this" is a number, not a list of names.** The number is an
+  encouragement to whoever asked; the names would turn it into a scoreboard. It
+  needs an account only so that pressing it twice isn't two.
+- **Answered requests stay up**, with a line saying what happened — which is
+  the reason to keep a prayer wall rather than a suggestion box.
+- The page is never indexed, and the request text never reaches the audit log.
+
 ## Present mode
 
 A hymn's words on the screen at the front of the room. **Present** sits on a

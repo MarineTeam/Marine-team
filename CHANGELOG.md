@@ -146,6 +146,30 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **A prayer wall, moderated by default.** Requests written at `/prayer` wait
+  until somebody puts them up. That is not a setting: an unmoderated prayer
+  wall on a church website is a liability with a "post" button, and the day it
+  is abused is the day somebody would have gone looking for the switch.
+  - **Anonymous means anonymous.** The row still knows whose it is — the writer
+    has to be able to take it down, and a moderator has to be able to act if it
+    is abusive — so anonymity can't be a missing column. Exactly one function
+    decides what a reader is told about who wrote something, every read goes
+    through it, and it withholds the name from the moderator's own queue too:
+    that screen gets left open, and a screenshot of it is how an anonymous
+    request stops being one.
+  - **Three audiences**: anyone who visits, members, or only the people who
+    look after prayer. Checked on every read rather than on the page that
+    happens to list them.
+  - Whoever wrote a request always sees it, even while it waits — otherwise
+    writing one and waiting looks exactly like it having been binned.
+  - **"I prayed for this" is a count, never a list of names.** The number
+    encourages whoever asked; the names would make it a scoreboard.
+  - Marking one answered keeps it on the wall with what happened, which is the
+    reason to have a prayer wall at all.
+  - `moderate_prayer` is its own grant, apart from events and forms: approving
+    a request somebody wrote about their marriage is pastoral work, and often
+    not the person who books the hall.
+
 - **Forms, built here rather than in code.** The connect card in the pew, a
   camp application, a request for a visit — questions are rows an admin adds,
   because they change every term and a deploy is the wrong unit of change for

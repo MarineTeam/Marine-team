@@ -177,6 +177,8 @@ model User {
   authorizedEmailsAdded AuthorizedEmail[]     @relation("AuthorizedEmailAddedBy")
   eventRegistrations    EventRegistration[]
   formSubmissions       FormSubmission[]
+  prayerRequests        PrayerRequest[]
+  prayers               PrayerIntercession[]
 }
 
 /**
@@ -2129,4 +2131,86 @@ model FormAnswer {
 
   @@unique([submissionId, fieldId])
   @@index([fieldId])
+}
+
+/// Who may read a prayer request.
+enum PrayerVisibility {
+  /// Anyone who can open the page, account or not.
+  EVERYONE
+  /// Signed-in members.
+  MEMBERS
+  /// Only whoever moderates the wall. For the ones that shouldn't be a wall.
+  LEADERS
+}
+
+enum PrayerStatus {
+  /// Written, not yet let through. The default, deliberately.
+  PENDING
+  APPROVED
+  /// Approved, and since answered — the reason a prayer wall is worth keeping.
+  ANSWERED
+  /// Taken down by a moderator. Kept rather than deleted so the decision is a
+  /// record, and so taking one down twice isn't a different outcome.
+  HIDDEN
+}
+
+/// A prayer request.
+///
+/// The whole feature is a moderation problem wearing a list. Three things here
+/// are load-bearing and are enforced in `lib/prayer.ts` rather than left to
+/// whoever writes the next query:
+///
+///   1. Nothing is visible until somebody lets it through.
+///   2. `anonymous` means the name never leaves the server — the row still
+///      knows whose it is, so they can edit and delete it, and so a moderator
+///      can act if it is abusive, but no read path a member can reach carries
+///      it.
+///   3. `visibility` is checked on every read, not only on the page that
+///      happens to list them.
+model PrayerRequest {
+  id     String  @id @default(cuid())
+  /// Null when a visitor wrote it. Present but withheld when `anonymous`.
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId String?
+  /// The name to show, when there is one to show. A visitor types theirs;
+  /// a member's is taken from their account at the time of writing, so
+  /// changing a display name later doesn't rewrite old requests.
+  name   String?
+  body   String
+
+  anonymous  Boolean          @default(false)
+  visibility PrayerVisibility @default(MEMBERS)
+  status     PrayerStatus     @default(PENDING)
+
+  /// What happened, written when it is marked answered.
+  answeredNote String?
+  answeredAt   DateTime?
+  /// Who let it through, so a decision has a name against it.
+  moderatedBy  String?
+  moderatedAt  DateTime?
+
+  prayers   PrayerIntercession[]
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+/// "I prayed for this."
+///
+/// A count rather than a list of names, on the page and in the model's use: the
+/// number is an encouragement to whoever wrote the request, and the names
+/// would turn it into a scoreboard. Stored per person only so that pressing it
+/// twice isn't two.
+model PrayerIntercession {
+  id        String        @id @default(cuid())
+  request   PrayerRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestId String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime      @default(now())
+
+  @@unique([requestId, userId])
+  @@index([requestId])
 }

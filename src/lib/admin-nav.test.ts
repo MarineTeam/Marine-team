@@ -13,6 +13,7 @@ const NOTHING: AdminAccess = {
   canModerateComments: false,
   canShareContent: false,
   canManageEvents: false,
+  canModeratePrayer: false,
   canSeeTrash: false,
 };
 
@@ -28,6 +29,7 @@ const EVERYTHING: AdminAccess = {
   canModerateComments: true,
   canShareContent: true,
   canManageEvents: true,
+  canModeratePrayer: true,
   canSeeTrash: true,
 };
 
