@@ -192,6 +192,8 @@ model User {
   prayers               PrayerIntercession[]
   smallGroups           SmallGroupMember[]
   broadcastsReceived    BroadcastRecipient[]
+  liveChatMessages      LiveChatMessage[]
+  liveChatMutes         LiveChatMute[]
 }
 
 /**
@@ -1240,8 +1242,20 @@ model LiveStream {
   published     Boolean   @default(false)
   startAt       DateTime
   endAt         DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+
+  /// Whether the chat beside this stream is open at all. Off by default: a
+  /// carol service streamed to the wider world is not automatically a place
+  /// a church wants an unattended comment box.
+  chatEnabled  Boolean @default(false)
+  /// Seconds a member must wait between messages, on top of the flood limit.
+  /// Zero is off; a moderator raises it when a stream gets busy.
+  chatSlowMode Int     @default(0)
+
+  chatMessages LiveChatMessage[]
+  chatMutes    LiveChatMute[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([startAt])
 }
@@ -2493,4 +2507,50 @@ model VideoFeed {
   updatedAt DateTime @updatedAt
 
   @@unique([kind, externalId])
+}
+
+/// A message in the chat beside a live stream.
+///
+/// Polling rather than sockets, and that is a deployment fact rather than a
+/// preference: this app runs on serverless functions with no long-lived
+/// process to hold a socket open. `GET ?since=<id>` is what a page asks every
+/// few seconds, which is cheap because the query is one indexed range scan.
+model LiveChatMessage {
+  id         String     @id @default(cuid())
+  stream     LiveStream @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  streamId   String
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  /// The name as it stood when they wrote it, so a later change of display
+  /// name doesn't rewrite what a conversation looked like.
+  authorName String
+  body       String
+
+  /// Taken down by a moderator. Kept rather than deleted so the same message
+  /// can't be re-sent past a moderator by reposting, and so the record of the
+  /// decision survives.
+  hidden    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  /// The poll: every message on this stream after the last one seen.
+  @@index([streamId, id])
+  @@index([userId])
+}
+
+/// Somebody stopped from writing in a stream's chat.
+///
+/// Per stream rather than site-wide: silencing somebody for one evening is the
+/// proportionate act, and a site-wide ban is a different decision made
+/// somewhere else.
+model LiveChatMute {
+  id        String     @id @default(cuid())
+  stream    LiveStream @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  streamId  String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  /// Who did it, for the record.
+  mutedBy   String
+  createdAt DateTime   @default(now())
+
+  @@unique([streamId, userId])
 }

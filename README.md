@@ -691,6 +691,18 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     *don't touch* rather than to *overwrite*.
   - `lib/video-feeds.ts` is the provider layer, the same shape as
     `ScheduleProvider`: four feed kinds, two APIs, one `fetchFeed`.
+- **Live chat polls; it does not hold a socket** (`lib/live-chat.ts`). Nothing
+  here is long-lived enough to keep a connection open, so the client asks
+  `?since=<id>` — one indexed range scan on `(streamId, id)`, usually
+  returning nothing — and pauses the interval on `document.hidden`.
+  - `visibleMessages` drops hidden rows *after* the query as well as in it, so
+    a poll cannot hand a tab that was seconds behind a message a moderator has
+    just removed. Hidden rather than deleted, so the same message can't be
+    reposted past them.
+  - `chatState` closes the chat an hour after a stream ends. An unattended
+    comment box on an old stream is the failure mode this whole design is
+    arranged against; the messages stay readable, the input goes.
+  - Slow mode is computed per author (`waitSeconds`), not per stream.
 - **A rota lives beside the running order**: `ServiceTeam` / `ServiceTeamMember`
   are the pick-list, `ServiceAssignment` is one ask with its answer, and
   `ServiceBlockout` is when somebody is away. The job is free text on the

@@ -1030,6 +1030,29 @@ or showcase and brings them in nightly.
 - Needs `YOUTUBE_API_KEY` or `VIMEO_ACCESS_TOKEN`; without one the screen says
   which is missing rather than importing nothing every night in silence.
 
+## Live chat
+
+A chat beside a live stream, switched on per stream at `/admin/live`.
+
+- **Off unless somebody turns it on.** A members' prayer meeting and a carol
+  service streamed to the wider world are not the same decision.
+- **Open only while somebody is watching** — half an hour before the start
+  until an hour after the end. Early enough for people arriving to say hello,
+  long enough that the conversation a service starts isn't cut off
+  mid-sentence, and then closed. The messages stay readable; the box goes.
+- **Slow mode**, in seconds, raised by a moderator when a stream gets busy. It
+  counts from *that person's* last message, not the chat's — limiting the whole
+  chat would let one fast typist silence everybody else.
+- **Anyone can take down their own message; a moderator can take down
+  anybody's**, and mute somebody for that stream, which also hides everything
+  they have already written. A muted person is muted for the evening, not for
+  ever — a site-wide ban is a different decision, made calmly on a different
+  screen.
+- A removed message never reappears, even in a browser tab that was a few
+  seconds behind.
+- The page asks for new messages every few seconds and **stops entirely while
+  the tab is hidden** — a church leaves this open on a laptop all week.
+
 ## Present mode
 
 A hymn's words on the screen at the front of the room. **Present** sits on a

@@ -16,6 +16,12 @@ const updateSchema = z.object({
   startAt: z.string().optional(),
   endAt: z.string().optional().nullable(),
   published: z.boolean().optional(),
+  /// Off by default on a new stream: a carol service streamed to the wider
+  /// world is not automatically a place a church wants an unattended comment
+  /// box. See lib/live-chat.ts for when an enabled chat is actually open.
+  chatEnabled: z.boolean().optional(),
+  /// Seconds between one person's messages. Raised when a stream gets busy.
+  chatSlowMode: z.number().int().min(0).max(300).optional(),
 });
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -1,12 +1,30 @@
 import { getCurrentLiveStream, getNextLiveStream } from "@/lib/content";
+import { getCurrentUser } from "@/lib/current-user";
+import { chatMessage, chatState } from "@/lib/live-chat";
 import { isPluginEnabled } from "@/lib/plugins";
+import { LiveChat } from "@/components/live-chat";
 import { PremiereCountdown } from "@/components/premiere-countdown";
+
+export const dynamic = "force-dynamic";
 
 export default async function LivePage() {
   const liveOn = await isPluginEnabled("live-streaming");
-  const [current, next] = liveOn
-    ? await Promise.all([getCurrentLiveStream(), getNextLiveStream()])
-    : [null, null];
+  const [cachedCurrent, cachedNext, user] = liveOn
+    ? await Promise.all([getCurrentLiveStream(), getNextLiveStream(), getCurrentUser()])
+    : [null, null, null];
+
+  // Both of these come through `unstable_cache`, which stores its answer as
+  // JSON — so the `DateTime` columns arrive back as strings however the types
+  // read. Anything calling a Date method on them throws at run time, in
+  // production only, on the one page nobody loads until a service starts.
+  const current = cachedCurrent
+    ? {
+        ...cachedCurrent,
+        startAt: new Date(cachedCurrent.startAt),
+        endAt: cachedCurrent.endAt ? new Date(cachedCurrent.endAt) : null,
+      }
+    : null;
+  const next = cachedNext ? { ...cachedNext, startAt: new Date(cachedNext.startAt) } : null;
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
@@ -32,6 +50,15 @@ export default async function LivePage() {
               allowFullScreen
             />
           </div>
+
+          {/* Rendered with the state the server worked out, so the panel is
+              right on the first paint rather than after the first poll. */}
+          <LiveChat
+            streamId={current.id}
+            signedIn={Boolean(user)}
+            initialState={chatState(current)}
+            message={chatMessage(chatState(current))}
+          />
         </div>
       )}
 

@@ -146,6 +146,36 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Chat beside a live stream.** Polling rather than sockets, because this app
+  runs on serverless functions with nothing long-lived to hold a connection
+  open — each poll asks only for what has arrived since the last id it saw, so
+  the usual answer is an empty array, and the page stops asking entirely while
+  the tab is hidden.
+  - **Off by default, and only open while somebody is watching**: from half an
+    hour before the start to an hour after the end. An unattended comment box
+    left standing on last year's carol service is exactly where the thing you
+    don't want written gets written.
+  - **Slow mode is per person, not per chat** — rate-limiting the whole chat
+    would let one fast typist silence everybody else — and sits on top of a
+    flood limit that is also per person.
+  - **Taking a message down hides rather than deletes it**, so it can't be
+    reposted past a moderator, and hidden is filtered in the poll as well as
+    the query: a message a moderator has just removed must not arrive at a tab
+    that was a few seconds behind.
+  - **Muting is per stream.** Silencing somebody for one evening is the
+    proportionate act while a service is going on; a site-wide ban is a
+    different decision made elsewhere, calmly.
+  - A message carries the author's name as it stood when they wrote it, so a
+    later change of display name doesn't rewrite what a conversation looked
+    like. No account id reaches the browser.
+
+- **Fixed: `/live` threw in production whenever a stream was live.**
+  `getCurrentLiveStream` goes through `unstable_cache`, which stores its answer
+  as JSON — so the `DateTime` columns come back as strings however the types
+  read, and anything calling a `Date` method on them throws. It is now
+  converted at the boundary, which also fixes the countdown for the next
+  stream.
+
 - **Videos can live at YouTube or Vimeo.** A church that already streams its
   service every Sunday has the sermon there before it thinks about this app;
   re-uploading it costs storage, bandwidth and somebody's Sunday afternoon.
