@@ -94,6 +94,7 @@ export const ADMIN_GROUPS: AdminGroup[] = [
       // Its own gate, not canManageEvents: approving a request somebody wrote
       // about their marriage is pastoral work, and often not the person who
       // books the hall.
+      { href: "/admin/groups", label: "Small groups", visible: (a) => a.canManageEvents },
       { href: "/admin/prayer", label: "Prayer wall", visible: (a) => a.canModeratePrayer },
     ],
   },

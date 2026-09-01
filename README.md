@@ -629,6 +629,19 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   - The narrowing `where` in `listPrayers` exists for the query planner;
     `visibleTo` is still what decides, so widening it cannot widen who sees
     what.
+- **A small group's address is structurally hard to leak** (`lib/groups.ts`).
+  `area` and `address` are separate columns; `presentGroup` is the only thing
+  that decides whether the second travels, and `VisibleGroup` declares
+  `address?` — absent rather than null when withheld, so a page that forgets
+  to check renders nothing instead of a home. Verified against a running
+  server: the string appears in neither the API response nor the page's HTML
+  for a visitor, a signed-in stranger, or somebody who has only asked to join.
+  - "Has asked to join" deliberately doesn't qualify. If it did, anyone with
+    an account could learn a leader's address by pressing a button — the
+    leader's answer is what turns a stranger into somebody who is coming.
+  - Leaders act through `canLead` on their own group rather than through a
+    capability: whoever hosts the Tuesday group shouldn't need an admin grant
+    to answer somebody knocking on their own door.
 - **A rota lives beside the running order**: `ServiceTeam` / `ServiceTeamMember`
   are the pick-list, `ServiceAssignment` is one ask with its answer, and
   `ServiceBlockout` is when somebody is away. The job is free text on the

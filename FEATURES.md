@@ -924,6 +924,31 @@ Ask for prayer at `/prayer`, and pray for what others have asked.
   the reason to keep a prayer wall rather than a suggestion box.
 - The page is never indexed, and the request text never reaches the audit log.
 
+## Small groups
+
+The home groups and studies that meet during the week, at `/groups`.
+
+- **Where it meets is two questions, not one.** A district ("North side, near
+  the station") is on the page for anybody. The address is given only to people
+  actually in the group. Most of these meet in somebody's living room, and an
+  address that has been public once stays somewhere for good.
+- **Asking to join is a request the leader answers**, and that is what keeps
+  the address safe rather than being politeness: somebody who has only asked is
+  not given it, or anyone with an account could learn where a leader lives by
+  pressing a button.
+- **A leader is not staff.** Whoever hosts the Tuesday group answers the people
+  who have asked, on the group's own page — no admin access, no capability to
+  be granted, no ticket to whoever runs the website.
+- **A full group stays on the list and says so.** The question somebody has is
+  "can I come"; "not this one, it's full" answers it, and hiding the group
+  doesn't.
+- **A group with no leader is flagged**, because it looks perfectly fine on the
+  list while having nobody to answer a request.
+- Only a yes is a notification: a no is a conversation, and a push saying "you
+  were turned down" is the wrong way for anybody to hear it.
+- Members see their groups at `/profile/groups`, and can leave or withdraw a
+  request at any time.
+
 ## Present mode
 
 A hymn's words on the screen at the front of the room. **Present** sits on a

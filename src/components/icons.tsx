@@ -142,6 +142,16 @@ export function HandsIcon({ className }: IconProps) {
   );
 }
 
+export function PeopleIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <circle cx="9" cy="8" r="3.25" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+      <path d="M16 5.5a3.25 3.25 0 0 1 0 6.5M17 14.5a6.5 6.5 0 0 1 4.5 5.5" />
+    </Icon>
+  );
+}
+
 export function BookIcon({ className }: IconProps) {
   return (
     <Icon className={className}>

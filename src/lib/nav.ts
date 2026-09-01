@@ -37,6 +37,7 @@ export type NavIcon =
   | "ticket"
   | "card"
   | "hands"
+  | "people"
   | "shield";
 
 export type NavItem = {
@@ -103,6 +104,7 @@ export const getShellNav = cache(async (): Promise<ShellNav> => {
   // The connect card, and whatever else there is to fill in.
   if (plugins.forms) browse.push({ href: "/forms", label: "Forms", icon: "card" });
   if (plugins.prayer) browse.push({ href: "/prayer", label: "Prayer", icon: "hands" });
+  if (plugins.groups) browse.push({ href: "/groups", label: "Small groups", icon: "people" });
 
   const library: NavItem[] = categories.map((category) => ({
     href: `/categories/${category.slug}`,
@@ -130,6 +132,9 @@ export const getShellNav = cache(async (): Promise<ShellNav> => {
     }
     if (plugins.events) {
       mine.push({ href: "/profile/events", label: "Your events", icon: "ticket" });
+    }
+    if (plugins.groups) {
+      mine.push({ href: "/profile/groups", label: "Your groups", icon: "people" });
     }
   }
 

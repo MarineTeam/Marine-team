@@ -179,6 +179,7 @@ model User {
   formSubmissions       FormSubmission[]
   prayerRequests        PrayerRequest[]
   prayers               PrayerIntercession[]
+  smallGroups           SmallGroupMember[]
 }
 
 /**
@@ -2213,4 +2214,73 @@ model PrayerIntercession {
 
   @@unique([requestId, userId])
   @@index([requestId])
+}
+
+/// A small group: a home group, a youth group, a men's Bible study.
+///
+/// The thing this model is most careful about is the address. A group that
+/// meets in somebody's living room must not publish where they live to the
+/// open internet — so `address` is separate from `area`, and only somebody in
+/// the group is ever given it. Getting that wrong once is not recoverable.
+model SmallGroup {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  description String?
+
+  /// When it meets, as free text: "Tuesdays, 7.30pm", "alternate Wednesdays".
+  /// Every group says it differently and a schedule table would be a second
+  /// thing to keep true.
+  meetsWhen String?
+  /// Roughly where, and safe to publish: "North side", "near the station".
+  area      String?
+  /// Exactly where. Shown only to people in the group — see lib/groups.ts.
+  address   String?
+
+  published  Boolean @default(false)
+  /// Whether it is taking new people at all. A group that is full is still
+  /// worth listing, because the answer to "can I come" is then a real one.
+  openToJoin Boolean @default(true)
+  /// Roughly how many it can hold, counting only the people actually in it.
+  capacity   Int?
+
+  members   SmallGroupMember[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([published])
+}
+
+enum GroupRole {
+  LEADER
+  MEMBER
+}
+
+enum GroupMemberStatus {
+  /// Asked to join; the leader hasn't answered.
+  REQUESTED
+  ACTIVE
+  /// The leader said no, or somebody left. Kept so the same person asking
+  /// again is a conversation rather than a surprise.
+  DECLINED
+}
+
+model SmallGroupMember {
+  id      String     @id @default(cuid())
+  group   SmallGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId String
+  user    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String
+
+  role   GroupRole         @default(MEMBER)
+  status GroupMemberStatus @default(REQUESTED)
+  /// What they said when they asked.
+  note   String?
+
+  respondedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([groupId, userId])
+  @@index([userId, status])
+  @@index([groupId, status])
 }

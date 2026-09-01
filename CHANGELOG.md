@@ -146,6 +146,27 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Small groups.** A directory at `/groups` of the home groups and studies
+  that meet during the week, with join requests the group's own leader answers.
+  - **The address is the whole design.** Most of these meet in somebody's
+    living room, so a group has two "where" fields: `area`, a district, safe to
+    print; and `address`, a house, given only to people actually in the group.
+    One function decides which, and the type a page receives has no required
+    `address` on it — so a page that forgets to check has nothing to print
+    rather than printing a home. An address that has been on the open internet
+    once stays somewhere for good.
+  - **Asking to join is a request, not a join**, and that is what keeps the
+    address safe: somebody who has merely asked is not given it, or anybody
+    with an account could learn where a leader lives by pressing a button.
+  - **A leader is not staff.** Whoever hosts the Tuesday group answers requests
+    on the group's own page, with no admin access and no capability grant.
+  - **A full group stays listed and says it's full** — the question somebody
+    has is "can I come", and "not this one" answers it. A group with no leader
+    is flagged in the admin list, because nobody can answer a request to join
+    it.
+  - Only a yes is a notification. A no is a conversation, and a push saying
+    "you were turned down" is the wrong way for anybody to hear it.
+
 - **A prayer wall, moderated by default.** Requests written at `/prayer` wait
   until somebody puts them up. That is not a setting: an unmoderated prayer
   wall on a church website is a liability with a "post" button, and the day it

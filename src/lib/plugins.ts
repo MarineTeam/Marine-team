@@ -28,6 +28,7 @@ export const PLUGIN_META = [
   { slug: "book-reader", name: "Book reader", description: "Opens PDF and EPUB files in an in-app reader with contents, search, highlights and read-aloud, instead of only offering them as downloads." },
   { slug: "schedules", name: "Schedules", description: "Rotas anyone can read at /calendar — fed from a Google Sheet or managed here. Names rather than accounts, for the people who never log in." },
   { slug: "events", name: "Events", description: "Published events at /events with sign-up: capacity, a waiting list that moves when somebody drops out, and guests." },
+  { slug: "groups", name: "Small groups", description: "A directory of home groups at /groups, with join requests a leader answers. The address is given only to people in the group." },
   { slug: "prayer", name: "Prayer wall", description: "A moderated wall of prayer requests at /prayer, with an anonymous option and an \"I prayed for this\" count. Nothing appears until it is let through." },
   { slug: "forms", name: "Forms", description: "Connect cards and sign-up forms built here rather than in code, filled in at /forms, with the responses kept and exportable." },
 ] as const;
