@@ -4,7 +4,7 @@ import { SeriesTile } from "@/components/series-tile";
 import { MenuTile } from "@/components/menu-tile";
 import { searchContent, getSearchFilterOptions } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
-import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
+import { videoThumbnailUrl } from "@/lib/video-source";
 
 export default async function SearchPage({
   searchParams,
@@ -147,7 +147,7 @@ export default async function SearchPage({
                 href={`/videos/${video.slug}`}
                 title={video.title}
                 subtitle={video.series?.title ?? video.description}
-                thumbnailUrl={bunnyStreamThumbnailUrl(video.bunnyVideoId, video.thumbnailFileName)}
+                thumbnailUrl={videoThumbnailUrl(video)}
                 badge={video.memberOnly ? "Members" : undefined}
               />
             ))}

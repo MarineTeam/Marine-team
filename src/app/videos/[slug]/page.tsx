@@ -30,7 +30,6 @@ import { hasCapability } from "@/lib/permissions";
 import { getShareOptions } from "@/lib/share-links";
 import { getDownloadAvailability } from "@/lib/downloads";
 import { getPluginStates } from "@/lib/plugins";
-import { bunnyStreamEmbedUrl, bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { WatchProgressTracker } from "@/components/watch-progress-tracker";
 import { VideoPlayer } from "@/components/video-player";
 import { FavoriteButton } from "@/components/favorite-button";
@@ -52,6 +51,7 @@ import { SermonOutline } from "@/components/sermon-outline";
 import { UpNextPanel } from "@/components/up-next-panel";
 import { PremiereCountdown } from "@/components/premiere-countdown";
 import { ViewEventBeacon } from "@/components/view-event-beacon";
+import { sourceName, videoEmbedUrl, videoThumbnailUrl, watchAtSourceUrl } from "@/lib/video-source";
 
 /**
  * Mirrors the page body's own restraint: a video the current visitor can't
@@ -74,7 +74,7 @@ export async function generateMetadata({
   const description = video.description
     ? truncateDescription(video.description)
     : `Watch ${video.title}${video.series ? ` from ${video.series.title}` : ""} on Marine Team.`;
-  const thumbnailUrl = bunnyStreamThumbnailUrl(video.bunnyVideoId, video.thumbnailFileName) || undefined;
+  const thumbnailUrl = videoThumbnailUrl(video) || undefined;
 
   return {
     title: video.title,
@@ -143,10 +143,10 @@ export default async function VideoPage({
     "@type": "VideoObject",
     name: video.title,
     description: video.description || `Watch ${video.title} on Marine Team.`,
-    thumbnailUrl: [bunnyStreamThumbnailUrl(video.bunnyVideoId, video.thumbnailFileName)],
+    thumbnailUrl: [videoThumbnailUrl(video)],
     uploadDate: video.createdAt.toISOString(),
     ...(video.durationSeconds ? { duration: `PT${video.durationSeconds}S` } : {}),
-    ...(video.status === "READY" ? { embedUrl: bunnyStreamEmbedUrl(video.bunnyVideoId) } : {}),
+    ...(video.status === "READY" ? { embedUrl: videoEmbedUrl(video) } : {}),
   };
   const breadcrumbItems: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
@@ -321,7 +321,7 @@ export default async function VideoPage({
         <CastButton
           videoId={video.id}
           title={video.title}
-          artworkUrl={bunnyStreamThumbnailUrl(video.bunnyVideoId, video.thumbnailFileName) || undefined}
+          artworkUrl={videoThumbnailUrl(video) || undefined}
         />
       )}
 
@@ -337,10 +337,26 @@ export default async function VideoPage({
           )}
         </div>
       ) : video.status === "READY" ? (
-        <VideoPlayer
-          embedUrl={bunnyStreamEmbedUrl(video.bunnyVideoId, resumeAt)}
-          chapters={chaptersOn ? chapters : []}
-        />
+        <>
+          <VideoPlayer
+            embedUrl={videoEmbedUrl(video, resumeAt)}
+            chapters={chaptersOn ? chapters : []}
+          />
+          {/* Some people would rather watch where it lives — and a church that
+              wants the view counted there has a reason to make it easy. */}
+          {watchAtSourceUrl(video) && (
+            <p className="mt-2 text-xs text-sec">
+              <a
+                href={watchAtSourceUrl(video) as string}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent hover:underline"
+              >
+                Watch on {sourceName(video.source)} →
+              </a>
+            </p>
+          )}
+        </>
       ) : (
         <div className="aspect-video flex items-center justify-center rounded-lg bg-chip text-sec">
           This video is still processing. Please check back soon.
@@ -373,7 +389,7 @@ export default async function VideoPage({
         <UpNextPanel
           href={`/videos/${upNext.slug}`}
           title={upNext.title}
-          thumbnailUrl={bunnyStreamThumbnailUrl(upNext.bunnyVideoId, upNext.thumbnailFileName)}
+          thumbnailUrl={videoThumbnailUrl(upNext)}
           durationSeconds={video.durationSeconds}
           resumeAtSeconds={resumeAt}
         />
@@ -391,7 +407,7 @@ export default async function VideoPage({
                 href={`/videos/${v.slug}`}
                 title={v.title}
                 subtitle={v.series?.title}
-                thumbnailUrl={bunnyStreamThumbnailUrl(v.bunnyVideoId, v.thumbnailFileName)}
+                thumbnailUrl={videoThumbnailUrl(v)}
               />
             ))}
           </div>

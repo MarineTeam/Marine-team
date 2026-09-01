@@ -3,10 +3,10 @@ import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { getPlaylist, getPublicPlaylist } from "@/lib/content";
 import { getDisplayName } from "@/lib/profile";
-import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { PlaylistDetail } from "@/components/playlist-detail";
 import { MenuTile } from "@/components/menu-tile";
 import { ShareButtons } from "@/components/share-buttons";
+import { videoThumbnailUrl } from "@/lib/video-source";
 
 export default async function PlaylistPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -23,7 +23,7 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
               ...item,
               video: {
                 ...item.video,
-                thumbnailUrl: bunnyStreamThumbnailUrl(item.video.bunnyVideoId, item.video.thumbnailFileName),
+                thumbnailUrl: videoThumbnailUrl(item.video),
               },
             })),
           }}
@@ -75,7 +75,7 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
               href={`/videos/${item.video.slug}`}
               title={item.video.title}
               subtitle={item.video.series?.title}
-              thumbnailUrl={bunnyStreamThumbnailUrl(item.video.bunnyVideoId, item.video.thumbnailFileName)}
+              thumbnailUrl={videoThumbnailUrl(item.video)}
             />
           ))}
         </div>

@@ -28,13 +28,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 401 });
   }
 
-  const stuck = await prisma.video.findMany({ where: { status: "PROCESSING", deletedAt: null } });
+  // Bunny's own, only: an imported video is never PROCESSING here, and if one
+  // somehow were there is no encode to ask about.
+  const stuck = await prisma.video.findMany({
+    where: { status: "PROCESSING", deletedAt: null, source: "BUNNY", bunnyVideoId: { not: null } },
+  });
 
   let updated = 0;
   const errors: string[] = [];
   for (const video of stuck) {
     try {
-      const data = await bunnyGetStreamVideo(video.bunnyVideoId);
+      const data = await bunnyGetStreamVideo(video.bunnyVideoId as string);
       const status = mapBunnyStreamStatus(data.status);
       if (status !== "PROCESSING") {
         await prisma.video.update({
@@ -60,6 +64,11 @@ export async function GET(request: NextRequest) {
     where: {
       status: "READY",
       deletedAt: null,
+      // Bunny's own, only: an imported YouTube or Vimeo video has no encode
+      // here to ask about, and asking would be a request per video per day
+      // for an answer that cannot exist.
+      source: "BUNNY",
+      bunnyVideoId: { not: null },
       OR: [{ hasMp4Fallback: null }, { hasMp4Fallback: false }],
     },
     orderBy: { updatedAt: "asc" },
@@ -70,7 +79,7 @@ export async function GET(request: NextRequest) {
   let mp4Found = 0;
   for (const video of withoutMp4) {
     try {
-      const data = await bunnyGetStreamVideo(video.bunnyVideoId);
+      const data = await bunnyGetStreamVideo(video.bunnyVideoId as string);
       const hasMp4Fallback = data.hasMP4Fallback === true;
       await prisma.video.update({
         where: { id: video.id },

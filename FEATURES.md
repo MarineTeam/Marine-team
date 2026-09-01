@@ -1003,6 +1003,33 @@ by adding one file.
   the filter useless in the church that most needs it, where most of the
   archive predates anybody thinking about this.
 
+## Importing from YouTube and Vimeo
+
+A church that streams its service to YouTube every Sunday already has the
+sermon there. `/admin/video-feeds` points at a channel, playlist, Vimeo account
+or showcase and brings them in nightly.
+
+- **An imported video is an ordinary video.** It goes in a series, gets a
+  speaker and scripture references, appears in search, can be favourited and
+  put in a playlist — it simply plays in the source's own frame, with a
+  "Watch on YouTube" link for anyone who would rather.
+- **Editing an import sticks.** Rename "Sunday Service 12/10/25 || FULL
+  SERVICE" to "The Cost of Discipleship" and no later sync will undo it. Each
+  field is compared against what the source said last time, so untouched fields
+  keep updating and edited ones are left alone — one field at a time, so
+  renaming the title doesn't stop the description importing.
+- **New imports arrive unpublished** unless the feed says otherwise, because a
+  church that streams its whole service doesn't want the twenty minutes of an
+  empty stage appearing on its own site.
+- **What an imported video cannot do**, and says so rather than failing:
+  downloads (there is no file of ours), captions (they are the source's),
+  automatic transcription (it needs a file), and thumbnail upload. The download
+  button doesn't appear at all.
+- **A feed that hasn't changed costs one request**, and removing a feed keeps
+  the videos it brought in.
+- Needs `YOUTUBE_API_KEY` or `VIMEO_ACCESS_TOKEN`; without one the screen says
+  which is missing rather than importing nothing every night in silence.
+
 ## Present mode
 
 A hymn's words on the screen at the front of the room. **Present** sits on a

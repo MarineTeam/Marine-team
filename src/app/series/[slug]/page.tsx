@@ -25,7 +25,6 @@ import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
 import { getShareOptions } from "@/lib/share-links";
 import { getPluginStates } from "@/lib/plugins";
-import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { FavoriteButton } from "@/components/favorite-button";
 import { WatchLaterButton } from "@/components/watch-later-button";
 import { SubscribeButton } from "@/components/subscribe-button";
@@ -45,6 +44,7 @@ import { fileBook, pdfsOf } from "@/lib/hymnal";
 import { bookCacheTag } from "@/lib/reader-cache";
 import { CommentSection } from "@/components/comment-section";
 import { ViewEventBeacon } from "@/components/view-event-beacon";
+import { videoThumbnailUrl } from "@/lib/video-source";
 
 /**
  * Mirrors the page body's own restraint: a member-only series the current
@@ -70,7 +70,7 @@ export async function generateMetadata({
   const firstVideo = series.videos[0];
   const thumbnailUrl =
     series.coverImageUrl ??
-    (firstVideo ? bunnyStreamThumbnailUrl(firstVideo.bunnyVideoId, firstVideo.thumbnailFileName) || undefined : undefined);
+    (firstVideo ? videoThumbnailUrl(firstVideo) || undefined : undefined);
 
   return {
     title: series.title,
@@ -301,10 +301,7 @@ export default async function SeriesPage({
                       subtitle={
                         sequenceLocked ? "Watch the previous episode first" : video.description
                       }
-                      thumbnailUrl={bunnyStreamThumbnailUrl(
-                        video.bunnyVideoId,
-                        video.thumbnailFileName,
-                      )}
+                      thumbnailUrl={videoThumbnailUrl(video)}
                       badge={badge}
                     />
                   );

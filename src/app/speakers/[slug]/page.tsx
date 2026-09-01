@@ -5,8 +5,8 @@ import { notFound } from "next/navigation";
 import { MenuTile } from "@/components/menu-tile";
 import { getSpeakerBySlug } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
-import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { truncateDescription } from "@/lib/seo";
+import { videoThumbnailUrl } from "@/lib/video-source";
 
 // Speaker bios and photos are public regardless of login state — the
 // videos list below badges member-only entries individually rather than
@@ -82,7 +82,7 @@ export default async function SpeakerPage({
               href={`/videos/${v.slug}`}
               title={v.title}
               subtitle={v.series?.title ?? v.description}
-              thumbnailUrl={bunnyStreamThumbnailUrl(v.bunnyVideoId, v.thumbnailFileName)}
+              thumbnailUrl={videoThumbnailUrl(v)}
               badge={v.memberOnly ? "Members" : undefined}
             />
           ))}

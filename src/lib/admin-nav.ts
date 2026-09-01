@@ -71,6 +71,9 @@ export const ADMIN_GROUPS: AdminGroup[] = [
       { href: "/admin/videos", label: "Videos", visible: always },
       { href: "/admin/speakers", label: "Speakers", visible: (a) => a.canManageVideosSiteWide },
       { href: "/admin/live", label: "Live streaming", visible: (a) => a.canManageVideosSiteWide },
+      // Same gate as videos: an imported video is a video, and whoever may
+      // manage those may decide where they come from.
+      { href: "/admin/video-feeds", label: "Import from YouTube", visible: (a) => a.canManageVideosSiteWide },
       { href: "/admin/files", label: "Files", visible: always },
       // A plan is a list of files, so whoever may arrange the library may
       // arrange a service — see the services API for why that's the gate.

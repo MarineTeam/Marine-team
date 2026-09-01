@@ -10,7 +10,8 @@ import {
   descendantCategoryIds,
 } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
-import { bunnyCreateStreamVideo, bunnyStreamTusSignature, bunnyStreamThumbnailUrl } from "@/lib/bunny";
+import { bunnyCreateStreamVideo, bunnyStreamTusSignature } from "@/lib/bunny";
+import { videoThumbnailUrl } from "@/lib/video-source";
 
 const createSchema = z
   .object({
@@ -64,7 +65,7 @@ export async function GET() {
     // (which uses node:crypto and can't be bundled into a client component).
     const withThumbnails = videos.map((v) => ({
       ...v,
-      thumbnailPreviewUrl: bunnyStreamThumbnailUrl(v.bunnyVideoId, v.thumbnailFileName),
+      thumbnailPreviewUrl: videoThumbnailUrl(v),
     }));
     return NextResponse.json(withThumbnails);
   } catch (error) {

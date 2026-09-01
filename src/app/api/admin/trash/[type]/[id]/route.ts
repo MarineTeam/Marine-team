@@ -82,7 +82,9 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
       }
       case "video": {
         const video = await prisma.video.findUniqueOrThrow({ where: { id } });
-        await bunnyDeleteStreamVideo(video.bunnyVideoId);
+        // An imported video has no asset of ours to delete; the row goes and
+        // the video carries on existing at YouTube or Vimeo, which is right.
+        if (video.bunnyVideoId) await bunnyDeleteStreamVideo(video.bunnyVideoId);
         await prisma.video.delete({ where: { id } });
         name = video.title;
         break;

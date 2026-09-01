@@ -22,7 +22,7 @@ import {
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { getPluginStates } from "@/lib/plugins";
-import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
+import { videoThumbnailUrl } from "@/lib/video-source";
 
 /**
  * Mirrors the page body's own restraint: a member-only category the current
@@ -53,7 +53,7 @@ export async function generateMetadata({
   const thumbnailUrl =
     category.coverImageUrl ??
     seriesThumbnail ??
-    (firstVideo ? bunnyStreamThumbnailUrl(firstVideo.bunnyVideoId, firstVideo.thumbnailFileName) || null : null) ??
+    (firstVideo ? videoThumbnailUrl(firstVideo) || null : null) ??
     undefined;
 
   return {
@@ -228,7 +228,7 @@ export default async function CategoryPage({
                     href={`/videos/${video.slug}`}
                     title={video.title}
                     subtitle={video.description}
-                    thumbnailUrl={bunnyStreamThumbnailUrl(video.bunnyVideoId, video.thumbnailFileName)}
+                    thumbnailUrl={videoThumbnailUrl(video)}
                     badge={video.memberOnly ? "Members" : undefined}
                   />
                 ))}

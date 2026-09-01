@@ -677,6 +677,20 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   - `device-settings.ts` keeps its own copy of the language list so that the
     module every page imports to read a preference doesn't pull two catalogues
     with it; `i18n.test.ts` asserts the copies agree.
+- **`Video.source` decides which player fills the frame** (`lib/video-source.ts`).
+  `bunnyVideoId` became nullable rather than an empty string, which made the
+  type-checker enumerate every Bunny-only capability — downloads, captions,
+  MP4 renditions, encode-status sync, transcription — and each now refuses an
+  imported video with a reason instead of failing at the API call. The three
+  players all take a start time, so chapters and resume work unchanged.
+  - The sync (`lib/video-feed-sync.ts`) keeps `importedTitle` /
+    `importedDescription` beside the live fields and only overwrites a field
+    whose live value still equals the imported one. Without that three-way
+    comparison every nightly sync silently undoes the edits made after the
+    last one. A null `imported*` means "we don't know", which resolves to
+    *don't touch* rather than to *overwrite*.
+  - `lib/video-feeds.ts` is the provider layer, the same shape as
+    `ScheduleProvider`: four feed kinds, two APIs, one `fetchFeed`.
 - **A rota lives beside the running order**: `ServiceTeam` / `ServiceTeamMember`
   are the pick-list, `ServiceAssignment` is one ask with its answer, and
   `ServiceBlockout` is when somebody is away. The job is free text on the

@@ -38,7 +38,9 @@ export async function transcribeNextQueued(): Promise<TranscribeOutcome> {
   });
 
   const video = await prisma.video.findFirst({
-    where: { transcriptStatus: "QUEUED", deletedAt: null },
+    // A transcription service wants a file, and only a video stored here has
+    // one we can hand it — an imported video's audio isn't ours to fetch.
+    where: { transcriptStatus: "QUEUED", deletedAt: null, source: "BUNNY", bunnyVideoId: { not: null } },
     orderBy: { transcriptStartedAt: { sort: "asc", nulls: "first" } },
     select: { id: true, title: true, bunnyVideoId: true, mp4Resolutions: true },
   });
@@ -67,7 +69,7 @@ export async function transcribeNextQueued(): Promise<TranscribeOutcome> {
       );
     }
 
-    const source = await fetch(bunnyStreamMp4Url(video.bunnyVideoId, height));
+    const source = await fetch(bunnyStreamMp4Url(video.bunnyVideoId as string, height));
     if (!source.ok) return await fail(`Couldn't fetch the video's audio (${source.status}).`);
 
     const audio = await source.blob();

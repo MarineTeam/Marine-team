@@ -371,17 +371,44 @@ model Series {
 }
 
 model Video {
-  id                  String                @id @default(cuid())
-  title               String
-  slug                String                @unique
-  description         String?
-  bunnyVideoId        String
-  bunnyLibraryId      String
+  id                   String                @id @default(cuid())
+  title                String
+  slug                 String                @unique
+  description          String?
+  /// Where the video actually lives. BUNNY is the library this app uploads
+  /// to; the others are somebody else's player in an iframe.
+  source               VideoSource           @default(BUNNY)
+  /// Null for a video that isn't in Bunny at all — see `source`. Everything
+  /// that reads this (downloads, captions, MP4 renditions, the encode-status
+  /// sync) is a Bunny-only capability, so a null here is the honest way to
+  /// say "that doesn't apply", rather than an empty string every caller has
+  /// to remember to check.
+  bunnyVideoId         String?
+  bunnyLibraryId       String?
+  /// The id at YouTube or Vimeo. Unique per source, which is what stops a
+  /// re-sync importing the same video twice.
+  externalId           String?
+  /// The page a viewer would land on at the source, for a "watch on YouTube"
+  /// link and for an admin checking what was imported.
+  externalUrl          String?
+  /// The thumbnail the source gave us. Bunny computes its own from the video.
+  externalThumbnailUrl String?
+  /// The title and description as the source had them at the last sync.
+  ///
+  /// Kept so a re-sync can tell "nobody has touched this, take the new
+  /// wording" from "somebody rewrote it here, leave it alone" — comparing the
+  /// live field against this rather than overwriting blind. Without it, every
+  /// sync undoes the edits an admin made after the last one.
+  importedTitle        String?
+  importedDescription  String?
+  /// Which feed imported it, so removing a feed can say what it brought in.
+  feed                 VideoFeed?            @relation(fields: [feedId], references: [id], onDelete: SetNull)
+  feedId               String?
   // Bunny stores the thumbnail under a per-video file name, which is only
   // "thumbnail.jpg" for auto-generated ones — setting a custom thumbnail
   // (via our admin UI or Bunny's dashboard) changes it. Synced from the
   // Bunny API; null falls back to the "thumbnail.jpg" default.
-  thumbnailFileName   String?
+  thumbnailFileName    String?
   // Bunny's MP4-fallback state for this video, cached from the Stream API by
   // the sync routes so the download endpoint reads Postgres instead of
   // calling Bunny on every tap. Null means "never synced" — the download
@@ -390,11 +417,11 @@ model Video {
   // Per-video, not per-library: enabling MP4 Fallback in Bunny's encoding
   // settings only affects later uploads, so an older video sits at false
   // until it's re-uploaded or repackaged.
-  hasMp4Fallback      Boolean?
+  hasMp4Fallback       Boolean?
   // Bunny's `availableResolutions`, verbatim (e.g. "240p,360p,480p"). Kept as
   // the raw string so it survives Bunny adding renditions we don't know yet;
   // parseBunnyResolutions is what interprets it.
-  mp4Resolutions      String?
+  mp4Resolutions       String?
   // Full text transcript, admin-entered. Shown in a collapsible panel by
   // the Transcripts plugin and matched by search when that plugin is on.
   /// The language this was recorded in, as a BCP-47 tag ("en", "es").
@@ -403,8 +430,8 @@ model Video {
   /// screens, and this says what a sermon is actually in. Null means nobody
   /// has said, which is treated as the site's default rather than as "any" —
   /// guessing would file every unlabelled sermon under every language.
-  language            String?
-  transcript          String?
+  language             String?
+  transcript           String?
   /// Where an automatic transcription of this video has got to: null for a
   /// video nobody has asked to transcribe, then QUEUED → RUNNING → DONE, or
   /// FAILED with the reason in `transcriptError`.
@@ -413,68 +440,71 @@ model Video {
   /// per video and the video is what anybody looks at to find out. See
   /// /api/cron/transcribe for why a queue exists at all: transcribing an hour
   /// of audio takes minutes, which is longer than a request may live.
-  transcriptStatus    String?
-  transcriptError     String?
+  transcriptStatus     String?
+  transcriptError      String?
   /// When the current attempt started, so one that died mid-run — a function
   /// killed at its timeout writes nothing — can be noticed and retried rather
   /// than sitting in RUNNING for ever.
-  transcriptStartedAt DateTime?
+  transcriptStartedAt  DateTime?
   // A fill-in-the-blank note outline for this talk, written by an admin as
   // plain text with three-or-more underscores marking each gap. Held here
   // rather than in a table of its own for the same reason as the transcript:
   // it is one piece of text belonging to one video. See lib/outline.ts.
-  noteOutline         String?
+  noteOutline          String?
   // Free-form Bible references entered by the admin (e.g. "John 3:16-18"),
   // shown as chips on the video page and matched by search; also powers
   // /scripture/[book] listings, matching Series.tags' book-of-a-verse-first
   // token as the "book" for that route.
-  scriptureRefs       String[]              @default([])
-  durationSeconds     Int?
-  status              VideoStatus           @default(PROCESSING)
-  memberOnly          Boolean               @default(false)
+  scriptureRefs        String[]              @default([])
+  durationSeconds      Int?
+  status               VideoStatus           @default(PROCESSING)
+  memberOnly           Boolean               @default(false)
   // Tri-state download override — see Category.downloadEnabled. The most
   // specific level, so this wins over its series and category.
-  downloadEnabled     Boolean?
-  hidden              Boolean               @default(false)
-  published           Boolean               @default(false)
-  publishAt           DateTime?
-  unpublishAt         DateTime?
+  downloadEnabled      Boolean?
+  hidden               Boolean               @default(false)
+  published            Boolean               @default(false)
+  publishAt            DateTime?
+  unpublishAt          DateTime?
   // Soft delete — see Category.deletedAt. The Bunny Stream asset itself
   // isn't removed until the trash entry is permanently purged.
-  deletedAt           DateTime?
-  isPremiere          Boolean               @default(false)
-  position            Int                   @default(0)
-  series              Series?               @relation(fields: [seriesId], references: [id], onDelete: SetNull)
-  seriesId            String?
+  deletedAt            DateTime?
+  isPremiere           Boolean               @default(false)
+  position             Int                   @default(0)
+  series               Series?               @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  seriesId             String?
   // Set only when seriesId is null: a video attached straight to a category,
   // skipping the series layer for categories that don't need it (see FileAsset.categoryId too).
-  category            Category?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  categoryId          String?
+  category             Category?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId           String?
   // Who preached/presented this video; optional since not every video is a sermon.
-  speaker             Speaker?              @relation(fields: [speakerId], references: [id], onDelete: SetNull)
-  speakerId           String?
-  watchProgress       WatchProgress[]
-  favoritedBy         VideoFavorite[]
-  comments            Comment[]
-  ratings             Rating[]
-  watchLaterBy        VideoWatchLater[]
-  viewCount           Int                   @default(0)
-  reactions           Reaction[]
-  viewEvents          ViewEvent[]
-  playlistItems       PlaylistItem[]
-  viewerGroups        VideoViewerGroup[]
-  viewers             VideoViewer[]
-  chapters            Chapter[]
-  sermonNotes         SermonNote[]
-  outlineAnswers      SermonOutlineAnswer[]
-  shareLinks          ShareLink[]
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  speaker              Speaker?              @relation(fields: [speakerId], references: [id], onDelete: SetNull)
+  speakerId            String?
+  watchProgress        WatchProgress[]
+  favoritedBy          VideoFavorite[]
+  comments             Comment[]
+  ratings              Rating[]
+  watchLaterBy         VideoWatchLater[]
+  viewCount            Int                   @default(0)
+  reactions            Reaction[]
+  viewEvents           ViewEvent[]
+  playlistItems        PlaylistItem[]
+  viewerGroups         VideoViewerGroup[]
+  viewers              VideoViewer[]
+  chapters             Chapter[]
+  sermonNotes          SermonNote[]
+  outlineAnswers       SermonOutlineAnswer[]
+  shareLinks           ShareLink[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 
+  /// One row per video per source: a re-sync updates rather than duplicates.
+  @@unique([source, externalId])
   @@index([seriesId])
   @@index([categoryId])
   @@index([speakerId])
   @@index([language])
+  @@index([feedId])
 }
 
 // A named timestamp within a video (e.g. "Intro", "Q&A"), for the Chapters
@@ -2411,4 +2441,56 @@ model BroadcastRecipient {
   /// One row per person per channel, so a resumed run can't send twice.
   @@unique([broadcastId, channel, address])
   @@index([broadcastId, status])
+}
+
+/// Where a video is played from.
+enum VideoSource {
+  BUNNY
+  YOUTUBE
+  VIMEO
+}
+
+enum VideoFeedKind {
+  YOUTUBE_CHANNEL
+  YOUTUBE_PLAYLIST
+  VIMEO_USER
+  VIMEO_SHOWCASE
+}
+
+/// A channel, playlist or account to import videos from.
+///
+/// The point of this over uploading twice is a church that already streams to
+/// YouTube every Sunday: the sermon is already there, and re-uploading it to
+/// Bunny costs storage, bandwidth and somebody's Sunday afternoon.
+model VideoFeed {
+  id         String        @id @default(cuid())
+  kind       VideoFeedKind
+  /// The channel id, playlist id, Vimeo user id or showcase id.
+  externalId String
+  name       String
+
+  /// Where imported videos land. One of these, or neither for unfiled.
+  seriesId   String?
+  categoryId String?
+
+  /// Whether an import is published straight away. Off by default: a church
+  /// that streams its whole service to YouTube does not want the twenty
+  /// minutes of an empty stage before it starts appearing on its own site.
+  autoPublish Boolean @default(false)
+  /// How many to look back over on each sync. Enough to catch a re-upload,
+  /// small enough that a daily job stays cheap.
+  lookBack    Int     @default(25)
+  enabled     Boolean @default(true)
+
+  lastSyncedAt   DateTime?
+  lastSyncStatus String?
+  lastError      String?
+  /// The upstream payload's fingerprint, so an unchanged feed does no writes.
+  fingerprint    String?
+
+  videos    Video[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([kind, externalId])
 }

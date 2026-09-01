@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { errorResponse } from "@/lib/api-guard";
+import { ApiError, errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureContentAccess } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { bunnyAddCaption, bunnyDeleteCaption, bunnyGetStreamVideo } from "@/lib/bunny";
@@ -9,11 +9,26 @@ import { bunnyAddCaption, bunnyDeleteCaption, bunnyGetStreamVideo } from "@/lib/
 // image upload's size, but capped for the same request-body reason.
 const MAX_CAPTION_BYTES = 1 * 1024 * 1024;
 
+/**
+ * The video, once it is established that captions are even a thing it has.
+ *
+ * Captions here are Bunny's — read from it live, written to it. An imported
+ * YouTube or Vimeo video has captions, but they are the source's, managed
+ * where the video lives; this route has nothing to act on. Narrowing the type
+ * is what makes every handler below stop having to ask.
+ */
 async function loadVideo(id: string) {
   const user = await ensureStaff();
   const video = await prisma.video.findUniqueOrThrow({ where: { id } });
   await ensureContentAccess(user, { seriesId: video.seriesId, categoryId: video.categoryId });
-  return { user, video };
+  if (!video.bunnyVideoId) {
+    throw new ApiError(
+      400,
+      "not_hosted_here",
+      "That video isn't stored here, so its captions are managed where it lives.",
+    );
+  }
+  return { user, video: { ...video, bunnyVideoId: video.bunnyVideoId } };
 }
 
 /** Current caption tracks for a video, read live from Bunny (source of truth — nothing is cached in our DB). */

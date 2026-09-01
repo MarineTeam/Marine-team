@@ -146,6 +146,32 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Videos can live at YouTube or Vimeo.** A church that already streams its
+  service every Sunday has the sermon there before it thinks about this app;
+  re-uploading it costs storage, bandwidth and somebody's Sunday afternoon.
+  - An imported video is an **ordinary video row** — filed into a series, given
+    a speaker and scripture references, searched, favourited, added to a
+    playlist — that happens to play in the source's own frame. Chapters work,
+    because every player takes a start time.
+  - **A sync never overwrites an edit made here.** Each imported field is kept
+    twice: the live one, and what the source last said. A field is replaced
+    only when the live value still equals the imported one — which is exactly
+    "nobody has touched this". Rename an import to "The Cost of Discipleship"
+    and tonight's sync leaves the title alone while still taking the new
+    description.
+  - `bunnyVideoId` is **nullable** now rather than an empty string, so every
+    Bunny-only feature — downloads, captions, MP4 renditions, the encode-status
+    sync, transcription — has to answer for itself what an imported video
+    means. Each one refuses with a sentence saying why, and the download button
+    doesn't appear at all.
+  - A feed that hasn't changed does no writes and no second API call. Removing
+    a feed keeps the videos it brought in: they have been filed and watched,
+    and deleting them because the *source* was tidied up would be the
+    surprising reading.
+  - YouTube through the no-cookie player with related videos off — a sermon on
+    a church's own site shouldn't end in a wall of somebody else's
+    recommendations — and Vimeo with do-not-track on.
+
 - **The app speaks more than one language.** The `language` device setting had
   one option and nothing read it; it is real now, with English and Spanish.
   - **A catalogue is a typed object, so a missing key doesn't compile.**
