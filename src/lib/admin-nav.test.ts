@@ -12,6 +12,7 @@ const NOTHING: AdminAccess = {
   canManageFiles: false,
   canModerateComments: false,
   canShareContent: false,
+  canManageEvents: false,
   canSeeTrash: false,
 };
 
@@ -26,6 +27,7 @@ const EVERYTHING: AdminAccess = {
   canManageFiles: true,
   canModerateComments: true,
   canShareContent: true,
+  canManageEvents: true,
   canSeeTrash: true,
 };
 

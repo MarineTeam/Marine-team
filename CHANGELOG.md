@@ -146,6 +146,27 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Events, with sign-up that can run out.** Published at `/events` with a
+  date, a place and a description; the interesting part is the number.
+  - **The last place is given to one person.** Everything that decides "is
+    there room" happens under a lock on the event row, so four people pressing
+    the button in the same second get one yes and three waiting-list places
+    rather than four yeses and an overbooked hall.
+  - **The waiting list moves when somebody drops out** — and stops at the first
+    party that doesn't fit rather than skipping ahead to a smaller one. Two
+    places free and a family of four at the front means nobody moves: passing
+    over that family to seat the couple behind them is the thing people notice
+    and rightly resent. Raising the capacity moves it too, in the same breath,
+    and says how many moved.
+  - **Guests count as places**, because a guest sits somewhere.
+  - **You don't need an account.** The people a church most wants at a men's
+    breakfast are the ones who have never made one, so sign-up takes a name and
+    an email; `Members only` is how an event closes that. Only people with an
+    account are ever notified: an address typed into a public form is not one
+    this app has agreed to write to.
+  - The list an organiser prints comes out as CSV, and says who is a member and
+    who isn't — the one thing the sign-up form didn't ask.
+
 - **Schedules, brought over from the calendar app.** Any number of recurring
   rotas — Breakbread, Welcome, Sound — read at `/calendar` by people who never
   log in, and fed either from a Google Sheet somebody already maintains or

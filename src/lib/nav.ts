@@ -34,6 +34,7 @@ export type NavIcon =
   | "person"
   | "download"
   | "calendar"
+  | "ticket"
   | "shield";
 
 export type NavItem = {
@@ -94,6 +95,9 @@ export const getShellNav = cache(async (): Promise<ShellNav> => {
   if (plugins["live-streaming"]) browse.push({ href: "/live", label: "Live", icon: "live" });
   // The running order for a service — what somebody opens on the way in.
   if (plugins["service-plans"]) browse.push({ href: "/services", label: "Services", icon: "calendar" });
+  // What's on. Public, because the people it most wants to reach are the ones
+  // who have never made an account.
+  if (plugins.events) browse.push({ href: "/events", label: "Events", icon: "ticket" });
 
   const library: NavItem[] = categories.map((category) => ({
     href: `/categories/${category.slug}`,
@@ -118,6 +122,9 @@ export const getShellNav = cache(async (): Promise<ShellNav> => {
     }
     if (plugins.downloads) {
       mine.push({ href: "/profile/downloads", label: "Downloads", icon: "download" });
+    }
+    if (plugins.events) {
+      mine.push({ href: "/profile/events", label: "Your events", icon: "ticket" });
     }
   }
 

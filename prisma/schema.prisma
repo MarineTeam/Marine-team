@@ -175,6 +175,7 @@ model User {
   readingMarks          ReadingMark[]
   identities            UserIdentity[]
   authorizedEmailsAdded AuthorizedEmail[]     @relation("AuthorizedEmailAddedBy")
+  eventRegistrations    EventRegistration[]
 }
 
 /**
@@ -1933,4 +1934,91 @@ model CalendarEventPerson {
   @@unique([eventId, personId])
   @@index([personId])
   @@index([eventId, position])
+}
+
+/// An event people sign up for: a men's breakfast, a youth weekend, a carol
+/// service with limited seats.
+///
+/// Separate from `CalendarEvent` (a rota date read off a spreadsheet) and from
+/// `ServicePlan` (the running order of a Sunday) on purpose. Those two answer
+/// "who is on" and "what is being sung"; this one answers "is there a place
+/// for me", which is the only one of the three with a number that can run out.
+model Event {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  title       String
+  description String?
+  location    String?
+
+  startsAt DateTime
+  /// Null for something with no stated finish.
+  endsAt   DateTime?
+  allDay   Boolean   @default(false)
+
+  /// Drafts stay off the members' list until somebody is happy with it.
+  published  Boolean @default(false)
+  /// Only signed-in members may see it, and so only they may register.
+  memberOnly Boolean @default(false)
+
+  /// Whether sign-up is offered at all. An event can be worth publishing
+  /// with nothing to fill in — a carol service everyone simply comes to.
+  registration Boolean   @default(false)
+  /// Places, counting guests. Null is unlimited.
+  capacity     Int?
+  /// Whether a full event still takes names, in order, for a place that frees up.
+  waitlist     Boolean   @default(true)
+  /// The window sign-up is open in. Either end may be absent.
+  opensAt      DateTime?
+  closesAt     DateTime?
+  /// How many extra people one registration may bring. 0 means just yourself.
+  maxGuests    Int       @default(0)
+
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  registrations EventRegistration[]
+
+  @@index([published, startsAt])
+  @@index([startsAt])
+}
+
+enum RegistrationStatus {
+  GOING
+  WAITLIST
+  CANCELLED
+}
+
+/// One sign-up.
+///
+/// `userId` is nullable because the people a church most wants at an event are
+/// the ones who have never made an account. A registration always carries its
+/// own name and email, even when an account is attached, so the list an
+/// organiser prints is complete whether or not everyone on it is a member.
+model EventRegistration {
+  id      String  @id @default(cuid())
+  event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId String
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId  String?
+
+  name   String
+  email  String
+  phone  String?
+  /// Extra people coming with them; a registration takes `1 + guests` places.
+  guests Int     @default(0)
+  note   String?
+
+  status      RegistrationStatus @default(GOING)
+  /// Set when a waitlisted place was promoted, so the confirmation can say so
+  /// and an organiser can see it happened.
+  promotedAt  DateTime?
+  cancelledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One live registration per account per event. Cancelling keeps the row —
+  /// it is the record that they were coming — so a re-registration reuses it.
+  @@unique([eventId, userId])
+  @@index([eventId, status, createdAt])
+  @@index([userId])
 }

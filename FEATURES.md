@@ -848,6 +848,36 @@ per-device subscriptions; this app's push is keyed to an account. Linking a
 name to a member's account is what turns reminders on for them, and everyone
 else still has the calendar, which is the source of truth.
 
+## Events
+
+What's on, at `/events`, and who is coming.
+
+- **A date, a place, a description**, and optionally sign-up. Plenty of events
+  are worth publishing with nothing to fill in — a carol service everybody
+  simply comes to — so sign-up is a switch rather than an assumption.
+- **You don't need an account to sign up.** The people a church most wants at a
+  men's breakfast are the ones who have never made one. **Members only** is how
+  an event closes that, and such an event is invisible — not refused — to
+  anyone not signed in, because a title is a leak too.
+- **Places, and what happens when they run out.** A guest counts as a place,
+  because a guest sits somewhere. When it is full, sign-up becomes a waiting
+  list, or refuses outright if the waiting list is turned off.
+- **The last place goes to one person.** Everything that decides "is there
+  room" happens under a lock on the event, so four people pressing the button
+  in the same second get one yes and three places on the list — not four yeses
+  and an overbooked hall.
+- **The waiting list moves by itself** when somebody drops out, and again when
+  an organiser raises the capacity. It **stops at the first party that doesn't
+  fit** rather than skipping ahead to a smaller one: two places free and a
+  family of four at the front means nobody moves, because passing over that
+  family to seat the couple behind them is exactly what people notice and
+  rightly resent. Whoever moves up is told.
+- **Members see their own sign-ups** at `/profile/events`, and can cancel from
+  there or from the event.
+- **Organisers get the list**, on screen and as a CSV for the door, a
+  mail-merge or a spreadsheet — with a column saying who is a member, which is
+  the one thing the sign-up form didn't ask.
+
 ## Present mode
 
 A hymn's words on the screen at the front of the room. **Present** sits on a

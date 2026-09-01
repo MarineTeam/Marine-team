@@ -587,6 +587,21 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     doesn't touch its events' `updatedAt` and a day leaving the window is
     never reported deleted. `Snapshot` lives in `lib/schedules/types.ts`, not
     beside the query that builds it, because the merging runs in a browser.
+- **An event's capacity is decided under a row lock** (`lib/events.ts`):
+  `SELECT … FOR UPDATE` on the `Event` row inside the transaction that writes
+  the registration, so concurrent sign-ups for the last place serialise per
+  event while other events proceed in parallel — and without the
+  serialisation failures a `Serializable` transaction would make the caller
+  retry. Reading the count outside the transaction and writing inside is the
+  version of this that overbooks under load. Promotion off the waiting list
+  happens in that same transaction, because "a place is free" and "you have
+  it" must never be two facts another request can slip between.
+  - The decision itself (`registrationState`, `promotable`) is pure and
+    tested without a database, including the rule that promotion stops at the
+    first party too big to fit rather than skipping to a smaller one.
+  - `manage_events` is a new capability rather than a reuse of
+    `manage_files`: a registration list carries names, phone numbers and
+    addresses that the media library never does.
 - **A rota lives beside the running order**: `ServiceTeam` / `ServiceTeamMember`
   are the pick-list, `ServiceAssignment` is one ask with its answer, and
   `ServiceBlockout` is when somebody is away. The job is free text on the

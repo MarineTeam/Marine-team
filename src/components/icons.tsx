@@ -115,6 +115,15 @@ export function CalendarIcon({ className }: IconProps) {
   );
 }
 
+export function TicketIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M3.5 8.5V6.5a1 1 0 0 1 1-1h15a1 1 0 0 1 1 1v2a2.5 2.5 0 0 0 0 7v2a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-2a2.5 2.5 0 0 0 0-7z" />
+      <path d="M14 5.5v13" />
+    </Icon>
+  );
+}
+
 export function BookIcon({ className }: IconProps) {
   return (
     <Icon className={className}>

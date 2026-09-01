@@ -28,6 +28,8 @@ export type AdminAccess = {
   canManageFiles: boolean;
   canModerateComments: boolean;
   canShareContent: boolean;
+  /** The diary, the sign-up sheets and the group list — one job, one grant. */
+  canManageEvents: boolean;
   /** Anyone who can manage something that lands in the trash can empty it. */
   canSeeTrash: boolean;
 };
@@ -77,6 +79,15 @@ export const ADMIN_GROUPS: AdminGroup[] = [
       // The other kind of rota: names on a spreadsheet, read by people with
       // no account. Same gate — it is the same job.
       { href: "/admin/schedules", label: "Schedules", visible: (a) => a.canManageFiles },
+    ],
+  },
+  {
+    label: "Church life",
+    links: [
+      // A different job from the media library, and a different gate: a
+      // registration list carries names and phone numbers that /admin/videos
+      // never does.
+      { href: "/admin/events", label: "Events", visible: (a) => a.canManageEvents },
     ],
   },
   {
