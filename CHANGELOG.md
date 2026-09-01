@@ -215,6 +215,17 @@ All notable changes to this project are documented here. Format follows
   it type-checks, lints and builds. It caught two real cases the moment it was
   written.
 
+- **Every scheduled job now runs at most once a day.** Two of the crons added
+  with the schedules and transcription features were hourly, which Vercel's
+  Hobby plan rejects at deploy time — so the whole deployment failed with
+  "Hobby accounts are limited to daily cron jobs" rather than the jobs merely
+  running too often. `cron.test.ts` now asserts it, since nothing else in the
+  build does.
+  - **Transcription is bounded by time rather than by a count.** It was one
+    video per run, which was fine hourly and would have meant one video a day
+    on a daily cron. A run now takes as many as fit inside the function's own
+    limit and leaves the rest queued.
+
 - **Events, with sign-up that can run out.** Published at `/events` with a
   date, a place and a description; the interesting part is the number.
   - **The last place is given to one person.** Everything that decides "is

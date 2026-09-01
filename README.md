@@ -875,20 +875,44 @@ To change the schema:
 
 ### Scheduled jobs
 
-`vercel.json` declares two crons, both guarded by the same `CRON_SECRET`
-bearer-token check (Vercel Cron attaches it automatically):
+**Every schedule here runs at most once a day, and that is a hard constraint
+rather than a preference.** Vercel's Hobby plan refuses anything more frequent
+at *deploy* time — the whole deployment fails with "Hobby accounts are limited
+to daily cron jobs" — so an hourly entry in `vercel.json` is not a job that
+runs too often, it is a site that doesn't go live. `cron.test.ts` asserts it,
+because nothing else in the build does. On a paid plan, tighten these and
+delete that test deliberately.
 
-- `/api/cron/notification-digest`, daily at 13:00 UTC. Batches every queued
+`vercel.json` declares five crons, all guarded by the same `CRON_SECRET`
+bearer-token check (Vercel Cron attaches it automatically), and all at
+different minutes so two never share a run:
+
+- `/api/cron/sync-schedules`, 05:30 UTC. Imports every Google Sheets schedule
+  whose own interval has elapsed; a schedule set to sync more often than daily
+  is effectively capped by this cadence. Before the reminders below, so they
+  go out on the morning's data rather than yesterday's.
+- `/api/cron/sync-video-status`, 06:00 UTC. Polls Bunny for every video still
+  stuck in `PROCESSING` and reconciles its status/duration/thumbnail, the same
+  as the admin's manual "Sync from Bunny" button — so a finished encode doesn't
+  sit unprocessed until someone happens to click refresh.
+- `/api/cron/notification-digest`, 13:00 UTC. Batches every queued
   `PendingNotification` per user into a single push and clears the queue —
   the only delivery path for members who chose the "Daily digest" frequency;
   if this cron isn't running, their notifications pile up and never arrive.
-- `/api/cron/sync-video-status`, daily at 06:00 UTC. Polls Bunny for every
-  video still stuck in `PROCESSING` and reconciles its status/duration/
-  thumbnail, the same as the admin's manual "Sync from Bunny" button — so a
-  finished encode doesn't sit unprocessed until someone happens to click
-  refresh. Daily is the Hobby-plan-safe cadence (Vercel's free tier only
-  allows once-a-day cron schedules); a Pro plan can tighten this to run
-  every few minutes if stuck videos need to resolve faster.
+- `/api/cron/schedule-reminders`, 18:00 UTC. Tells people what they are on for
+  tomorrow, one message however many rotas they are on.
+- `/api/cron/transcribe`, 02:00 UTC. Works through the transcription queue.
+  **Bounded by time, not by a count**: it takes as many videos as fit inside
+  the function's own limit (`maxDuration`, and the shorter `BUDGET_MS` it stops
+  starting new work at) and leaves the rest for tomorrow. It was one video per
+  run on an hourly cron, which on a daily cadence would have meant one video a
+  day — a church with forty untranscribed sermons waiting until Christmas. A
+  run killed mid-transcription leaves that video `RUNNING`; the stale sweep in
+  `transcribeNextQueued` re-queues anything stuck there for half an hour.
+  - Note the honest limit: on Hobby, `maxDuration` is 60s, and an hour of
+    audio may not transcribe inside that at all. A deployment that needs this
+    to work on long sermons wants a plan with a longer function timeout,
+    raising `maxDuration` and `BUDGET_MS` together.
 
 ### Preview deployments need their own database
 

@@ -19,10 +19,9 @@ export type TranscribeOutcome =
 /**
  * Transcribes one queued video, if there is one.
  *
- * Deliberately one per call. Transcribing an hour of audio takes minutes even
- * on a fast service, so a loop over a whole library would be a request that
- * never returns; a cron that does one at a time gets through a backlog
- * without any single run being long.
+ * The primitive. `transcribeQueued` below is what the cron calls: it drains
+ * as many of these as fit in the time a serverless function is allowed, which
+ * is the honest bound rather than an arbitrary count.
  */
 export async function transcribeNextQueued(): Promise<TranscribeOutcome> {
   const config = transcribeConfig();
@@ -88,4 +87,67 @@ export async function transcribeNextQueued(): Promise<TranscribeOutcome> {
           : "Transcription failed.",
     );
   }
+}
+
+export type DrainOutcome = {
+  done: number;
+  failed: number;
+  /** Still queued when the run stopped. */
+  remaining: number;
+  /** Why it stopped. */
+  stopped: "empty" | "out-of-time" | "not-configured";
+  ms: number;
+};
+
+/**
+ * Works through the queue for as long as there is time.
+ *
+ * This used to be one video per run, on an hourly cron. Vercel's Hobby plan
+ * allows a cron only once a day (see vercel.json), and one video a day would
+ * mean a church with forty untranscribed sermons waiting until Christmas — so
+ * the bound moved from a count to the thing that was actually being protected:
+ * the function's own time limit.
+ *
+ * It starts another video only if the slowest one so far would still fit in
+ * what is left, which is the cheapest estimate that doesn't need to know how
+ * long an unseen file is. The first is always attempted, even if it then
+ * overruns — a run killed mid-transcription leaves the video RUNNING, and the
+ * stale sweep at the top of `transcribeNextQueued` puts it back in the queue.
+ */
+export function hasTimeForAnother(elapsedMs: number, slowestMs: number, budgetMs: number): boolean {
+  return elapsedMs + slowestMs <= budgetMs;
+}
+
+export async function transcribeQueued(budgetMs: number): Promise<DrainOutcome> {
+  const started = Date.now();
+  const totals = { done: 0, failed: 0 };
+  let slowest = 0;
+  let stopped: DrainOutcome["stopped"] = "empty";
+
+  if (!transcribeConfig()) {
+    return { ...totals, remaining: 0, stopped: "not-configured", ms: 0 };
+  }
+
+  for (;;) {
+    // `slowest` is 0 on the first pass, so one is always attempted.
+    if (!hasTimeForAnother(Date.now() - started, slowest, budgetMs)) {
+      stopped = "out-of-time";
+      break;
+    }
+
+    const before = Date.now();
+    const outcome = await transcribeNextQueued();
+    if (outcome.status === "idle") break;
+
+    slowest = Math.max(slowest, Date.now() - before);
+    if (outcome.status === "done") totals.done += 1;
+    else totals.failed += 1;
+  }
+
+  return {
+    ...totals,
+    remaining: await prisma.video.count({ where: { transcriptStatus: "QUEUED", deletedAt: null } }),
+    stopped,
+    ms: Date.now() - started,
+  };
 }
