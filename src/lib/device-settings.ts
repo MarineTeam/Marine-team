@@ -85,6 +85,16 @@ export type DeviceSettings = {
    * every device starts with.
    */
   tabHrefs: string[] | null;
+  /**
+   * Who is looking at the calendar, as a Person id — chosen once on this
+   * device so a rota can answer "what am I on for".
+   *
+   * A preference, not a login: it grants access to nothing, and every
+   * schedule it filters is readable by anyone with the URL either way. Per
+   * device because that is what it is — the phone in somebody's pocket knows
+   * whose it is; the laptop in the church office does not.
+   */
+  calendarPersonId: string | null;
 };
 
 export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
@@ -99,6 +109,7 @@ export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
   presentTheme: "dark",
   readingTextScale: 1,
   tabHrefs: null,
+  calendarPersonId: null,
 };
 
 export const DEVICE_SETTINGS_KEY = "marine-device-settings";
@@ -158,6 +169,10 @@ export function parseDeviceSettings(raw: string | null | undefined): DeviceSetti
       typeof value.readingTextScale === "number" && Number.isFinite(value.readingTextScale)
         ? Math.min(MAX_READING_SCALE, Math.max(MIN_READING_SCALE, value.readingTextScale))
         : DEFAULT_DEVICE_SETTINGS.readingTextScale,
+    calendarPersonId:
+      typeof value.calendarPersonId === "string" && value.calendarPersonId.length <= 60
+        ? value.calendarPersonId
+        : DEFAULT_DEVICE_SETTINGS.calendarPersonId,
     presentTheme: value.presentTheme === "light" ? "light" : DEFAULT_DEVICE_SETTINGS.presentTheme,
     tabHrefs: parseTabHrefs(value.tabHrefs),
   };

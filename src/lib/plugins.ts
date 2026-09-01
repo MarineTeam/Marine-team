@@ -26,6 +26,7 @@ export const PLUGIN_META = [
   { slug: "downloads", name: "Downloads", description: "Lets members download videos to their device for offline viewing, with per-category/series/video control at /admin/downloads." },
   { slug: "service-plans", name: "Service plans", description: "Lets staff publish the running order of hymns for a service, which members open as one list at /services." },
   { slug: "book-reader", name: "Book reader", description: "Opens PDF and EPUB files in an in-app reader with contents, search, highlights and read-aloud, instead of only offering them as downloads." },
+  { slug: "schedules", name: "Schedules", description: "Rotas anyone can read at /calendar — fed from a Google Sheet or managed here. Names rather than accounts, for the people who never log in." },
 ] as const;
 
 export type PluginSlug = (typeof PLUGIN_META)[number]["slug"];

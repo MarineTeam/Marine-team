@@ -146,6 +146,25 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Schedules, brought over from the calendar app.** Any number of recurring
+  rotas — Breakbread, Welcome, Sound — read at `/calendar` by people who never
+  log in, and fed either from a Google Sheet somebody already maintains or
+  from the admin interface here. A separate feature from the service rota,
+  which schedules accounts against a service's running order; this schedules
+  names, most of which have no account.
+  - **No login for readers.** A name is chosen once on a device, like the
+    theme, and grants access to nothing.
+  - **Test connection** previews what the parser made of a spreadsheet before
+    anything is imported — including every row it skipped and why, because a
+    cell nobody can read is skipped and reported rather than guessed at.
+  - **A failed sync deletes nothing**, and an unchanged sheet does no writes.
+  - **Near-duplicate names are suggested for merging, never merged** — which
+    two names belong to one person is not a guess an app should act on.
+  - Reminders go through this app's existing push rather than a second stack,
+    which means somebody on a rota **without** an account doesn't get one.
+    The calendar remains the source of truth for them.
+
+
 - **A rota: who is serving, and whether they said yes.** A running order says
   what is being sung; it had no way to say who is there to do it. Teams
   (`/admin/teams`) are the groups you schedule from; the rota is built on the

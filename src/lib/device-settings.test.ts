@@ -32,6 +32,7 @@ describe("parseDeviceSettings", () => {
       presentTheme: "light",
       readingTextScale: 1.2,
       tabHrefs: ["/", "/categories/hymnals"],
+      calendarPersonId: "person_1",
     };
     expect(parseDeviceSettings(JSON.stringify(stored))).toEqual(stored);
   });

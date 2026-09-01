@@ -74,6 +74,9 @@ export const ADMIN_GROUPS: AdminGroup[] = [
       // The people who serve at those services — same gate, since whoever
       // arranges a service arranges who is at it.
       { href: "/admin/teams", label: "Teams", visible: (a) => a.canManageFiles },
+      // The other kind of rota: names on a spreadsheet, read by people with
+      // no account. Same gate — it is the same job.
+      { href: "/admin/schedules", label: "Schedules", visible: (a) => a.canManageFiles },
     ],
   },
   {

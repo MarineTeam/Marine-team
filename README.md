@@ -565,6 +565,19 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   and pinned by `offline-shell.test.ts`. EPUB scaling goes through
   `rendition.themes.fontSize` as a percentage: the book's pages live in an
   iframe with their own stylesheet, so a size set outside it reaches nothing.
+- **Schedules are a second, separate rota system**, ported from the calendar
+  app: `Schedule` / `ScheduleSource` / `CalendarEvent` / `Person`. The point of
+  its shape is the provider layer — `lib/schedules/provider.ts` picks a
+  `ScheduleProvider` (Google Sheets or the database) and nothing above it knows
+  which, so a schedule can switch source without a component changing.
+  `lib/sheets/` is the parsing (two layouts, forgiving dates, skip-and-report),
+  `lib/schedules/sync.ts` the import (resolve names to people, never delete on
+  failure, skip writes when the payload is unchanged).
+  - Adapted rather than copied where this app already had the machinery: its
+    `ApiError` folded into `errorResponse`, its audit into `logAudit`, its
+    in-memory rate limiter dropped for this app's database-backed one, and
+    `lib/schedules/http.ts` keeps the four idioms its twenty route handlers
+    were written against so they port without a rewrite.
 - **A rota lives beside the running order**: `ServiceTeam` / `ServiceTeamMember`
   are the pick-list, `ServiceAssignment` is one ask with its answer, and
   `ServiceBlockout` is when somebody is away. The job is free text on the

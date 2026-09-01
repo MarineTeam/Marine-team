@@ -5,6 +5,7 @@
     { "path": "/api/cron/notification-digest", "schedule": "0 13 * * *" },
     { "path": "/api/cron/sync-video-status", "schedule": "0 6 * * *" },
     { "path": "/api/cron/transcribe", "schedule": "15 * * * *" },
-    { "path": "/api/cron/sync-schedules", "schedule": "30 * * * *" }
+    { "path": "/api/cron/sync-schedules", "schedule": "30 * * * *" },
+    { "path": "/api/cron/schedule-reminders", "schedule": "0 18 * * *" }
   ]
 }

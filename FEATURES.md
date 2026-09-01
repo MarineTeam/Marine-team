@@ -763,6 +763,74 @@ Both live on the same plan.
 An unanswered ask stays on a member's rota page even after its date has
 passed: it doesn't stop being unanswered because the day went by.
 
+## Schedules (`/calendar`)
+
+The other kind of rota, brought over from the calendar app: any number of
+recurring schedules — Breakbread, Welcome, Sound, Senior Visit — read by
+people who never log in, and fed either from a Google Sheet somebody already
+maintains or from the admin interface here.
+
+Deliberately separate from the service rota above. That one puts **accounts**
+against a service's running order. This one puts **names** against recurring
+rotas, and most of those names have no account and are not going to make one.
+Gated by the **Schedules** plugin.
+
+### For everybody
+
+- **Choose your name once.** No account, no password: it is a preference on
+  that device, like the theme, and grants access to nothing — every schedule
+  here is readable by anyone with the URL either way. "Everyone" is a
+  first-class answer.
+- **What's next**, a **list** by day, or a **month grid**, filtered to one
+  schedule with the chip row and to yourself with **Only mine**.
+- The page is **not indexed**: it carries people's names.
+
+### For whoever keeps the rota (`/admin/schedules`)
+
+- A schedule is **managed here** or **fed by a Google Sheet**, and everything
+  downstream — the calendar, the API, the reminders — cannot tell which.
+  Switching one over later keeps the events already imported, as ordinary
+  editable rows.
+- **Test connection** shows the first few events exactly as the parser read
+  them, plus every row it skipped and why, *before* anything is imported. A
+  column mapping is guesswork until you can see what it made of the sheet.
+- Two spreadsheet layouts are understood: `Date | Names` with everyone in one
+  column, and `Date | Devin | Cindy | …` with a column each marked ×. A cell
+  with other text in it doubles as the job ("Bread"). Columns obviously not
+  people — Notes, Week, Location, Time — are skipped, so a sheet with a notes
+  column doesn't acquire a person called Notes.
+- Dates are read forgivingly: `July 10`, `july 10th`, `Sunday, July 12`,
+  `7/10`, `2026-07-10` and a real spreadsheet date all work. **A cell nobody
+  can read is skipped and reported, never guessed at** — one bad row never
+  aborts an import.
+- **A failed sync deletes nothing.** If Google is unreachable, what was
+  imported before stays exactly as it was, and a payload that hasn't changed
+  upstream does no writes at all.
+- **People** (`/admin/people`) are names, created automatically as they turn
+  up. Spellings that differ only in case, spacing or accents are already one
+  person; genuine near-duplicates ("Dave" and "Davey") are *suggested* for
+  merging and never merged automatically. A merge moves the history onto one
+  record and keeps the other spelling as an alias, so the next sync resolves
+  to the right person instead of recreating the duplicate.
+
+### Reminders, and what didn't come across
+
+A daily job tells people what they are on for tomorrow, one message however
+many rotas they are on — through this app's existing push, email and profile
+inbox rather than a second notification stack.
+
+That has a consequence worth stating plainly: **somebody on a rota with no
+account gets no reminder.** The calendar app reached them through anonymous
+per-device subscriptions; this app's push is keyed to an account. Linking a
+name to a member's account is what turns reminders on for them, and everyone
+else still has the calendar, which is the source of truth.
+
+The calendar app also cached its snapshot in IndexedDB so the whole thing
+worked offline. `/api/sync/snapshot` came across and answers, but nothing
+reads it yet — this app has its own offline shell, and wiring the calendar
+into that is a separate piece of work rather than a second offline mechanism
+bolted alongside.
+
 ## Present mode
 
 A hymn's words on the screen at the front of the room. **Present** sits on a
