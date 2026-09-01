@@ -146,6 +146,34 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Announcements: one message to everybody, by email, text or push.** Sent
+  from `/admin/broadcasts`, gated on `manage_users` — writing to every member
+  is closer to holding the membership list than to booking the hall.
+  - **The screen says how many people it will actually reach, before the send
+    button, and why the rest won't be.** A church with 400 members does not
+    have 400 addresses it may write to and certainly not 400 numbers it may
+    text; if that difference isn't shown, "I told everyone" is false and nobody
+    finds out until a family turns up to a cancelled service.
+  - **Three different consent rules, deliberately not one.** Email is on unless
+    somebody turned announcements off — and that is a *separate* switch from
+    "email me when a sermon publishes", because turning off new-video emails is
+    not asking to miss "the road is closed". SMS is off unless somebody said
+    yes and gave a number themselves. Push only reaches a device already signed
+    up. A phone number typed into a public event sign-up form is never treated
+    as consent to be texted.
+  - **Sending is resumable.** Recipients are frozen into rows with the address
+    copied in, then worked through in bounded batches, each marked as it goes —
+    so a run killed at 180 of 400 continues at 181 rather than emailing
+    everybody again. The admin screen drives the loop (which is what gives a
+    progress bar); a daily cron finishes anything abandoned.
+  - **Send yourself a test first**, and one bad address never stops the other
+    three hundred — a failure is recorded against that person with the
+    provider's own reason.
+  - SMS via Twilio or a generic JSON webhook, behind one interface. Unset says
+    which variables are missing rather than silently doing nothing. The
+    message's cost in segments is shown as you type, including the halving one
+    curly apostrophe causes.
+
 - **Small groups.** A directory at `/groups` of the home groups and studies
   that meet during the week, with join requests the group's own leader answers.
   - **The address is the whole design.** Most of these meet in somebody's

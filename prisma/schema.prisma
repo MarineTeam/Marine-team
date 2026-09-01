@@ -138,6 +138,17 @@ model User {
   // Opt-in email channel, independent of notificationFrequency (which only
   // governs push timing) — always sent immediately when a notification fires.
   emailNotifications    Boolean               @default(false)
+  /// A mobile number, given by the member themselves. Never imported.
+  phone                 String?
+  /// Whether they agreed to be texted. Off unless somebody says yes: a text
+  /// costs the church money and the recipient their attention, and in most
+  /// places sending one without consent is also illegal.
+  smsOptIn              Boolean               @default(false)
+  /// Whether church-wide announcements reach them by email. On by default,
+  /// and deliberately separate from `emailNotifications` above — somebody who
+  /// turned off "a new sermon is up" has not asked to miss "no service
+  /// tomorrow, the road is closed".
+  broadcastEmails       Boolean               @default(true)
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
   pendingNotifications  PendingNotification[]
@@ -180,6 +191,7 @@ model User {
   prayerRequests        PrayerRequest[]
   prayers               PrayerIntercession[]
   smallGroups           SmallGroupMember[]
+  broadcastsReceived    BroadcastRecipient[]
 }
 
 /**
@@ -2283,4 +2295,106 @@ model SmallGroupMember {
   @@unique([groupId, userId])
   @@index([userId, status])
   @@index([groupId, status])
+}
+
+/// Who a broadcast goes to.
+enum BroadcastAudience {
+  /// Every authorized member.
+  EVERYONE
+  /// Everyone assigned a particular permission group.
+  PERMISSION_GROUP
+  /// Everyone signed up to an event — including the ones with no account,
+  /// who are reachable by email and nothing else.
+  EVENT
+  /// A small group's active members.
+  SMALL_GROUP
+  /// A service team's members.
+  TEAM
+}
+
+enum BroadcastStatus {
+  DRAFT
+  /// Recipients resolved and being worked through.
+  SENDING
+  SENT
+  /// Stopped by hand part-way.
+  CANCELLED
+}
+
+enum BroadcastChannel {
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  /// Nothing was wrong; there was simply no way to reach them on this channel
+  /// — no phone number, or they never opted in.
+  SKIPPED
+}
+
+/// One message sent to many people: "no service tomorrow, the road is closed".
+///
+/// The recipients are resolved into rows *before* anything is sent, and each
+/// is marked as it goes. That is what makes a send resumable: a serverless
+/// function killed half way through 400 emails has already recorded the 180 it
+/// managed, and the next run picks up at 181 rather than emailing everybody
+/// twice.
+model Broadcast {
+  id      String @id @default(cuid())
+  subject String
+  body    String
+
+  /// EMAIL / SMS / PUSH, any combination.
+  channels BroadcastChannel[]
+
+  audience     BroadcastAudience @default(EVERYONE)
+  /// The group, event, small group or team, when the audience names one.
+  audienceId   String?
+  /// What the audience was called when it was chosen, so a list of past
+  /// broadcasts still reads sensibly after the group is renamed or deleted.
+  audienceName String?
+
+  status BroadcastStatus @default(DRAFT)
+
+  /// Who sent it, for the list and the audit trail.
+  createdBy String
+  createdAt DateTime  @default(now())
+  sentAt    DateTime?
+
+  recipients BroadcastRecipient[]
+
+  @@index([status, createdAt])
+}
+
+/// One person, one channel, one message.
+///
+/// The address is copied here at resolve time rather than read back through
+/// the user: somebody who changes their number between composing and sending
+/// should not have half a broadcast go to their old one and half to the new.
+model BroadcastRecipient {
+  id          String    @id @default(cuid())
+  broadcast   Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  broadcastId String
+  /// Null for somebody reachable by email who has no account — an event's
+  /// sign-ups are full of them.
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId      String?
+
+  channel BroadcastChannel
+  /// The email address or phone number, as it stood when the audience was resolved.
+  address String
+  /// Shown in the send report, so a failure names a person rather than an id.
+  name    String?
+
+  status DeliveryStatus @default(PENDING)
+  error  String?
+  sentAt DateTime?
+
+  /// One row per person per channel, so a resumed run can't send twice.
+  @@unique([broadcastId, channel, address])
+  @@index([broadcastId, status])
 }

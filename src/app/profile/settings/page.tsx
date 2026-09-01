@@ -49,6 +49,9 @@ export default async function ProfileSettingsPage() {
           notificationsOn={notificationsOn}
           currentNotificationFrequency={user.notificationFrequency}
           currentEmailNotifications={user.emailNotifications}
+          currentPhone={user.phone}
+          currentSmsOptIn={user.smsOptIn}
+          currentBroadcastEmails={user.broadcastEmails}
         />
       </section>
 

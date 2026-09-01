@@ -949,6 +949,37 @@ The home groups and studies that meet during the week, at `/groups`.
 - Members see their groups at `/profile/groups`, and can leave or withdraw a
   request at any time.
 
+## Announcements
+
+One message to everybody, or to one group, from `/admin/broadcasts`.
+
+- **Choose an audience**: everyone, a permission group, a small group, a
+  service team, or everyone signed up to an event — most of whom have no
+  account, and are reachable at the address they typed.
+- **Email, text, push**, any combination.
+- **It tells you who it will reach before you send it**, and why the rest it
+  won't: "reaches 312 people — and 41 get nothing · 28 no mobile number, 13
+  turned off announcement emails". Without that number, "I told everyone" is
+  false and the people who got it assume everybody did.
+- **Consent is three separate rules.** Email is on unless somebody turned
+  announcements off — a different switch from "email me when a sermon
+  publishes", because turning that off is not asking to miss a cancellation.
+  A text needs an explicit yes and a number the member typed in themselves;
+  a number given on a public event form is never treated as consent. Push
+  needs a device already signed up.
+- **Send yourself a test first.** The one thing that makes a typo in a message
+  to four hundred people survivable is having read it on a phone.
+- **It survives being interrupted.** The list is frozen before anything goes
+  out and each person is marked as they are sent, so closing the laptop
+  half-way means the rest go later — not that everybody gets it twice.
+- **One bad address doesn't stop the rest**, and the failures are listed
+  afterwards with the reason the provider gave.
+- Texting works through Twilio or your own gateway; with neither set up, the
+  channel says exactly which settings are missing. The cost in message
+  segments is shown as you type — a single curly apostrophe pasted from a word
+  processor halves what fits in one text, which is worth knowing before it is
+  multiplied by three hundred.
+
 ## Present mode
 
 A hymn's words on the screen at the front of the room. **Present** sits on a

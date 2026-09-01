@@ -11,6 +11,10 @@ const schema = z.object({
   displayName: z.string().trim().max(50).nullable(),
   notificationFrequency: z.enum(["INSTANT", "DAILY"]).optional(),
   emailNotifications: z.boolean().optional(),
+  /** A number the member types in themselves. Never imported from anywhere. */
+  phone: z.string().trim().max(40).nullish(),
+  smsOptIn: z.boolean().optional(),
+  broadcastEmails: z.boolean().optional(),
 });
 
 /**
@@ -24,7 +28,8 @@ export async function PATCH(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { displayName, notificationFrequency, emailNotifications } = schema.parse(await request.json());
+  const body = schema.parse(await request.json());
+  const { displayName, notificationFrequency, emailNotifications } = body;
   const [profilesOn, notificationsOn] = await Promise.all([
     isPluginEnabled("profiles"),
     isPluginEnabled("notifications"),
@@ -36,6 +41,16 @@ export async function PATCH(request: NextRequest) {
       ...(profilesOn ? { displayName: displayName || null } : {}),
       ...(notificationsOn && notificationFrequency ? { notificationFrequency } : {}),
       ...(notificationsOn && emailNotifications !== undefined ? { emailNotifications } : {}),
+      // Not behind the Notifications plugin: these govern church-wide
+      // announcements, which are sent by hand and have nothing to do with
+      // whether new sermons notify anybody.
+      ...(body.phone !== undefined ? { phone: body.phone?.trim() || null } : {}),
+      // Consent goes with the number: clearing the number withdraws it, so
+      // nobody is left opted in to texts at an address the app no longer has.
+      ...(body.smsOptIn !== undefined
+        ? { smsOptIn: body.smsOptIn && Boolean(body.phone ?? user.phone) }
+        : {}),
+      ...(body.broadcastEmails !== undefined ? { broadcastEmails: body.broadcastEmails } : {}),
     },
   });
   return NextResponse.json({ ok: true });

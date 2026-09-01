@@ -642,6 +642,26 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   - Leaders act through `canLead` on their own group rather than through a
     capability: whoever hosts the Tuesday group shouldn't need an admin grant
     to answer somebody knocking on their own door.
+- **A broadcast is resolved into rows before anything is sent**
+  (`lib/broadcast.ts` for the rules, `lib/broadcast-send.ts` for the work).
+  One row per person per channel with the address copied in, each marked as it
+  goes — which is what makes a send resumable across a killed function, and
+  what stops a changed phone number splitting a broadcast between the old one
+  and the new. A unique index on `(broadcast, channel, address)` is the
+  backstop against a double-clicked button.
+  - The batch loop lives in the *browser*: the admin screen calls
+    `/send` repeatedly. A single request that tried to send four hundred
+    emails would be killed at the platform timeout with no record of how far
+    it got, and this way the same mechanism produces a progress bar.
+    `/api/cron/broadcasts` is the backstop for a closed laptop, not the
+    delivery path.
+  - `planDelivery` is pure and holds all three consent rules, so the count on
+    the screen is the count that goes out. `smsOptIn` is deliberately not
+    inferable from having a phone number: an event's sign-up form collects
+    numbers, and that is not permission to text.
+  - `sms.ts` (segment counting, number normalising) is split from
+    `sms-send.ts` (providers) because the composer shows the cost as you type
+    and so ends up in the browser bundle.
 - **A rota lives beside the running order**: `ServiceTeam` / `ServiceTeamMember`
   are the pick-list, `ServiceAssignment` is one ask with its answer, and
   `ServiceBlockout` is when somebody is away. The job is free text on the

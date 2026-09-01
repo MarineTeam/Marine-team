@@ -113,6 +113,10 @@ export const ADMIN_GROUPS: AdminGroup[] = [
     label: "People",
     links: [
       { href: "/admin/users", label: "Members & roles", visible: (a) => a.canManageUsers },
+      // Writing to every member at once is closer to holding the membership
+      // list than to booking the hall, so it sits with the list and shares
+      // its grant.
+      { href: "/admin/broadcasts", label: "Announcements", visible: (a) => a.canManageUsers },
       { href: "/admin/authorized-emails", label: "Who can sign in", visible: (a) => a.canManageUsers },
       { href: "/admin/permissions", label: "Permissions", visible: (a) => a.canManagePermissions },
       { href: "/admin/access-attempts", label: "Access attempts", visible: (a) => a.canViewAuditLog },
