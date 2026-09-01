@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/current-user";
 import { getRecentlyPlayed } from "@/lib/content";
 import { MenuTile } from "@/components/menu-tile";
-import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
+import { videoThumbnailUrl } from "@/lib/video-source";
 
 export default async function RecentlyPlayedPage() {
   const user = await getCurrentUser();
@@ -38,7 +38,7 @@ export default async function RecentlyPlayedPage() {
               href={`/videos/${entry.video.slug}`}
               title={entry.video.title}
               subtitle={entry.video.series?.title}
-              thumbnailUrl={bunnyStreamThumbnailUrl(entry.video.bunnyVideoId, entry.video.thumbnailFileName)}
+              thumbnailUrl={videoThumbnailUrl(entry.video)}
               badge={entry.completed ? "Watched" : undefined}
             />
           ))}

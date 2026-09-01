@@ -2,7 +2,7 @@ import Link from "next/link";
 import { MenuTile } from "@/components/menu-tile";
 import { getVideosByScriptureBook } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
-import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
+import { videoThumbnailUrl } from "@/lib/video-source";
 
 export default async function ScriptureBookPage({
   params,
@@ -33,7 +33,7 @@ export default async function ScriptureBookPage({
               href={`/videos/${v.slug}`}
               title={v.title}
               subtitle={v.series?.title ?? v.description}
-              thumbnailUrl={bunnyStreamThumbnailUrl(v.bunnyVideoId, v.thumbnailFileName)}
+              thumbnailUrl={videoThumbnailUrl(v)}
               badge={v.memberOnly ? "Members" : undefined}
               tags={v.scriptureRefs}
             />

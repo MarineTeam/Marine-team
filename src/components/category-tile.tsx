@@ -1,5 +1,5 @@
 import { MenuRow, MenuTile } from "@/components/menu-tile";
-import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
+import { videoThumbnailUrl, type SourcedVideo } from "@/lib/video-source";
 
 type CategoryTileData = {
   slug: string;
@@ -8,7 +8,7 @@ type CategoryTileData = {
   coverImageUrl: string | null;
   series: { coverImageUrl: string | null }[];
   children: { id: string }[];
-  videos: { bunnyVideoId: string; thumbnailFileName: string | null }[];
+  videos: SourcedVideo[];
   files: { id: string }[];
 };
 
@@ -25,7 +25,7 @@ export function CategoryTile({
   const thumbnailUrl =
     category.coverImageUrl ??
     seriesThumbnail ??
-    (firstVideo ? bunnyStreamThumbnailUrl(firstVideo.bunnyVideoId, firstVideo.thumbnailFileName) : null);
+    (firstVideo ? videoThumbnailUrl(firstVideo) : null);
   const itemCount =
     category.series.length + category.children.length + category.videos.length + category.files.length;
 

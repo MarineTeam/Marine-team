@@ -16,6 +16,20 @@ export type ThemePreference = "system" | "light" | "dark";
 export const MIN_PRESENT_SCALE = 0.5;
 export const MAX_PRESENT_SCALE = 2.5;
 
+/**
+ * How far reading type can be nudged (see readingTextScale).
+ *
+ * A narrower range than present mode's, and for a different reason: that one
+ * is sizing words to a wall from across a hall, this one is a body of text
+ * somebody is holding. Below about three quarters a hymn stops being
+ * readable at arm's length, and much past double it a verse of a hymn is
+ * three words to a line.
+ */
+export const MIN_READING_SCALE = 0.75;
+export const MAX_READING_SCALE = 2;
+/** One press of A− or A+. Small enough to land on a comfortable size rather than step over it. */
+export const READING_SCALE_STEP = 0.1;
+
 /** Speeds offered in the settings UI; the stored value is validated against these. */
 export const PLAYBACK_SPEEDS = [0.75, 1, 1.25, 1.5, 1.75, 2] as const;
 
@@ -23,7 +37,15 @@ export const PLAYBACK_SPEEDS = [0.75, 1, 1.25, 1.5, 1.75, 2] as const;
  * Only English ships today. The setting is stored (and shown, disabled) so
  * the preference has a home before the strings are translated.
  */
-export const LANGUAGES = [{ code: "en", label: "English" }] as const;
+/**
+ * The languages the app speaks, mirrored from lib/i18n so this module stays
+ * free of anything that would drag a catalogue into every page that reads a
+ * setting. `i18n.test.ts` is what keeps the two in step.
+ */
+export const LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "es", label: "Español" },
+] as const;
 
 export type DeviceSettings = {
   theme: ThemePreference;
@@ -55,11 +77,32 @@ export type DeviceSettings = {
   /** Present mode's own palette — light on dark carries further in a dark room. */
   presentTheme: "dark" | "light";
   /**
+   * How big the words are where the app shows a body of text to read — a
+   * hymn's lyrics, an EPUB's pages. Per device for the same reason as present
+   * mode's: it belongs to the screen and the eyes in front of it, not to the
+   * account. Deliberately separate from that one, because a projector's size
+   * and a phone's are never the same answer.
+   *
+   * The PDF reader is not included: its pages are pictures, and it has had a
+   * zoom of its own from the start.
+   */
+  readingTextScale: number;
+  /**
    * Which icons the bottom bar carries, as hrefs, in order — see
    * lib/nav-tabs.ts. Null means the app's own suggestion, which is what
    * every device starts with.
    */
   tabHrefs: string[] | null;
+  /**
+   * Who is looking at the calendar, as a Person id — chosen once on this
+   * device so a rota can answer "what am I on for".
+   *
+   * A preference, not a login: it grants access to nothing, and every
+   * schedule it filters is readable by anyone with the URL either way. Per
+   * device because that is what it is — the phone in somebody's pocket knows
+   * whose it is; the laptop in the church office does not.
+   */
+  calendarPersonId: string | null;
 };
 
 export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
@@ -72,7 +115,9 @@ export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
   keepScreenAwake: true,
   presentTextScale: 1,
   presentTheme: "dark",
+  readingTextScale: 1,
   tabHrefs: null,
+  calendarPersonId: null,
 };
 
 export const DEVICE_SETTINGS_KEY = "marine-device-settings";
@@ -128,6 +173,14 @@ export function parseDeviceSettings(raw: string | null | undefined): DeviceSetti
       typeof value.presentTextScale === "number" && Number.isFinite(value.presentTextScale)
         ? Math.min(MAX_PRESENT_SCALE, Math.max(MIN_PRESENT_SCALE, value.presentTextScale))
         : DEFAULT_DEVICE_SETTINGS.presentTextScale,
+    readingTextScale:
+      typeof value.readingTextScale === "number" && Number.isFinite(value.readingTextScale)
+        ? Math.min(MAX_READING_SCALE, Math.max(MIN_READING_SCALE, value.readingTextScale))
+        : DEFAULT_DEVICE_SETTINGS.readingTextScale,
+    calendarPersonId:
+      typeof value.calendarPersonId === "string" && value.calendarPersonId.length <= 60
+        ? value.calendarPersonId
+        : DEFAULT_DEVICE_SETTINGS.calendarPersonId,
     presentTheme: value.presentTheme === "light" ? "light" : DEFAULT_DEVICE_SETTINGS.presentTheme,
     tabHrefs: parseTabHrefs(value.tabHrefs),
   };

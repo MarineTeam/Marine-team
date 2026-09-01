@@ -2,7 +2,33 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npx prisma migrate deploy && node scripts/copy-offline-viewers.mjs && next build",
   "crons": [
-    { "path": "/api/cron/notification-digest", "schedule": "0 13 * * *" },
-    { "path": "/api/cron/sync-video-status", "schedule": "0 6 * * *" }
+    {
+      "path": "/api/cron/sync-schedules",
+      "schedule": "30 5 * * *"
+    },
+    {
+      "path": "/api/cron/sync-video-status",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/notification-digest",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/schedule-reminders",
+      "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron/transcribe",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/broadcasts",
+      "schedule": "45 3 * * *"
+    },
+    {
+      "path": "/api/cron/sync-video-feeds",
+      "schedule": "15 7 * * *"
+    }
   ]
 }

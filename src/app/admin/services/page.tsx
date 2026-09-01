@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ServicePlansManager } from "@/components/service-plans-manager";
 import { isPluginEnabled } from "@/lib/plugins";
 
@@ -24,6 +25,15 @@ export default async function AdminServicesPage() {
           </p>
         )}
       </div>
+      {/* The plans are also the record of what was sung, which is what a
+          licence return asks for once a year. */}
+      <p className="text-sm">
+        <Link href="/admin/services/report" className="text-accent hover:underline">
+          What we sang →
+        </Link>{" "}
+        <span className="text-sec">a song-by-song count for a licence return.</span>
+      </p>
+
       <ServicePlansManager />
     </div>
   );

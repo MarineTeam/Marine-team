@@ -71,6 +71,8 @@ export default async function AdminOverview() {
     canManageFiles: true,
     canModerateComments: true,
     canShareContent: true,
+    canManageEvents: true,
+    canModeratePrayer: true,
     canSeeTrash: true,
   }).filter((group) => group.label !== null);
 

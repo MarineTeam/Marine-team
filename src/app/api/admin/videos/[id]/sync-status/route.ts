@@ -18,6 +18,11 @@ export async function POST(
     const { id } = await params;
     const video = await prisma.video.findUniqueOrThrow({ where: { id } });
     await ensureContentAccess(user, { seriesId: video.seriesId, categoryId: video.categoryId });
+    // Bunny-only: an imported video's encode status lives at its source, and there
+    // is nothing here to act on.
+    if (!video.bunnyVideoId) {
+      return NextResponse.json({ error: "That video isn't stored here, so there's no encode to sync." }, { status: 400 });
+    }
 
     const data = await bunnyGetStreamVideo(video.bunnyVideoId);
 

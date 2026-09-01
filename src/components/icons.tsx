@@ -115,6 +115,52 @@ export function CalendarIcon({ className }: IconProps) {
   );
 }
 
+export function TicketIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M3.5 8.5V6.5a1 1 0 0 1 1-1h15a1 1 0 0 1 1 1v2a2.5 2.5 0 0 0 0 7v2a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-2a2.5 2.5 0 0 0 0-7z" />
+      <path d="M14 5.5v13" />
+    </Icon>
+  );
+}
+
+export function CardIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <rect x="3.5" y="5" width="17" height="14" rx="2" />
+      <path d="M7.5 10h5M7.5 14h9" />
+    </Icon>
+  );
+}
+
+export function HandsIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M12 20.5c-3 0-5.5-2-6.5-4.5L4 12a1.5 1.5 0 0 1 2.6-1.4L8 12V5a1.5 1.5 0 0 1 3 0v5" />
+      <path d="M12 20.5c3 0 5.5-2 6.5-4.5L20 12a1.5 1.5 0 0 0-2.6-1.4L16 12V5a1.5 1.5 0 0 0-3 0v5" />
+    </Icon>
+  );
+}
+
+export function PeopleIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <circle cx="9" cy="8" r="3.25" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+      <path d="M16 5.5a3.25 3.25 0 0 1 0 6.5M17 14.5a6.5 6.5 0 0 1 4.5 5.5" />
+    </Icon>
+  );
+}
+
+export function TvIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <rect x="2.5" y="4.5" width="19" height="13" rx="2" />
+      <path d="M8 20.5h8" />
+    </Icon>
+  );
+}
+
 export function BookIcon({ className }: IconProps) {
   return (
     <Icon className={className}>

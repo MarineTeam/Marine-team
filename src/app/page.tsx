@@ -5,8 +5,8 @@ import { SeriesTile } from "@/components/series-tile";
 import { MenuTile } from "@/components/menu-tile";
 import { getBranding } from "@/lib/branding";
 import { getCurrentUser } from "@/lib/current-user";
-import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { getPluginStates } from "@/lib/plugins";
+import { videoThumbnailUrl } from "@/lib/video-source";
 import {
   getFeaturedSeries,
   getPublishedCategoriesWithSeries,
@@ -119,7 +119,7 @@ export default async function Home() {
                   href={`/videos/${entry.video.slug}`}
                   title={entry.video.title}
                   subtitle={entry.video.series?.title}
-                  thumbnailUrl={bunnyStreamThumbnailUrl(entry.video.bunnyVideoId, entry.video.thumbnailFileName)}
+                  thumbnailUrl={videoThumbnailUrl(entry.video)}
                 />
               ))}
             </div>

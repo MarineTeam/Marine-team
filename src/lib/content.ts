@@ -6,6 +6,8 @@ import { isPluginEnabled } from "@/lib/plugins";
 import { getShareGrants } from "@/lib/share-access";
 import { fileHref, hymnReadingOrder } from "@/lib/hymnal";
 import { excerptAround, findMatches } from "@/lib/reader";
+import { printedPage } from "@/lib/page-offset";
+import { fingerprintOutline } from "@/lib/outline";
 
 export function canAccess(memberOnly: boolean, isLoggedIn: boolean): boolean {
   return !memberOnly || isLoggedIn;
@@ -504,7 +506,14 @@ export async function searchContent(query: string, isLoggedIn: boolean, filters:
     ? { OR: [{ categoryId: filters.categoryId }, { series: { categoryId: filters.categoryId } }] }
     : {};
 
-  const [categories, seriesCandidates, videoCandidates, fileCandidates] = await Promise.all([
+  const [
+    categories,
+    seriesCandidates,
+    videoCandidates,
+    fileCandidates,
+    bookHymnCandidates,
+    bookHymnWordCandidates,
+  ] = await Promise.all([
     filters.categoryId || filters.speakerId
       ? Promise.resolve([])
       : prisma.category.findMany({
@@ -582,6 +591,33 @@ export async function searchContent(query: string, isLoggedIn: boolean, filters:
           },
           take: 50,
         }),
+    // Hymns *inside* a scanned book, from the contents an admin indexed.
+    // Without these, searching "It Is Well" finds it only where somebody has
+    // typed the lyrics — never in the hymnal it is actually printed in.
+    filters.speakerId
+      ? Promise.resolve([])
+      : prisma.bookHymn.findMany({
+          where: {
+            AND: [
+              { file: { ...where, ...fileCategoryFilter } },
+              /^\d{1,4}$/.test(q)
+                ? { OR: [{ number: Number(q) }, { title: { contains: q, mode: "insensitive" } }] }
+                : { title: { contains: q, mode: "insensitive" } },
+            ],
+          },
+          include: {
+            file: {
+              select: { id: true, title: true, pageOffset: true, series: { select: { title: true } } },
+            },
+          },
+          take: 30,
+        }),
+    // The same hymns, found by a line of their words rather than their
+    // titles — "sweet the sound" should reach hymn 214 wherever it is
+    // printed, not only where somebody keeps a lyrics page for it.
+    filters.speakerId || /^\d{1,4}$/.test(q)
+      ? Promise.resolve([])
+      : hymnsMatchingWords(q, { ...where, ...fileCategoryFilter }, 30),
   ]);
 
   let series = seriesCandidates
@@ -604,6 +640,30 @@ export async function searchContent(query: string, isLoggedIn: boolean, filters:
   // contents. An audio handout is a row with a download button under its
   // series — search already finds that series, and a result that led nowhere
   // in particular would be worse than none.
+  const foundByTitle = new Set(bookHymnCandidates.map((hymn) => hymn.id));
+  const bookHymnHits = [
+    ...bookHymnCandidates.map((hymn) => ({ hymn, excerpt: null as string | null })),
+    // A hymn found both ways is one hymn, and the title match is the better
+    // description of why it is here.
+    ...bookHymnWordCandidates
+      .filter((hymn) => !foundByTitle.has(hymn.id))
+      .map((hymn) => ({ hymn, excerpt: hymn.excerpt })),
+  ].map(({ hymn, excerpt }) => ({
+    item: {
+      id: hymn.id,
+      title: hymn.title,
+      href: hymnHref(hymn.fileId, hymn.page, hymn.number),
+      // The number on the board where the book prints one; the page it is on
+      // otherwise.
+      pageNumber: hymn.number ?? printedPage(hymn.page, hymn.file.pageOffset),
+      context: hymn.file.series?.title ?? hymn.file.title,
+      excerpt,
+    },
+    // Matching on the words is worth the same as it is for a hymn with a
+    // lyrics page of its own, so the two kinds of hymn rank together.
+    score: relevanceScore(q, hymn.title, null) + (excerpt ? 10 : 0),
+  }));
+
   const files = fileCandidates
     .map((file) => {
       const href = fileHref(file);
@@ -626,6 +686,9 @@ export async function searchContent(query: string, isLoggedIn: boolean, filters:
       };
     })
     .filter((hit): hit is NonNullable<typeof hit> => hit !== null)
+    // One list, because to whoever is searching they are all hymns: some have
+    // their own page with the words on it, some are a line in a scanned book.
+    .concat(bookHymnHits)
     .sort((a, b) => b.score - a.score)
     .slice(0, 20)
     .map((hit) => hit.item);
@@ -664,6 +727,321 @@ export async function searchContent(query: string, isLoggedIn: boolean, filters:
 
 /** One hymn or book in a set of search results. */
 export type FileSearchHit = Awaited<ReturnType<typeof searchContent>>["files"][number];
+
+/**
+ * Hymns inside the books of one section, by name or by number.
+ *
+ * This is the search a hymnal category needs and couldn't have: a hymn in a
+ * scanned book exists only in that PDF's bookmarks, so before those were
+ * resolved and stored (see BookHymn) there was nothing to look in — six books
+ * meant six PDFs to parse, and nobody waits for that to find out which one
+ * has "It Is Well".
+ *
+ * A number is matched as a number: typing 214 finds hymn 214 rather than
+ * everything with 214 anywhere in its title. Section headings are skipped —
+ * an outline's depth-0 entries in a nested book are "Praise", "Advent", and
+ * you can't sing those.
+ */
+/** Where a hymn inside a book opens: its page, and which hymn that page is. */
+function hymnHref(fileId: string, page: number, number: number | null): string {
+  return `/read/${fileId}?page=${page}${number === null ? "" : `&hymn=${number}`}`;
+}
+
+/**
+ * Hymns inside whole-book hymnals whose *words* match, with the line that did.
+ *
+ * Two queries rather than one because the words and the contents entry can't
+ * be joined in a single filter: lyrics are keyed to (book, number) so a
+ * reindex can't sweep them away (see BookHymnDetail), and Prisma can't match a
+ * relation against the parent row's own column. So the words are found first,
+ * then the entries they belong to — which is also what carries the page and
+ * the title a result needs.
+ *
+ * A hymn whose words are typed but whose contents entry has gone is dropped
+ * here: there is no page to send anyone to.
+ */
+async function hymnsMatchingWords(
+  q: string,
+  fileWhere: Prisma.FileAssetWhereInput,
+  take: number,
+) {
+  const words = await prisma.bookHymnDetail.findMany({
+    where: { lyricsText: { contains: q, mode: "insensitive" }, file: fileWhere },
+    select: { fileId: true, number: true, lyricsText: true },
+    take,
+  });
+  if (words.length === 0) return [];
+
+  const entries = await prisma.bookHymn.findMany({
+    where: { OR: words.map((row) => ({ fileId: row.fileId, number: row.number })) },
+    include: {
+      file: {
+        select: { id: true, title: true, pageOffset: true, series: { select: { title: true } } },
+      },
+    },
+    orderBy: [{ number: "asc" }, { position: "asc" }],
+  });
+
+  const byHymn = new Map(words.map((row) => [`${row.fileId}:${row.number}`, row.lyricsText]));
+  return entries.flatMap((entry) => {
+    const lyricsText = byHymn.get(`${entry.fileId}:${entry.number}`);
+    if (!lyricsText) return [];
+    const flat = lyricsText.replace(/\s+/g, " ");
+    const at = findMatches(flat, q);
+    return [
+      {
+        ...entry,
+        // The line they half-remembered, in the words the book prints.
+        excerpt: at.length > 0 ? excerptAround(flat, at[0], q.length) : null,
+      },
+    ];
+  });
+}
+
+/**
+ * Hymns found by words on the *pages* of a scanned book.
+ *
+ * The words come from BookPage — what an admin's OCR pass read off the
+ * images — and a page is not a thing to hand somebody as a result. So each
+ * matching page is attributed to the hymn it falls inside: the last contents
+ * entry at or before that page, which is how a book works. A hit before the
+ * first entry belongs to the front matter and is dropped; there is no hymn
+ * to name it by.
+ *
+ * This is the only way a hymn nobody has typed the words of can be found by
+ * its words, which on a shelf of scanned hymnals is most of them.
+ */
+async function hymnsMatchingPages(
+  q: string,
+  fileWhere: Prisma.FileAssetWhereInput,
+  take: number,
+) {
+  const pages = await prisma.bookPage.findMany({
+    where: { text: { contains: q, mode: "insensitive" }, file: fileWhere },
+    select: { fileId: true, page: true, text: true },
+    orderBy: [{ fileId: "asc" }, { page: "asc" }],
+    // Bounded well below the result limit: each matched book costs a read of
+    // its contents below, and twenty pages is already more than anybody
+    // scrolls through.
+    take: 25,
+  });
+  if (pages.length === 0) return [];
+
+  const entries = await prisma.bookHymn.findMany({
+    where: { fileId: { in: [...new Set(pages.map((page) => page.fileId))] } },
+    include: {
+      file: {
+        select: { id: true, title: true, pageOffset: true, series: { select: { title: true } } },
+      },
+    },
+    orderBy: [{ fileId: "asc" }, { page: "asc" }],
+  });
+
+  const byFile = new Map<string, typeof entries>();
+  for (const entry of entries) {
+    const list = byFile.get(entry.fileId);
+    if (list) list.push(entry);
+    else byFile.set(entry.fileId, [entry]);
+  }
+
+  const found = new Map<string, (typeof entries)[number] & { excerpt: string | null }>();
+  for (const page of pages) {
+    const list = byFile.get(page.fileId);
+    if (!list) continue;
+    // The last entry starting at or before this page — the hymn the page is
+    // part of. The list is ordered by page, so this is the one before the
+    // first entry that starts after it.
+    let containing: (typeof entries)[number] | null = null;
+    for (const entry of list) {
+      if (entry.page > page.page) break;
+      containing = entry;
+    }
+    if (!containing || found.has(containing.id)) continue;
+
+    const at = findMatches(page.text, q);
+    found.set(containing.id, {
+      ...containing,
+      excerpt: at.length > 0 ? excerptAround(page.text, at[0], q.length) : null,
+    });
+    if (found.size >= take) break;
+  }
+
+  return [...found.values()];
+}
+
+export async function searchHymnsInCategory(
+  categoryId: string,
+  query: string,
+  isLoggedIn: boolean,
+  limit = 40,
+) {
+  const q = query.trim();
+  if (!q) return [];
+  const asNumber = /^\d{1,4}$/.test(q) ? Number(q) : null;
+
+  const fileWhere: Prisma.FileAssetWhereInput = {
+    ...publishedNow(),
+    ...guestFilter(isLoggedIn),
+    OR: [{ categoryId }, { series: { categoryId } }],
+  };
+
+  const [byTitle, byWords, byPages] = await Promise.all([
+    prisma.bookHymn.findMany({
+      where: {
+        AND: [
+          { file: fileWhere },
+          asNumber === null
+            ? { title: { contains: q, mode: "insensitive" } }
+            : { OR: [{ number: asNumber }, { title: { contains: q, mode: "insensitive" } }] },
+        ],
+      },
+      include: {
+        file: {
+          select: { id: true, title: true, pageOffset: true, series: { select: { title: true } } },
+        },
+      },
+      // The number first when there is one, so hymn 214 leads its own results.
+      orderBy: [{ number: "asc" }, { position: "asc" }],
+      take: limit,
+    }),
+    // A number is a number, not a line of a hymn: searching 214 shouldn't
+    // return every hymn whose words happen to contain it.
+    asNumber === null ? hymnsMatchingWords(q, fileWhere, limit) : Promise.resolve([]),
+    asNumber === null ? hymnsMatchingPages(q, fileWhere, limit) : Promise.resolve([]),
+  ]);
+
+  // Title first, then typed words, then words read off the page. Somebody who
+  // typed a title meant the title; and where a hymn has been typed out, those
+  // words are exact where the scan's are a machine's best reading of a
+  // photograph. A hymn found more than one way is one hymn.
+  const seen = new Set<string>();
+  const hymns = [];
+  for (const hymn of [...byTitle, ...byWords, ...byPages]) {
+    if (seen.has(hymn.id)) continue;
+    seen.add(hymn.id);
+    hymns.push(hymn);
+    if (hymns.length === limit) break;
+  }
+
+  // Section headings are left in rather than guessed at: they carry a page
+  // like anything else, "Advent" is a reasonable thing to search for, and the
+  // only way to tell a heading from a hymn in a flat outline is whether it
+  // has a number — which is what the number search already keys on.
+  return hymns.map((hymn) => ({
+    id: hymn.id,
+    title: hymn.title,
+    number: hymn.number,
+    // Stored in PDF pages; shown as the book prints them.
+    printedPage: printedPage(hymn.page, hymn.file.pageOffset),
+    // The number rides along so the reader knows *which hymn* was opened and
+    // not merely which page — see HymnLookup. It changes nothing about where
+    // the link lands.
+    href: hymnHref(hymn.fileId, hymn.page, hymn.number),
+    bookId: hymn.fileId,
+    bookTitle: hymn.file.series?.title ?? hymn.file.title,
+    /** The line that matched, for a hymn found by its words rather than its title. */
+    excerpt: "excerpt" in hymn ? hymn.excerpt : null,
+  }));
+}
+
+/**
+ * One numbered hymn inside a whole-book hymnal: what the book calls it, the
+ * page it starts on, and its words if anybody has typed them.
+ *
+ * The two halves come from different places on purpose. The title and page
+ * are contents, rewritten whenever the book is indexed; the words are typed
+ * and keyed to the number so a reindex can't take them (see BookHymnDetail).
+ * A hymn whose words exist but whose contents entry has gone still presents,
+ * titled by its number alone — which is the honest thing to show when the
+ * only thing known about it is the number somebody typed it under.
+ */
+export async function getBookHymn(fileId: string, number: number) {
+  const [entry, lyrics] = await Promise.all([
+    prisma.bookHymn.findFirst({
+      where: { fileId, number },
+      select: { title: true, page: true },
+      orderBy: { position: "asc" },
+    }),
+    prisma.bookHymnDetail.findUnique({
+      where: { fileId_number: { fileId, number } },
+      select: { lyricsText: true, copyright: true, author: true, ccliNumber: true },
+    }),
+  ]);
+  if (!entry && !lyrics) return null;
+  return {
+    number,
+    title: entry?.title ?? `Hymn ${number}`,
+    page: entry?.page ?? null,
+    lyricsText: lyrics?.lyricsText ?? null,
+    copyright: lyrics?.copyright ?? null,
+    author: lyrics?.author ?? null,
+    ccliNumber: lyrics?.ccliNumber ?? null,
+  };
+}
+
+/**
+ * Matches inside one book, from the text read out of its pages.
+ *
+ * Shaped as the reader's own search hits are (see SearchHit), so the panel
+ * that lists them doesn't need to know which of the two answered — a page
+ * label, a line of context, and the location to jump to.
+ *
+ * One hit per page: a common word would otherwise return a thousand rows on
+ * a long book, and a page is the unit anybody navigates by anyway.
+ */
+export async function searchBookText(fileId: string, query: string, pageOffset: number) {
+  const pages = await prisma.bookPage.findMany({
+    where: { fileId, text: { contains: query, mode: "insensitive" } },
+    select: { page: true, text: true, source: true },
+    orderBy: { page: "asc" },
+    take: 100,
+  });
+
+  return pages.map((row) => {
+    const at = findMatches(row.text, query);
+    const printed = printedPage(row.page, pageOffset);
+    return {
+      // Labelled by the page printed in the book, falling back to the PDF
+      // page (and saying so) for a hit in the front matter, which has no
+      // printed number to quote — matching the reader's own labels.
+      label: printed === null ? `PDF page ${row.page}` : `Page ${printed}`,
+      excerpt: at.length > 0 ? excerptAround(row.text, at[0], query.length) : "",
+      location: String(row.page),
+      /** Whether these words were read off a photograph, and so may be imperfect. */
+      ocr: row.source === "ocr",
+    };
+  });
+}
+
+/**
+ * Which hymn numbers in this book have words stored — the ones a Present
+ * button can be offered for.
+ *
+ * Numbers rather than rows: that is what the book's contents are matched
+ * against in the browser, and what /present/[fileId]?hymn= takes.
+ */
+export async function presentableHymnNumbers(fileId: string): Promise<Set<number>> {
+  const rows = await prisma.bookHymnDetail.findMany({
+    // The words, not merely a row: a hymn can carry credits with nobody
+    // having typed its verses, and offering a screen for that would put an
+    // empty one at the front of the room.
+    where: { fileId, lyricsText: { not: null } },
+    select: { number: true },
+  });
+  return new Set(rows.map((row) => row.number));
+}
+
+/** Whether a section has any book contents to search yet, for what the box says when it doesn't. */
+export async function categoryHasIndexedBooks(categoryId: string): Promise<boolean> {
+  const indexed = await prisma.fileAsset.count({
+    where: {
+      ...publishedNow(),
+      contentsIndexedAt: { not: null },
+      OR: [{ categoryId }, { series: { categoryId } }],
+    },
+  });
+  return indexed > 0;
+}
 
 // --- Comments ----------------------------------------------------------------
 
@@ -1111,7 +1489,7 @@ export const getTrendingSeries = unstable_cache(getTrendingSeriesUncached, ["tre
 export async function getAnalyticsSummary(days = 30) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-  const [totalViews, topSeriesGrouped, topVideosGrouped] = await Promise.all([
+  const [totalViews, topSeriesGrouped, topVideosGrouped, topHymnsGrouped] = await Promise.all([
     prisma.viewEvent.count({ where: { createdAt: { gte: since } } }),
     prisma.viewEvent.groupBy({
       by: ["seriesId"],
@@ -1125,6 +1503,17 @@ export async function getAnalyticsSummary(days = 30) {
       where: { videoId: { not: null }, createdAt: { gte: since } },
       _count: { videoId: true },
       orderBy: { _count: { videoId: "desc" } },
+      take: 10,
+    }),
+    // A hymn is neither a series nor a video, and is counted separately (see
+    // HymnLookup). Grouped by both columns because the two shapes of hymn
+    // share this table: a file on its own has no number, and a book has one
+    // row per number rather than one for the whole book.
+    prisma.hymnLookup.groupBy({
+      by: ["fileId", "number"],
+      where: { createdAt: { gte: since } },
+      _count: { _all: true },
+      orderBy: { _count: { id: "desc" } },
       take: 10,
     }),
   ]);
@@ -1146,6 +1535,26 @@ export async function getAnalyticsSummary(days = 30) {
   ]);
   const seriesMap = new Map(seriesById.map((s) => [s.id, s]));
   const videoMap = new Map(videosById.map((v) => [v.id, v]));
+
+  // What to call each looked-up hymn. A file of its own is titled by its row;
+  // a number inside a book is titled by that book's contents, and falls back
+  // to the number when the book has since been re-indexed without it.
+  const [hymnFiles, hymnEntries] = await Promise.all([
+    prisma.fileAsset.findMany({
+      where: { id: { in: [...new Set(topHymnsGrouped.map((g) => g.fileId))] } },
+      select: { id: true, title: true, series: { select: { title: true } } },
+    }),
+    prisma.bookHymn.findMany({
+      where: {
+        OR: topHymnsGrouped
+          .filter((g) => g.number !== null)
+          .map((g) => ({ fileId: g.fileId, number: g.number })),
+      },
+      select: { fileId: true, number: true, title: true },
+    }),
+  ]);
+  const hymnFileMap = new Map(hymnFiles.map((file) => [file.id, file]));
+  const hymnEntryMap = new Map(hymnEntries.map((entry) => [`${entry.fileId}:${entry.number}`, entry.title]));
   // Fraction of this window's watchers who reached the end, per video —
   // reuses the same heartbeat data that already powers "Continue watching"
   // and resume-on-return, so this costs one extra groupBy pair, not a new
@@ -1173,7 +1582,55 @@ export async function getAnalyticsSummary(days = 30) {
         (r): r is { video: NonNullable<typeof r.video>; views: number; completionRate: number | null } =>
           Boolean(r.video),
       ),
+    topHymns: topHymnsGrouped.flatMap((group) => {
+      const file = hymnFileMap.get(group.fileId);
+      // A hymn whose file has been deleted since keeps no row here: there is
+      // nothing left to name it by.
+      if (!file) return [];
+      const title =
+        group.number === null
+          ? file.title
+          : (hymnEntryMap.get(`${group.fileId}:${group.number}`) ?? `Hymn ${group.number}`);
+      return [
+        {
+          key: `${group.fileId}:${group.number ?? ""}`,
+          title,
+          number: group.number,
+          book: group.number === null ? (file.series?.title ?? null) : file.title,
+          lookups: group._count._all,
+        },
+      ];
+    }),
   };
+}
+
+/**
+ * A member's answers to a video's note sheet, and whether the sheet has been
+ * edited since they wrote them.
+ *
+ * The comparison is what makes the answers safe to show: a gap is identified
+ * by its position, so an outline edited afterwards can leave answer three
+ * sitting against a gap it was never written for. Rather than guess, the page
+ * says so — see SermonOutlineAnswer.
+ */
+export async function getOutlineAnswers(userId: string, videoId: string, outline: string) {
+  const row = await prisma.sermonOutlineAnswer.findUnique({
+    where: { userId_videoId: { userId, videoId } },
+    select: { answers: true, outlineVersion: true },
+  });
+  if (!row) return { answers: {}, outlineChanged: false };
+
+  // Stored as JSON, so anything could be in the column; only string values
+  // are answers, and a corrupted row should read as an empty sheet rather
+  // than crash the page it is on.
+  const answers: Record<string, string> = {};
+  if (row.answers && typeof row.answers === "object" && !Array.isArray(row.answers)) {
+    for (const [key, value] of Object.entries(row.answers as Record<string, unknown>)) {
+      if (typeof value === "string") answers[key] = value;
+    }
+  }
+
+  return { answers, outlineChanged: row.outlineVersion !== fingerprintOutline(outline) };
 }
 
 // --- Recommendations -----------------------------------------------------

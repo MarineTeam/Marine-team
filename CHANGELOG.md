@@ -6,6 +6,42 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-09-03
+
+The release this app stops being a video library and starts being the thing a
+church runs its week on.
+
+**Major**, and not only for the size of it. Two schema changes are breaking for
+anything reading the database directly: `Video.bunnyVideoId` and
+`bunnyLibraryId` are now nullable, because a video may live at YouTube or Vimeo
+and have no Bunny id at all; and `BookHymnLyric` became `BookHymnDetail`, since
+a row can now carry a song's credits without carrying its words. Every
+migration is additive to existing data and nothing needs back-filling.
+
+The shape of it, in one paragraph each:
+
+- **The library learned to read.** A scanned hymnal's contents can be indexed,
+  typed by hand, or read off the page with OCR, so a hymn nobody digitised is
+  still findable by its number. Books, service orders and now the rota all
+  travel on the device.
+- **A service has a life around it.** The running order carries who is serving
+  and whether they said yes; the words go on the wall; the licence return
+  counts itself.
+- **Two kinds of rota.** One for members with accounts, one — ported whole from
+  the calendar app — for the far larger number of people who have none, fed
+  from a spreadsheet somebody already keeps.
+- **The rest of a church's week**: events with a sign-up that can genuinely run
+  out, forms built without a deploy, a moderated prayer wall, and a small-group
+  directory that does not publish anybody's address.
+- **Reaching people**: one announcement to everybody by email, text or push,
+  with an honest count of who it will actually reach — and Spanish, with the
+  machinery for any third language.
+- **Getting on a screen**: videos that live at YouTube or Vimeo, chat beside a
+  live stream, and a television that signs itself in with a code.
+
+Everything below is the detail, newest first.
+
+
 ### Security
 
 - **Uploaded files are no longer served by permanent, unauthenticated CDN
@@ -146,6 +182,479 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **The television.** Three things, none of which is a native app — see the
+  note in FEATURES.md about what is deliberately not here.
+  - **Sign in with a code on the screen.** You cannot type an email address
+    and a password with a remote, so this is the device authorization grant:
+    the television shows six characters, a member types them at `/link` on
+    their phone, and the television — polling all along — gets a token. The
+    two codes are deliberately different things: the short one is on a screen
+    in a room that may hold a hundred people, so it can never be the thing
+    that redeems a token. The long one never leaves the television, and both
+    are stored hashed.
+  - The code alphabet leaves out every character that looks like another on a
+    screen, and typing the one you thought you saw still finds the code — an
+    O where the screen showed a Q resolves, because the screen cannot have
+    shown an O. The approval names the device in a sentence, because the one
+    attack this flow cannot design away is somebody being talked into typing a
+    code from a screen that is not theirs.
+  - **A catalogue feed** at `/api/tv/feed.json` and `/api/tv/feed.xml`. Point
+    Roku's Direct Publisher at the first and it builds and ships a real
+    channel with no BrightScript; the second is what most other platforms
+    take, generated from the same query so two feeds of one library can't
+    disagree. **Nothing member-only is in either**: a feed is fetched with no
+    session, cached by somebody else and republished to every television that
+    installs the channel, so "who can see this" has one honest answer.
+  - **A ten-foot screen** at `/tv`: large type, overscan margins, and focus
+    that moves with the four arrows — nothing wraps, and moving between rows
+    keeps your column, because on a device with no pointer focus reappearing
+    somewhere else is disorienting. Works today on Samsung and LG browsers and
+    anything with an HDMI stick.
+  - Members see and revoke their signed-in televisions at `/profile/devices`.
+    A television token does not expire, and the set is in a room they may not
+    be in any more.
+
+- **Chat beside a live stream.** Polling rather than sockets, because this app
+  runs on serverless functions with nothing long-lived to hold a connection
+  open — each poll asks only for what has arrived since the last id it saw, so
+  the usual answer is an empty array, and the page stops asking entirely while
+  the tab is hidden.
+  - **Off by default, and only open while somebody is watching**: from half an
+    hour before the start to an hour after the end. An unattended comment box
+    left standing on last year's carol service is exactly where the thing you
+    don't want written gets written.
+  - **Slow mode is per person, not per chat** — rate-limiting the whole chat
+    would let one fast typist silence everybody else — and sits on top of a
+    flood limit that is also per person.
+  - **Taking a message down hides rather than deletes it**, so it can't be
+    reposted past a moderator, and hidden is filtered in the poll as well as
+    the query: a message a moderator has just removed must not arrive at a tab
+    that was a few seconds behind.
+  - **Muting is per stream.** Silencing somebody for one evening is the
+    proportionate act while a service is going on; a site-wide ban is a
+    different decision made elsewhere, calmly.
+  - A message carries the author's name as it stood when they wrote it, so a
+    later change of display name doesn't rewrite what a conversation looked
+    like. No account id reaches the browser.
+
+- **Fixed: `/live` threw in production whenever a stream was live.**
+  `getCurrentLiveStream` goes through `unstable_cache`, which stores its answer
+  as JSON — so the `DateTime` columns come back as strings however the types
+  read, and anything calling a `Date` method on them throws. It is now
+  converted at the boundary, which also fixes the countdown for the next
+  stream.
+
+- **Videos can live at YouTube or Vimeo.** A church that already streams its
+  service every Sunday has the sermon there before it thinks about this app;
+  re-uploading it costs storage, bandwidth and somebody's Sunday afternoon.
+  - An imported video is an **ordinary video row** — filed into a series, given
+    a speaker and scripture references, searched, favourited, added to a
+    playlist — that happens to play in the source's own frame. Chapters work,
+    because every player takes a start time.
+  - **A sync never overwrites an edit made here.** Each imported field is kept
+    twice: the live one, and what the source last said. A field is replaced
+    only when the live value still equals the imported one — which is exactly
+    "nobody has touched this". Rename an import to "The Cost of Discipleship"
+    and tonight's sync leaves the title alone while still taking the new
+    description.
+  - `bunnyVideoId` is **nullable** now rather than an empty string, so every
+    Bunny-only feature — downloads, captions, MP4 renditions, the encode-status
+    sync, transcription — has to answer for itself what an imported video
+    means. Each one refuses with a sentence saying why, and the download button
+    doesn't appear at all.
+  - A feed that hasn't changed does no writes and no second API call. Removing
+    a feed keeps the videos it brought in: they have been filed and watched,
+    and deleting them because the *source* was tidied up would be the
+    surprising reading.
+  - YouTube through the no-cookie player with related videos off — a sermon on
+    a church's own site shouldn't end in a wall of somebody else's
+    recommendations — and Vimeo with do-not-track on.
+
+- **The app speaks more than one language.** The `language` device setting had
+  one option and nothing read it; it is real now, with English and Spanish.
+  - **A catalogue is a typed object, so a missing key doesn't compile.**
+    Completeness is the type-checker's job. What it can't see — a translation
+    that drops a `{placeholder}`, turning "3 places left" into "places left"
+    and losing the number — is what the test checks.
+  - **It follows the browser.** With no choice stored, `Accept-Language`
+    decides, quality weights and all; `es-419` and `es-ES` both find Spanish,
+    and a language the app doesn't speak falls back to English rather than
+    erroring. Somebody whose phone is in Spanish shouldn't have to find a
+    setting.
+  - **The choice is a cookie as well as a device setting**, because these pages
+    render on the server and the server cannot read localStorage. Without it
+    every page would arrive in English and flip a moment later.
+  - Translated so far: the navigation, and the events, forms, prayer and small
+    group pages — the ones a visitor who doesn't read English most needs. The
+    library, the reader and the admin are still English only; the catalogue is
+    where the rest goes.
+  - **What language a sermon is in is a separate question** from what language
+    the app's screens are in, and has its own field on a video and a series. An
+    episode inherits its series' answer; unlabelled means unlabelled and is
+    treated as the site's default rather than as "any", because filing every
+    untagged sermon under every language would make the filter useless in
+    exactly the church that needs it.
+
+- **Announcements: one message to everybody, by email, text or push.** Sent
+  from `/admin/broadcasts`, gated on `manage_users` — writing to every member
+  is closer to holding the membership list than to booking the hall.
+  - **The screen says how many people it will actually reach, before the send
+    button, and why the rest won't be.** A church with 400 members does not
+    have 400 addresses it may write to and certainly not 400 numbers it may
+    text; if that difference isn't shown, "I told everyone" is false and nobody
+    finds out until a family turns up to a cancelled service.
+  - **Three different consent rules, deliberately not one.** Email is on unless
+    somebody turned announcements off — and that is a *separate* switch from
+    "email me when a sermon publishes", because turning off new-video emails is
+    not asking to miss "the road is closed". SMS is off unless somebody said
+    yes and gave a number themselves. Push only reaches a device already signed
+    up. A phone number typed into a public event sign-up form is never treated
+    as consent to be texted.
+  - **Sending is resumable.** Recipients are frozen into rows with the address
+    copied in, then worked through in bounded batches, each marked as it goes —
+    so a run killed at 180 of 400 continues at 181 rather than emailing
+    everybody again. The admin screen drives the loop (which is what gives a
+    progress bar); a daily cron finishes anything abandoned.
+  - **Send yourself a test first**, and one bad address never stops the other
+    three hundred — a failure is recorded against that person with the
+    provider's own reason.
+  - SMS via Twilio or a generic JSON webhook, behind one interface. Unset says
+    which variables are missing rather than silently doing nothing. The
+    message's cost in segments is shown as you type, including the halving one
+    curly apostrophe causes.
+
+- **Small groups.** A directory at `/groups` of the home groups and studies
+  that meet during the week, with join requests the group's own leader answers.
+  - **The address is the whole design.** Most of these meet in somebody's
+    living room, so a group has two "where" fields: `area`, a district, safe to
+    print; and `address`, a house, given only to people actually in the group.
+    One function decides which, and the type a page receives has no required
+    `address` on it — so a page that forgets to check has nothing to print
+    rather than printing a home. An address that has been on the open internet
+    once stays somewhere for good.
+  - **Asking to join is a request, not a join**, and that is what keeps the
+    address safe: somebody who has merely asked is not given it, or anybody
+    with an account could learn where a leader lives by pressing a button.
+  - **A leader is not staff.** Whoever hosts the Tuesday group answers requests
+    on the group's own page, with no admin access and no capability grant.
+  - **A full group stays listed and says it's full** — the question somebody
+    has is "can I come", and "not this one" answers it. A group with no leader
+    is flagged in the admin list, because nobody can answer a request to join
+    it.
+  - Only a yes is a notification. A no is a conversation, and a push saying
+    "you were turned down" is the wrong way for anybody to hear it.
+
+- **A prayer wall, moderated by default.** Requests written at `/prayer` wait
+  until somebody puts them up. That is not a setting: an unmoderated prayer
+  wall on a church website is a liability with a "post" button, and the day it
+  is abused is the day somebody would have gone looking for the switch.
+  - **Anonymous means anonymous.** The row still knows whose it is — the writer
+    has to be able to take it down, and a moderator has to be able to act if it
+    is abusive — so anonymity can't be a missing column. Exactly one function
+    decides what a reader is told about who wrote something, every read goes
+    through it, and it withholds the name from the moderator's own queue too:
+    that screen gets left open, and a screenshot of it is how an anonymous
+    request stops being one.
+  - **Three audiences**: anyone who visits, members, or only the people who
+    look after prayer. Checked on every read rather than on the page that
+    happens to list them.
+  - Whoever wrote a request always sees it, even while it waits — otherwise
+    writing one and waiting looks exactly like it having been binned.
+  - **"I prayed for this" is a count, never a list of names.** The number
+    encourages whoever asked; the names would make it a scoreboard.
+  - Marking one answered keeps it on the wall with what happened, which is the
+    reason to have a prayer wall at all.
+  - `moderate_prayer` is its own grant, apart from events and forms: approving
+    a request somebody wrote about their marriage is pastoral work, and often
+    not the person who books the hall.
+
+- **Forms, built here rather than in code.** The connect card in the pew, a
+  camp application, a request for a visit — questions are rows an admin adds,
+  because they change every term and a deploy is the wrong unit of change for
+  "add a box for dietary requirements".
+  - **An answer belongs to the question, not to its wording.** Rename "Phone"
+    to "Mobile" and every answer already given is still an answer to it.
+  - **A question is never really deleted, only stopped.** Removing the row
+    would leave a year of responses with a column nobody can name, so a
+    retired question keeps labelling the answers people gave it and the export
+    still carries them, after the live ones.
+  - **The server decides what a valid answer is.** `required` and
+    `type="email"` in the browser are a courtesy a crafted POST walks past; in
+    particular an option nobody offered is refused rather than appearing in the
+    export as though somebody had chosen it.
+  - Responses can be marked dealt with, **by name** — the way follow-up fails
+    is two people each assuming the other rang.
+
+- **A test that no client component can reach the database.** `lib/db.ts`
+  builds a PrismaClient; one *value* imported from a module that transitively
+  imports it drags the whole client into the browser bundle, where it throws on
+  sight and the page renders "This page couldn't load". Nothing catches that —
+  it type-checks, lints and builds. It caught two real cases the moment it was
+  written.
+
+- **Every scheduled job now runs at most once a day.** Two of the crons added
+  with the schedules and transcription features were hourly, which Vercel's
+  Hobby plan rejects at deploy time — so the whole deployment failed with
+  "Hobby accounts are limited to daily cron jobs" rather than the jobs merely
+  running too often. `cron.test.ts` now asserts it, since nothing else in the
+  build does.
+  - **Transcription is bounded by time rather than by a count.** It was one
+    video per run, which was fine hourly and would have meant one video a day
+    on a daily cron. A run now takes as many as fit inside the function's own
+    limit and leaves the rest queued.
+
+- **Events, with sign-up that can run out.** Published at `/events` with a
+  date, a place and a description; the interesting part is the number.
+  - **The last place is given to one person.** Everything that decides "is
+    there room" happens under a lock on the event row, so four people pressing
+    the button in the same second get one yes and three waiting-list places
+    rather than four yeses and an overbooked hall.
+  - **The waiting list moves when somebody drops out** — and stops at the first
+    party that doesn't fit rather than skipping ahead to a smaller one. Two
+    places free and a family of four at the front means nobody moves: passing
+    over that family to seat the couple behind them is the thing people notice
+    and rightly resent. Raising the capacity moves it too, in the same breath,
+    and says how many moved.
+  - **Guests count as places**, because a guest sits somewhere.
+  - **You don't need an account.** The people a church most wants at a men's
+    breakfast are the ones who have never made one, so sign-up takes a name and
+    an email; `Members only` is how an event closes that. Only people with an
+    account are ever notified: an address typed into a public form is not one
+    this app has agreed to write to.
+  - The list an organiser prints comes out as CSV, and says who is a member and
+    who isn't — the one thing the sign-up form didn't ask.
+
+- **Schedules, brought over from the calendar app.** Any number of recurring
+  rotas — Breakbread, Welcome, Sound — read at `/calendar` by people who never
+  log in, and fed either from a Google Sheet somebody already maintains or
+  from the admin interface here. A separate feature from the service rota,
+  which schedules accounts against a service's running order; this schedules
+  names, most of which have no account.
+  - **No login for readers.** A name is chosen once on a device, like the
+    theme, and grants access to nothing.
+  - **Test connection** previews what the parser made of a spreadsheet before
+    anything is imported — including every row it skipped and why, because a
+    cell nobody can read is skipped and reported rather than guessed at.
+  - **A failed sync deletes nothing**, and an unchanged sheet does no writes.
+  - **Near-duplicate names are suggested for merging, never merged** — which
+    two names belong to one person is not a guess an app should act on.
+  - Reminders go through this app's existing push rather than a second stack,
+    which means somebody on a rota **without** an account doesn't get one.
+    The calendar remains the source of truth for them.
+  - **Keep the calendar on this device** puts the year of rotas — a few
+    kilobytes of text — beside the saved books, videos and service orders, on
+    the same offline screen, filtered to the name you already chose. Once
+    saved it keeps itself current: opening the calendar with a connection
+    asks only for what has changed since last time, which is what
+    `/api/sync/snapshot` was built for. Two things the payload can never say,
+    the device works out itself — a schedule that was turned off takes its
+    dates with it, and days that fall out behind the window are dropped —
+    because otherwise both would sit on the phone for good and somebody would
+    turn up for a rota that had been withdrawn.
+
+
+- **A rota: who is serving, and whether they said yes.** A running order says
+  what is being sung; it had no way to say who is there to do it. Teams
+  (`/admin/teams`) are the groups you schedule from; the rota is built on the
+  plan itself, under the hymns.
+  - **Asking somebody notifies them**, and they answer on `/profile/rota` with
+    yes or no — a decline carrying a reason, because a "no" without one just
+    moves the conversation to text message. That answer beside each name is
+    the whole difference between a rota and a list.
+  - **Blockouts**: a member records when they're away, and whoever builds the
+    rota is warned *before* they ask rather than after. A warning, not a bar —
+    sometimes a rota is a conversation.
+  - The service page lists who is serving, **only those who said yes**: an
+    outstanding ask is a conversation between two people, not a notice board.
+  - An unanswered ask stays on a member's page after its date has passed. It
+    doesn't stop being unanswered because the day went by.
+
+- **Sermon note sheets with blanks.** The fill-in-the-blank sheet handed out at
+  the door in a great many churches, as a page in the app: an admin writes the
+  outline as plain text with underscores for the gaps, and the congregation
+  fills it in while the talk is going on and keeps it.
+  - Saved as it is typed, not on a button — somebody filling this in is
+    listening to something else, and a Save they forget loses the lot.
+  - A gap is identified by its position, so an outline edited afterwards can
+    leave an answer against a gap it was never written for. The sheet says it
+    has changed rather than quietly shuffling somebody's notes.
+
+- **Transcripts can be written automatically.** They have been hand-typed
+  since they shipped, which in practice means most videos have none and the
+  search that reads them finds nothing. **Transcribe it for me** queues a
+  video; a scheduled job takes one per run, because an hour of audio takes
+  minutes and that is longer than a request may live.
+  - It needs a speech-to-text service (`TRANSCRIBE_API_URL`) — hosted, or a
+    Whisper server in the church office, in which case no audio leaves the
+    building. Unset, the button is refused and says why.
+  - The audio goes through this server rather than the service being handed a
+    media URL: those URLs are signed and short-lived, and giving a third party
+    a key to the library is a different thing from giving it one file.
+
+
+- **A hymn can carry its credits, and the projector shows them.** CCLI
+  number, words &amp; music, copyright line, key and tempo — in both places a
+  hymn lives, its own row or a number inside a book. The **copyright line
+  stays on the projector** the whole time the words are up, rather than
+  fading with the controls after three seconds: a licence requires it to be
+  visible while the words are, and something that disappears on its own
+  doesn't meet that.
+
+- **"What we sang", for a licence return.** `/admin/services → What we sang`
+  counts each song in a service plan dated inside a window and how many
+  services it was sung in, with its CCLI number, author and copyright, and a
+  CSV export. Counted from the plans, since a plan is the record of what was
+  sung — a hymn opened on a phone on Tuesday isn't. Unpublished plans count
+  too: a draft that never got published was still sung, and under-reporting a
+  return is the worse mistake.
+
+- **Audio gets the controls a phone expects.** Playing a talk puts its title,
+  series and cover on the lock screen, with play, pause, a scrubber that
+  moves, and skip buttons — plus a sleep timer and a speed control beside the
+  player. The lock screen is claimed on play rather than on load, so a page of
+  eight talks doesn't have eight players fighting over it.
+  - The **default playback speed** in `/profile/settings` finally does
+    something. It was stored and shown as a reminder because Bunny's embed
+    takes no such parameter; that was never true of audio, which is our own
+    element.
+
+
+- **Reading text size, per device.** A− and A+ beside a hymn's words and in
+  the EPUB reader, because the moment anybody discovers a hymn is too small is
+  while they are looking at it — in a pew, which is not when somebody goes
+  hunting through a settings page. It is under **Reading** in
+  `/profile/settings` as well, and the offline screen both reads it and can
+  change it, since a hall with no signal is where the size matters most.
+  - An EPUB is scaled as a percentage, so the book's own headings and verses
+    stay in proportion instead of all collapsing to one size. A scanned PDF is
+    deliberately left out — its pages are pictures, and the reader has zoomed
+    them from the start. Present mode keeps its own separate size: a projector
+    across a hall and a phone in a hand are never the same answer.
+
+- **A hymn or a book can be shared.** A hymn is the thing here most worth
+  sending somebody — "we're singing this on Sunday" — and had no way to be
+  sent. The same buttons videos have now sit on a hymn's page and a book's,
+  and the reader's bottom bar has a **Link** button for the hymn open in front
+  of you.
+  - That one links by **number** (`/books/<id>?hymn=214`), not by page: a page
+    number means nothing to somebody holding a different edition, and stops
+    meaning anything here the moment the book is re-scanned. Only an
+    unnumbered spot falls back to its page.
+  - Not offered on a members-only hymn or book, where a link a stranger
+    can't open would be worse than no button.
+
+
+- **A service's running order can be kept on the device.** The books could
+  already be saved; the sheet saying which hymns to open could not — the wrong
+  way round for a hall with no signal, since the order is the thing you need
+  first and it is two kilobytes against a hymnal's forty megabytes.
+  - **Keep this order offline** on a service's page saves it; the offline
+    screen then lists it with its day, its notes and every hymn, and a hymn
+    whose book is also on the device opens that book at it. One whose book
+    isn't says so on the row instead of offering a button that does nothing.
+  - A running order gets reordered up to Saturday night, so a saved copy is
+    checked when the page is opened: one that has changed since says **Order
+    changed — update** rather than being quietly wrong in somebody's hands.
+  - Its own cache and index rather than the books' ones, so clearing one kind
+    of saved thing never takes another with it.
+
+- **A service order can be printed.** For whoever would rather hand out the
+  numbers than a phone: the plan, its day, its notes and the hymns, with the
+  app's header, rail, tab bar, buttons and "members only" badges left off the
+  sheet.
+
+- **Each row of a plan is named by the hymn, not the book it is in.** A plan
+  item points at a file and a number, and a file's title is the book's — so an
+  order built from one hymnal read "214 Church Hymn Book, 302 Church Hymn
+  Book" on screen, on paper and offline. The book's indexed contents know what
+  214 is called, so they are asked; a book nobody has indexed still falls back
+  to its own title.
+
+- **Most looked-up hymns, in the admin analytics.** What a hymn list can't
+  tell you is what the congregation actually sings. Counted when a hymn is
+  genuinely opened — its own page, a book opened at its number, or put on the
+  projector — and named by the book's contents rather than by the book.
+  - Counted in the browser rather than when a page renders, because Next
+    prefetches links on hover and a server-side count would largely be a
+    count of mice. The cost is the other direction: a blocked request means
+    an opening goes uncounted, which is the right way round for a number
+    nothing depends on. Included in the analytics CSV export.
+
+
+- **A book with no bookmarks can have its contents typed in.** Most cheaply
+  scanned hymnals are six hundred images and nothing else: the indexing pass
+  finds no outline, stores nothing, and the section stays without a search
+  box. The contents are printed in the front of the book, so **Type
+  contents…** (a file's Details panel in `/admin/files`) takes them a line at
+  a time — label, then page, separated by a tab, a pipe, or just the trailing
+  number, with two spaces of indent for a hymn under a heading.
+  - Pages are the ones **printed in the book**; the book's own offset is
+    applied, and `pdf:2` names a page of front matter, which has no printed
+    number.
+  - A line that can't be read is reported with its number instead of being
+    dropped, and the box counts what it will save as you type.
+  - It opens an already-indexed book too, writing back exactly what was
+    stored, nesting included — so one wrong bookmark can be corrected without
+    re-scanning. The bookmark-reading pass no longer sends an empty contents
+    list, which would have replaced a typed one with nothing.
+
+- **A hymn inside a whole-book hymnal can have words, and be projected.** A
+  hymn that is its own file kept its lyrics on its row; a hymn inside a
+  scanned book had no row, so a service built from book numbers offered no
+  **Present** button — the projector worked for one kind of hymnal and not the
+  other. **Hymn lyrics…** is a picker over the book's indexed contents: find
+  the number, paste the words.
+  - The words are stored against the **book and the hymn number**, not the
+    contents row, which every reindex replaces — so re-indexing, re-scanning
+    or retyping a book's contents doesn't lose an evening's typing. An
+    unnumbered entry has nothing to key on and can't have words.
+  - **Present** now sits on the book's contents page and on *every* service
+    plan row that has words, not only the first — a hymn gets sung out of
+    order, and somebody takes over the screen halfway through.
+  - A line of those words finds the hymn, in the section box and in the
+    site-wide search, with the line that matched shown under the result.
+
+- **A scanned book's pages can be read for their text, so they can be
+  searched.** Search-in-the-book and read-aloud both work off a PDF's text
+  layer, and a scan has none — so on most hymnals they quietly did nothing.
+  **Read this book's text…** reads every page: the file's own text layer where
+  there is one, OCR off the image where there isn't.
+  - **Resumable and interruptible**, because a hymnal takes the better part of
+    an hour and a laptop sleeps. Pages are stored in tens as they are read,
+    and starting again carries on from the first page not yet held; a book
+    only counts as read when a run reaches its last page.
+  - **In-book search then answers from the stored text** — one request rather
+    than six hundred pages parsed in the browser, and it finds words on a
+    photograph. A book nobody has read still searches as it always did, rather
+    than reporting "no matches" for a book that was never read. Results read
+    by OCR say so.
+  - **The section search uses it too**: a matching page is attributed to the
+    hymn it falls inside, so what comes back is a hymn to open rather than a
+    page number. This is the only way a hymn nobody has typed out is findable
+    by its words.
+  - The OCR engine is served from the app's own `/tesseract`, copied out of
+    `node_modules` at install time like the offline readers, rather than from
+    a public CDN that a filtered office connection may not reach.
+
+
+- **A hymnal section can be searched, across every book in it.** The hymns of
+  a scanned hymnal live in that PDF's own bookmarks, which only a browser with
+  the file open can resolve — so a category holding six books couldn't be
+  searched at all, and nobody waits for six PDFs to be parsed to find out
+  which one has "It Is Well". An admin now resolves each book's contents once
+  (the file list's indexing pass, which already opens every book to draw its
+  cover) and they are stored as `BookHymn` rows.
+  - **One box on the section's page** searches every indexed book in it, as
+    you type, by name or by number — 214 finds hymn 214 rather than everything
+    with "214" in it — and each result opens the reader at that page. Section
+    headings are searchable too; "Advent" is a place worth going.
+  - **The site search finds them as well.** "It Is Well" used to be findable
+    only where somebody had typed the lyrics out; now it is found in the
+    hymnal it is actually printed in, in the same **Hymns & books** list.
+  - Pages are stored as PDF pages like everything else about a position in a
+    book, so correcting a book's page offset relabels the results without
+    reindexing. A section whose books haven't been indexed shows no box rather
+    than an empty one.
 - **Present mode**: a hymn's words on the screen at the front of the room —
   one verse at a time, as large as it will go, white on black with a light
   option. **Present** on a hymn's page, or **Present this service** on a
@@ -570,6 +1079,14 @@ All notable changes to this project are documented here. Format follows
   the inbox, shared links, and account settings, which a member always needs.
 
 ### Fixed
+
+- **Share links carried a relative URL.** The X and Facebook buttons built
+  their href during render, where on the server there is no `location` — so
+  the markup a person actually clicked sent `/videos/some-slug` to a site with
+  no idea what that is. The origin is now learned on mount, which keeps the
+  server's markup and the first client render agreeing and corrects the links
+  before anything can be clicked. Affected series, videos and playlists, and
+  was found by putting the same buttons on hymns.
 
 - **Fixed a production `P2037` "too many connections" error** caused by
   runtime traffic sharing a direct database connection sized for a

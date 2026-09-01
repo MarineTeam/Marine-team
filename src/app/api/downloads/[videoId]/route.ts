@@ -60,7 +60,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       );
     }
 
-    const source = await resolveMp4Source(video);
+    // `getDownloadAvailability` has already refused a video that isn't ours,
+    // so by here there is a Bunny id; this narrows the type to match.
+    const source = await resolveMp4Source({ ...video, bunnyVideoId: video.bunnyVideoId as string });
     if (!source.ok) {
       return NextResponse.json(
         { error: DENIAL_MESSAGES[source.reason], reason: source.reason },

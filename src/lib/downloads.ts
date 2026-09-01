@@ -32,6 +32,10 @@ export type DownloadDenialReason =
   | "not_permitted"
   | "wrong_platform"
   | "not_logged_in"
+  // Nothing is wrong: the video simply isn't ours to hand out. An imported
+  // YouTube or Vimeo sermon has no file here, and offering a download that
+  // could only ever fail is worse than saying where to watch it.
+  | "not_hosted_here"
   // The four below are all "we couldn't get you a file", kept apart because
   // each has a different fix and only one of them is about the video itself.
   // Collapsing them into a single "no downloadable file" message is what made
@@ -50,6 +54,7 @@ export type DownloadAvailability =
 export const DENIAL_MESSAGES: Record<DownloadDenialReason, string> = {
   plugin_off: "Downloads are turned off for this site.",
   content_blocked: "This video isn't available for download.",
+  not_hosted_here: "This one plays from elsewhere, so there's no file to download.",
   not_permitted: "Your account doesn't have download access.",
   wrong_platform: "Downloads aren't available here — try the installed app.",
   not_logged_in: "Log in to download.",
@@ -154,10 +159,17 @@ export async function getDownloadAvailability({
     seriesId: string | null;
     categoryId: string | null;
     series?: { downloadEnabled: boolean | null; categoryId: string | null } | null;
+    /** Absent for a video that lives somewhere else — see lib/video-source.ts. */
+    bunnyVideoId?: string | null;
   };
   platform: ClientPlatform | "any";
 }): Promise<DownloadAvailability> {
   if (!user) return deny("not_logged_in");
+
+  // Checked before the permission questions on purpose: whether a file exists
+  // to hand out has nothing to do with who is asking, and answering "you're
+  // not allowed" about a video nobody could download would be a lie.
+  if (video.bunnyVideoId === null) return deny("not_hosted_here");
 
   const categoryId = video.series?.categoryId ?? video.categoryId ?? null;
   const [pluginOn, policy] = await Promise.all([

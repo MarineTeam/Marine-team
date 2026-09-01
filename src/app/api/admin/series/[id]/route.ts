@@ -17,6 +17,7 @@ export const updateSchema = z.object({
     .regex(/^[a-z0-9-]+$/)
     .optional(),
   description: z.string().optional(),
+  language: z.string().max(10).optional().nullable(),
   coverImageUrl: z.string().url().optional().or(z.literal("")),
   abbreviation: z.string().optional(),
   hymnPerFile: z.boolean().optional(),
@@ -39,6 +40,9 @@ function normalizeSeriesData(body: z.infer<typeof updateSchema>) {
   return {
     ...body,
     tags: body.tags?.map((t) => t.trim().toLowerCase()).filter(Boolean),
+    // An empty box means "nobody has said", which is not the same as
+    // asserting the site's default — see lib/content-language.ts.
+    language: body.language === undefined ? undefined : body.language || null,
     publishAt:
       body.publishAt === undefined ? undefined : body.publishAt === null ? null : new Date(body.publishAt),
     unpublishAt:

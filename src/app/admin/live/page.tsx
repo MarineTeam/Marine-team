@@ -20,6 +20,8 @@ type LiveStream = {
   published: boolean;
   startAt: string;
   endAt: string | null;
+  chatEnabled: boolean;
+  chatSlowMode: number;
 };
 
 export default function LiveAdminPage() {
@@ -95,6 +97,21 @@ export default function LiveAdminPage() {
     await load();
   }
 
+  /**
+   * The chat's two switches.
+   *
+   * On the stream rather than site-wide: a members' prayer meeting and a
+   * carol service streamed to the wider world are not the same decision.
+   */
+  async function setChat(s: LiveStream, patch: { chatEnabled?: boolean; chatSlowMode?: number }) {
+    setStreams((current) => current.map((item) => (item.id === s.id ? { ...item, ...patch } : item)));
+    await fetch(`/api/admin/live/${s.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+  }
+
   async function remove(id: string) {
     if (!confirm("Delete this live stream?")) return;
     await fetch(`/api/admin/live/${id}`, { method: "DELETE" });
@@ -107,7 +124,10 @@ export default function LiveAdminPage() {
         <h1 className="text-xl font-semibold">Live streaming</h1>
         <p className="text-sm text-zinc-500">
           Points at a stream already embedded elsewhere (YouTube, Boxcast, etc.) — Bunny Stream has no live
-          ingest. Publishing a stream sends a push notification (&ldquo;Live now&rdquo;) if the Live streaming
+          ingest. Chat is off until switched on per stream, and is only open from half an hour
+          before the start until an hour after the end — an unattended comment box left standing on
+          last year&rsquo;s carol service is where the thing you don&rsquo;t want written gets
+          written. Publishing a stream sends a push notification (&ldquo;Live now&rdquo;) if the Live streaming
           plugin is enabled in{" "}
           <a href="/admin/plugins" className="underline">
             Plugins
@@ -181,7 +201,28 @@ export default function LiveAdminPage() {
               </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <label className="flex items-center gap-1.5 text-zinc-500">
+                <input
+                  type="checkbox"
+                  checked={s.chatEnabled}
+                  onChange={(e) => setChat(s, { chatEnabled: e.target.checked })}
+                />
+                Chat
+              </label>
+              {s.chatEnabled && (
+                <label className="flex items-center gap-1.5 text-zinc-500">
+                  <span title="Seconds one person waits between messages">Slow</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={300}
+                    value={s.chatSlowMode}
+                    onChange={(e) => setChat(s, { chatSlowMode: Number(e.target.value) })}
+                    className="w-16 rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+                  />
+                </label>
+              )}
               <button
                 onClick={() => toggle(s)}
                 className={`rounded-md border px-2 py-1 dark:border-zinc-700 ${s.published ? "border-amber-400 text-amber-700 dark:text-amber-400" : ""}`}

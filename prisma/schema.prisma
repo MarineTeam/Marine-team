@@ -138,6 +138,17 @@ model User {
   // Opt-in email channel, independent of notificationFrequency (which only
   // governs push timing) — always sent immediately when a notification fires.
   emailNotifications    Boolean               @default(false)
+  /// A mobile number, given by the member themselves. Never imported.
+  phone                 String?
+  /// Whether they agreed to be texted. Off unless somebody says yes: a text
+  /// costs the church money and the recipient their attention, and in most
+  /// places sending one without consent is also illegal.
+  smsOptIn              Boolean               @default(false)
+  /// Whether church-wide announcements reach them by email. On by default,
+  /// and deliberately separate from `emailNotifications` above — somebody who
+  /// turned off "a new sermon is up" has not asked to miss "no service
+  /// tomorrow, the road is closed".
+  broadcastEmails       Boolean               @default(true)
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
   pendingNotifications  PendingNotification[]
@@ -150,6 +161,13 @@ model User {
   comments              Comment[]
   commentReports        CommentReport[]
   sermonNotes           SermonNote[]
+  outlineAnswers        SermonOutlineAnswer[]
+  serviceTeams          ServiceTeamMember[]
+  serviceAssignments    ServiceAssignment[]
+  serviceBlockouts      ServiceBlockout[]
+  /// The name this account appears under on a rota, when they are the same
+  /// person — see Person.
+  person                Person?
   groupAssignments      GroupAssignment[]
   ratings               Rating[]
   seriesWatchLater      SeriesWatchLater[]
@@ -168,6 +186,15 @@ model User {
   readingMarks          ReadingMark[]
   identities            UserIdentity[]
   authorizedEmailsAdded AuthorizedEmail[]     @relation("AuthorizedEmailAddedBy")
+  eventRegistrations    EventRegistration[]
+  formSubmissions       FormSubmission[]
+  prayerRequests        PrayerRequest[]
+  prayers               PrayerIntercession[]
+  smallGroups           SmallGroupMember[]
+  broadcastsReceived    BroadcastRecipient[]
+  liveChatMessages      LiveChatMessage[]
+  liveChatMutes         LiveChatMute[]
+  tvDevices             TvDevice[]
 }
 
 /**
@@ -295,6 +322,10 @@ model Series {
   title             String
   slug              String              @unique
   description       String?
+  /// The language this series is in, as a BCP-47 tag. See Video.language —
+  /// a video without its own inherits the series' answer rather than the
+  /// site's, because a Spanish series' episodes are Spanish.
+  language          String?
   coverImageUrl     String?
   // Short badge shown on this book's cover in a hymnalStyle category's grid
   // (e.g. "GSFH1"). Unused outside that grid.
@@ -338,20 +369,49 @@ model Series {
   shareLinks        ShareLink[]
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
+
+  @@index([language])
 }
 
 model Video {
-  id                String             @id @default(cuid())
-  title             String
-  slug              String             @unique
-  description       String?
-  bunnyVideoId      String
-  bunnyLibraryId    String
+  id                   String                @id @default(cuid())
+  title                String
+  slug                 String                @unique
+  description          String?
+  /// Where the video actually lives. BUNNY is the library this app uploads
+  /// to; the others are somebody else's player in an iframe.
+  source               VideoSource           @default(BUNNY)
+  /// Null for a video that isn't in Bunny at all — see `source`. Everything
+  /// that reads this (downloads, captions, MP4 renditions, the encode-status
+  /// sync) is a Bunny-only capability, so a null here is the honest way to
+  /// say "that doesn't apply", rather than an empty string every caller has
+  /// to remember to check.
+  bunnyVideoId         String?
+  bunnyLibraryId       String?
+  /// The id at YouTube or Vimeo. Unique per source, which is what stops a
+  /// re-sync importing the same video twice.
+  externalId           String?
+  /// The page a viewer would land on at the source, for a "watch on YouTube"
+  /// link and for an admin checking what was imported.
+  externalUrl          String?
+  /// The thumbnail the source gave us. Bunny computes its own from the video.
+  externalThumbnailUrl String?
+  /// The title and description as the source had them at the last sync.
+  ///
+  /// Kept so a re-sync can tell "nobody has touched this, take the new
+  /// wording" from "somebody rewrote it here, leave it alone" — comparing the
+  /// live field against this rather than overwriting blind. Without it, every
+  /// sync undoes the edits an admin made after the last one.
+  importedTitle        String?
+  importedDescription  String?
+  /// Which feed imported it, so removing a feed can say what it brought in.
+  feed                 VideoFeed?            @relation(fields: [feedId], references: [id], onDelete: SetNull)
+  feedId               String?
   // Bunny stores the thumbnail under a per-video file name, which is only
   // "thumbnail.jpg" for auto-generated ones — setting a custom thumbnail
   // (via our admin UI or Bunny's dashboard) changes it. Synced from the
   // Bunny API; null falls back to the "thumbnail.jpg" default.
-  thumbnailFileName String?
+  thumbnailFileName    String?
   // Bunny's MP4-fallback state for this video, cached from the Stream API by
   // the sync routes so the download endpoint reads Postgres instead of
   // calling Bunny on every tap. Null means "never synced" — the download
@@ -360,63 +420,94 @@ model Video {
   // Per-video, not per-library: enabling MP4 Fallback in Bunny's encoding
   // settings only affects later uploads, so an older video sits at false
   // until it's re-uploaded or repackaged.
-  hasMp4Fallback    Boolean?
+  hasMp4Fallback       Boolean?
   // Bunny's `availableResolutions`, verbatim (e.g. "240p,360p,480p"). Kept as
   // the raw string so it survives Bunny adding renditions we don't know yet;
   // parseBunnyResolutions is what interprets it.
-  mp4Resolutions    String?
+  mp4Resolutions       String?
   // Full text transcript, admin-entered. Shown in a collapsible panel by
   // the Transcripts plugin and matched by search when that plugin is on.
-  transcript        String?
+  /// The language this was recorded in, as a BCP-47 tag ("en", "es").
+  ///
+  /// Content, not chrome: a member's language setting changes the app's own
+  /// screens, and this says what a sermon is actually in. Null means nobody
+  /// has said, which is treated as the site's default rather than as "any" —
+  /// guessing would file every unlabelled sermon under every language.
+  language             String?
+  transcript           String?
+  /// Where an automatic transcription of this video has got to: null for a
+  /// video nobody has asked to transcribe, then QUEUED → RUNNING → DONE, or
+  /// FAILED with the reason in `transcriptError`.
+  ///
+  /// A column rather than a job table because there is at most one of these
+  /// per video and the video is what anybody looks at to find out. See
+  /// /api/cron/transcribe for why a queue exists at all: transcribing an hour
+  /// of audio takes minutes, which is longer than a request may live.
+  transcriptStatus     String?
+  transcriptError      String?
+  /// When the current attempt started, so one that died mid-run — a function
+  /// killed at its timeout writes nothing — can be noticed and retried rather
+  /// than sitting in RUNNING for ever.
+  transcriptStartedAt  DateTime?
+  // A fill-in-the-blank note outline for this talk, written by an admin as
+  // plain text with three-or-more underscores marking each gap. Held here
+  // rather than in a table of its own for the same reason as the transcript:
+  // it is one piece of text belonging to one video. See lib/outline.ts.
+  noteOutline          String?
   // Free-form Bible references entered by the admin (e.g. "John 3:16-18"),
   // shown as chips on the video page and matched by search; also powers
   // /scripture/[book] listings, matching Series.tags' book-of-a-verse-first
   // token as the "book" for that route.
-  scriptureRefs     String[]           @default([])
-  durationSeconds   Int?
-  status            VideoStatus        @default(PROCESSING)
-  memberOnly        Boolean            @default(false)
+  scriptureRefs        String[]              @default([])
+  durationSeconds      Int?
+  status               VideoStatus           @default(PROCESSING)
+  memberOnly           Boolean               @default(false)
   // Tri-state download override — see Category.downloadEnabled. The most
   // specific level, so this wins over its series and category.
-  downloadEnabled   Boolean?
-  hidden            Boolean            @default(false)
-  published         Boolean            @default(false)
-  publishAt         DateTime?
-  unpublishAt       DateTime?
+  downloadEnabled      Boolean?
+  hidden               Boolean               @default(false)
+  published            Boolean               @default(false)
+  publishAt            DateTime?
+  unpublishAt          DateTime?
   // Soft delete — see Category.deletedAt. The Bunny Stream asset itself
   // isn't removed until the trash entry is permanently purged.
-  deletedAt         DateTime?
-  isPremiere        Boolean            @default(false)
-  position          Int                @default(0)
-  series            Series?            @relation(fields: [seriesId], references: [id], onDelete: SetNull)
-  seriesId          String?
+  deletedAt            DateTime?
+  isPremiere           Boolean               @default(false)
+  position             Int                   @default(0)
+  series               Series?               @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  seriesId             String?
   // Set only when seriesId is null: a video attached straight to a category,
   // skipping the series layer for categories that don't need it (see FileAsset.categoryId too).
-  category          Category?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  categoryId        String?
+  category             Category?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId           String?
   // Who preached/presented this video; optional since not every video is a sermon.
-  speaker           Speaker?           @relation(fields: [speakerId], references: [id], onDelete: SetNull)
-  speakerId         String?
-  watchProgress     WatchProgress[]
-  favoritedBy       VideoFavorite[]
-  comments          Comment[]
-  ratings           Rating[]
-  watchLaterBy      VideoWatchLater[]
-  viewCount         Int                @default(0)
-  reactions         Reaction[]
-  viewEvents        ViewEvent[]
-  playlistItems     PlaylistItem[]
-  viewerGroups      VideoViewerGroup[]
-  viewers           VideoViewer[]
-  chapters          Chapter[]
-  sermonNotes       SermonNote[]
-  shareLinks        ShareLink[]
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  speaker              Speaker?              @relation(fields: [speakerId], references: [id], onDelete: SetNull)
+  speakerId            String?
+  watchProgress        WatchProgress[]
+  favoritedBy          VideoFavorite[]
+  comments             Comment[]
+  ratings              Rating[]
+  watchLaterBy         VideoWatchLater[]
+  viewCount            Int                   @default(0)
+  reactions            Reaction[]
+  viewEvents           ViewEvent[]
+  playlistItems        PlaylistItem[]
+  viewerGroups         VideoViewerGroup[]
+  viewers              VideoViewer[]
+  chapters             Chapter[]
+  sermonNotes          SermonNote[]
+  outlineAnswers       SermonOutlineAnswer[]
+  shareLinks           ShareLink[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 
+  /// One row per video per source: a re-sync updates rather than duplicates.
+  @@unique([source, externalId])
   @@index([seriesId])
   @@index([categoryId])
   @@index([speakerId])
+  @@index([language])
+  @@index([feedId])
 }
 
 // A named timestamp within a video (e.g. "Intro", "Q&A"), for the Chapters
@@ -474,6 +565,110 @@ model VideoFavorite {
   @@index([videoId])
 }
 
+/// One line of a book's own contents — a hymn in a scanned hymnal — resolved
+/// once and stored, so it can be searched.
+///
+/// Every browser could read these itself (and `/books/[id]` still does, from
+/// the PDF's embedded bookmarks) but only for a book it has already opened,
+/// after seconds of resolving destinations. A hymnal category holding six
+/// books can't be searched that way at all: nobody waits for six PDFs to be
+/// parsed to find out which one has "It Is Well". So an admin resolves them
+/// once — in a browser, since that is where pdf.js runs — and the result
+/// lives here, where a query can reach every book at once.
+///
+/// `page` is a PDF page, like everything else stored about a book's position
+/// (see lib/page-offset.ts): the printed number is worked out for display, so
+/// correcting a book's offset relabels these without reindexing.
+model BookHymn {
+  id       String    @id @default(cuid())
+  file     FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileId   String
+  /// The label exactly as the book's contents print it.
+  title    String
+  /// The number in front of that label, when it has one — what goes up on the
+  /// board, and what somebody types. See hymnNumberOf in lib/toc-nav.ts.
+  number   Int?
+  page     Int
+  /// Nesting in the outline, so a section heading can be told from a hymn.
+  depth    Int       @default(0)
+  position Int
+
+  @@index([fileId])
+  @@index([number])
+  @@index([title])
+}
+
+/// The words on one page of a book, so a scan can be searched.
+///
+/// A PDF made by a typesetter carries its text; a PDF made by a scanner is
+/// photographs, and everything the reader offers over text — search in the
+/// book, read aloud — silently does nothing on one. Which is most hymnals.
+///
+/// So the text is read once, by an admin's browser, and kept: from the file's
+/// own text layer where there is one, and off the image with OCR where there
+/// isn't. Per page rather than per book because a page is what a result has
+/// to send somebody to, and because reading six hundred pages is a job that
+/// gets interrupted — stored a page at a time, it resumes where it stopped.
+model BookPage {
+  id     String    @id @default(cuid())
+  file   FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileId String
+  /// A PDF page, like everything else stored about a position in a book.
+  page   Int
+  text   String
+  /// How it was read: "text" from the file's own layer, "ocr" off the image.
+  /// Kept because they are not equally trustworthy — OCR of a tight scan
+  /// misreads letters, and a search that finds nothing on such a book should
+  /// be explicable rather than mysterious.
+  source String
+
+  @@unique([fileId, page])
+  @@index([fileId])
+}
+
+/// What a person has typed about a hymn that lives inside a whole-book PDF:
+/// its words, and the credits a licence return and a projector both need.
+///
+/// Kept apart from BookHymn on purpose. Those rows are the book's contents,
+/// replaced whole every time the book is indexed — deleted and written again
+/// from the PDF's bookmarks. This is typed by hand, an evening at a time, and
+/// cannot live somewhere a reindex sweeps away.
+///
+/// So it is keyed by the number on the board rather than by a row id: hymn
+/// 214 of this book is still hymn 214 after the book is re-scanned,
+/// re-indexed, or has its contents retyped. The trade is that an unnumbered
+/// entry — a section heading, a hymn a book prints without a number — has
+/// nothing to key on and can't be described here.
+///
+/// The same credits sit on FileAsset for a hymn that *is* a file, which is
+/// the split lyrics already make. Two homes rather than one table with a
+/// nullable number, because a unique index over a nullable column constrains
+/// nothing in Postgres — two "the file itself" rows would both be allowed.
+model BookHymnDetail {
+  id         String    @id @default(cuid())
+  file       FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileId     String
+  /// The hymn number as printed in this book. See hymnNumberOf in lib/toc-nav.ts.
+  number     Int
+  /// Null for a hymn whose credits are known but whose words nobody has typed.
+  lyricsText String?
+  /// The CCLI song number, for the licence return. Free text: it is an
+  /// identifier printed on a page, not a number to do arithmetic with.
+  ccliNumber String?
+  /// "Words: John Newton. Music: Traditional." — as the book prints it.
+  author     String?
+  /// The copyright line. A licence requires this *on the screen* while the
+  /// words are projected, which is why it travels with them.
+  copyright  String?
+  /// The key it is sung in here ("G", "Eb"), for whoever is playing.
+  musicalKey String?
+  tempoBpm   Int?
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([fileId, number])
+  @@index([fileId])
+}
+
 // A member's bookmark of a file — a hymn, or a whole book. Series and videos
 // have had this from the start; a hymnal's hymns are the thing this app gets
 // looked things up in most, and had no way to be kept in a list.
@@ -496,19 +691,110 @@ model FileFavorite {
 /// building opens the same copy of — closer to the board at the front of the
 /// room than to anybody's library.
 model ServicePlan {
-  id          String            @id @default(cuid())
+  id          String              @id @default(cuid())
   title       String
   /// The day it is for. Nullable because a plan is often drafted before the
   /// date is settled, and the list sorts undated plans by when they were made.
   serviceDate DateTime?
   notes       String?
   /// Drafts stay off the members' list until someone is happy with the order.
-  published   Boolean           @default(false)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  published   Boolean             @default(false)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
   items       ServicePlanItem[]
+  assignments ServiceAssignment[]
 
   @@index([serviceDate])
+}
+
+/// A team that serves at a service: musicians, welcome, sound, readers.
+///
+/// Teams are the unit somebody is scheduled *on*; the job they do that week
+/// is free text on the assignment ("Piano", "Second reading"), because every
+/// church names those differently and a table of positions would be a second
+/// thing to maintain for no extra answer.
+model ServiceTeam {
+  id        String              @id @default(cuid())
+  name      String
+  /// Ordering on the admin page and on a plan, so the list reads the way the
+  /// church thinks of it rather than alphabetically.
+  position  Int                 @default(0)
+  createdAt DateTime            @default(now())
+  members   ServiceTeamMember[]
+  roles     ServiceAssignment[]
+}
+
+/// Somebody who can be scheduled on a team.
+///
+/// Membership is separate from the assignment so the scheduler has a list to
+/// pick from — the point of a rota is not typing names — and so that leaving
+/// a team doesn't erase the record of having served.
+model ServiceTeamMember {
+  id       String      @id @default(cuid())
+  team     ServiceTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId   String
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String
+  /// What they usually do, offered as the default when scheduling them.
+  position String?
+  joinedAt DateTime    @default(now())
+
+  @@unique([teamId, userId])
+  @@index([userId])
+}
+
+/// One person, on for one job, at one service.
+///
+/// The status is the whole point of a rota over a list: somebody is asked,
+/// and they say yes or no, and the person building it can see which. A
+/// decline carries its reason, because "no" without one just means the same
+/// conversation happens by text message instead.
+model ServiceAssignment {
+  id          String           @id @default(cuid())
+  plan        ServicePlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  planId      String
+  team        ServiceTeam      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  /// Empty rather than null when unspecified: a unique index over a nullable
+  /// column constrains nothing in Postgres, and this one is what stops the
+  /// same person being asked twice for the same job.
+  position    String           @default("")
+  status      AssignmentStatus @default(INVITED)
+  /// Why they said no, in their words.
+  note        String?
+  respondedAt DateTime?
+  createdAt   DateTime         @default(now())
+
+  @@unique([planId, userId, position])
+  @@index([planId])
+  @@index([userId, status])
+}
+
+enum AssignmentStatus {
+  INVITED
+  ACCEPTED
+  DECLINED
+}
+
+/// Days somebody has said they can't serve.
+///
+/// Stored as a range because that is how people say it — "we're away the
+/// first two weeks of August" — and checked when scheduling so the person
+/// building a rota is told before they ask rather than after. It is a warning
+/// and not a bar: a rota is a conversation, and sometimes you ask anyway.
+model ServiceBlockout {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  /// Inclusive, both ends: somebody away "the 3rd to the 5th" means all three.
+  startDate DateTime
+  endDate   DateTime
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, startDate])
 }
 
 /// One hymn in a service, which is one of the two shapes a hymn takes here
@@ -594,21 +880,21 @@ model WatchProgress {
 }
 
 model FileAsset {
-  id               String    @id @default(cuid())
-  title            String
-  bunnyPath        String
-  url              String
-  sizeBytes        Int?
-  mimeType         String?
-  memberOnly       Boolean   @default(false)
-  hidden           Boolean   @default(false)
-  published        Boolean   @default(true)
-  publishAt        DateTime?
-  unpublishAt      DateTime?
+  id                String    @id @default(cuid())
+  title             String
+  bunnyPath         String
+  url               String
+  sizeBytes         Int?
+  mimeType          String?
+  memberOnly        Boolean   @default(false)
+  hidden            Boolean   @default(false)
+  published         Boolean   @default(true)
+  publishAt         DateTime?
+  unpublishAt       DateTime?
   // Soft delete — see Category.deletedAt. The Bunny Storage object itself
   // isn't removed until the trash entry is permanently purged.
-  deletedAt        DateTime?
-  position         Int       @default(0)
+  deletedAt         DateTime?
+  position          Int       @default(0)
   // The three below apply only inside a hymnPerFile series, where this file
   // is one hymn rather than a whole book.
   //
@@ -616,13 +902,22 @@ model FileAsset {
   // hymn-list.tsx and driving its "Page" sort — distinct from `position`
   // above, which drives drag-reorder and isn't necessarily the same
   // sequence (printed page numbers can skip).
-  pageNumber       Int?
+  pageNumber        Int?
   // Free-text topical grouping (e.g. "Praise", "Prayer") for hymn-list's
   // "Category" sort. Unrelated to the Category model.
-  groupLabel       String?
+  groupLabel        String?
   // Formatted lyrics shown on this hymn's page; when null that page falls
   // back to the PDF reader/download as its primary view.
-  lyricsText       String?
+  lyricsText        String?
+  // The credits for a hymn that *is* a file — the same ones BookHymnDetail
+  // holds for a hymn inside a book. A licence return needs the CCLI number
+  // and the copyright line; a projector is required to show the copyright
+  // line while the words are up; the key and tempo are for whoever plays.
+  ccliNumber        String?
+  songAuthor        String?
+  songCopyright     String?
+  musicalKey        String?
+  tempoBpm          Int?
   // How many PDF pages sit in front of this book's printed page 1 — its
   // front matter. Applies to a whole-book PDF, unlike the three above.
   //
@@ -631,7 +926,7 @@ model FileAsset {
   // where a number is shown to or typed by a person, so a hymn on the
   // book's page 45 is listed and reached as 45 rather than as 55. See
   // lib/page-offset.ts.
-  pageOffset       Int       @default(0)
+  pageOffset        Int       @default(0)
   // A small JPEG data URL of this book's first page, and how many hymns its
   // bookmarks list — both derived from the PDF once by an admin (see
   // "Generate covers" in the file manager) rather than by every visitor's
@@ -641,31 +936,43 @@ model FileAsset {
   // the row: a deleted file takes its thumbnail with it, with no orphan
   // left in Bunny for a later purge to miss. Kept small for the same reason
   // — these travel with every listing that renders a book grid.
-  coverDataUrl     String?
-  hymnCount        Int?
+  coverDataUrl      String?
+  hymnCount         Int?
+  /// When this book's own contents were last read into BookHymn rows, or
+  /// null for a book nobody has indexed yet. Shown in the admin so it is
+  /// obvious which books are searchable.
+  contentsIndexedAt DateTime?
+  /// When this book's pages were last read for their text, or null for a book
+  /// nobody has read. Set when a pass reaches the last page, so a run stopped
+  /// halfway leaves it null and the button still offers to finish.
+  textIndexedAt     DateTime?
   // The admin's *intent* to publish this as a podcast episode, set from the
   // admin file list. Deliberately separate from publicPath below, which is
   // the *state*: a file can be intended for the podcast while temporarily
   // not mirrored (its series was flipped members-only, it was unpublished),
   // and flipping that back restores it without the admin re-ticking anything.
-  podcastPublished Boolean   @default(false)
+  podcastPublished  Boolean   @default(false)
   // Where this file's public copy lives in the separate public storage zone,
   // or null when it isn't mirrored. Never derived from bunnyPath — a
   // podcast enclosure URL is only ever built from a value actually written
   // here after a successful copy, so a file that failed to mirror is absent
   // from the feed rather than advertised at a URL that 404s.
-  publicPath       String?
-  series           Series?   @relation(fields: [seriesId], references: [id], onDelete: SetNull)
-  seriesId         String?
+  publicPath        String?
+  series            Series?   @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  seriesId          String?
   // Set only when seriesId is null: a file attached straight to a category (see Video.categoryId).
-  category         Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  categoryId       String?
-  createdAt        DateTime  @default(now())
+  category          Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId        String?
+  createdAt         DateTime  @default(now())
 
   readingProgress ReadingProgress[]
   readingMarks    ReadingMark[]
   favoritedBy     FileFavorite[]
   servicePlanned  ServicePlanItem[]
+  hymns           BookHymn[]
+  hymnDetails     BookHymnDetail[]
+  pages           BookPage[]
+  lookups         HymnLookup[]
 
   @@index([seriesId])
   @@index([categoryId])
@@ -936,8 +1243,20 @@ model LiveStream {
   published     Boolean   @default(false)
   startAt       DateTime
   endAt         DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+
+  /// Whether the chat beside this stream is open at all. Off by default: a
+  /// carol service streamed to the wider world is not automatically a place
+  /// a church wants an unattended comment box.
+  chatEnabled  Boolean @default(false)
+  /// Seconds a member must wait between messages, on top of the flood limit.
+  /// Zero is off; a moderator raises it when a stream gets busy.
+  chatSlowMode Int     @default(0)
+
+  chatMessages LiveChatMessage[]
+  chatMutes    LiveChatMute[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([startAt])
 }
@@ -1075,6 +1394,36 @@ model ViewEvent {
   @@index([createdAt])
 }
 
+/// A hymn somebody actually opened.
+///
+/// Distinct from ViewEvent, which counts series and videos: a hymn is neither.
+/// It is also two different things — a file of its own, or a number inside a
+/// whole-book hymnal — so both are recorded here, `number` telling them apart
+/// (see lib/hymnal.ts for the split).
+///
+/// Written from the browser rather than when a page renders, because Next
+/// prefetches links on hover: a server-side count would mostly measure mice
+/// moving over a list. What that costs is honesty about the failure — an ad
+/// blocker or a closed tab means a lookup goes unrecorded — which is the
+/// right trade for a number nothing depends on except an admin's sense of
+/// what the congregation sings.
+model HymnLookup {
+  id        String    @id @default(cuid())
+  file      FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileId    String
+  /// The number on the board, for a hymn inside a book; null for a hymn that
+  /// is its own file, which the file itself identifies.
+  number    Int?
+  /// Where it was opened from — "hymn", "book", "reader", "present" — so a
+  /// count can be read knowing what kind of opening it counts.
+  source    String
+  userId    String?
+  createdAt DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([fileId, number, createdAt])
+}
+
 // Granular content-viewing access, layered on top of the plain `memberOnly`
 // gate. As soon as a series/video has any SeriesViewerGroup/SeriesViewer (or
 // Video equivalent) row, `memberOnly` stops being the gate for it: only
@@ -1136,6 +1485,32 @@ model VideoViewer {
 // while watching). The timestamp is manually entered, not synced to actual
 // playback — the same limitation as Chapters, since Bunny's embed has no
 // postMessage API to read real playback position from.
+/// One member's answers to a video's fill-in-the-blank note outline.
+///
+/// The outline is on the Video (`noteOutline`), like the transcript: it is
+/// one piece of text an admin writes. The answers are per member and stored
+/// as a map from a gap's position to what they typed.
+///
+/// Position is the only identity a gap has, which is exactly the risk when an
+/// outline is edited afterwards — insert a gap at the top and every answer
+/// below belongs to the wrong one. `outlineVersion` records what the outline
+/// said when these were written (see fingerprintOutline), so the page can say
+/// the sheet changed rather than quietly shuffling somebody's notes.
+model SermonOutlineAnswer {
+  id             String   @id @default(cuid())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  video          Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId        String
+  /// `{ "0": "unearned", "3": "free" }` — only the gaps actually filled in.
+  answers        Json
+  outlineVersion String
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, videoId])
+  @@index([videoId])
+}
+
 model SermonNote {
   id               String   @id @default(cuid())
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1420,4 +1795,832 @@ model BrandSettings {
   brandLight String   @default("#4fc3f7")
   logoUrl    String?
   updatedAt  DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Schedules — the rotas a group runs, from a spreadsheet or from the admin
+// interface. Ported from the calendar app; see FEATURES.md → Schedules.
+//
+// Deliberately separate from ServicePlan and its rota. That one schedules
+// *accounts* against a service's running order; this one schedules *names*,
+// most of which never log in, against any number of recurring rotas — and
+// takes them from a Google Sheet somebody is already maintaining. They answer
+// different questions and are not worth forcing into one model.
+// ---------------------------------------------------------------------------
+
+enum ScheduleSourceType {
+  WEB
+  GOOGLE_SHEETS
+}
+
+/// Layout of the spreadsheet a Google Sheets schedule points at.
+enum SheetFormat {
+  /// `Date | Names` where Names is a delimited list ("Devin, Cindy").
+  DATE_NAMES
+  /// `Date | Devin | Cindy | ...` where each person is a column marked "x".
+  NAME_COLUMNS
+}
+
+enum ScheduleSyncStatus {
+  NEVER
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+enum CalendarEventStatus {
+  CONFIRMED
+  TENTATIVE
+  CANCELLED
+}
+
+model Schedule {
+  id           String             @id @default(cuid())
+  /// URL/filter friendly key, e.g. "breakbread". Stable across renames.
+  slug         String             @unique
+  name         String
+  description  String?
+  /// Emoji or short icon token rendered by the UI.
+  icon         String             @default("calendar")
+  /// Accent token resolved by src/lib/schedules/colors.ts.
+  color        String             @default("slate")
+  enabled      Boolean            @default(true)
+  displayOrder Int                @default(0)
+  sourceType   ScheduleSourceType @default(WEB)
+
+  source ScheduleSource?
+  events CalendarEvent[]
+
+  /// Soft delete, so a device syncing incrementally is told to drop its
+  /// cached rows rather than keeping a schedule that has gone.
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([enabled, displayOrder])
+  @@index([updatedAt])
+}
+
+/// Per-schedule source configuration, in its own table so a schedule can
+/// switch source type without carrying dead columns around.
+model ScheduleSource {
+  id         String   @id @default(cuid())
+  scheduleId String   @unique
+  schedule   Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  type ScheduleSourceType
+
+  // --- Google Sheets fields (null for WEB schedules) ---
+  spreadsheetId String?
+  sheetName     String?
+  /// Optional A1 range within the sheet, e.g. "A1:F200".
+  range         String?
+  format        SheetFormat?
+
+  /// Parser tuning: header row, column mapping, name delimiter, truthy
+  /// markers, default year, timezone. Shape validated by Zod before it is
+  /// ever read — see src/lib/sheets/config.ts.
+  parserConfig Json @default("{}")
+
+  /// 0 disables automatic sync for this schedule.
+  syncIntervalMinutes Int @default(60)
+
+  lastSyncedAt   DateTime?
+  lastSyncStatus ScheduleSyncStatus @default(NEVER)
+  lastSyncError  String?
+  /// Hash of the last successfully imported payload, so a sync that finds
+  /// nothing changed upstream does no writes.
+  lastSyncHash   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Somebody who appears on a rota.
+///
+/// Not a User: most people on a church rota never log in, and the names come
+/// out of a spreadsheet. `userId` links the two where they are the same
+/// person, which is what lets a signed-in member see "only mine" without
+/// being asked who they are.
+model Person {
+  id String @id @default(cuid())
+
+  /// Lowercased, whitespace-collapsed, accent-folded. The matching key.
+  normalizedName String  @unique
+  /// Preferred spelling, shown in the UI.
+  displayName    String
+  active         Boolean @default(true)
+
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId String? @unique
+
+  aliases PersonAlias[]
+  events  CalendarEventPerson[]
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([active, displayName])
+  @@index([updatedAt])
+}
+
+/// Extra spellings that resolve to the same person, so renaming somebody in a
+/// spreadsheet doesn't split their history across two records.
+model PersonAlias {
+  id             String @id @default(cuid())
+  personId       String
+  person         Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+  normalizedName String @unique
+
+  createdAt DateTime @default(now())
+
+  @@index([personId])
+}
+
+model CalendarEvent {
+  id         String   @id @default(cuid())
+  scheduleId String
+  schedule   Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  /// Stable key derived from the source row, so re-syncing a sheet updates
+  /// rows rather than duplicating them. Null for events added by hand.
+  externalId String?
+
+  /// A calendar day, stored without a time so it can't drift by a timezone.
+  date      DateTime  @db.Date
+  /// The last day, for something spanning more than one.
+  endDate   DateTime? @db.Date
+  allDay    Boolean   @default(true)
+  /// "HH:mm" local to the schedule; null when allDay.
+  startTime String?
+  endTime   String?
+
+  title    String?
+  notes    String?
+  location String?
+  status   CalendarEventStatus @default(CONFIRMED)
+
+  // --- recurrence: modelled, but the admin writes single occurrences ---
+  /// An RFC 5545 RRULE, e.g. "FREQ=WEEKLY;BYDAY=SU". Null for a one-off.
+  recurrenceRule    String?
+  recurrenceEndDate DateTime?       @db.Date
+  /// Set on an occurrence that overrides or cancels one instance of a series.
+  parentEventId     String?
+  parent            CalendarEvent?  @relation("CalendarEventSeries", fields: [parentEventId], references: [id], onDelete: Cascade)
+  occurrences       CalendarEvent[] @relation("CalendarEventSeries")
+
+  /// Where this row came from, recorded at write time so a sync never
+  /// clobbers an event somebody added by hand.
+  origin    ScheduleSourceType @default(WEB)
+  /// 1-based row in the source sheet, for telling an admin where a problem is.
+  sourceRow Int?
+
+  people CalendarEventPerson[]
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([scheduleId, externalId])
+  @@index([scheduleId, date])
+  @@index([date])
+  @@index([updatedAt])
+  @@index([parentEventId])
+}
+
+model CalendarEventPerson {
+  id       String        @id @default(cuid())
+  eventId  String
+  event    CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  personId String
+  person   Person        @relation(fields: [personId], references: [id], onDelete: Cascade)
+  /// An optional job, e.g. "Bread", "Cup", "Driver".
+  role     String?
+
+  /// Order within the event, as the source listed them. On a bread-and-cup
+  /// rota "Devin & Cindy" is not the same as "Cindy & Devin", so this is
+  /// displayed order rather than a sort key.
+  position Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, personId])
+  @@index([personId])
+  @@index([eventId, position])
+}
+
+/// An event people sign up for: a men's breakfast, a youth weekend, a carol
+/// service with limited seats.
+///
+/// Separate from `CalendarEvent` (a rota date read off a spreadsheet) and from
+/// `ServicePlan` (the running order of a Sunday) on purpose. Those two answer
+/// "who is on" and "what is being sung"; this one answers "is there a place
+/// for me", which is the only one of the three with a number that can run out.
+model Event {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  title       String
+  description String?
+  location    String?
+
+  startsAt DateTime
+  /// Null for something with no stated finish.
+  endsAt   DateTime?
+  allDay   Boolean   @default(false)
+
+  /// Drafts stay off the members' list until somebody is happy with it.
+  published  Boolean @default(false)
+  /// Only signed-in members may see it, and so only they may register.
+  memberOnly Boolean @default(false)
+
+  /// Whether sign-up is offered at all. An event can be worth publishing
+  /// with nothing to fill in — a carol service everyone simply comes to.
+  registration Boolean   @default(false)
+  /// Places, counting guests. Null is unlimited.
+  capacity     Int?
+  /// Whether a full event still takes names, in order, for a place that frees up.
+  waitlist     Boolean   @default(true)
+  /// The window sign-up is open in. Either end may be absent.
+  opensAt      DateTime?
+  closesAt     DateTime?
+  /// How many extra people one registration may bring. 0 means just yourself.
+  maxGuests    Int       @default(0)
+
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  registrations EventRegistration[]
+
+  @@index([published, startsAt])
+  @@index([startsAt])
+}
+
+enum RegistrationStatus {
+  GOING
+  WAITLIST
+  CANCELLED
+}
+
+/// One sign-up.
+///
+/// `userId` is nullable because the people a church most wants at an event are
+/// the ones who have never made an account. A registration always carries its
+/// own name and email, even when an account is attached, so the list an
+/// organiser prints is complete whether or not everyone on it is a member.
+model EventRegistration {
+  id      String  @id @default(cuid())
+  event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId String
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId  String?
+
+  name   String
+  email  String
+  phone  String?
+  /// Extra people coming with them; a registration takes `1 + guests` places.
+  guests Int     @default(0)
+  note   String?
+
+  status      RegistrationStatus @default(GOING)
+  /// Set when a waitlisted place was promoted, so the confirmation can say so
+  /// and an organiser can see it happened.
+  promotedAt  DateTime?
+  cancelledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One live registration per account per event. Cancelling keeps the row —
+  /// it is the record that they were coming — so a re-registration reuses it.
+  @@unique([eventId, userId])
+  @@index([eventId, status, createdAt])
+  @@index([userId])
+}
+
+/// A form somebody fills in: the connect card in the pew, a "would you like a
+/// visit", a camp application.
+///
+/// Built by an admin rather than by a developer, because the questions change
+/// every term and a deploy is the wrong unit of change for "add a box for
+/// dietary requirements".
+model Form {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  title       String
+  description String?
+
+  published    Boolean @default(false)
+  /// Only signed-in members may open it. Off by default: the whole point of a
+  /// connect card is the person who has just walked in.
+  memberOnly   Boolean @default(false)
+  /// Whether the same person may send it more than once. A connect card, yes;
+  /// a camp application, generally not.
+  multiple     Boolean @default(true)
+  /// Shown after sending, in place of the form.
+  confirmation String?
+  /// Addresses told about a submission, comma-separated. Kept on the form
+  /// rather than in an env var: different forms reach different people, and
+  /// the person who knows which is the one editing the form.
+  notifyEmails String?
+
+  fields      FormField[]
+  submissions FormSubmission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum FormFieldType {
+  TEXT
+  TEXTAREA
+  EMAIL
+  PHONE
+  NUMBER
+  DATE
+  SELECT
+  RADIO
+  CHECKBOX
+  CHECKBOXES
+}
+
+/// One question.
+///
+/// Soft-deleted rather than removed: an answer points at the field it answered,
+/// so deleting the row outright would leave a year of submissions with a column
+/// nobody can name. A deleted field simply stops being asked.
+model FormField {
+  id       String        @id @default(cuid())
+  form     Form          @relation(fields: [formId], references: [id], onDelete: Cascade)
+  formId   String
+  label    String
+  type     FormFieldType @default(TEXT)
+  /// A line under the question, for the thing the label can't say briefly.
+  help     String?
+  required Boolean       @default(false)
+  /// One option per line, for the types that offer a choice.
+  options  String?
+  position Int           @default(0)
+
+  deletedAt DateTime?
+  createdAt DateTime     @default(now())
+  answers   FormAnswer[]
+
+  @@index([formId, position])
+}
+
+model FormSubmission {
+  id     String  @id @default(cuid())
+  form   Form    @relation(fields: [formId], references: [id], onDelete: Cascade)
+  formId String
+  /// Null when a visitor sent it, which is most of them.
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId String?
+
+  /// Whoever has read it, so a card doesn't get followed up twice or not at all.
+  handledAt DateTime?
+  handledBy String?
+
+  answers   FormAnswer[]
+  createdAt DateTime     @default(now())
+
+  @@index([formId, createdAt])
+  @@index([userId])
+}
+
+/// One answer, tied to the field it answered rather than to the label it was
+/// asked under — so renaming a question doesn't rewrite history.
+model FormAnswer {
+  id           String         @id @default(cuid())
+  submission   FormSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submissionId String
+  field        FormField      @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  fieldId      String
+  /// Every answer is text. A number typed into a form is a number somebody
+  /// typed, and a checkbox list is its chosen options joined by a newline —
+  /// which keeps one shape to read, export and search.
+  value        String
+
+  @@unique([submissionId, fieldId])
+  @@index([fieldId])
+}
+
+/// Who may read a prayer request.
+enum PrayerVisibility {
+  /// Anyone who can open the page, account or not.
+  EVERYONE
+  /// Signed-in members.
+  MEMBERS
+  /// Only whoever moderates the wall. For the ones that shouldn't be a wall.
+  LEADERS
+}
+
+enum PrayerStatus {
+  /// Written, not yet let through. The default, deliberately.
+  PENDING
+  APPROVED
+  /// Approved, and since answered — the reason a prayer wall is worth keeping.
+  ANSWERED
+  /// Taken down by a moderator. Kept rather than deleted so the decision is a
+  /// record, and so taking one down twice isn't a different outcome.
+  HIDDEN
+}
+
+/// A prayer request.
+///
+/// The whole feature is a moderation problem wearing a list. Three things here
+/// are load-bearing and are enforced in `lib/prayer.ts` rather than left to
+/// whoever writes the next query:
+///
+///   1. Nothing is visible until somebody lets it through.
+///   2. `anonymous` means the name never leaves the server — the row still
+///      knows whose it is, so they can edit and delete it, and so a moderator
+///      can act if it is abusive, but no read path a member can reach carries
+///      it.
+///   3. `visibility` is checked on every read, not only on the page that
+///      happens to list them.
+model PrayerRequest {
+  id     String  @id @default(cuid())
+  /// Null when a visitor wrote it. Present but withheld when `anonymous`.
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId String?
+  /// The name to show, when there is one to show. A visitor types theirs;
+  /// a member's is taken from their account at the time of writing, so
+  /// changing a display name later doesn't rewrite old requests.
+  name   String?
+  body   String
+
+  anonymous  Boolean          @default(false)
+  visibility PrayerVisibility @default(MEMBERS)
+  status     PrayerStatus     @default(PENDING)
+
+  /// What happened, written when it is marked answered.
+  answeredNote String?
+  answeredAt   DateTime?
+  /// Who let it through, so a decision has a name against it.
+  moderatedBy  String?
+  moderatedAt  DateTime?
+
+  prayers   PrayerIntercession[]
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+/// "I prayed for this."
+///
+/// A count rather than a list of names, on the page and in the model's use: the
+/// number is an encouragement to whoever wrote the request, and the names
+/// would turn it into a scoreboard. Stored per person only so that pressing it
+/// twice isn't two.
+model PrayerIntercession {
+  id        String        @id @default(cuid())
+  request   PrayerRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestId String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime      @default(now())
+
+  @@unique([requestId, userId])
+  @@index([requestId])
+}
+
+/// A small group: a home group, a youth group, a men's Bible study.
+///
+/// The thing this model is most careful about is the address. A group that
+/// meets in somebody's living room must not publish where they live to the
+/// open internet — so `address` is separate from `area`, and only somebody in
+/// the group is ever given it. Getting that wrong once is not recoverable.
+model SmallGroup {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  description String?
+
+  /// When it meets, as free text: "Tuesdays, 7.30pm", "alternate Wednesdays".
+  /// Every group says it differently and a schedule table would be a second
+  /// thing to keep true.
+  meetsWhen String?
+  /// Roughly where, and safe to publish: "North side", "near the station".
+  area      String?
+  /// Exactly where. Shown only to people in the group — see lib/groups.ts.
+  address   String?
+
+  published  Boolean @default(false)
+  /// Whether it is taking new people at all. A group that is full is still
+  /// worth listing, because the answer to "can I come" is then a real one.
+  openToJoin Boolean @default(true)
+  /// Roughly how many it can hold, counting only the people actually in it.
+  capacity   Int?
+
+  members   SmallGroupMember[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([published])
+}
+
+enum GroupRole {
+  LEADER
+  MEMBER
+}
+
+enum GroupMemberStatus {
+  /// Asked to join; the leader hasn't answered.
+  REQUESTED
+  ACTIVE
+  /// The leader said no, or somebody left. Kept so the same person asking
+  /// again is a conversation rather than a surprise.
+  DECLINED
+}
+
+model SmallGroupMember {
+  id      String     @id @default(cuid())
+  group   SmallGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId String
+  user    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String
+
+  role   GroupRole         @default(MEMBER)
+  status GroupMemberStatus @default(REQUESTED)
+  /// What they said when they asked.
+  note   String?
+
+  respondedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([groupId, userId])
+  @@index([userId, status])
+  @@index([groupId, status])
+}
+
+/// Who a broadcast goes to.
+enum BroadcastAudience {
+  /// Every authorized member.
+  EVERYONE
+  /// Everyone assigned a particular permission group.
+  PERMISSION_GROUP
+  /// Everyone signed up to an event — including the ones with no account,
+  /// who are reachable by email and nothing else.
+  EVENT
+  /// A small group's active members.
+  SMALL_GROUP
+  /// A service team's members.
+  TEAM
+}
+
+enum BroadcastStatus {
+  DRAFT
+  /// Recipients resolved and being worked through.
+  SENDING
+  SENT
+  /// Stopped by hand part-way.
+  CANCELLED
+}
+
+enum BroadcastChannel {
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  /// Nothing was wrong; there was simply no way to reach them on this channel
+  /// — no phone number, or they never opted in.
+  SKIPPED
+}
+
+/// One message sent to many people: "no service tomorrow, the road is closed".
+///
+/// The recipients are resolved into rows *before* anything is sent, and each
+/// is marked as it goes. That is what makes a send resumable: a serverless
+/// function killed half way through 400 emails has already recorded the 180 it
+/// managed, and the next run picks up at 181 rather than emailing everybody
+/// twice.
+model Broadcast {
+  id      String @id @default(cuid())
+  subject String
+  body    String
+
+  /// EMAIL / SMS / PUSH, any combination.
+  channels BroadcastChannel[]
+
+  audience     BroadcastAudience @default(EVERYONE)
+  /// The group, event, small group or team, when the audience names one.
+  audienceId   String?
+  /// What the audience was called when it was chosen, so a list of past
+  /// broadcasts still reads sensibly after the group is renamed or deleted.
+  audienceName String?
+
+  status BroadcastStatus @default(DRAFT)
+
+  /// Who sent it, for the list and the audit trail.
+  createdBy String
+  createdAt DateTime  @default(now())
+  sentAt    DateTime?
+
+  recipients BroadcastRecipient[]
+
+  @@index([status, createdAt])
+}
+
+/// One person, one channel, one message.
+///
+/// The address is copied here at resolve time rather than read back through
+/// the user: somebody who changes their number between composing and sending
+/// should not have half a broadcast go to their old one and half to the new.
+model BroadcastRecipient {
+  id          String    @id @default(cuid())
+  broadcast   Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  broadcastId String
+  /// Null for somebody reachable by email who has no account — an event's
+  /// sign-ups are full of them.
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId      String?
+
+  channel BroadcastChannel
+  /// The email address or phone number, as it stood when the audience was resolved.
+  address String
+  /// Shown in the send report, so a failure names a person rather than an id.
+  name    String?
+
+  status DeliveryStatus @default(PENDING)
+  error  String?
+  sentAt DateTime?
+
+  /// One row per person per channel, so a resumed run can't send twice.
+  @@unique([broadcastId, channel, address])
+  @@index([broadcastId, status])
+}
+
+/// Where a video is played from.
+enum VideoSource {
+  BUNNY
+  YOUTUBE
+  VIMEO
+}
+
+enum VideoFeedKind {
+  YOUTUBE_CHANNEL
+  YOUTUBE_PLAYLIST
+  VIMEO_USER
+  VIMEO_SHOWCASE
+}
+
+/// A channel, playlist or account to import videos from.
+///
+/// The point of this over uploading twice is a church that already streams to
+/// YouTube every Sunday: the sermon is already there, and re-uploading it to
+/// Bunny costs storage, bandwidth and somebody's Sunday afternoon.
+model VideoFeed {
+  id         String        @id @default(cuid())
+  kind       VideoFeedKind
+  /// The channel id, playlist id, Vimeo user id or showcase id.
+  externalId String
+  name       String
+
+  /// Where imported videos land. One of these, or neither for unfiled.
+  seriesId   String?
+  categoryId String?
+
+  /// Whether an import is published straight away. Off by default: a church
+  /// that streams its whole service to YouTube does not want the twenty
+  /// minutes of an empty stage before it starts appearing on its own site.
+  autoPublish Boolean @default(false)
+  /// How many to look back over on each sync. Enough to catch a re-upload,
+  /// small enough that a daily job stays cheap.
+  lookBack    Int     @default(25)
+  enabled     Boolean @default(true)
+
+  lastSyncedAt   DateTime?
+  lastSyncStatus String?
+  lastError      String?
+  /// The upstream payload's fingerprint, so an unchanged feed does no writes.
+  fingerprint    String?
+
+  videos    Video[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([kind, externalId])
+}
+
+/// A message in the chat beside a live stream.
+///
+/// Polling rather than sockets, and that is a deployment fact rather than a
+/// preference: this app runs on serverless functions with no long-lived
+/// process to hold a socket open. `GET ?since=<id>` is what a page asks every
+/// few seconds, which is cheap because the query is one indexed range scan.
+model LiveChatMessage {
+  id         String     @id @default(cuid())
+  stream     LiveStream @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  streamId   String
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  /// The name as it stood when they wrote it, so a later change of display
+  /// name doesn't rewrite what a conversation looked like.
+  authorName String
+  body       String
+
+  /// Taken down by a moderator. Kept rather than deleted so the same message
+  /// can't be re-sent past a moderator by reposting, and so the record of the
+  /// decision survives.
+  hidden    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  /// The poll: every message on this stream after the last one seen.
+  @@index([streamId, id])
+  @@index([userId])
+}
+
+/// Somebody stopped from writing in a stream's chat.
+///
+/// Per stream rather than site-wide: silencing somebody for one evening is the
+/// proportionate act, and a site-wide ban is a different decision made
+/// somewhere else.
+model LiveChatMute {
+  id        String     @id @default(cuid())
+  stream    LiveStream @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  streamId  String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  /// Who did it, for the record.
+  mutedBy   String
+  createdAt DateTime   @default(now())
+
+  @@unique([streamId, userId])
+}
+
+enum TvDeviceStatus {
+  /// A code is on a screen; nobody has approved it yet.
+  PENDING
+  /// A member said yes. The device may exchange its secret for a token.
+  APPROVED
+  /// A member said no. Kept briefly so the television can say so rather than
+  /// timing out with no explanation.
+  DENIED
+  /// Signed in. `tokenHash` is live.
+  LINKED
+  /// Signed out, from the television or from the member's own settings.
+  REVOKED
+}
+
+/// A television signed in to somebody's account.
+///
+/// You cannot type an email address and a password with a remote control, so
+/// this is the device authorization grant (RFC 8628) in the shape this app
+/// needs: the television shows a short code, a member types that code on their
+/// phone, and the television — which has been polling all along — receives a
+/// long-lived token.
+///
+/// The split between the two codes is the whole security design and is not
+/// cosmetic:
+///
+///   - `userCode` is **public**. It is displayed on a screen in a room that
+///     may have a hundred people in it. It is short because somebody has to
+///     read it off a television and type it with a remote.
+///   - `deviceCode` is **secret**. Only the television that asked for the
+///     pairing ever sees it, and only it can exchange an approval for a token.
+///
+/// Without that split, anybody who could see the screen — or guess six
+/// characters — could take the token meant for the television.
+model TvDevice {
+  id String @id @default(cuid())
+
+  /// Shown on the television. Short, from an alphabet with no characters that
+  /// look like each other on a screen across a room.
+  userCode       String         @unique
+  /// Held only by the television. Hashed, like a password: a leaked database
+  /// must not hand somebody a working pairing.
+  deviceCodeHash String         @unique
+  status         TvDeviceStatus @default(PENDING)
+
+  /// What the television calls itself, so the approval screen can name it.
+  /// Supplied by the device and shown as it was given, never trusted.
+  deviceName String
+  /// Roughly what kind of thing it is, for the member's list of signed-in TVs.
+  deviceKind String?
+
+  /// Set when a member approves it.
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String?
+
+  /// The long-lived token, hashed. Present once linked.
+  tokenHash String? @unique
+
+  /// A pairing nobody completes is rubbish after a few minutes.
+  expiresAt  DateTime
+  approvedAt DateTime?
+  linkedAt   DateTime?
+  lastSeenAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, status])
+  @@index([expiresAt])
 }

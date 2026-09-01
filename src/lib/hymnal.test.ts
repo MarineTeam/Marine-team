@@ -67,6 +67,25 @@ describe("fingerprintHymns", () => {
     expect(fingerprintHymns(hymns).startsWith("2-")).toBe(true);
     expect(fingerprintHymns([])).toBe("0-811c9dc5");
   });
+
+  // Pinned to exact values, not just "different from each other": every copy
+  // saved on a device carries the fingerprint it was saved under, and a change
+  // to how this is computed would tell every one of them it was out of date
+  // while nothing about the book had changed. The unicode case is here because
+  // this hashes UTF-16 code units, which is the detail a rewrite would get
+  // wrong first.
+  it("is the same function it has always been", () => {
+    expect(fingerprintHymns([{ id: "a", title: "Holy", pageNumber: 1, lyricsText: "Holy, holy" }])).toBe(
+      "1-22df5215",
+    );
+    expect(
+      fingerprintHymns([
+        { id: "a", title: "Holy, Holy, Holy", pageNumber: 1, lyricsText: "Holy, holy, holy!" },
+        { id: "b", title: "Amazing Grace", pageNumber: null, lyricsText: "Amazing grace\nhow sweet" },
+        { id: "ç", title: "Ünïcode", pageNumber: 302, lyricsText: "…" },
+      ]),
+    ).toBe("3-d7515e80");
+  });
 });
 
 describe("fileHref", () => {

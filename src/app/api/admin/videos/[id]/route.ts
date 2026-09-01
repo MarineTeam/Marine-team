@@ -20,8 +20,14 @@ export const updateSchema = z
       .optional(),
     description: z.string().optional(),
     transcript: z.string().optional().nullable(),
+    // The fill-in-the-blank note sheet. Capped like the transcript is: it is
+    // a page of prose, not a book.
+    noteOutline: z.string().max(20000).optional().nullable(),
     scriptureRefs: z.array(z.string().min(1)).optional(),
     speakerId: z.string().optional().nullable(),
+    // "" clears it back to "nobody has said", which is not the same as
+    // asserting the site's default — see lib/content-language.ts.
+    language: z.string().max(10).optional().nullable(),
     seriesId: z.string().optional().nullable(),
     categoryId: z.string().optional().nullable(),
     memberOnly: z.boolean().optional(),
@@ -41,6 +47,9 @@ export const updateSchema = z
 function normalizeData(body: z.infer<typeof updateSchema>) {
   return {
     ...body,
+    // An empty box means "nobody has said", which is not the same as
+    // asserting the site's default — see lib/content-language.ts.
+    language: body.language === undefined ? undefined : body.language || null,
     // Assigning one of series/category clears the other, keeping them mutually exclusive.
     categoryId: body.seriesId ? null : body.categoryId,
     seriesId: body.categoryId ? null : body.seriesId,

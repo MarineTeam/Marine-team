@@ -1,6 +1,8 @@
 /**
- * Copies the two reader libraries' browser builds into `public/`, for the
- * offline shell.
+ * Copies browser builds out of node_modules into `public/`.
+ *
+ * Two unrelated needs, one script, because both are "a file a page has to be
+ * able to name a URL for": the offline shell's readers, and the OCR engine.
  *
  * The app itself never needs these: it imports both through the bundler,
  * which keeps them version-locked without anything in `public` (see
@@ -28,6 +30,27 @@ const publicDir = join(root, "public");
 // The minified builds only: these are fetched over a member's connection
 // when they first save a book, and the unminified ones are several times the
 // size for the same behaviour.
+/**
+ * The OCR engine, for reading a scanned book that has no text layer.
+ *
+ * Vendored rather than left to tesseract.js's default, which fetches its
+ * worker, its wasm core and its language data from a public CDN. A church
+ * office on a filtered connection would find the feature simply doesn't
+ * work, with nothing on screen to say why — and this app doesn't load its
+ * own code from anybody else's server.
+ *
+ * Only the LSTM path: that is what tesseract.js uses by default, and the
+ * `best_int` language data is a quarter the size of the full set for the
+ * same job. All three core variants travel because the worker feature-detects
+ * which one this browser can run and asks for it by name — a missing one is
+ * a 404 mid-run rather than a fallback.
+ */
+const TESSERACT_CORE = [
+  "tesseract-core-lstm.wasm.js",
+  "tesseract-core-simd-lstm.wasm.js",
+  "tesseract-core-relaxedsimd-lstm.wasm.js",
+];
+
 const FILES = [
   { from: join(modules, "pdfjs-dist", "build", "pdf.min.mjs"), to: join(publicDir, "pdfjs", "pdf.min.mjs") },
   {
@@ -36,6 +59,18 @@ const FILES = [
   },
   { from: join(modules, "jszip", "dist", "jszip.min.js"), to: join(publicDir, "epubjs", "jszip.min.js") },
   { from: join(modules, "epubjs", "dist", "epub.min.js"), to: join(publicDir, "epubjs", "epub.min.js") },
+  {
+    from: join(modules, "tesseract.js", "dist", "worker.min.js"),
+    to: join(publicDir, "tesseract", "worker.min.js"),
+  },
+  ...TESSERACT_CORE.map((name) => ({
+    from: join(modules, "tesseract.js-core", name),
+    to: join(publicDir, "tesseract", name),
+  })),
+  {
+    from: join(modules, "@tesseract.js-data", "eng", "4.0.0_best_int", "eng.traineddata.gz"),
+    to: join(publicDir, "tesseract", "eng.traineddata.gz"),
+  },
 ];
 
 async function sizeOf(path) {
@@ -51,7 +86,7 @@ async function main() {
     const name = to.slice(publicDir.length + 1);
     const sourceSize = await sizeOf(from);
     if (sourceSize === null) {
-      console.warn(`[offline-viewers] ${name} not found; offline reading will do without it.`);
+      console.warn(`[offline-viewers] ${name} not found; the feature that needs it will do without it.`);
       continue;
     }
     // Idempotent: this runs on every install and every build, and re-copying

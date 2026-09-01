@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   applyTheme,
   DEFAULT_DEVICE_SETTINGS,
@@ -11,6 +12,7 @@ import {
   type DeviceSettings,
   type ThemePreference,
 } from "@/lib/device-settings";
+import { ReadingSizeControls } from "@/components/reading-size";
 
 const THEME_OPTIONS: { value: ThemePreference; label: string; hint: string }[] = [
   { value: "system", label: "System", hint: "Follow this device's setting" },
@@ -28,6 +30,7 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; hint: string }[] =
  * would make the markup mismatch on hydration.
  */
 export function DeviceSettingsForm() {
+  const router = useRouter();
   const [settings, setSettings] = useState<DeviceSettings>(DEFAULT_DEVICE_SETTINGS);
   const [ready, setReady] = useState(false);
 
@@ -41,6 +44,26 @@ export function DeviceSettingsForm() {
     const next = writeDeviceSettings(change);
     setSettings(next);
     if (change.theme) applyTheme(next.theme);
+  }
+
+  /**
+   * The language goes to the server as well as into this device's settings.
+   *
+   * Pages here render on the server, which cannot read localStorage — so
+   * without the cookie every page would arrive in the old language and flip a
+   * moment later. `router.refresh()` re-renders them in the new one.
+   */
+  async function setLanguage(next: string) {
+    update({ language: next });
+    await fetch("/api/locale", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locale: next }),
+    }).catch(() => {
+      // The device setting is still saved; the server just keeps the old one
+      // until the next successful request.
+    });
+    router.refresh();
   }
 
   return (
@@ -73,8 +96,7 @@ export function DeviceSettingsForm() {
           <select
             id="language"
             value={settings.language}
-            onChange={(e) => update({ language: e.target.value })}
-            disabled={LANGUAGES.length === 1}
+            onChange={(e) => setLanguage(e.target.value)}
             className="mt-1 rounded-md border border-sep px-3 py-2 text-sm disabled:opacity-60"
           >
             {LANGUAGES.map((language) => (
@@ -83,7 +105,10 @@ export function DeviceSettingsForm() {
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-sec">More languages are coming; English is the only one for now.</p>
+          <p className="mt-1 text-xs text-sec">
+            The app&apos;s own screens follow this. Sermons and books are in whatever language they
+            were recorded or written in.
+          </p>
         </div>
       </section>
 
@@ -161,6 +186,21 @@ export function DeviceSettingsForm() {
             </span>
           </span>
         </label>
+        <div className="space-y-1 text-sm">
+          <div className="flex flex-wrap items-center gap-3">
+            <span>Reading text size</span>
+            <ReadingSizeControls
+              scale={settings.readingTextScale}
+              onChange={(next) => update({ readingTextScale: next })}
+            />
+          </div>
+          <p className="text-xs text-sec">
+            The size of a hymn&apos;s words and of an EPUB&apos;s pages. The same buttons sit beside
+            the words themselves, which is usually where you notice. A scanned book isn&apos;t
+            affected — its pages are pictures, and the reader zooms them instead. Present mode keeps
+            its own size, since a projector and a phone never want the same answer.
+          </p>
+        </div>
       </section>
 
       <p className="text-xs text-sec">

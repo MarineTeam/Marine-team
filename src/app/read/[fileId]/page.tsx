@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/current-user";
 import { isPluginEnabled } from "@/lib/plugins";
 import { readerFormat } from "@/lib/reader";
 import { BookReader } from "@/components/book-reader";
+import { HymnLookup } from "@/components/hymn-lookup";
 
 /**
  * A book the current visitor can't read gets a generic title here, the same
@@ -31,10 +32,11 @@ export default async function ReadPage({
   searchParams,
 }: {
   params: Promise<{ fileId: string }>;
-  searchParams: Promise<{ page?: string }>;
+  /** `hymn` says which hymn this page is, for a link that knew — see HymnLookup. */
+  searchParams: Promise<{ page?: string; hymn?: string }>;
 }) {
   const { fileId } = await params;
-  const { page } = await searchParams;
+  const { page, hymn } = await searchParams;
   const [file, user] = await Promise.all([getReadableFile(fileId), getCurrentUser()]);
   if (!file) notFound();
 
@@ -75,6 +77,7 @@ export default async function ReadPage({
   // the viewer's own resume position — tapping a specific hymn should open
   // to that hymn, not silently continue from wherever they last stopped.
   const requestedPage = page && Number.isFinite(Number(page)) && Number(page) >= 1 ? page : null;
+  const openedHymn = /^\d{1,4}$/.test(hymn ?? "") ? Number(hymn) : null;
 
   const backHref = file.series
     ? `/series/${file.series.slug}`
@@ -84,16 +87,19 @@ export default async function ReadPage({
   const backLabel = file.series?.title ?? file.category?.name ?? "Browse";
 
   return (
-    <BookReader
-      fileId={file.id}
-      fileTitle={file.title}
-      format={format}
-      backHref={backHref}
-      backLabel={backLabel}
-      initialLocation={requestedPage ?? progress?.location ?? null}
-      pageOffset={file.pageOffset}
-      sizeBytes={file.sizeBytes}
-      canSaveProgress={Boolean(user)}
-    />
+    <>
+      {openedHymn !== null && <HymnLookup fileId={file.id} number={openedHymn} source="reader" />}
+      <BookReader
+        fileId={file.id}
+        fileTitle={file.title}
+        format={format}
+        backHref={backHref}
+        backLabel={backLabel}
+        initialLocation={requestedPage ?? progress?.location ?? null}
+        pageOffset={file.pageOffset}
+        sizeBytes={file.sizeBytes}
+        canSaveProgress={Boolean(user)}
+      />
+    </>
   );
 }

@@ -83,25 +83,39 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const stalePublicPath = existing.publicPath;
-    const file = await prisma.fileAsset.update({
-      where: { id },
-      data: {
-        bunnyPath: replacement.bunnyPath,
-        url: replacement.url,
-        sizeBytes: replacement.sizeBytes,
-        mimeType: replacement.mimeType,
-        // Both were derived from the *previous* bytes: a cover of its first
-        // page and a count of its bookmarks. Cleared rather than kept, so a
-        // book grid shows the new book (working them out live) instead of
-        // confidently showing the old one until someone notices.
-        coverDataUrl: null,
-        hymnCount: null,
-        // The public copy is of the old bytes and lives at a path derived
-        // from the old storage path. Cleared here so the sync below treats
-        // this as a file that needs mirroring afresh.
-        publicPath: null,
-      },
-    });
+    const [file] = await prisma.$transaction([
+      prisma.fileAsset.update({
+        where: { id },
+        data: {
+          bunnyPath: replacement.bunnyPath,
+          url: replacement.url,
+          sizeBytes: replacement.sizeBytes,
+          mimeType: replacement.mimeType,
+          // All of these were derived from the *previous* bytes: a cover of
+          // its first page, a count of its bookmarks, when its contents were
+          // read and when its pages were. Cleared rather than kept, so a grid shows the new book
+          // (working them out live) instead of confidently showing the old
+          // one until someone notices — and so the row turns up again in the
+          // indexing pass rather than looking already done.
+          coverDataUrl: null,
+          hymnCount: null,
+          contentsIndexedAt: null,
+          textIndexedAt: null,
+          // The public copy is of the old bytes and lives at a path derived
+          // from the old storage path. Cleared here so the sync below treats
+          // this as a file that needs mirroring afresh.
+          publicPath: null,
+        },
+      }),
+      // The indexed hymns are page numbers into the bytes that just went
+      // away. Left behind, a search would send someone to a page of the new
+      // scan that holds something else entirely — worse than not finding it.
+      prisma.bookHymn.deleteMany({ where: { fileId: id } }),
+      // Likewise the text read off the old pages: page 231 of the new scan
+      // is a different page, and a search hit that opens it would be
+      // confidently wrong rather than simply missing.
+      prisma.bookPage.deleteMany({ where: { fileId: id } }),
+    ]);
 
     if (stalePublicPath) {
       try {

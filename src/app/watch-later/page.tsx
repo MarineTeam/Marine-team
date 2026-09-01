@@ -3,7 +3,7 @@ import { getWatchLater } from "@/lib/content";
 import { SeriesTile } from "@/components/series-tile";
 import { MenuTile } from "@/components/menu-tile";
 import { CategoryTile } from "@/components/category-tile";
-import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
+import { videoThumbnailUrl } from "@/lib/video-source";
 
 export default async function WatchLaterPage() {
   const user = await getCurrentUser();
@@ -66,7 +66,7 @@ export default async function WatchLaterPage() {
                 href={`/videos/${entry.video.slug}`}
                 title={entry.video.title}
                 subtitle={entry.video.series?.title}
-                thumbnailUrl={bunnyStreamThumbnailUrl(entry.video.bunnyVideoId, entry.video.thumbnailFileName)}
+                thumbnailUrl={videoThumbnailUrl(entry.video)}
               />
             ))}
           </div>

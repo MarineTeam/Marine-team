@@ -7,7 +7,9 @@ import { Breadcrumbs } from "@/components/breadcrumbs";
 import { CategoryTile } from "@/components/category-tile";
 import { SeriesTile } from "@/components/series-tile";
 import { HymnalBookGrid } from "@/components/hymnal-book-grid";
+import { HymnalSearch } from "@/components/hymnal-search";
 import { fileBook, pdfsOf, seriesBook } from "@/lib/hymnal";
+import { categoryHasIndexedBooks } from "@/lib/content";
 import { SubscribeButton } from "@/components/subscribe-button";
 import { WatchLaterButton } from "@/components/watch-later-button";
 import { MenuTile } from "@/components/menu-tile";
@@ -20,7 +22,7 @@ import {
 } from "@/lib/content";
 import { getCurrentUser } from "@/lib/current-user";
 import { getPluginStates } from "@/lib/plugins";
-import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
+import { videoThumbnailUrl } from "@/lib/video-source";
 
 /**
  * Mirrors the page body's own restraint: a member-only category the current
@@ -51,7 +53,7 @@ export async function generateMetadata({
   const thumbnailUrl =
     category.coverImageUrl ??
     seriesThumbnail ??
-    (firstVideo ? bunnyStreamThumbnailUrl(firstVideo.bunnyVideoId, firstVideo.thumbnailFileName) || null : null) ??
+    (firstVideo ? videoThumbnailUrl(firstVideo) || null : null) ??
     undefined;
 
   return {
@@ -191,6 +193,16 @@ export default async function CategoryPage({
                   ))}
                 </div>
               )}
+              {/* One box across every book in the section — the hymn in a
+                  scanned hymnal is only findable because an admin indexed
+                  its contents, so this shows nothing until one has. */}
+              {books.length > 0 && !locked && (
+                <HymnalSearch
+                  categoryId={category.id}
+                  indexed={await categoryHasIndexedBooks(category.id)}
+                  bookCount={books.length}
+                />
+              )}
               {books.length > 0 && <HymnalBookGrid books={books} />}
             </>
           ) : (
@@ -216,7 +228,7 @@ export default async function CategoryPage({
                     href={`/videos/${video.slug}`}
                     title={video.title}
                     subtitle={video.description}
-                    thumbnailUrl={bunnyStreamThumbnailUrl(video.bunnyVideoId, video.thumbnailFileName)}
+                    thumbnailUrl={videoThumbnailUrl(video)}
                     badge={video.memberOnly ? "Members" : undefined}
                   />
                 ))}
@@ -229,7 +241,13 @@ export default async function CategoryPage({
               <h2 className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">
                 {category.hymnalStyle && books.length > 0 ? "Other files" : "Files"}
               </h2>
-              <FileList files={looseFiles} isLoggedIn={isLoggedIn} readerOn={readerOn} />
+              <FileList
+                files={looseFiles}
+                isLoggedIn={isLoggedIn}
+                readerOn={readerOn}
+                context={category.name}
+                artworkUrl={category.coverImageUrl}
+              />
             </section>
           )}
         </>

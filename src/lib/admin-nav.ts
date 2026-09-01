@@ -28,6 +28,10 @@ export type AdminAccess = {
   canManageFiles: boolean;
   canModerateComments: boolean;
   canShareContent: boolean;
+  /** The diary, the sign-up sheets and the group list — one job, one grant. */
+  canManageEvents: boolean;
+  /** Pastoral rather than administrative, so deliberately its own grant. */
+  canModeratePrayer: boolean;
   /** Anyone who can manage something that lands in the trash can empty it. */
   canSeeTrash: boolean;
 };
@@ -67,10 +71,34 @@ export const ADMIN_GROUPS: AdminGroup[] = [
       { href: "/admin/videos", label: "Videos", visible: always },
       { href: "/admin/speakers", label: "Speakers", visible: (a) => a.canManageVideosSiteWide },
       { href: "/admin/live", label: "Live streaming", visible: (a) => a.canManageVideosSiteWide },
+      // Same gate as videos: an imported video is a video, and whoever may
+      // manage those may decide where they come from.
+      { href: "/admin/video-feeds", label: "Import from YouTube", visible: (a) => a.canManageVideosSiteWide },
       { href: "/admin/files", label: "Files", visible: always },
       // A plan is a list of files, so whoever may arrange the library may
       // arrange a service — see the services API for why that's the gate.
       { href: "/admin/services", label: "Services", visible: (a) => a.canManageFiles },
+      // The people who serve at those services — same gate, since whoever
+      // arranges a service arranges who is at it.
+      { href: "/admin/teams", label: "Teams", visible: (a) => a.canManageFiles },
+      // The other kind of rota: names on a spreadsheet, read by people with
+      // no account. Same gate — it is the same job.
+      { href: "/admin/schedules", label: "Schedules", visible: (a) => a.canManageFiles },
+    ],
+  },
+  {
+    label: "Church life",
+    links: [
+      // A different job from the media library, and a different gate: a
+      // registration list carries names and phone numbers that /admin/videos
+      // never does.
+      { href: "/admin/events", label: "Events", visible: (a) => a.canManageEvents },
+      { href: "/admin/forms", label: "Forms", visible: (a) => a.canManageEvents },
+      // Its own gate, not canManageEvents: approving a request somebody wrote
+      // about their marriage is pastoral work, and often not the person who
+      // books the hall.
+      { href: "/admin/groups", label: "Small groups", visible: (a) => a.canManageEvents },
+      { href: "/admin/prayer", label: "Prayer wall", visible: (a) => a.canModeratePrayer },
     ],
   },
   {
@@ -88,6 +116,10 @@ export const ADMIN_GROUPS: AdminGroup[] = [
     label: "People",
     links: [
       { href: "/admin/users", label: "Members & roles", visible: (a) => a.canManageUsers },
+      // Writing to every member at once is closer to holding the membership
+      // list than to booking the hall, so it sits with the list and shares
+      // its grant.
+      { href: "/admin/broadcasts", label: "Announcements", visible: (a) => a.canManageUsers },
       { href: "/admin/authorized-emails", label: "Who can sign in", visible: (a) => a.canManageUsers },
       { href: "/admin/permissions", label: "Permissions", visible: (a) => a.canManagePermissions },
       { href: "/admin/access-attempts", label: "Access attempts", visible: (a) => a.canViewAuditLog },

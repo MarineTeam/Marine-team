@@ -3,8 +3,8 @@ import { getCurrentUser } from "@/lib/current-user";
 import { getFavorites } from "@/lib/content";
 import { SeriesTile } from "@/components/series-tile";
 import { MenuTile } from "@/components/menu-tile";
-import { bunnyStreamThumbnailUrl } from "@/lib/bunny";
 import { fileHref } from "@/lib/hymnal";
+import { videoThumbnailUrl } from "@/lib/video-source";
 
 export default async function FavoritesPage() {
   const user = await getCurrentUser();
@@ -94,7 +94,7 @@ export default async function FavoritesPage() {
                 href={`/videos/${f.video.slug}`}
                 title={f.video.title}
                 subtitle={f.video.series?.title}
-                thumbnailUrl={bunnyStreamThumbnailUrl(f.video.bunnyVideoId, f.video.thumbnailFileName)}
+                thumbnailUrl={videoThumbnailUrl(f.video)}
               />
             ))}
           </div>

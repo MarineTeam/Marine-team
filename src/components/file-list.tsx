@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { canAccess } from "@/lib/content";
 import { readerFormat } from "@/lib/reader";
+import { AudioPlayer } from "@/components/audio-player";
 
 type FileListItem = {
   id: string;
@@ -14,11 +15,17 @@ export function FileList({
   files,
   isLoggedIn,
   readerOn = false,
+  context = null,
+  artworkUrl = null,
 }: {
   files: FileListItem[];
   isLoggedIn: boolean;
   /** Book reader plugin state for this section; when off, PDFs/EPUBs are download-only as before. */
   readerOn?: boolean;
+  /** The series or category these sit under — the second line on a lock screen. */
+  context?: string | null;
+  /** Its cover, for the lock screen's artwork. */
+  artworkUrl?: string | null;
 }) {
   return (
     <ul className="divide-y divide-sep rounded-lg border border-sep">
@@ -59,9 +66,7 @@ export function FileList({
               )}
             </div>
             {!locked && isAudio && (
-              <audio controls src={url} className="w-full">
-                Your browser does not support the audio element.
-              </audio>
+              <AudioPlayer src={url} title={file.title} artist={context} artworkUrl={artworkUrl} />
             )}
           </li>
         );

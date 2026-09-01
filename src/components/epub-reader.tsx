@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Book, Rendition, NavItem } from "epubjs";
 import type { ReaderHandle, SearchHit, TocEntry } from "@/components/reader-types";
+import { ReadingSizeControls, useReadingScale } from "@/components/reading-size";
 
 /**
  * EPUB half of the reader, using epub.js.
@@ -52,6 +53,7 @@ export function EpubReader({
   const containerRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<Book | null>(null);
   const renditionRef = useRef<Rendition | null>(null);
+  const [scale, setScale] = useReadingScale();
   const locationRef = useRef<string | null>(initialLocation);
 
   const [error, setError] = useState<string | null>(null);
@@ -253,6 +255,20 @@ export function EpubReader({
     });
   }, [loading, error, onReady]);
 
+  /**
+   * The reading size, into the document epub.js renders.
+   *
+   * `themes.fontSize` is the only way in: the book's pages live inside an
+   * iframe with their own stylesheet, so a font size set out here reaches
+   * nothing. A percentage rather than a pixel value, so the book's own
+   * relative sizes — a heading, a verse, a footnote — stay in proportion to
+   * each other instead of all collapsing to one size.
+   */
+  useEffect(() => {
+    if (loading) return;
+    renditionRef.current?.themes.fontSize(`${Math.round(scale * 100)}%`);
+  }, [scale, loading]);
+
   if (error) {
     return <div className="flex h-full items-center justify-center p-8 text-center text-sm text-red-600">{error}</div>;
   }
@@ -272,6 +288,10 @@ export function EpubReader({
         >
           Next ›
         </button>
+        {/* An EPUB reflows, so its type is the one thing about it worth
+            adjusting — and the size is remembered per device, so the next
+            book opens the way this one was left. */}
+        <ReadingSizeControls scale={scale} onChange={setScale} className="ml-2" />
       </div>
       <div className="relative min-h-0 flex-1 bg-white">
         {loading && (

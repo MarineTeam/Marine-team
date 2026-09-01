@@ -13,11 +13,13 @@ import {
   countNumberedEntries,
   currentTocIndex,
   findHymnIndex,
+  hymnNumberOf,
   nextTocIndex,
   previousTocIndex,
   type TocPosition,
 } from "@/lib/toc-nav";
 import type { ReaderHandle, SearchHit, TocEntry } from "@/components/reader-types";
+import { CopyHymnLink } from "@/components/copy-hymn-link";
 
 type Panel = "contents" | "search" | "marks";
 
@@ -74,6 +76,8 @@ export function BookReader({
   const [here, setHere] = useState<TocPosition>(null);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[] | null>(null);
+  /** Whether these results came off photographs, and so may have misread a word. */
+  const [fromReadPages, setFromReadPages] = useState(false);
   const [searching, setSearching] = useState(false);
   const [marks, setMarks] = useState<ReadingMark[]>([]);
   const [marking, setMarking] = useState(false);
@@ -161,11 +165,33 @@ export function BookReader({
     if (ready) void loadContents();
   }, [ready, loadContents]);
 
+  /**
+   * Where a book's stored text exists, it answers; otherwise the reader
+   * searches the open document as it always has.
+   *
+   * The difference matters most on the books this app is mostly made of: a
+   * scanned hymnal has no text layer at all, so searching the open document
+   * finds nothing however long it takes. Where an admin has read the pages
+   * (see BookPage), the words are there to be found — and one request beats
+   * parsing six hundred pages in the browser even for a book that has them.
+   */
   async function runSearch(event: React.FormEvent) {
     event.preventDefault();
     if (!query.trim()) return;
     setSearching(true);
+    setFromReadPages(false);
     try {
+      const res = await fetch(`/api/files/${fileId}/search?q=${encodeURIComponent(query)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.indexed) {
+          setHits(data.hits);
+          setFromReadPages(data.hits.some((hit: { ocr?: boolean }) => hit.ocr));
+          return;
+        }
+      }
+      // A book nobody has read, or a request that didn't land: the open
+      // document is still there to be searched.
       setHits((await handleRef.current?.search(query)) ?? []);
     } finally {
       setSearching(false);
@@ -343,6 +369,11 @@ export function BookReader({
                 </form>
                 {searching && <p className="text-sm text-sec">Searching…</p>}
                 {hits?.length === 0 && !searching && <p className="text-sm text-sec">No matches.</p>}
+                {fromReadPages && (
+                  <p className="text-xs text-ter">
+                    Read off the scanned pages, so a word here and there may have been misread.
+                  </p>
+                )}
                 <ul className="space-y-2 text-sm">
                   {hits?.map((hit, i) => (
                     <li key={`${hit.location}-${i}`}>
@@ -448,6 +479,15 @@ export function BookReader({
           >
             Next ›
           </button>
+          {/* Sending somebody the hymn you are looking at, from where you are
+              looking at it — the bar already knows which hymn that is. */}
+          <CopyHymnLink
+            fileId={fileId}
+            hymnNumber={currentEntry ? hymnNumberOf(currentEntry.label) : null}
+            currentPage={() =>
+              format === "pdf" ? (handleRef.current?.currentLocation() ?? null) : null
+            }
+          />
         </nav>
       )}
 

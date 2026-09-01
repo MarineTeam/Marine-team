@@ -18,6 +18,7 @@ const eslintConfig = defineConfig([
     // tree — keep these in step with the same paths in .gitignore.
     "public/pdfjs/**",
     "public/epubjs/**",
+    "public/tesseract/**",
   ]),
 ]);
 

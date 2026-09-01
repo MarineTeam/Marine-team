@@ -27,6 +27,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const user = await ensureStaff();
     const { id } = await params;
     const video = await prisma.video.findUniqueOrThrow({ where: { id } });
+    // Bunny-only: an imported video's thumbnail is the source's, and this
+    // route would have nothing to upload it to.
+    if (!video.bunnyVideoId) {
+      return NextResponse.json(
+        { error: "That video isn't stored here, so its thumbnail comes from the source." },
+        { status: 400 },
+      );
+    }
+    const bunnyVideoId = video.bunnyVideoId;
     await ensureContentAccess(user, { seriesId: video.seriesId, categoryId: video.categoryId });
 
     const contentType = request.headers.get("content-type") ?? "";
@@ -55,10 +64,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       sourceUrl = body.thumbnailUrl;
     }
 
-    await bunnySetStreamThumbnail(video.bunnyVideoId, sourceUrl);
+    await bunnySetStreamThumbnail(bunnyVideoId, sourceUrl);
     // Setting a custom thumbnail changes Bunny's stored file name, so read it
     // back rather than assuming the "thumbnail.jpg" default.
-    const bunnyVideo = await bunnyGetStreamVideo(video.bunnyVideoId);
+    const bunnyVideo = await bunnyGetStreamVideo(bunnyVideoId);
     const updated = await prisma.video.update({
       where: { id },
       data: { thumbnailFileName: bunnyVideo.thumbnailFileName ?? null },

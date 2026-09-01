@@ -1,8 +1,16 @@
 # Marine Team
 
-A Subsplash-style media library: Auth0 login, an admin CMS for managing
-series/categories/videos/files, video hosted on Bunny Stream, and downloadable
-files hosted on Bunny Storage.
+What a church runs its week on. It began as a Subsplash-style media library —
+Auth0 login, an admin CMS over series, categories, videos and files, video on
+Bunny Stream — and that is still the middle of it. Around that now: hymnals you
+can search by number even when they are scans, a service's running order with
+the rota beside it, two kinds of volunteer schedule, events people sign up for,
+forms, a prayer wall, small groups, announcements by email and text, Spanish,
+and a screen for the television.
+
+Almost all of it is optional. Every feature past the library is a plugin an
+admin switches on at `/admin/plugins`, so a church that wants a video site gets
+a video site.
 
 See [FEATURES.md](./FEATURES.md) for the full feature list and
 [CHANGELOG.md](./CHANGELOG.md) for release history.
@@ -13,7 +21,24 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
 - Prisma + PostgreSQL
 - `@auth0/nextjs-auth0` for login/session (Regular Web Application flow)
 - Bunny Stream (video) + Bunny Storage (files), uploaded directly from the
-  browser via TUS so large files never pass through the app server
+  browser via TUS so large files never pass through the app server —
+  or YouTube and Vimeo, for a church that already streams there
+
+## Optional services
+
+None of these is needed to run the app; each switches a feature on, and the
+screen that needs it says which variable is missing rather than failing
+quietly.
+
+| What it does | Wants |
+| --- | --- |
+| Email (notifications, announcements) | `RESEND_API_KEY`, `EMAIL_FROM` |
+| Text messages | `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` + `TWILIO_FROM`, or `SMS_WEBHOOK_URL` |
+| Web push | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` |
+| Automatic transcription | `TRANSCRIBE_API_URL` |
+| Importing from YouTube / Vimeo | `YOUTUBE_API_KEY` / `VIMEO_ACCESS_TOKEN` |
+| Rotas from a spreadsheet | a Google service account (see the Schedules section) |
+| Scheduled jobs | `CRON_SECRET` |
 
 ## Setup
 
@@ -521,6 +546,229 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     and plugin checks as the page) and they are cached as JSON under
     `/offline-hymnal/<id>.json`. Both kinds share one index, discriminated by
     `kind`.
+- **A book's contents are indexed server-side** into `BookHymn` rows by the
+  admin's cover/index pass (`derivePdfBook` resolves the outline in the
+  browser, since that is where pdf.js runs, and PUTs it to
+  `/api/admin/files/[id]/contents`, which parses the hymn number with the same
+  `hymnNumberOf` the reader uses). That is what lets `searchHymnsInCategory`
+  answer across a whole shelf, and lets `searchContent` find a hymn printed
+  inside a scanned book. Pages are stored as PDF pages; the printed number is
+  derived at the edge, as everywhere else. A PDF with no bookmarks indexes to
+  nothing, so the same rows can be typed by hand instead — `ContentsEditor`
+  parses the box with `lib/book-contents.ts` (printed pages in, PDF pages
+  stored, indentation as nesting) and PUTs to the same route; the outline pass
+  declines to send an empty list, which would otherwise replace a typed one.
+- **A hymn inside a book can have words**, in `BookHymnLyric`, keyed by
+  `(fileId, number)` rather than by a `BookHymn` row — those are deleted and
+  rewritten on every reindex, and these are typed by hand. That is what makes
+  a whole-book hymn presentable (`planItemPresentable`, `presentHref`,
+  `/present/[fileId]?hymn=`) and findable by a line of its words
+  (`hymnsMatchingWords`, which reads the words first and then the contents
+  entries they belong to, since Prisma can't match a relation against the
+  parent row's own column).
+- **A scanned book's pages can be read** into `BookPage` — the file's own text
+  layer where there is one, OCR off the image where there isn't
+  (`BookTextReader` in the admin's browser; `lib/ocr-client.ts` points
+  tesseract.js at this app's own `/tesseract`, vendored by
+  `scripts/copy-offline-viewers.mjs`, rather than at a CDN). Stored a page at
+  a time so an hour-long run is resumable and interruptible; `textIndexedAt`
+  is set only by a run that reaches the last page. `searchBookText` then backs
+  the reader's in-book search (falling back to parsing the open document for a
+  book nobody has read), and `hymnsMatchingPages` attributes a matching page
+  to the contents entry it falls inside, so a section search still returns
+  hymns rather than page numbers.
+- **A service's running order can be kept on the device** (`lib/offline-services.ts`,
+  `/api/offline/service/[id]`): its own Cache Storage cache and localStorage
+  index rather than the books' ones, since a plan is kept for one Sunday and
+  thrown away after it. Fingerprinted with the shared `lib/fingerprint.ts` over
+  what is actually handed out, so a `?probe=1` request answers "is the order I
+  saved still the order" without re-fetching it. The offline shell renders it,
+  and opens a hymn whose book is also saved.
+- **Reading text size** (`readingTextScale` in `lib/device-settings.ts`) is one
+  per-device value shared by the lyrics view, the EPUB reader and the offline
+  shell — which both reads and writes it, so its clamp bounds are copied there
+  and pinned by `offline-shell.test.ts`. EPUB scaling goes through
+  `rendition.themes.fontSize` as a percentage: the book's pages live in an
+  iframe with their own stylesheet, so a size set outside it reaches nothing.
+- **Schedules are a second, separate rota system**, ported from the calendar
+  app: `Schedule` / `ScheduleSource` / `CalendarEvent` / `Person`. The point of
+  its shape is the provider layer — `lib/schedules/provider.ts` picks a
+  `ScheduleProvider` (Google Sheets or the database) and nothing above it knows
+  which, so a schedule can switch source without a component changing.
+  `lib/sheets/` is the parsing (two layouts, forgiving dates, skip-and-report),
+  `lib/schedules/sync.ts` the import (resolve names to people, never delete on
+  failure, skip writes when the payload is unchanged).
+  - Adapted rather than copied where this app already had the machinery: its
+    `ApiError` folded into `errorResponse`, its audit into `logAudit`, its
+    in-memory rate limiter dropped for this app's database-backed one, and
+    `lib/schedules/http.ts` keeps the four idioms its twenty route handlers
+    were written against so they port without a rewrite.
+  - **The calendar goes on the device incrementally** (`lib/offline-calendar.ts`,
+    `/api/sync/snapshot`): Cache Storage under `/offline-calendar/snapshot.json`
+    like everything else saved here, rather than the calendar app's IndexedDB,
+    so the static offline shell can read it with no bundle. What is stored is
+    the *merge* rather than the server's bytes — `mergeSnapshot` is pure and
+    carries the two rules a delta can't state, since disabling a schedule
+    doesn't touch its events' `updatedAt` and a day leaving the window is
+    never reported deleted. `Snapshot` lives in `lib/schedules/types.ts`, not
+    beside the query that builds it, because the merging runs in a browser.
+- **An event's capacity is decided under a row lock** (`lib/events.ts`):
+  `SELECT … FOR UPDATE` on the `Event` row inside the transaction that writes
+  the registration, so concurrent sign-ups for the last place serialise per
+  event while other events proceed in parallel — and without the
+  serialisation failures a `Serializable` transaction would make the caller
+  retry. Reading the count outside the transaction and writing inside is the
+  version of this that overbooks under load. Promotion off the waiting list
+  happens in that same transaction, because "a place is free" and "you have
+  it" must never be two facts another request can slip between.
+  - The decision itself (`registrationState`, `promotable`) is pure and
+    tested without a database, including the rule that promotion stops at the
+    first party too big to fit rather than skipping to a smaller one.
+  - `manage_events` is a new capability rather than a reuse of
+    `manage_files`: a registration list carries names, phone numbers and
+    addresses that the media library never does.
+- **A form's questions are rows, and its answers point at those rows**
+  (`lib/forms.ts` for the rules, `lib/forms-query.ts` for the reads). Two
+  consequences are the design: renaming a question can't detach its answers,
+  and deleting one is replaced by `deletedAt` — a hard delete would cascade a
+  year of answers away, or leave them under a column nobody can name.
+  `columnsFor` puts live questions first and retired ones after, so an export
+  never silently drops what somebody actually said.
+  - The split between those two files is load-bearing rather than tidiness:
+    the fill-in component is `"use client"`, and one value imported from a
+    module that reaches `lib/db` bundles PrismaClient into the browser.
+    `client-bundle.test.ts` walks every client component's value imports
+    transitively and fails on any that reach it — a class of bug that
+    type-checks, lints and builds, and only shows up as a blank page.
+- **The prayer wall's two decisions are one function each** (`lib/prayer.ts`):
+  `canSee` for whether a reader may see a request at all, `bylineFor` for what
+  they may be told about who wrote it. Every read path — the wall, the
+  moderation queue, the API — goes through `visibleTo`, which composes them.
+  The alternative is a `where` clause copied between four queries that
+  eventually disagree, and here disagreement means somebody's name on
+  something they asked to post anonymously.
+  - Anonymity is not a missing column: the row keeps `userId` so the writer
+    can delete their own and a moderator can act on abuse. It is enforced by
+    `bylineFor` being the only place a name is allowed out, and by
+    `VisiblePrayer` having no `userId` field to populate.
+  - The narrowing `where` in `listPrayers` exists for the query planner;
+    `visibleTo` is still what decides, so widening it cannot widen who sees
+    what.
+- **A small group's address is structurally hard to leak** (`lib/groups.ts`).
+  `area` and `address` are separate columns; `presentGroup` is the only thing
+  that decides whether the second travels, and `VisibleGroup` declares
+  `address?` — absent rather than null when withheld, so a page that forgets
+  to check renders nothing instead of a home. Verified against a running
+  server: the string appears in neither the API response nor the page's HTML
+  for a visitor, a signed-in stranger, or somebody who has only asked to join.
+  - "Has asked to join" deliberately doesn't qualify. If it did, anyone with
+    an account could learn a leader's address by pressing a button — the
+    leader's answer is what turns a stranger into somebody who is coming.
+  - Leaders act through `canLead` on their own group rather than through a
+    capability: whoever hosts the Tuesday group shouldn't need an admin grant
+    to answer somebody knocking on their own door.
+- **A broadcast is resolved into rows before anything is sent**
+  (`lib/broadcast.ts` for the rules, `lib/broadcast-send.ts` for the work).
+  One row per person per channel with the address copied in, each marked as it
+  goes — which is what makes a send resumable across a killed function, and
+  what stops a changed phone number splitting a broadcast between the old one
+  and the new. A unique index on `(broadcast, channel, address)` is the
+  backstop against a double-clicked button.
+  - The batch loop lives in the *browser*: the admin screen calls
+    `/send` repeatedly. A single request that tried to send four hundred
+    emails would be killed at the platform timeout with no record of how far
+    it got, and this way the same mechanism produces a progress bar.
+    `/api/cron/broadcasts` is the backstop for a closed laptop, not the
+    delivery path.
+  - `planDelivery` is pure and holds all three consent rules, so the count on
+    the screen is the count that goes out. `smsOptIn` is deliberately not
+    inferable from having a phone number: an event's sign-up form collects
+    numbers, and that is not permission to text.
+  - `sms.ts` (segment counting, number normalising) is split from
+    `sms-send.ts` (providers) because the composer shows the cost as you type
+    and so ends up in the browser bundle.
+- **Translation is a typed object, not a key-path lookup** (`lib/i18n/`).
+  `Messages` is derived from the English catalogue, so a language file missing
+  or misspelling a key fails to compile — completeness needs no test. The test
+  covers what types can't see: a translation that drops a `{placeholder}`,
+  which loses a number from a sentence and still renders.
+  - The chosen locale is a **cookie** as well as a device setting, because
+    these pages are server-rendered and the server cannot read localStorage.
+    Storing it only in the browser would mean every page arriving in the old
+    language and flipping after hydration.
+  - `pickLocale` parses `Accept-Language` with its quality weights and matches
+    regional tags to their base language; it is pure and tested, including the
+    case where the header asks for a language the app doesn't speak.
+  - `device-settings.ts` keeps its own copy of the language list so that the
+    module every page imports to read a preference doesn't pull two catalogues
+    with it; `i18n.test.ts` asserts the copies agree.
+- **`Video.source` decides which player fills the frame** (`lib/video-source.ts`).
+  `bunnyVideoId` became nullable rather than an empty string, which made the
+  type-checker enumerate every Bunny-only capability — downloads, captions,
+  MP4 renditions, encode-status sync, transcription — and each now refuses an
+  imported video with a reason instead of failing at the API call. The three
+  players all take a start time, so chapters and resume work unchanged.
+  - The sync (`lib/video-feed-sync.ts`) keeps `importedTitle` /
+    `importedDescription` beside the live fields and only overwrites a field
+    whose live value still equals the imported one. Without that three-way
+    comparison every nightly sync silently undoes the edits made after the
+    last one. A null `imported*` means "we don't know", which resolves to
+    *don't touch* rather than to *overwrite*.
+  - `lib/video-feeds.ts` is the provider layer, the same shape as
+    `ScheduleProvider`: four feed kinds, two APIs, one `fetchFeed`.
+- **Live chat polls; it does not hold a socket** (`lib/live-chat.ts`). Nothing
+  here is long-lived enough to keep a connection open, so the client asks
+  `?since=<id>` — one indexed range scan on `(streamId, id)`, usually
+  returning nothing — and pauses the interval on `document.hidden`.
+  - `visibleMessages` drops hidden rows *after* the query as well as in it, so
+    a poll cannot hand a tab that was seconds behind a message a moderator has
+    just removed. Hidden rather than deleted, so the same message can't be
+    reposted past them.
+  - `chatState` closes the chat an hour after a stream ends. An unattended
+    comment box on an old stream is the failure mode this whole design is
+    arranged against; the messages stay readable, the input goes.
+  - Slow mode is computed per author (`waitSeconds`), not per stream.
+- **Signing a television in is RFC 8628, not a password box**
+  (`lib/tv-pairing.ts` for the rules, `lib/tv-session.ts` for the storage).
+  The user code and the device code are two different secrets on purpose: the
+  first is on a screen in a public room and only ever names a request; the
+  second never leaves the television and is the only thing that can exchange
+  an approval for a token. Both are stored hashed; the token is compared in
+  constant time; `claimToken` is a conditional update, so two polls arriving
+  together cannot both mint one.
+  - `pollAnswer` checks expiry *before* "approved", so a code somebody
+    approved and walked away from stops being redeemable rather than waiting
+    for ever.
+  - The feed routes use `force-dynamic` plus `s-maxage`, **not** `revalidate`:
+    `revalidate` on a route with no dynamic input makes Next prerender it at
+    build time, and the feed would then ship carrying whatever database the
+    build machine saw. Same one-fetch-an-hour behaviour, always from live
+    data.
+  - `feedVideos` filters `memberOnly: false` on the video *and* on its series.
+    That is the whole safety argument for the feature: there is no session on
+    a request from Roku's crawler.
+  - `/tv` covers the app chrome with `fixed inset-0` the way presenter mode
+    does, rather than restructuring the root layout — a remote cannot use a
+    sidebar, and on a television it would eat a fifth of the screen.
+- **A rota lives beside the running order**: `ServiceTeam` / `ServiceTeamMember`
+  are the pick-list, `ServiceAssignment` is one ask with its answer, and
+  `ServiceBlockout` is when somebody is away. The job is free text on the
+  assignment rather than a positions table — every church names those
+  differently — and it defaults to `""` rather than null so the unique index
+  over `(planId, userId, position)` actually constrains anything.
+- **Automatic transcription is a queue on the video row** (`transcriptStatus`),
+  drained one at a time by `/api/cron/transcribe`: an hour of audio takes
+  minutes, which outlives a request. `lib/transcribe.ts` speaks the multipart
+  `file` + `{ text }` shape every speech-to-text service implements, so the
+  deployment picks the provider — including one on its own network.
+- **A sermon note sheet is text with `___` in it** (`lib/outline.ts`), parsed
+  into segments at render. Answers are keyed by a gap's position, and the
+  outline's fingerprint travels with them so an edited sheet is reported
+  rather than silently misaligned.
+- **Hymn openings are counted in the browser** (`HymnLookup` + the beacon
+  component of the same name), not on render: Next prefetches links on hover,
+  so a server-side count would largely count hovering. Feeds "most looked-up
+  hymns" in the admin analytics.
 - **The bottom bar** is per device: `getShellNav` returns both the app's
   suggested `tabs` and every destination this viewer could choose
   (`tabOptions`), and `src/lib/nav-tabs.ts` resolves a stored list of hrefs
@@ -735,20 +983,44 @@ To change the schema:
 
 ### Scheduled jobs
 
-`vercel.json` declares two crons, both guarded by the same `CRON_SECRET`
-bearer-token check (Vercel Cron attaches it automatically):
+**Every schedule here runs at most once a day, and that is a hard constraint
+rather than a preference.** Vercel's Hobby plan refuses anything more frequent
+at *deploy* time — the whole deployment fails with "Hobby accounts are limited
+to daily cron jobs" — so an hourly entry in `vercel.json` is not a job that
+runs too often, it is a site that doesn't go live. `cron.test.ts` asserts it,
+because nothing else in the build does. On a paid plan, tighten these and
+delete that test deliberately.
 
-- `/api/cron/notification-digest`, daily at 13:00 UTC. Batches every queued
+`vercel.json` declares five crons, all guarded by the same `CRON_SECRET`
+bearer-token check (Vercel Cron attaches it automatically), and all at
+different minutes so two never share a run:
+
+- `/api/cron/sync-schedules`, 05:30 UTC. Imports every Google Sheets schedule
+  whose own interval has elapsed; a schedule set to sync more often than daily
+  is effectively capped by this cadence. Before the reminders below, so they
+  go out on the morning's data rather than yesterday's.
+- `/api/cron/sync-video-status`, 06:00 UTC. Polls Bunny for every video still
+  stuck in `PROCESSING` and reconciles its status/duration/thumbnail, the same
+  as the admin's manual "Sync from Bunny" button — so a finished encode doesn't
+  sit unprocessed until someone happens to click refresh.
+- `/api/cron/notification-digest`, 13:00 UTC. Batches every queued
   `PendingNotification` per user into a single push and clears the queue —
   the only delivery path for members who chose the "Daily digest" frequency;
   if this cron isn't running, their notifications pile up and never arrive.
-- `/api/cron/sync-video-status`, daily at 06:00 UTC. Polls Bunny for every
-  video still stuck in `PROCESSING` and reconciles its status/duration/
-  thumbnail, the same as the admin's manual "Sync from Bunny" button — so a
-  finished encode doesn't sit unprocessed until someone happens to click
-  refresh. Daily is the Hobby-plan-safe cadence (Vercel's free tier only
-  allows once-a-day cron schedules); a Pro plan can tighten this to run
-  every few minutes if stuck videos need to resolve faster.
+- `/api/cron/schedule-reminders`, 18:00 UTC. Tells people what they are on for
+  tomorrow, one message however many rotas they are on.
+- `/api/cron/transcribe`, 02:00 UTC. Works through the transcription queue.
+  **Bounded by time, not by a count**: it takes as many videos as fit inside
+  the function's own limit (`maxDuration`, and the shorter `BUDGET_MS` it stops
+  starting new work at) and leaves the rest for tomorrow. It was one video per
+  run on an hourly cron, which on a daily cadence would have meant one video a
+  day — a church with forty untranscribed sermons waiting until Christmas. A
+  run killed mid-transcription leaves that video `RUNNING`; the stale sweep in
+  `transcribeNextQueued` re-queues anything stuck there for half an hour.
+  - Note the honest limit: on Hobby, `maxDuration` is 60s, and an hour of
+    audio may not transcribe inside that at all. A deployment that needs this
+    to work on long sermons wants a plan with a longer function timeout,
+    raising `maxDuration` and `BUDGET_MS` together.
 
 ### Preview deployments need their own database
 

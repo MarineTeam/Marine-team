@@ -60,7 +60,9 @@ export async function GET() {
       // Stream listing pages to completion, so videos are always sound.
       storageTruncated: storage.truncated,
       files: storage.truncated ? [] : files.filter((f) => !storagePaths.has(f.bunnyPath)),
-      videos: videos.filter((v) => !streamIds.has(v.bunnyVideoId)),
+      // Only Bunny's own can be orphaned in Bunny. An imported video has no
+      // id to look for, and listing it here would read as "delete this".
+      videos: videos.filter((v) => v.bunnyVideoId !== null && !streamIds.has(v.bunnyVideoId)),
       checked: { files: files.length, videos: videos.length },
     });
   } catch (error) {

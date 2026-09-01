@@ -54,6 +54,8 @@ async function resolveAdminAccess(user: User): Promise<AdminAccess> {
       canManageFiles: true,
       canModerateComments: true,
       canShareContent: true,
+      canManageEvents: true,
+      canModeratePrayer: true,
       canSeeTrash: true,
     };
   }
@@ -69,6 +71,8 @@ async function resolveAdminAccess(user: User): Promise<AdminAccess> {
     canManageSeries,
     canManageFiles,
     canShareContent,
+    canManageEvents,
+    canModeratePrayer,
     moderateScope,
   ] = await Promise.all([
     hasCapability(user, "manage_users"),
@@ -81,6 +85,8 @@ async function resolveAdminAccess(user: User): Promise<AdminAccess> {
     hasCapability(user, "manage_series"),
     hasCapability(user, "manage_files"),
     hasCapability(user, "share_content"),
+    hasCapability(user, "manage_events"),
+    hasCapability(user, "moderate_prayer"),
     getCapabilityScope(user, "moderate_comments"),
   ]);
 
@@ -94,6 +100,8 @@ async function resolveAdminAccess(user: User): Promise<AdminAccess> {
     canManageVideosSiteWide,
     canManageFiles,
     canShareContent,
+    canManageEvents,
+    canModeratePrayer,
     // Scoped rather than site-wide: moderating one category's comments is
     // enough to need the queue.
     canModerateComments:
