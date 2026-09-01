@@ -152,6 +152,15 @@ export function PeopleIcon({ className }: IconProps) {
   );
 }
 
+export function TvIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <rect x="2.5" y="4.5" width="19" height="13" rx="2" />
+      <path d="M8 20.5h8" />
+    </Icon>
+  );
+}
+
 export function BookIcon({ className }: IconProps) {
   return (
     <Icon className={className}>

@@ -703,6 +703,28 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
     comment box on an old stream is the failure mode this whole design is
     arranged against; the messages stay readable, the input goes.
   - Slow mode is computed per author (`waitSeconds`), not per stream.
+- **Signing a television in is RFC 8628, not a password box**
+  (`lib/tv-pairing.ts` for the rules, `lib/tv-session.ts` for the storage).
+  The user code and the device code are two different secrets on purpose: the
+  first is on a screen in a public room and only ever names a request; the
+  second never leaves the television and is the only thing that can exchange
+  an approval for a token. Both are stored hashed; the token is compared in
+  constant time; `claimToken` is a conditional update, so two polls arriving
+  together cannot both mint one.
+  - `pollAnswer` checks expiry *before* "approved", so a code somebody
+    approved and walked away from stops being redeemable rather than waiting
+    for ever.
+  - The feed routes use `force-dynamic` plus `s-maxage`, **not** `revalidate`:
+    `revalidate` on a route with no dynamic input makes Next prerender it at
+    build time, and the feed would then ship carrying whatever database the
+    build machine saw. Same one-fetch-an-hour behaviour, always from live
+    data.
+  - `feedVideos` filters `memberOnly: false` on the video *and* on its series.
+    That is the whole safety argument for the feature: there is no session on
+    a request from Roku's crawler.
+  - `/tv` covers the app chrome with `fixed inset-0` the way presenter mode
+    does, rather than restructuring the root layout — a remote cannot use a
+    sidebar, and on a television it would eat a fifth of the screen.
 - **A rota lives beside the running order**: `ServiceTeam` / `ServiceTeamMember`
   are the pick-list, `ServiceAssignment` is one ask with its answer, and
   `ServiceBlockout` is when somebody is away. The job is free text on the

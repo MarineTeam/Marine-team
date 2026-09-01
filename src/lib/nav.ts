@@ -40,6 +40,7 @@ export type NavIcon =
   | "card"
   | "hands"
   | "people"
+  | "tv"
   | "shield";
 
 export type NavItem = {
@@ -142,6 +143,9 @@ export const getShellNav = cache(async (): Promise<ShellNav> => {
     }
     if (plugins.groups) {
       mine.push({ href: "/profile/groups", label: t.yourGroups, icon: "people" });
+    }
+    if (plugins.tv) {
+      mine.push({ href: "/profile/devices", label: t.televisions, icon: "tv" });
     }
   }
 

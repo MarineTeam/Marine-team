@@ -146,6 +146,38 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **The television.** Three things, none of which is a native app — see the
+  note in FEATURES.md about what is deliberately not here.
+  - **Sign in with a code on the screen.** You cannot type an email address
+    and a password with a remote, so this is the device authorization grant:
+    the television shows six characters, a member types them at `/link` on
+    their phone, and the television — polling all along — gets a token. The
+    two codes are deliberately different things: the short one is on a screen
+    in a room that may hold a hundred people, so it can never be the thing
+    that redeems a token. The long one never leaves the television, and both
+    are stored hashed.
+  - The code alphabet leaves out every character that looks like another on a
+    screen, and typing the one you thought you saw still finds the code — an
+    O where the screen showed a Q resolves, because the screen cannot have
+    shown an O. The approval names the device in a sentence, because the one
+    attack this flow cannot design away is somebody being talked into typing a
+    code from a screen that is not theirs.
+  - **A catalogue feed** at `/api/tv/feed.json` and `/api/tv/feed.xml`. Point
+    Roku's Direct Publisher at the first and it builds and ships a real
+    channel with no BrightScript; the second is what most other platforms
+    take, generated from the same query so two feeds of one library can't
+    disagree. **Nothing member-only is in either**: a feed is fetched with no
+    session, cached by somebody else and republished to every television that
+    installs the channel, so "who can see this" has one honest answer.
+  - **A ten-foot screen** at `/tv`: large type, overscan margins, and focus
+    that moves with the four arrows — nothing wraps, and moving between rows
+    keeps your column, because on a device with no pointer focus reappearing
+    somewhere else is disorienting. Works today on Samsung and LG browsers and
+    anything with an HDMI stick.
+  - Members see and revoke their signed-in televisions at `/profile/devices`.
+    A television token does not expire, and the set is in a room they may not
+    be in any more.
+
 - **Chat beside a live stream.** Polling rather than sockets, because this app
   runs on serverless functions with nothing long-lived to hold a connection
   open — each poll asks only for what has arrived since the last id it saw, so

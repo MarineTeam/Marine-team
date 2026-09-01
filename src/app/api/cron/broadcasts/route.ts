@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendNextBatch, unfinishedBroadcasts } from "@/lib/broadcast-send";
+import { purgeExpiredPairings } from "@/lib/tv-session";
 
 /**
  * Finishes anything left half-sent.
@@ -39,5 +40,10 @@ export async function GET(request: NextRequest) {
     finished.push({ id, ...totals, remaining: progress.remaining });
   }
 
-  return NextResponse.json({ ranAt: new Date().toISOString(), broadcasts: finished });
+  // Piggy-backed on this sweep rather than given a cron of its own: the
+  // hosting plan allows one job a day, and clearing out pairings nobody
+  // completed is a single indexed delete.
+  const pairingsPurged = await purgeExpiredPairings();
+
+  return NextResponse.json({ ranAt: new Date().toISOString(), broadcasts: finished, pairingsPurged });
 }

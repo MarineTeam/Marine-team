@@ -1053,6 +1053,57 @@ A chat beside a live stream, switched on per stream at `/admin/live`.
 - The page asks for new messages every few seconds and **stops entirely while
   the tab is hidden** — a church leaves this open on a laptop all week.
 
+## On the television
+
+Three separate things, and it is worth being plain about which is which.
+
+### Sign in with a code on the screen
+
+You cannot type an email address and a password with a remote control. A
+television shows six characters; somebody opens `/link` on their phone, types
+them, and is asked — by name — whether to sign *that* television in. The
+television, which has been asking all along, gets a token a few seconds later.
+
+The code on the screen is not the thing that signs anything in. It is visible
+to everybody in the room, so it only ever names a request; a separate secret
+that never leaves the television is what redeems it. The characters avoid every
+pair that looks alike on a screen, and typing the one you thought you saw still
+works.
+
+Members see their signed-in televisions at `/profile/devices` and can sign one
+out at any time — worth doing for a set they no longer have, since the sign-in
+does not expire on its own.
+
+### A catalogue feed
+
+`/api/tv/feed.json` is the shape Roku's **Direct Publisher** reads: point a
+channel at it and Roku builds and ships a real television channel, with no
+BrightScript and nothing to maintain. `/api/tv/feed.xml` is the same catalogue
+as MRSS, which most other platforms and search integrations take.
+
+**Only public content goes in a feed.** A feed is fetched by somebody else's
+server with no session, cached by them, and republished to every television
+that installs the channel. There is no login to put in front of it, so anything
+members-only is excluded — including a public video inside a members-only
+series.
+
+### A screen for a remote
+
+`/tv` is the app at arm's length: large type, margins that survive a
+television's overscan, and focus that moves with the four arrows. Nothing
+wraps at the end of a row and moving between rows keeps your column, because
+with no pointer, focus reappearing somewhere unexpected leaves you lost. It
+works today in the browsers built into Samsung and LG sets, and on anything
+with an HDMI stick.
+
+### What is not here
+
+**A native Roku, Apple TV or Android TV app.** Each is a separate codebase in a
+different language, a developer account, a store review and hardware to test
+on — none of which lives in this repository, and none of which can honestly be
+built from it. What is here is everything such an app would need from this
+side: the sign-in, the catalogue, and a screen that already works.
+
 ## Present mode
 
 A hymn's words on the screen at the front of the room. **Present** sits on a

@@ -194,6 +194,7 @@ model User {
   broadcastsReceived    BroadcastRecipient[]
   liveChatMessages      LiveChatMessage[]
   liveChatMutes         LiveChatMute[]
+  tvDevices             TvDevice[]
 }
 
 /**
@@ -2553,4 +2554,73 @@ model LiveChatMute {
   createdAt DateTime   @default(now())
 
   @@unique([streamId, userId])
+}
+
+enum TvDeviceStatus {
+  /// A code is on a screen; nobody has approved it yet.
+  PENDING
+  /// A member said yes. The device may exchange its secret for a token.
+  APPROVED
+  /// A member said no. Kept briefly so the television can say so rather than
+  /// timing out with no explanation.
+  DENIED
+  /// Signed in. `tokenHash` is live.
+  LINKED
+  /// Signed out, from the television or from the member's own settings.
+  REVOKED
+}
+
+/// A television signed in to somebody's account.
+///
+/// You cannot type an email address and a password with a remote control, so
+/// this is the device authorization grant (RFC 8628) in the shape this app
+/// needs: the television shows a short code, a member types that code on their
+/// phone, and the television — which has been polling all along — receives a
+/// long-lived token.
+///
+/// The split between the two codes is the whole security design and is not
+/// cosmetic:
+///
+///   - `userCode` is **public**. It is displayed on a screen in a room that
+///     may have a hundred people in it. It is short because somebody has to
+///     read it off a television and type it with a remote.
+///   - `deviceCode` is **secret**. Only the television that asked for the
+///     pairing ever sees it, and only it can exchange an approval for a token.
+///
+/// Without that split, anybody who could see the screen — or guess six
+/// characters — could take the token meant for the television.
+model TvDevice {
+  id String @id @default(cuid())
+
+  /// Shown on the television. Short, from an alphabet with no characters that
+  /// look like each other on a screen across a room.
+  userCode       String         @unique
+  /// Held only by the television. Hashed, like a password: a leaked database
+  /// must not hand somebody a working pairing.
+  deviceCodeHash String         @unique
+  status         TvDeviceStatus @default(PENDING)
+
+  /// What the television calls itself, so the approval screen can name it.
+  /// Supplied by the device and shown as it was given, never trusted.
+  deviceName String
+  /// Roughly what kind of thing it is, for the member's list of signed-in TVs.
+  deviceKind String?
+
+  /// Set when a member approves it.
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String?
+
+  /// The long-lived token, hashed. Present once linked.
+  tokenHash String? @unique
+
+  /// A pairing nobody completes is rubbish after a few minutes.
+  expiresAt  DateTime
+  approvedAt DateTime?
+  linkedAt   DateTime?
+  lastSeenAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, status])
+  @@index([expiresAt])
 }
