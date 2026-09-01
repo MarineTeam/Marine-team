@@ -1,8 +1,16 @@
 # Marine Team
 
-A Subsplash-style media library: Auth0 login, an admin CMS for managing
-series/categories/videos/files, video hosted on Bunny Stream, and downloadable
-files hosted on Bunny Storage.
+What a church runs its week on. It began as a Subsplash-style media library —
+Auth0 login, an admin CMS over series, categories, videos and files, video on
+Bunny Stream — and that is still the middle of it. Around that now: hymnals you
+can search by number even when they are scans, a service's running order with
+the rota beside it, two kinds of volunteer schedule, events people sign up for,
+forms, a prayer wall, small groups, announcements by email and text, Spanish,
+and a screen for the television.
+
+Almost all of it is optional. Every feature past the library is a plugin an
+admin switches on at `/admin/plugins`, so a church that wants a video site gets
+a video site.
 
 See [FEATURES.md](./FEATURES.md) for the full feature list and
 [CHANGELOG.md](./CHANGELOG.md) for release history.
@@ -13,7 +21,24 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
 - Prisma + PostgreSQL
 - `@auth0/nextjs-auth0` for login/session (Regular Web Application flow)
 - Bunny Stream (video) + Bunny Storage (files), uploaded directly from the
-  browser via TUS so large files never pass through the app server
+  browser via TUS so large files never pass through the app server —
+  or YouTube and Vimeo, for a church that already streams there
+
+## Optional services
+
+None of these is needed to run the app; each switches a feature on, and the
+screen that needs it says which variable is missing rather than failing
+quietly.
+
+| What it does | Wants |
+| --- | --- |
+| Email (notifications, announcements) | `RESEND_API_KEY`, `EMAIL_FROM` |
+| Text messages | `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` + `TWILIO_FROM`, or `SMS_WEBHOOK_URL` |
+| Web push | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` |
+| Automatic transcription | `TRANSCRIBE_API_URL` |
+| Importing from YouTube / Vimeo | `YOUTUBE_API_KEY` / `VIMEO_ACCESS_TOKEN` |
+| Rotas from a spreadsheet | a Google service account (see the Schedules section) |
+| Scheduled jobs | `CRON_SECRET` |
 
 ## Setup
 

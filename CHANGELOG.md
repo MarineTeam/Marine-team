@@ -6,6 +6,42 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-09-03
+
+The release this app stops being a video library and starts being the thing a
+church runs its week on.
+
+**Major**, and not only for the size of it. Two schema changes are breaking for
+anything reading the database directly: `Video.bunnyVideoId` and
+`bunnyLibraryId` are now nullable, because a video may live at YouTube or Vimeo
+and have no Bunny id at all; and `BookHymnLyric` became `BookHymnDetail`, since
+a row can now carry a song's credits without carrying its words. Every
+migration is additive to existing data and nothing needs back-filling.
+
+The shape of it, in one paragraph each:
+
+- **The library learned to read.** A scanned hymnal's contents can be indexed,
+  typed by hand, or read off the page with OCR, so a hymn nobody digitised is
+  still findable by its number. Books, service orders and now the rota all
+  travel on the device.
+- **A service has a life around it.** The running order carries who is serving
+  and whether they said yes; the words go on the wall; the licence return
+  counts itself.
+- **Two kinds of rota.** One for members with accounts, one — ported whole from
+  the calendar app — for the far larger number of people who have none, fed
+  from a spreadsheet somebody already keeps.
+- **The rest of a church's week**: events with a sign-up that can genuinely run
+  out, forms built without a deploy, a moderated prayer wall, and a small-group
+  directory that does not publish anybody's address.
+- **Reaching people**: one announcement to everybody by email, text or push,
+  with an honest count of who it will actually reach — and Spanish, with the
+  machinery for any third language.
+- **Getting on a screen**: videos that live at YouTube or Vimeo, chat beside a
+  live stream, and a television that signs itself in with a code.
+
+Everything below is the detail, newest first.
+
+
 ### Security
 
 - **Uploaded files are no longer served by permanent, unauthenticated CDN

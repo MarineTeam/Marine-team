@@ -3,6 +3,37 @@
 A complete list of what's built. See [README.md](./README.md) for setup and
 [CHANGELOG.md](./CHANGELOG.md) for release history.
 
+Everything past the media library is a plugin, off until an admin turns it on
+at `/admin/plugins` — a church that wants a video site is not given a prayer
+wall it never asked for.
+
+## Where things are
+
+| For the congregation | |
+| --- | --- |
+| `/` `/categories` `/series` `/videos` | the library |
+| `/search` | one search across titles, descriptions, transcripts and hymn text |
+| `/services` | the running order for a service, and the hymns in it |
+| `/calendar` | the rota, for people with no account |
+| `/events` | what's on, and signing up |
+| `/forms` | connect cards and sign-up forms |
+| `/prayer` | the prayer wall |
+| `/groups` | small groups |
+| `/live` | a live stream, with chat |
+| `/tv` | the same library, for a remote control |
+| `/link` | signing a television in |
+| `/profile` | your own rota, events, groups, downloads and televisions |
+
+| For whoever runs it | |
+| --- | --- |
+| `/admin/series` `/admin/videos` `/admin/files` | the library |
+| `/admin/services` `/admin/teams` | a service and who is serving at it |
+| `/admin/schedules` `/admin/people` | rotas from a spreadsheet |
+| `/admin/events` `/admin/forms` `/admin/groups` `/admin/prayer` | church life |
+| `/admin/broadcasts` | one message to everybody |
+| `/admin/video-feeds` | importing from YouTube or Vimeo |
+| `/admin/plugins` `/admin/branding` `/admin/permissions` | how the site behaves |
+
 ## Public site
 
 - **Browsing** — a vertical list of tiles (thumbnail, title, item count),
