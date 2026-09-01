@@ -11,6 +11,7 @@ import {
   registrationMessage,
   registrationState,
 } from "@/lib/events";
+import { currentMessages } from "@/lib/i18n/locale";
 import { isPluginEnabled } from "@/lib/plugins";
 import { getDisplayName } from "@/lib/profile";
 
@@ -37,7 +38,7 @@ export default async function EventPage(props: { params: Promise<{ slug: string 
   const event = await getEventBySlug(slug);
   if (!event || !event.published) notFound();
 
-  const user = await getCurrentUser();
+  const [user, { t }] = await Promise.all([getCurrentUser(), currentMessages()]);
   // Not a 403: a members-only event should be indistinguishable from one that
   // doesn't exist, or the title itself leaks.
   if (event.memberOnly && !user) notFound();
@@ -55,7 +56,7 @@ export default async function EventPage(props: { params: Promise<{ slug: string 
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-10">
       <p className="text-sm">
         <Link href="/events" className="text-accent hover:underline">
-          ← Events
+          ← {t.events.title}
         </Link>
       </p>
 
@@ -80,6 +81,7 @@ export default async function EventPage(props: { params: Promise<{ slug: string 
             : null
         }
         defaults={user ? { name: getDisplayName(user), email: user.email } : null}
+        t={t.events}
       />
     </div>
   );

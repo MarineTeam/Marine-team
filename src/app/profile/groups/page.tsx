@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { myGroups } from "@/lib/groups-query";
+import { currentMessages } from "@/lib/i18n/locale";
 import { isPluginEnabled } from "@/lib/plugins";
 
 export const metadata = { title: "Your groups" };
@@ -14,20 +15,21 @@ export default async function ProfileGroupsPage() {
     return <p className="text-sm text-sec">Small groups are switched off at the moment.</p>;
   }
 
+  const { t } = await currentMessages();
   const memberships = await myGroups(user.id);
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-ink">Your groups</h2>
-        <p className="mt-1 text-sm text-sec">Where you meet during the week.</p>
+        <h2 className="text-lg font-semibold text-ink">{t.groups.yourGroups}</h2>
+        <p className="mt-1 text-sm text-sec">{t.groups.yourGroupsSubtitle}</p>
       </div>
 
       {memberships.length === 0 ? (
         <p className="rounded-lg border border-dashed border-sep p-8 text-center text-sm text-sec">
-          You&apos;re not in a group yet.{" "}
+          {t.groups.notInAGroup}{" "}
           <Link href="/groups" className="text-accent hover:underline">
-            See what there is →
+            {t.groups.seeWhatThereIs} →
           </Link>
         </p>
       ) : (
@@ -41,11 +43,11 @@ export default async function ProfileGroupsPage() {
                 </span>
                 {membership.status === "REQUESTED" && (
                   <span className="mt-0.5 block text-xs text-ter">
-                    You&apos;ve asked to join — the leader will be in touch.
+                    {t.groups.youveAsked}
                   </span>
                 )}
                 {membership.role === "LEADER" && (
-                  <span className="mt-0.5 block text-xs text-ter">You lead this one.</span>
+                  <span className="mt-0.5 block text-xs text-ter">{t.groups.youLeadThis}</span>
                 )}
               </Link>
             </li>

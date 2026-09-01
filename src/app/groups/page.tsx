@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { listGroups, viewerFor } from "@/lib/groups-query";
+import { format } from "@/lib/i18n";
+import { currentMessages } from "@/lib/i18n/locale";
 import { isPluginEnabled } from "@/lib/plugins";
 
 export const dynamic = "force-dynamic";
@@ -23,19 +25,19 @@ export const metadata: Metadata = {
  */
 export default async function GroupsPage() {
   if (!(await isPluginEnabled("groups"))) notFound();
-  const viewer = await viewerFor(await getCurrentUser());
+  const [viewer, { t }] = await Promise.all([viewerFor(await getCurrentUser()), currentMessages()]);
   const groups = await listGroups(viewer);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-10">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-ink">Small groups</h1>
-        <p className="mt-1 text-sm text-sec">Where people meet during the week.</p>
+        <h1 className="text-3xl font-bold tracking-tight text-ink">{t.groups.title}</h1>
+        <p className="mt-1 text-sm text-sec">{t.groups.subtitle}</p>
       </div>
 
       {groups.length === 0 ? (
         <p className="rounded-lg border border-dashed border-sep p-8 text-center text-sm text-sec">
-          No groups listed yet.
+          {t.groups.noneListed}
         </p>
       ) : (
         <ul className="divide-y divide-sep rounded-lg border border-sep">
@@ -48,14 +50,16 @@ export default async function GroupsPage() {
                 </span>
                 <span className="mt-0.5 block text-xs text-ter">
                   {group.standing === "member" || group.standing === "leader"
-                    ? "You're in this group"
+                    ? t.groups.youreIn
                     : group.standing === "requested"
-                      ? "You've asked to join"
+                      ? t.groups.youveAsked
                       : group.joinState === "full"
-                        ? "Full"
+                        ? t.events.full
                         : group.joinState === "closed"
-                          ? "Not taking new people"
-                          : `${group.memberCount} ${group.memberCount === 1 ? "person" : "people"}`}
+                          ? t.groups.notTakingNew
+                          : group.memberCount === 1
+                            ? t.groups.onePerson
+                            : format(t.groups.people, { count: group.memberCount })}
                 </span>
               </Link>
             </li>

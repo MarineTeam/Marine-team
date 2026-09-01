@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { eventWhen, listPublishedEvents, placesLeft, registrationState } from "@/lib/events";
+import { format } from "@/lib/i18n";
+import { currentMessages } from "@/lib/i18n/locale";
 import { isPluginEnabled } from "@/lib/plugins";
 
 export const dynamic = "force-dynamic";
@@ -15,19 +17,19 @@ export const metadata: Metadata = {
 /** What's on, soonest first. Past events drop off rather than being paged through. */
 export default async function EventsPage() {
   if (!(await isPluginEnabled("events"))) notFound();
-  const user = await getCurrentUser();
+  const [user, { t }] = await Promise.all([getCurrentUser(), currentMessages()]);
   const events = await listPublishedEvents({ memberOnly: Boolean(user) });
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-10">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-ink">Events</h1>
-        <p className="mt-1 text-sm text-sec">What&apos;s on, and how to sign up.</p>
+        <h1 className="text-3xl font-bold tracking-tight text-ink">{t.events.title}</h1>
+        <p className="mt-1 text-sm text-sec">{t.events.subtitle}</p>
       </div>
 
       {events.length === 0 ? (
         <p className="rounded-lg border border-dashed border-sep p-8 text-center text-sm text-sec">
-          Nothing coming up.
+          {t.events.nothingComingUp}
         </p>
       ) : (
         <ul className="divide-y divide-sep rounded-lg border border-sep">
@@ -44,16 +46,18 @@ export default async function EventsPage() {
                   {state !== "off" && (
                     <span className="mt-0.5 block text-xs text-ter">
                       {state === "waitlist-only"
-                        ? "Full — waiting list open"
+                        ? t.events.fullWaitlist
                         : state === "full"
-                          ? "Full"
+                          ? t.events.full
                           : state === "closed"
-                            ? "Sign-up closed"
+                            ? t.events.signUpClosed
                             : state === "not-open-yet"
-                              ? "Sign-up not open yet"
+                              ? t.events.signUpNotOpen
                               : left === null
-                                ? "Sign-up open"
-                                : `${left} ${left === 1 ? "place" : "places"} left`}
+                                ? t.events.signUpOpen
+                                : left === 1
+                                  ? t.events.onePlaceLeft
+                                  : format(t.events.placesLeft, { count: left })}
                     </span>
                   )}
                 </Link>

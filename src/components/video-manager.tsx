@@ -26,6 +26,7 @@ import {
   BulkSelectAll,
   useBulkSelect,
 } from "@/components/bulk-select";
+import { LANGUAGES } from "@/lib/device-settings";
 
 type Speaker = { id: string; name: string };
 
@@ -54,6 +55,8 @@ type Video = {
   transcriptStatus: string | null;
   transcriptError: string | null;
   noteOutline: string | null;
+  /** What this was recorded in, or null for "nobody has said". */
+  language: string | null;
 };
 type BunnyLibraryVideo = {
   guid: string;
@@ -363,6 +366,21 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
     await load();
   }
 
+  /**
+   * What language this was recorded in.
+   *
+   * A different question from the member's own language setting, which
+   * changes the app's screens rather than saying what a sermon is in.
+   */
+  async function setLanguage(id: string, language: string) {
+    await fetch(`/api/admin/videos/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ language: language || null }),
+    });
+    await load();
+  }
+
   async function remove(id: string) {
     if (!confirm("Move this video to Trash? It's restorable from Admin > Trash; the Bunny Stream asset isn't removed until it's permanently deleted from there.")) return;
     await fetch(`/api/admin/videos/${id}`, { method: "DELETE" });
@@ -648,6 +666,21 @@ export function VideoManager({ seriesId, categoryId }: { seriesId?: string; cate
                 {speakerList.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={v.language ?? ""}
+                onChange={(e) => setLanguage(v.id, e.target.value)}
+                className="rounded-md border border-sep px-2 py-1"
+                aria-label="Language"
+              >
+                {/* Blank is "nobody has said", which the app treats as the
+                    site's default rather than as "any language". */}
+                <option value="">Language not set</option>
+                {LANGUAGES.map((language) => (
+                  <option key={language.code} value={language.code}>
+                    {language.label}
                   </option>
                 ))}
               </select>

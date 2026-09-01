@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { isChoice, optionsOf, type Askable } from "@/lib/forms";
+import type { Messages } from "@/lib/i18n";
 
 /**
  * A form as somebody fills it in.
@@ -15,10 +16,12 @@ export function FormFiller({
   slug,
   fields,
   confirmation,
+  t,
 }: {
   slug: string;
   fields: Askable[];
   confirmation: string | null;
+  t: Messages["forms"];
 }) {
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -59,7 +62,7 @@ export function FormFiller({
         if (body.errors) setErrors(body.errors);
         throw new Error(body.error ?? "Couldn't send that.");
       }
-      setSent(body.confirmation ?? confirmation ?? "Thank you — that's been sent.");
+      setSent(body.confirmation ?? confirmation ?? t.thankYou);
     } catch (thrown) {
       setMessage(thrown instanceof Error ? thrown.message : "Couldn't send that.");
     } finally {
@@ -74,7 +77,7 @@ export function FormFiller({
   if (fields.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-sep p-8 text-center text-sm text-sec">
-        This form has no questions on it yet.
+        {t.noQuestions}
       </p>
     );
   }
@@ -114,7 +117,7 @@ export function FormFiller({
                   className={field}
                 >
                   <option value="" disabled>
-                    Choose…
+                    {t.choose}
                   </option>
                   {options.map((option) => (
                     <option key={option} value={option}>
@@ -195,7 +198,7 @@ export function FormFiller({
         disabled={busy}
         className="btn-primary rounded-md px-4 py-2 text-sm text-white disabled:opacity-60"
       >
-        {busy ? "Sending…" : "Send"}
+        {busy ? "…" : t.send}
       </button>
       {message && <p className="text-sm text-red-600">{message}</p>}
     </form>

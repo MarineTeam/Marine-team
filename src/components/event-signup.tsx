@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { RegistrationState } from "@/lib/events";
+import { format, type Messages } from "@/lib/i18n";
 
 type Mine = { id: string; status: string; guests: number; name: string } | null;
 
@@ -21,6 +22,7 @@ export function EventSignup({
   message,
   mine,
   defaults,
+  t,
 }: {
   slug: string;
   state: RegistrationState;
@@ -28,7 +30,11 @@ export function EventSignup({
   message: string;
   mine: Mine;
   defaults: { name: string; email: string } | null;
-}) {
+  /** Passed in rather than resolved here: the locale lives in a cookie the
+      server has already read, and a client component reading it again would
+      render English first and correct itself. */
+  t: Messages["events"];
+  }) {
   const router = useRouter();
   const [name, setName] = useState(mine?.name ?? defaults?.name ?? "");
   const [email, setEmail] = useState(defaults?.email ?? "");
@@ -53,11 +59,7 @@ export function EventSignup({
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't sign you up.");
-      setDone(
-        body.status === "GOING"
-          ? "You're signed up. See you there."
-          : "You're on the waiting list — we'll let you know if a place frees up.",
-      );
+      setDone(body.status === "GOING" ? t.youreSignedUp : t.youreWaiting);
       router.refresh();
     } catch (thrown) {
       setError(thrown instanceof Error ? thrown.message : "Couldn't sign you up.");
@@ -88,7 +90,7 @@ export function EventSignup({
     return (
       <div className="space-y-2 rounded-lg border border-sep p-4">
         <p className="text-sm font-medium text-ink">
-          {mine.status === "GOING" ? "✓ You're signed up." : "You're on the waiting list."}
+          {mine.status === "GOING" ? `✓ ${t.youreSignedUp}` : t.youreWaiting}
           {mine.guests > 0 && ` Bringing ${mine.guests}.`}
         </p>
         <button
@@ -96,7 +98,7 @@ export function EventSignup({
           disabled={busy}
           className="rounded-md border border-sep px-3 py-1.5 text-sm hover:bg-hover disabled:opacity-60"
         >
-          {busy ? "Cancelling…" : "Cancel my place"}
+          {busy ? "…" : t.cancelPlace}
         </button>
         {error && <p className="text-xs text-red-600">{error}</p>}
       </div>
@@ -114,12 +116,12 @@ export function EventSignup({
   return (
     <form onSubmit={submit} className="space-y-3 rounded-lg border border-sep p-4">
       <p className="text-sm font-medium text-ink">
-        {state === "waitlist-only" ? "Join the waiting list" : "Sign up"}
+        {state === "waitlist-only" ? t.joinWaitingList : t.signUp}
       </p>
       {message && <p className="text-xs text-sec">{message}</p>}
 
       <label className="block text-sm">
-        <span className="text-sec">Your name</span>
+        <span className="text-sec">{t.yourName}</span>
         <input
           required
           value={name}
@@ -128,7 +130,7 @@ export function EventSignup({
         />
       </label>
       <label className="block text-sm">
-        <span className="text-sec">Email</span>
+        <span className="text-sec">{t.email}</span>
         <input
           required
           type="email"
@@ -138,7 +140,7 @@ export function EventSignup({
         />
       </label>
       <label className="block text-sm">
-        <span className="text-sec">Phone (optional)</span>
+        <span className="text-sec">{t.phone}</span>
         <input
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
@@ -147,7 +149,7 @@ export function EventSignup({
       </label>
       {maxGuests > 0 && (
         <label className="block text-sm">
-          <span className="block text-sec">Bringing anyone? (up to {maxGuests})</span>
+          <span className="block text-sec">{format(t.bringing, { count: maxGuests })}</span>
           <input
             type="number"
             min={0}
@@ -159,7 +161,7 @@ export function EventSignup({
         </label>
       )}
       <label className="block text-sm">
-        <span className="text-sec">Anything we should know? (optional)</span>
+        <span className="text-sec">{t.anythingToKnow}</span>
         <textarea
           rows={2}
           value={note}
@@ -173,7 +175,7 @@ export function EventSignup({
         disabled={busy}
         className="btn-primary rounded-md px-4 py-2 text-sm text-white disabled:opacity-60"
       >
-        {busy ? "Sending…" : state === "waitlist-only" ? "Join the waiting list" : "Sign me up"}
+        {busy ? "…" : state === "waitlist-only" ? t.joinWaitingList : t.signMeUp}
       </button>
       {error && <p className="text-xs text-red-600">{error}</p>}
     </form>

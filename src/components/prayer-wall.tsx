@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { format, type Messages } from "@/lib/i18n";
 
 type Prayer = {
   id: string;
@@ -23,7 +24,7 @@ type Prayer = {
  * component never has an account id to leak, and never has to remember not to
  * print one.
  */
-export function PrayerWall({ signedIn }: { signedIn: boolean }) {
+export function PrayerWall({ signedIn, t }: { signedIn: boolean; t: Messages["prayer"] }) {
   const [requests, setRequests] = useState<Prayer[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [body, setBody] = useState("");
@@ -60,12 +61,12 @@ export function PrayerWall({ signedIn }: { signedIn: boolean }) {
           visibility,
         }),
       });
-      if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't send that.");
+      if (!response.ok) throw new Error((await response.json()).error ?? t.couldntSend);
       setBody("");
       setSent(true);
       await load();
     } catch (thrown) {
-      setError(thrown instanceof Error ? thrown.message : "Couldn't send that.");
+      setError(thrown instanceof Error ? thrown.message : t.couldntSend);
     } finally {
       setBusy(false);
     }
@@ -81,7 +82,7 @@ export function PrayerWall({ signedIn }: { signedIn: boolean }) {
   }
 
   async function remove(request: Prayer) {
-    if (!window.confirm("Take this down?")) return;
+    if (!window.confirm(t.takeThisDown)) return;
     const response = await fetch(`/api/prayer/${request.id}`, { method: "DELETE" });
     if (response.ok) await load();
   }
@@ -91,7 +92,7 @@ export function PrayerWall({ signedIn }: { signedIn: boolean }) {
   return (
     <div className="space-y-6">
       <form onSubmit={submit} className="space-y-3 rounded-lg border border-sep p-4">
-        <p className="text-sm font-medium text-ink">Ask for prayer</p>
+        <p className="text-sm font-medium text-ink">{t.askForPrayer}</p>
         <textarea
           required
           rows={3}
@@ -100,13 +101,13 @@ export function PrayerWall({ signedIn }: { signedIn: boolean }) {
             setBody(e.target.value);
             setSent(false);
           }}
-          placeholder="What would you like people to pray for?"
+          placeholder={t.whatToPrayFor}
           className={field}
         />
 
         {!anonymous && (
           <label className="block text-sm">
-            <span className="text-sec">Your name (optional)</span>
+            <span className="text-sec">{t.yourNameOptional}</span>
             <input value={name} onChange={(e) => setName(e.target.value)} className={field} />
           </label>
         )}
@@ -117,20 +118,20 @@ export function PrayerWall({ signedIn }: { signedIn: boolean }) {
             checked={anonymous}
             onChange={(e) => setAnonymous(e.target.checked)}
           />
-          Post this anonymously
+          {t.postAnonymously}
         </label>
 
         {signedIn && (
           <label className="block text-sm">
-            <span className="text-sec">Who can see it</span>
+            <span className="text-sec">{t.whoCanSee}</span>
             <select
               value={visibility}
               onChange={(e) => setVisibility(e.target.value)}
               className={field}
             >
-              <option value="MEMBERS">Members</option>
-              <option value="EVERYONE">Anyone who visits the site</option>
-              <option value="LEADERS">Only the people who look after prayer</option>
+              <option value="MEMBERS">{t.seenByMembers}</option>
+              <option value="EVERYONE">{t.seenByEveryone}</option>
+              <option value="LEADERS">{t.seenByLeaders}</option>
             </select>
           </label>
         )}
@@ -140,11 +141,11 @@ export function PrayerWall({ signedIn }: { signedIn: boolean }) {
           disabled={busy}
           className="btn-primary rounded-md px-4 py-2 text-sm text-white disabled:opacity-60"
         >
-          {busy ? "Sending…" : "Send"}
+          {busy ? "…" : t.send}
         </button>
         {sent && (
           <p className="text-xs text-sec">
-            Thank you. Somebody will read it before it goes on the wall.
+            {t.willBeRead}
           </p>
         )}
         {error && <p className="text-xs text-red-600">{error}</p>}
@@ -152,20 +153,20 @@ export function PrayerWall({ signedIn }: { signedIn: boolean }) {
 
       {loaded && requests.length === 0 ? (
         <p className="rounded-lg border border-dashed border-sep p-8 text-center text-sm text-sec">
-          Nothing on the wall yet.
+          {t.nothingOnWall}
         </p>
       ) : (
         <ul className="space-y-3">
           {requests.map((request) => (
             <li key={request.id} className="space-y-2 rounded-lg border border-sep p-4">
               {request.status === "PENDING" && (
-                <p className="text-xs text-ter">Waiting to be read — only you can see this.</p>
+                <p className="text-xs text-ter">{t.waitingToBeRead}</p>
               )}
               <p className="text-sm whitespace-pre-wrap text-ink">{request.body}</p>
 
               {request.answeredNote && (
                 <p className="rounded-md border border-green-300 px-3 py-2 text-sm text-green-800 dark:border-green-900 dark:text-green-300">
-                  Answered: {request.answeredNote}
+                  {t.answered}: {request.answeredNote}
                 </p>
               )}
 
@@ -180,12 +181,14 @@ export function PrayerWall({ signedIn }: { signedIn: boolean }) {
                       disabled={request.prayed}
                       className="rounded-md border border-sep px-2 py-1 hover:bg-hover disabled:opacity-60"
                     >
-                      {request.prayed ? "✓ You prayed" : "I prayed for this"}
+                      {request.prayed ? `✓ ${t.youPrayed}` : t.iPrayed}
                     </button>
                   )}
                   {request.prayers > 0 && (
                     <span>
-                      {request.prayers} {request.prayers === 1 ? "person has" : "people have"} prayed
+                      {request.prayers === 1
+                        ? t.onePersonPrayed
+                        : format(t.peoplePrayed, { count: request.prayers })}
                     </span>
                   )}
                   {request.mine && (
@@ -193,7 +196,7 @@ export function PrayerWall({ signedIn }: { signedIn: boolean }) {
                       onClick={() => remove(request)}
                       className="rounded-md border border-sep px-2 py-1 hover:bg-hover"
                     >
-                      Take down
+                      {t.takeDown}
                     </button>
                   )}
                 </span>

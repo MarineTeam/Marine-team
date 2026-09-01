@@ -980,6 +980,29 @@ One message to everybody, or to one group, from `/admin/broadcasts`.
   processor halves what fits in one text, which is worth knowing before it is
   multiplied by three hundred.
 
+## Languages
+
+The app's own screens come in English and Spanish, and a church can add a third
+by adding one file.
+
+- **It follows the browser first.** Somebody whose phone is in Spanish gets
+  Spanish without finding a setting — `Accept-Language` is honoured with its
+  quality weights, and `es-ES` or `es-419` both mean Spanish. A language the
+  app doesn't speak falls back to English rather than half-translating.
+- **A choice sticks**, on that device, next to the theme.
+- **What is translated**: the navigation, and the events, forms, prayer and
+  small-group pages — the ones a visitor who doesn't read English most needs.
+  The library, the reader and the admin screens are English only for now.
+  Adding to a language is filling in one file; a key missing from it won't
+  build, and a translation that has quietly dropped a number from a sentence
+  fails a test.
+- **What language a sermon is in is a different question**, and has its own
+  setting on a video and on a series. An episode with no answer takes its
+  series'; a series with no answer is the site's default. Deliberately not
+  "any language": filing every untagged sermon under every language would make
+  the filter useless in the church that most needs it, where most of the
+  archive predates anybody thinking about this.
+
 ## Present mode
 
 A hymn's words on the screen at the front of the room. **Present** sits on a

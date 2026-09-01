@@ -37,7 +37,15 @@ export const PLAYBACK_SPEEDS = [0.75, 1, 1.25, 1.5, 1.75, 2] as const;
  * Only English ships today. The setting is stored (and shown, disabled) so
  * the preference has a home before the strings are translated.
  */
-export const LANGUAGES = [{ code: "en", label: "English" }] as const;
+/**
+ * The languages the app speaks, mirrored from lib/i18n so this module stays
+ * free of anything that would drag a catalogue into every page that reads a
+ * setting. `i18n.test.ts` is what keeps the two in step.
+ */
+export const LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "es", label: "Español" },
+] as const;
 
 export type DeviceSettings = {
   theme: ThemePreference;

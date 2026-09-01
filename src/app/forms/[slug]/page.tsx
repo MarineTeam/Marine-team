@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { FormFiller } from "@/components/form-filler";
 import { getCurrentUser } from "@/lib/current-user";
 import { getPublicForm } from "@/lib/forms-query";
+import { currentMessages } from "@/lib/i18n/locale";
 import { isPluginEnabled } from "@/lib/plugins";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,7 @@ export default async function FormPage(props: { params: Promise<{ slug: string }
 
   // Not a 403: a members-only form is indistinguishable from one that isn't
   // there, so its title doesn't leak either.
-  const user = await getCurrentUser();
+  const [user, { t }] = await Promise.all([getCurrentUser(), currentMessages()]);
   if (form.memberOnly && !user) notFound();
 
   return (
@@ -39,7 +40,12 @@ export default async function FormPage(props: { params: Promise<{ slug: string }
           <p className="mt-2 text-sm whitespace-pre-wrap text-sec">{form.description}</p>
         )}
       </div>
-      <FormFiller slug={form.slug} fields={form.fields} confirmation={form.confirmation} />
+      <FormFiller
+        slug={form.slug}
+        fields={form.fields}
+        confirmation={form.confirmation}
+        t={t.forms}
+      />
     </div>
   );
 }

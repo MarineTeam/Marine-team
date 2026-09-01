@@ -146,6 +146,31 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **The app speaks more than one language.** The `language` device setting had
+  one option and nothing read it; it is real now, with English and Spanish.
+  - **A catalogue is a typed object, so a missing key doesn't compile.**
+    Completeness is the type-checker's job. What it can't see — a translation
+    that drops a `{placeholder}`, turning "3 places left" into "places left"
+    and losing the number — is what the test checks.
+  - **It follows the browser.** With no choice stored, `Accept-Language`
+    decides, quality weights and all; `es-419` and `es-ES` both find Spanish,
+    and a language the app doesn't speak falls back to English rather than
+    erroring. Somebody whose phone is in Spanish shouldn't have to find a
+    setting.
+  - **The choice is a cookie as well as a device setting**, because these pages
+    render on the server and the server cannot read localStorage. Without it
+    every page would arrive in English and flip a moment later.
+  - Translated so far: the navigation, and the events, forms, prayer and small
+    group pages — the ones a visitor who doesn't read English most needs. The
+    library, the reader and the admin are still English only; the catalogue is
+    where the rest goes.
+  - **What language a sermon is in is a separate question** from what language
+    the app's screens are in, and has its own field on a video and a series. An
+    episode inherits its series' answer; unlabelled means unlabelled and is
+    treated as the site's default rather than as "any", because filing every
+    untagged sermon under every language would make the filter useless in
+    exactly the church that needs it.
+
 - **Announcements: one message to everybody, by email, text or push.** Sent
   from `/admin/broadcasts`, gated on `manage_users` — writing to every member
   is closer to holding the membership list than to booking the hall.

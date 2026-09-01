@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PrayerWall } from "@/components/prayer-wall";
 import { getCurrentUser } from "@/lib/current-user";
+import { currentMessages } from "@/lib/i18n/locale";
 import { isPluginEnabled } from "@/lib/plugins";
 
 export const dynamic = "force-dynamic";
@@ -14,17 +15,15 @@ export const metadata: Metadata = {
 
 export default async function PrayerPage() {
   if (!(await isPluginEnabled("prayer"))) notFound();
-  const user = await getCurrentUser();
+  const [user, { t }] = await Promise.all([getCurrentUser(), currentMessages()]);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-10">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-ink">Prayer</h1>
-        <p className="mt-1 text-sm text-sec">
-          Ask, and pray for what others have asked. Everything is read by somebody before it goes up.
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight text-ink">{t.prayer.title}</h1>
+        <p className="mt-1 text-sm text-sec">{t.prayer.subtitle}</p>
       </div>
-      <PrayerWall signedIn={Boolean(user)} />
+      <PrayerWall signedIn={Boolean(user)} t={t.prayer} />
     </div>
   );
 }

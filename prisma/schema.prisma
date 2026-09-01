@@ -319,6 +319,10 @@ model Series {
   title             String
   slug              String              @unique
   description       String?
+  /// The language this series is in, as a BCP-47 tag. See Video.language —
+  /// a video without its own inherits the series' answer rather than the
+  /// site's, because a Spanish series' episodes are Spanish.
+  language          String?
   coverImageUrl     String?
   // Short badge shown on this book's cover in a hymnalStyle category's grid
   // (e.g. "GSFH1"). Unused outside that grid.
@@ -362,6 +366,8 @@ model Series {
   shareLinks        ShareLink[]
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
+
+  @@index([language])
 }
 
 model Video {
@@ -391,6 +397,13 @@ model Video {
   mp4Resolutions      String?
   // Full text transcript, admin-entered. Shown in a collapsible panel by
   // the Transcripts plugin and matched by search when that plugin is on.
+  /// The language this was recorded in, as a BCP-47 tag ("en", "es").
+  ///
+  /// Content, not chrome: a member's language setting changes the app's own
+  /// screens, and this says what a sermon is actually in. Null means nobody
+  /// has said, which is treated as the site's default rather than as "any" —
+  /// guessing would file every unlabelled sermon under every language.
+  language            String?
   transcript          String?
   /// Where an automatic transcription of this video has got to: null for a
   /// video nobody has asked to transcribe, then QUEUED → RUNNING → DONE, or
@@ -461,6 +474,7 @@ model Video {
   @@index([seriesId])
   @@index([categoryId])
   @@index([speakerId])
+  @@index([language])
 }
 
 // A named timestamp within a video (e.g. "Intro", "Q&A"), for the Chapters

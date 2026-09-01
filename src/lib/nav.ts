@@ -3,6 +3,8 @@ import { getBranding, type Branding } from "@/lib/branding";
 import { getNavCategories } from "@/lib/content";
 import { getCurrentUser, getSessionIdentity } from "@/lib/current-user";
 import { getUnreadNotificationCount } from "@/lib/inbox";
+import { messagesFor } from "@/lib/i18n";
+import { currentLocale } from "@/lib/i18n/locale";
 import { getPluginStates } from "@/lib/plugins";
 import { isStaff } from "@/lib/permissions";
 import { getDisplayName } from "@/lib/profile";
@@ -78,13 +80,18 @@ export type ShellNav = {
 };
 
 export const getShellNav = cache(async (): Promise<ShellNav> => {
-  const [branding, user, identity, plugins, categories] = await Promise.all([
+  const [branding, user, identity, plugins, categories, locale] = await Promise.all([
     getBranding(),
     getCurrentUser(),
     getSessionIdentity(),
     getPluginStates(),
     getNavCategories(),
+    currentLocale(),
   ]);
+  // The rail and the tab strip are on every page, so this is where a language
+  // choice is most visible — and the category names below are deliberately
+  // *not* translated: they are content an admin typed, not chrome.
+  const t = messagesFor(locale).nav;
 
   const [staff, unreadCount] = await Promise.all([
     user ? isStaff(user) : Promise.resolve(false),
@@ -92,19 +99,19 @@ export const getShellNav = cache(async (): Promise<ShellNav> => {
   ]);
 
   const browse: NavItem[] = [
-    { href: "/", label: "Home", icon: "home", exact: true },
-    { href: "/search", label: "Search", icon: "search" },
+    { href: "/", label: t.home, icon: "home", exact: true },
+    { href: "/search", label: t.search, icon: "search" },
   ];
-  if (plugins["live-streaming"]) browse.push({ href: "/live", label: "Live", icon: "live" });
+  if (plugins["live-streaming"]) browse.push({ href: "/live", label: t.live, icon: "live" });
   // The running order for a service — what somebody opens on the way in.
-  if (plugins["service-plans"]) browse.push({ href: "/services", label: "Services", icon: "calendar" });
+  if (plugins["service-plans"]) browse.push({ href: "/services", label: t.services, icon: "calendar" });
   // What's on. Public, because the people it most wants to reach are the ones
   // who have never made an account.
-  if (plugins.events) browse.push({ href: "/events", label: "Events", icon: "ticket" });
+  if (plugins.events) browse.push({ href: "/events", label: t.events, icon: "ticket" });
   // The connect card, and whatever else there is to fill in.
-  if (plugins.forms) browse.push({ href: "/forms", label: "Forms", icon: "card" });
-  if (plugins.prayer) browse.push({ href: "/prayer", label: "Prayer", icon: "hands" });
-  if (plugins.groups) browse.push({ href: "/groups", label: "Small groups", icon: "people" });
+  if (plugins.forms) browse.push({ href: "/forms", label: t.forms, icon: "card" });
+  if (plugins.prayer) browse.push({ href: "/prayer", label: t.prayer, icon: "hands" });
+  if (plugins.groups) browse.push({ href: "/groups", label: t.groups, icon: "people" });
 
   const library: NavItem[] = categories.map((category) => ({
     href: `/categories/${category.slug}`,
@@ -117,32 +124,32 @@ export const getShellNav = cache(async (): Promise<ShellNav> => {
   const mine: NavItem[] = [];
   if (user) {
     if (plugins["watch-history"]) {
-      mine.push({ href: "/recently-played", label: "Recently played", icon: "clock" });
+      mine.push({ href: "/recently-played", label: t.recentlyPlayed, icon: "clock" });
     }
-    if (plugins.favorites) mine.push({ href: "/favorites", label: "Favorites", icon: "star" });
+    if (plugins.favorites) mine.push({ href: "/favorites", label: t.favorites, icon: "star" });
     if (plugins["watch-later"]) {
-      mine.push({ href: "/watch-later", label: "Watch later", icon: "sparkle" });
+      mine.push({ href: "/watch-later", label: t.watchLater, icon: "sparkle" });
     }
-    if (plugins.playlists) mine.push({ href: "/playlists", label: "Playlists", icon: "playlist" });
+    if (plugins.playlists) mine.push({ href: "/playlists", label: t.playlists, icon: "playlist" });
     if (plugins.subscriptions) {
-      mine.push({ href: "/subscriptions", label: "Subscriptions", icon: "bell" });
+      mine.push({ href: "/subscriptions", label: t.subscriptions, icon: "bell" });
     }
     if (plugins.downloads) {
-      mine.push({ href: "/profile/downloads", label: "Downloads", icon: "download" });
+      mine.push({ href: "/profile/downloads", label: t.downloads, icon: "download" });
     }
     if (plugins.events) {
-      mine.push({ href: "/profile/events", label: "Your events", icon: "ticket" });
+      mine.push({ href: "/profile/events", label: t.yourEvents, icon: "ticket" });
     }
     if (plugins.groups) {
-      mine.push({ href: "/profile/groups", label: "Your groups", icon: "people" });
+      mine.push({ href: "/profile/groups", label: t.yourGroups, icon: "people" });
     }
   }
 
   const sections: NavSection[] = [{ label: null, items: browse }];
-  if (library.length > 0) sections.push({ label: "Library", items: library });
-  if (mine.length > 0) sections.push({ label: "Your library", items: mine });
+  if (library.length > 0) sections.push({ label: t.library, items: library });
+  if (mine.length > 0) sections.push({ label: t.yourLibrary, items: mine });
   if (staff) {
-    sections.push({ label: null, items: [{ href: "/admin", label: "Admin", icon: "shield" }] });
+    sections.push({ label: null, items: [{ href: "/admin", label: t.admin, icon: "shield" }] });
   }
 
   // The tab strip is the installed app's only navigation, so it leads with
@@ -150,12 +157,12 @@ export const getShellNav = cache(async (): Promise<ShellNav> => {
   // inbox lives, hence the badge.
   const tabs: NavItem[] = [{ href: "/", label: "Home", icon: "home", exact: true }];
   if (plugins["watch-history"]) {
-    tabs.push({ href: "/recently-played", label: "Recently played", icon: "clock" });
+    tabs.push({ href: "/recently-played", label: t.recentlyPlayed, icon: "clock" });
   }
-  if (plugins.favorites) tabs.push({ href: "/favorites", label: "Favorites", icon: "star" });
-  tabs.push({ href: "/recently-added", label: "New", icon: "sparkle" });
+  if (plugins.favorites) tabs.push({ href: "/favorites", label: t.favorites, icon: "star" });
+  tabs.push({ href: "/recently-added", label: t.new, icon: "sparkle" });
   if (user) {
-    tabs.push({ href: "/profile", label: "Profile", icon: "person", badge: unreadCount });
+    tabs.push({ href: "/profile", label: t.profile, icon: "person", badge: unreadCount });
   }
 
   // Everything a device may choose between. Ordered as the rail is — the
@@ -163,14 +170,14 @@ export const getShellNav = cache(async (): Promise<ShellNav> => {
   // reads like the app rather than like a list of URLs.
   const tabOptions: NavItem[] = [
     ...browse,
-    { href: "/recently-added", label: "New", icon: "sparkle" },
+    { href: "/recently-added", label: t.new, icon: "sparkle" },
     ...library,
     ...mine,
   ];
   if (user) {
-    tabOptions.push({ href: "/profile", label: "Profile", icon: "person", badge: unreadCount });
+    tabOptions.push({ href: "/profile", label: t.profile, icon: "person", badge: unreadCount });
   }
-  if (staff) tabOptions.push({ href: "/admin", label: "Admin", icon: "shield" });
+  if (staff) tabOptions.push({ href: "/admin", label: t.admin, icon: "shield" });
 
   return {
     branding,

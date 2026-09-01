@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { joinMessage, type JoinState, type Standing } from "@/lib/groups";
+import { format, type Messages } from "@/lib/i18n";
 
 type Request = { id: string; name: string; note: string | null; askedAt: string };
 
@@ -18,10 +19,12 @@ export function GroupPanel({
   slug,
   standing,
   state,
+  t,
 }: {
   slug: string;
   standing: Standing;
   state: JoinState;
+  t: Messages["groups"];
 }) {
   const router = useRouter();
   const [note, setNote] = useState("");
@@ -62,7 +65,7 @@ export function GroupPanel({
   }
 
   async function leave() {
-    if (!window.confirm(standing === "requested" ? "Withdraw your request?" : "Leave this group?")) {
+    if (!window.confirm(standing === "requested" ? t.withdraw : t.leaveGroup)) {
       return;
     }
     const response = await fetch(`/api/groups/${slug}/join`, { method: "DELETE" });
@@ -86,7 +89,7 @@ export function GroupPanel({
       {state === "open" ? (
         <form onSubmit={ask} className="space-y-2 rounded-lg border border-sep p-4">
           <label className="block text-sm">
-            <span className="text-sec">Anything to say to the leader? (optional)</span>
+            <span className="text-sec">{t.anythingToSay}</span>
             <textarea
               rows={2}
               value={note}
@@ -99,7 +102,7 @@ export function GroupPanel({
             disabled={busy}
             className="btn-primary rounded-md px-4 py-2 text-sm text-white disabled:opacity-60"
           >
-            {busy ? "Sending…" : "Ask to join"}
+            {busy ? "…" : t.askToJoin}
           </button>
           {error && <p className="text-xs text-red-600">{error}</p>}
         </form>
@@ -111,7 +114,7 @@ export function GroupPanel({
               onClick={leave}
               className="rounded-md border border-sep px-3 py-1.5 text-sm hover:bg-hover"
             >
-              {standing === "requested" ? "Withdraw" : "Leave the group"}
+              {standing === "requested" ? t.withdraw : t.leaveGroup}
             </button>
           )}
         </div>
@@ -121,8 +124,10 @@ export function GroupPanel({
         <section className="space-y-2">
           <h2 className="text-sm font-semibold text-ink">
             {requests.length === 0
-              ? "Nobody is waiting"
-              : `${requests.length} ${requests.length === 1 ? "person has" : "people have"} asked to join`}
+              ? t.nobodyWaiting
+              : requests.length === 1
+                ? t.onePersonAsked
+                : format(t.peopleAsked, { count: requests.length })}
           </h2>
           {requests.map((request) => (
             <div key={request.id} className="space-y-2 rounded-lg border border-sep p-3">
@@ -133,13 +138,13 @@ export function GroupPanel({
                   onClick={() => answer(request, true)}
                   className="btn-primary rounded-md px-3 py-1.5 text-xs text-white"
                 >
-                  Yes, come along
+                  {t.yesComeAlong}
                 </button>
                 <button
                   onClick={() => answer(request, false)}
                   className="rounded-md border border-sep px-3 py-1.5 text-xs hover:bg-hover"
                 >
-                  Not this one
+                  {t.notThisOne}
                 </button>
               </div>
             </div>

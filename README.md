@@ -662,6 +662,21 @@ See [FEATURES.md](./FEATURES.md) for the full feature list and
   - `sms.ts` (segment counting, number normalising) is split from
     `sms-send.ts` (providers) because the composer shows the cost as you type
     and so ends up in the browser bundle.
+- **Translation is a typed object, not a key-path lookup** (`lib/i18n/`).
+  `Messages` is derived from the English catalogue, so a language file missing
+  or misspelling a key fails to compile — completeness needs no test. The test
+  covers what types can't see: a translation that drops a `{placeholder}`,
+  which loses a number from a sentence and still renders.
+  - The chosen locale is a **cookie** as well as a device setting, because
+    these pages are server-rendered and the server cannot read localStorage.
+    Storing it only in the browser would mean every page arriving in the old
+    language and flipping after hydration.
+  - `pickLocale` parses `Accept-Language` with its quality weights and matches
+    regional tags to their base language; it is pure and tested, including the
+    case where the header asks for a language the app doesn't speak.
+  - `device-settings.ts` keeps its own copy of the language list so that the
+    module every page imports to read a preference doesn't pull two catalogues
+    with it; `i18n.test.ts` asserts the copies agree.
 - **A rota lives beside the running order**: `ServiceTeam` / `ServiceTeamMember`
   are the pick-list, `ServiceAssignment` is one ask with its answer, and
   `ServiceBlockout` is when somebody is away. The job is free text on the

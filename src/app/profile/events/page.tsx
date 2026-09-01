@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
 import { eventWhen, listRegistrationsFor } from "@/lib/events";
+import { currentMessages } from "@/lib/i18n/locale";
 import { isPluginEnabled } from "@/lib/plugins";
 
 export const metadata = { title: "Your events" };
@@ -22,6 +23,7 @@ export default async function ProfileEventsPage() {
     return <p className="text-sm text-sec">Events are switched off at the moment.</p>;
   }
 
+  const { t } = await currentMessages();
   const registrations = await listRegistrationsFor(user.id);
   const upcoming = registrations.filter(
     (registration) => (registration.event.endsAt ?? registration.event.startsAt) >= new Date(),
@@ -30,15 +32,15 @@ export default async function ProfileEventsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-ink">Your events</h2>
-        <p className="mt-1 text-sm text-sec">What you&apos;ve signed up for.</p>
+        <h2 className="text-lg font-semibold text-ink">{t.events.yourEvents}</h2>
+        <p className="mt-1 text-sm text-sec">{t.events.yourEventsSubtitle}</p>
       </div>
 
       {upcoming.length === 0 ? (
         <p className="rounded-lg border border-dashed border-sep p-8 text-center text-sm text-sec">
-          You haven&apos;t signed up for anything.{" "}
+          {t.events.notSignedUp}{" "}
           <Link href="/events" className="text-accent hover:underline">
-            See what&apos;s on →
+            {t.events.seeWhatsOn} →
           </Link>
         </p>
       ) : (
@@ -55,7 +57,7 @@ export default async function ProfileEventsPage() {
                   {registration.guests > 0 && ` · bringing ${registration.guests}`}
                 </span>
                 {registration.status === "WAITLIST" && (
-                  <span className="mt-0.5 block text-xs text-ter">On the waiting list.</span>
+                  <span className="mt-0.5 block text-xs text-ter">{t.events.youreWaiting}</span>
                 )}
               </Link>
             </li>
