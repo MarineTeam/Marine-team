@@ -23,6 +23,7 @@ wall it never asked for.
 | `/tv` | the same library, for a remote control |
 | `/link` | signing a television in |
 | `/profile` | your own rota, events, groups, downloads and televisions |
+| `/profile/settings` | how the site behaves for you — and a copy of your data |
 
 | For whoever runs it | |
 | --- | --- |
@@ -284,7 +285,9 @@ unread badge). Five sections:
     selector is disabled), **Autoplay**, and **Default playback speed**.
   - **Account** (applies wherever they log in): display name (Profiles
     plugin), notification frequency and email opt-in (Notifications plugin),
-    and **Delete account**.
+    phone number and announcement consent.
+  - **Your data**: **Download my data**, then **Delete account** — the two
+    halves of the same decision, deliberately next to each other.
 
 Notes on the device settings:
 
@@ -308,6 +311,56 @@ Notes on the device settings:
   the audit-log entry, which stores an email rather than a foreign key. The
   last remaining admin is refused, since that would leave nobody able to
   grant access again.
+
+### Download my data (`GET /api/profile/export`)
+
+One JSON file holding everything the app knows about the member who asked
+for it, saved as `marine-team-<name>-<date>.json`. It is the counterpart to
+deleting an account: leaving shouldn't mean losing four years of sermon notes,
+and "what do you actually hold on me?" deserves an answer that isn't an admin
+running queries by hand.
+
+Not behind a plugin. Every other member-facing feature here can be switched
+off by an admin; this one answers a question a member is entitled to ask, so
+there is no switch for it.
+
+What's in it: the account row and its sign-in methods; favorites, watch later,
+follows, playlists, ratings, reactions and watch history; reading positions,
+highlights and bookmarks; sermon notes and outline answers; comments and the
+reports they filed; teams, rota assignments and unavailable dates; event
+sign-ups; form and connect-card submissions; prayer requests they wrote;
+small groups; notifications and announcements they were sent; live-chat
+messages; push and television devices; share links; and every access grant
+held against their name.
+
+Three rules decide the rest, and they pull against each other:
+
+- **Completeness.** If a row is keyed to the member, it's in the file. A
+  partial export is worse than none, because it looks complete.
+- **Nobody else's data leaves with it.** Most of what a member touches here is
+  shared. So a comment carries `isReply: true` but not the comment above it; a
+  prayer they interceded for is a request id and a date, not somebody's words;
+  a group's address follows `canSeeAddress` from `lib/groups.ts` — the *same
+  function* the group's own page uses, so being on the waiting list gets an
+  area and no house, and the two rules can't drift apart. The moderator who
+  hid a message and the staff member who sent an announcement aren't named.
+- **No live secret goes into a downloaded file.** An export gets emailed to a
+  laptop and forwarded to a solicitor. Web Push keys, television tokens and
+  share-link password hashes are capabilities, not facts, and stay out. Push
+  devices are listed by their push service (`https://fcm.googleapis.com`)
+  rather than the endpoint that would let a reader push to that phone.
+
+Two guards keep it that way. `assertExportSafe` walks the finished document —
+arrays included, since an export is almost all lists — and **throws** rather
+than filtering if a forbidden key appears anywhere: a credential reaching that
+point means a query changed, and stripping it silently would hide that. And a
+test reads `data-export-query.ts` as text, asserting every Prisma call is
+scoped to one `userId` and that the file never uses `include:` — a `findMany`
+that forgets its `where` exports the whole congregation, and does it quietly.
+
+Rate-limited to two exports a minute per member (counted from the audit log,
+which also records each one), since it is the most expensive thing any
+logged-in member can ask for.
 
 ## Share links
 

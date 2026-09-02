@@ -6,6 +6,21 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Download my data** (`GET /api/profile/export`). A member can take one JSON
+  file holding everything the app knows about them — notes, highlights,
+  comments, sign-ups, prayer requests, playlists, watch history, messages,
+  devices, share links and access grants — from **Profile → Settings → Your
+  data**, next to Delete account. Nobody else's words travel with it: a reply
+  to their comment, the text of a prayer they interceded for, a group address
+  they only asked for, and the names of moderators and senders all stay out.
+  Neither do live secrets — push keys, television tokens and share-link
+  password hashes. `assertExportSafe` throws rather than filtering if one
+  appears, and a source-level test holds every query in the file to one
+  `userId`. Two exports a minute per member; each is audit-logged. Not behind
+  a plugin: it answers a question a member is entitled to ask.
+
 ## [2.0.0] - 2026-09-03
 
 The release this app stops being a video library and starts being the thing a
