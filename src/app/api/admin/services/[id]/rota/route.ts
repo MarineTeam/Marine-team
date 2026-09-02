@@ -41,6 +41,11 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         note: row.note,
         personName: personName(row.user),
         teamName: row.team.name,
+        // The organiser's two questions about a swap: is anybody still needed
+        // for this, and who is actually turning up now.
+        coverWanted: row.coverWanted,
+        coverNote: row.coverNote,
+        coveredFor: row.coveredFor ? personName(row.coveredFor) : null,
         away: isBlockedOut(
           blockouts.filter((away) => away.userId === row.userId),
           plan.serviceDate,

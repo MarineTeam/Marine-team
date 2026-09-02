@@ -169,6 +169,7 @@ model User {
   outlineAnswers        SermonOutlineAnswer[]
   serviceTeams          ServiceTeamMember[]
   serviceAssignments    ServiceAssignment[]
+  coveredForAssignments ServiceAssignment[]   @relation("AssignmentCoveredFor")
   serviceBlockouts      ServiceBlockout[]
   /// The name this account appears under on a rota, when they are the same
   /// person — see Person.
@@ -770,9 +771,27 @@ model ServiceAssignment {
   /// Why they said no, in their words.
   note        String?
   respondedAt DateTime?
-  createdAt   DateTime         @default(now())
+
+  /// Set when whoever is on has asked somebody else to take it.
+  ///
+  /// A flag on the assignment rather than a swap record of its own: what is
+  /// being asked for is *this slot*, and covering it means the slot changes
+  /// hands. A separate table would have to be kept in step with the thing it
+  /// describes, and the state it would hold is one boolean.
+  coverWanted  Boolean   @default(false)
+  /// What they said when they asked — "away that weekend", "will know Friday".
+  coverNote    String?
+  coverAskedAt DateTime?
+  /// Who had it before somebody covered, kept so the rota still shows what
+  /// happened rather than quietly reading as though they were never on.
+  coveredForId String?
+  coveredFor   User?     @relation("AssignmentCoveredFor", fields: [coveredForId], references: [id], onDelete: SetNull)
+  coveredAt    DateTime?
+
+  createdAt DateTime @default(now())
 
   @@unique([planId, userId, position])
+  @@index([teamId, coverWanted])
   @@index([planId])
   @@index([userId, status])
 }

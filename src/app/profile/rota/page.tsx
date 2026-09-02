@@ -3,6 +3,8 @@ import { getCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/db";
 import { isPluginEnabled } from "@/lib/plugins";
 import { assignmentRole, getMyAssignments } from "@/lib/rota";
+import { askerName, canAskForCover } from "@/lib/cover";
+import { openCoverRequests } from "@/lib/cover-query";
 import { RotaPanel } from "@/components/rota-panel";
 
 export const metadata = { title: "Your rota" };
@@ -22,10 +24,16 @@ export default async function RotaPage() {
     return <p className="text-sm text-sec">Service plans are switched off at the moment.</p>;
   }
 
-  const [assignments, blockouts] = await Promise.all([
+  const [assignments, blockouts, coverRequests] = await Promise.all([
     getMyAssignments(user.id),
     prisma.serviceBlockout.findMany({ where: { userId: user.id }, orderBy: { startDate: "asc" } }),
+    openCoverRequests(user.id),
   ]);
+
+  // Dates are written out on the server throughout: one formatted in the
+  // browser can differ from the one on the service page beside it.
+  const day = (date: Date | null) =>
+    date ? date.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }) : null;
 
   return (
     <div className="space-y-6">
@@ -44,16 +52,21 @@ export default async function RotaPage() {
           note: item.note,
           planId: item.plan.id,
           planTitle: item.plan.title,
-          // Written out on the server: a date formatted in the browser can
-          // differ from the one on the service page beside it.
-          day: item.plan.serviceDate
-            ? item.plan.serviceDate.toLocaleDateString("en-GB", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-              })
-            : null,
+          day: day(item.plan.serviceDate),
           published: item.plan.published,
+          coverWanted: item.coverWanted,
+          coverNote: item.coverNote,
+          // The same rule the API applies, asked here so the button only
+          // appears where pressing it would work.
+          coverable: canAskForCover(item, user.id) === "ok" || item.coverWanted,
+        }))}
+        coverRequests={coverRequests.map((request) => ({
+          id: request.id,
+          role: assignmentRole(request),
+          planTitle: request.plan.title,
+          day: day(request.plan.serviceDate),
+          askedBy: askerName(request.user),
+          note: request.coverNote,
         }))}
         blockouts={blockouts.map((item) => ({
           id: item.id,

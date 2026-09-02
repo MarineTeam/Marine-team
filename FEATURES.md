@@ -926,6 +926,37 @@ A daily job tells people what they are on for tomorrow, one message however
 many rotas they are on — through this app's existing push, email and profile
 inbox rather than a second notification stack.
 
+### When somebody can't make it
+
+The rota models an ask and an answer. What it had no word for is the thing that
+happens most often *after* a yes: something comes up. Without one, the whole
+exchange goes to text message and the rota keeps saying somebody will be there
+who won't.
+
+- **"Ask someone to cover this"** puts the slot in front of the rest of that
+  team — and nobody else, because a cover request is addressed to the people who
+  could do the job. Everyone on the team is told once.
+- **Somebody unanswered can ask too.** "I've been asked and I can't — does
+  anyone else want it?" is a real thing to say, and making them accept first in
+  order to hand it on would be a step that exists only to satisfy a state
+  machine. Somebody who has already *declined* can't: there is nothing to cover.
+- **The slot changes hands, once.** Two people pressing "I'll take it" in the
+  same second is not rare on a Sunday morning, so the write is conditional on
+  the slot still being open *and* still being held by the person who asked —
+  one winner, and the other is told somebody beat them rather than both being
+  thanked.
+- **A volunteer who marked themselves away is warned, not refused.** They have
+  almost certainly changed their plans, and a rota that argues with the person
+  offering to help is a rota nobody helps with. Being already on that service
+  *is* a refusal, with the reason said plainly rather than a caught database
+  constraint.
+- **The rota remembers whose it was.** The organiser's page shows *needs cover*
+  against an open request and *covering for X* once somebody has stepped in, so
+  a swap reads as a swap rather than as the name quietly changing.
+- **The old note doesn't follow the slot.** It was the previous person's aside
+  to the organiser, and carrying it onto somebody else's acceptance would put
+  words in their mouth.
+
 That has a consequence worth stating plainly: **somebody on a rota with no
 account gets no reminder.** The calendar app reached them through anonymous
 per-device subscriptions; this app's push is keyed to an account. Linking a

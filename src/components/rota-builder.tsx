@@ -19,6 +19,11 @@ type Assignment = {
   teamName: string;
   /** Whether this person said they're away on the day — see ServiceBlockout. */
   away: boolean;
+  /** They've asked their team to take this one; nobody has yet. */
+  coverWanted: boolean;
+  coverNote: string | null;
+  /** Set once somebody took it: who it was originally asked of. */
+  coveredFor: string | null;
 };
 
 function label(person: Person): string {
@@ -136,6 +141,15 @@ export function RotaBuilder({ planId }: { planId: string }) {
                   {STATUS_TEXT[row.status]}
                   {row.note && ` — ${row.note}`}
                 </span>
+                {/* Two different facts, and an organiser needs both: somebody
+                    is still needed for this one, or somebody already stepped
+                    in and the name above is not who was first asked. */}
+                {row.coverWanted && (
+                  <span className="block text-amber-600">
+                    needs cover{row.coverNote && ` — ${row.coverNote}`}
+                  </span>
+                )}
+                {row.coveredFor && <span className="block text-sec">covering for {row.coveredFor}</span>}
               </span>
               <button
                 onClick={() => void remove(row.id)}

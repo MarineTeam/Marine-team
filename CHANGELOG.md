@@ -31,6 +31,13 @@ All notable changes to this project are documented here. Format follows
   one date sticks, editing never rewrites the past, changing the timing leaves
   booked dates where they are, and stopping a series never deletes a date
   somebody has signed up for.
+- **Rota cover.** Somebody who can't make a service they're on can ask their
+  team to take it, from `/profile/rota`; everyone on that team is told, and the
+  first to take it gets the slot. The hand-over is a conditional write, so two
+  people taking it at once produces one winner and one honest "somebody has
+  already taken this". A volunteer who had marked themselves away is warned and
+  may go ahead; one already on that service is refused with the reason. The
+  organiser's page shows *needs cover* and *covering for X*.
 - **Calendar exports.** Three `.ics` feeds: one event (`Add to my calendar` on
   its page), a public **what's on** feed to subscribe to, and a member's own
   diary — rota, sign-ups and the dates a rota names them on — behind a token

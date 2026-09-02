@@ -44,6 +44,7 @@ export const getPlanAssignments = cache(async function getPlanAssignments(planId
     include: {
       team: { select: { id: true, name: true, position: true } },
       user: { select: { id: true, name: true, displayName: true, email: true } },
+      coveredFor: { select: { name: true, displayName: true, email: true } },
     },
     orderBy: [{ team: { position: "asc" } }, { position: "asc" }],
   });
