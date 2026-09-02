@@ -3,7 +3,7 @@ import { errorResponse } from "@/lib/api-guard";
 import { getCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/db";
 import { canLead, standingIn } from "@/lib/groups";
-import { pendingRequests, viewerFor } from "@/lib/groups-query";
+import { groupWaitingList, pendingRequests, viewerFor } from "@/lib/groups-query";
 
 /**
  * Who has asked to join, for the leader of this group.
@@ -25,7 +25,10 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ sl
     if (!canLead(standingIn(group.members, viewer), viewer)) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    return NextResponse.json({ requests: await pendingRequests(group.id) });
+    // Both lists in one answer: they are the same question — who wants in —
+    // asked of two states, and a leader looking at one wants to see the other.
+    const [requests, waiting] = await Promise.all([pendingRequests(group.id), groupWaitingList(group.id)]);
+    return NextResponse.json({ requests, waiting });
   } catch (error) {
     return errorResponse(error);
   }

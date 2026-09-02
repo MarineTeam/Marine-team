@@ -13,6 +13,7 @@ export type EditableGroup = {
   published: boolean;
   openToJoin: boolean;
   capacity: number | null;
+  waitlist: boolean;
 };
 
 type Member = {
@@ -170,6 +171,14 @@ export function GroupEditor({ group: initial }: { group: EditableGroup }) {
             onChange={(v) => {
               setGroup({ ...group, openToJoin: v });
               save({ openToJoin: v });
+            }}
+          />
+          <Toggle
+            label="Waiting list when full"
+            checked={group.waitlist}
+            onChange={(v) => {
+              setGroup({ ...group, waitlist: v });
+              save({ waitlist: v });
             }}
           />
         </div>

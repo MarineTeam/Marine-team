@@ -53,13 +53,17 @@ export default async function GroupsPage() {
                     ? t.groups.youreIn
                     : group.standing === "requested"
                       ? t.groups.youveAsked
-                      : group.joinState === "full"
-                        ? t.events.full
-                        : group.joinState === "closed"
-                          ? t.groups.notTakingNew
-                          : group.memberCount === 1
-                            ? t.groups.onePerson
-                            : format(t.groups.people, { count: group.memberCount })}
+                      : group.standing === "waitlisted"
+                        ? t.groups.youreWaiting
+                        : group.joinState === "full"
+                          ? t.events.full
+                          : group.joinState === "waitlist"
+                            ? t.groups.fullTakingNames
+                            : group.joinState === "closed"
+                              ? t.groups.notTakingNew
+                              : group.memberCount === 1
+                                ? t.groups.onePerson
+                                : format(t.groups.people, { count: group.memberCount })}
                 </span>
               </Link>
             </li>

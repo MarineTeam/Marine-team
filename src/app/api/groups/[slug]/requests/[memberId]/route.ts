@@ -4,7 +4,7 @@ import { errorResponse } from "@/lib/api-guard";
 import { getCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/db";
 import { activeMembers, canLead, standingIn } from "@/lib/groups";
-import { viewerFor } from "@/lib/groups-query";
+import { promoteFromWaitlist, viewerFor } from "@/lib/groups-query";
 import { notifySubscribers } from "@/lib/push";
 
 const patchSchema = z.object({ accept: z.boolean() });
@@ -42,6 +42,11 @@ export async function PATCH(
       where: { id: memberId },
       data: { status: accept ? "ACTIVE" : "DECLINED", respondedAt: new Date() },
     });
+
+    // A no gives the place back. An unanswered request holds one (see
+    // placesLeft), so without this a declined ask would keep a place shut for
+    // good and the waiting list would never move again.
+    if (!accept) await promoteFromWaitlist(group.id);
 
     // Only a yes is a notification. A no is a conversation, and a push saying
     // "you were turned down" is the wrong way for anybody to hear it.

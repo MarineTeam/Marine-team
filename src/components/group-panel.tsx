@@ -31,13 +31,18 @@ export function GroupPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [requests, setRequests] = useState<Request[]>([]);
+  const [waiting, setWaiting] = useState<Request[]>([]);
 
   const leads = standing === "leader";
 
   const loadRequests = useCallback(async () => {
     if (!leads) return;
     const response = await fetch(`/api/groups/${slug}/requests`);
-    if (response.ok) setRequests((await response.json()).requests);
+    if (response.ok) {
+      const data = (await response.json()) as { requests: Request[]; waiting: Request[] };
+      setRequests(data.requests);
+      setWaiting(data.waiting);
+    }
   }, [leads, slug]);
 
   useEffect(() => {
@@ -86,7 +91,7 @@ export function GroupPanel({
 
   return (
     <div className="space-y-4">
-      {state === "open" ? (
+      {state === "open" || state === "waitlist" ? (
         <form onSubmit={ask} className="space-y-2 rounded-lg border border-sep p-4">
           <label className="block text-sm">
             <span className="text-sec">{t.anythingToSay}</span>
@@ -102,19 +107,19 @@ export function GroupPanel({
             disabled={busy}
             className="btn-primary rounded-md px-4 py-2 text-sm text-white disabled:opacity-60"
           >
-            {busy ? "…" : t.askToJoin}
+            {busy ? "…" : state === "waitlist" ? t.putNameDown : t.askToJoin}
           </button>
           {error && <p className="text-xs text-red-600">{error}</p>}
         </form>
       ) : (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-sep p-4">
           <p className="text-sm text-sec">{joinMessage(state)}</p>
-          {(standing === "member" || standing === "requested") && (
+          {(standing === "member" || standing === "requested" || standing === "waitlisted") && (
             <button
               onClick={leave}
               className="rounded-md border border-sep px-3 py-1.5 text-sm hover:bg-hover"
             >
-              {standing === "requested" ? t.withdraw : t.leaveGroup}
+              {standing === "requested" || standing === "waitlisted" ? t.withdraw : t.leaveGroup}
             </button>
           )}
         </div>
@@ -149,6 +154,25 @@ export function GroupPanel({
               </div>
             </div>
           ))}
+        </section>
+      )}
+
+      {leads && waiting.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold text-ink">
+            {waiting.length === 1 ? t.onePersonWaiting : format(t.peopleWaiting, { count: waiting.length })}
+          </h2>
+          {/* Names only, and no Yes button: there is no place to give them
+              yet. A place opening moves the longest-waiting one into the list
+              above, where the leader can answer it. */}
+          <ol className="divide-y divide-sep rounded-lg border border-sep">
+            {waiting.map((person) => (
+              <li key={person.id} className="px-3 py-2">
+                <p className="text-sm text-ink">{person.name}</p>
+                {person.note && <p className="text-xs whitespace-pre-wrap text-sec">{person.note}</p>}
+              </li>
+            ))}
+          </ol>
         </section>
       )}
     </div>

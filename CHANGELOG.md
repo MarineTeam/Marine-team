@@ -31,6 +31,13 @@ All notable changes to this project are documented here. Format follows
   one date sticks, editing never rewrites the past, changing the timing leaves
   booked dates where they are, and stopping a series never deletes a date
   somebody has signed up for.
+- **Small-group waiting lists.** A full group takes names in order instead of
+  closing the door, and a place opening — somebody leaving, a leader removing
+  somebody, or the capacity being raised — moves the longest-waiting person to a
+  *request* in front of the leader, never straight into the group: the leader's
+  yes is what a home address travels with. Promotion runs under the group's row
+  lock, so one free place reaches one person. An unanswered request now holds a
+  place (and a "no" gives it back), which changes what `joinState` calls full.
 - **Rota cover.** Somebody who can't make a service they're on can ask their
   team to take it, from `/profile/rota`; everyone on that team is told, and the
   first to take it gets the slot. The hand-over is a conditional write, so two

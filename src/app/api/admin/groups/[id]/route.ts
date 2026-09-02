@@ -3,6 +3,7 @@ import { z } from "zod";
 import { errorResponse } from "@/lib/api-guard";
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { promoteFromWaitlist } from "@/lib/groups-query";
 import { ensureCapability, ensureStaff } from "@/lib/permissions";
 import { getDisplayName } from "@/lib/profile";
 import { slugify } from "@/lib/slug";
@@ -17,6 +18,7 @@ const patchSchema = z.object({
   published: z.boolean().optional(),
   openToJoin: z.boolean().optional(),
   capacity: z.number().int().min(0).max(1000).nullish(),
+  waitlist: z.boolean().optional(),
 });
 
 export async function GET(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -62,10 +64,17 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       where: { id },
       data: { ...body, slug: body.slug ? slugify(body.slug) || undefined : undefined },
     });
+    // Raising the capacity is the other way a place appears, so the waiting
+    // list is offered it here as well as when somebody leaves. Called
+    // unconditionally: it works out for itself whether there is room, and
+    // "did this edit raise it" is a question with a wrong answer when two
+    // admins are editing.
+    const promoted = await promoteFromWaitlist(group.id);
+
     // The address is never written to the audit log: that log is read by more
     // people than the group is.
     await logAudit(user.email, "update", "small-group", group.id, group.name);
-    return NextResponse.json({ group });
+    return NextResponse.json({ group, promoted });
   } catch (error) {
     return errorResponse(error);
   }
