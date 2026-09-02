@@ -31,6 +31,14 @@ All notable changes to this project are documented here. Format follows
   one date sticks, editing never rewrites the past, changing the timing leaves
   booked dates where they are, and stopping a series never deletes a date
   somebody has signed up for.
+- **Calendar exports.** Three `.ics` feeds: one event (`Add to my calendar` on
+  its page), a public **what's on** feed to subscribe to, and a member's own
+  diary — rota, sign-ups and the dates a rota names them on — behind a token
+  they make at `/profile/settings` and can replace or stop. A declined rota date
+  is written `STATUS:CANCELLED` rather than omitted, all-day events end on the
+  following day (DTEND is exclusive), and lines fold at 75 **octets** without
+  splitting a character. The feed token is on the data export's forbidden-key
+  list, so it can never travel in a downloaded file.
 - `lib/recurrence.ts`: an RFC 5545 RRULE subset — parse, expand, describe, and
   wall-clock-to-instant — refusing at parse time any rule part it cannot
   compute, rather than ignoring it and answering with the wrong dates.

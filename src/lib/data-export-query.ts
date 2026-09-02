@@ -373,6 +373,12 @@ export async function buildExport(user: User, at = new Date()) {
       updatedAt: iso(user.updatedAt),
       /** The name this account appears under on a rota, when it has one. */
       rotaName: person?.displayName ?? null,
+      /**
+       * Whether a calendar-feed link exists — not the link itself. The token in
+       * it is the whole of that feed's authentication, so it belongs in the
+       * settings page that can replace it and nowhere else.
+       */
+      calendarLinkActive: user.calendarToken !== null,
     },
 
     signInMethods: identities.map((row) => ({

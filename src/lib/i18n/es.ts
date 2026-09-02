@@ -51,6 +51,8 @@ export const es: Messages = {
     title: "Eventos",
     subtitle: "Qué hay, y cómo apuntarse.",
     nothingComingUp: "No hay nada próximamente.",
+    subscribeToCalendar: "Suscribirse en tu calendario",
+    addToCalendar: "Añadir a mi calendario",
     signUpOpen: "Inscripción abierta",
     signUpClosed: "Inscripción cerrada",
     signUpNotOpen: "La inscripción aún no está abierta",

@@ -39,8 +39,9 @@ export const EXPORT_FORMAT_VERSION = 1;
  * Key names that must never appear in an export at any depth.
  *
  * These are the columns that are *credentials*, not facts: the Web Push pair
- * that lets the holder push to a browser, the hashes behind a share-link
- * passphrase and a television's sign-in, and the moderator names attached to
+ * that lets the holder push to a browser, the secret in a personal calendar
+ * feed's URL, the hashes behind a share-link passphrase and a television's
+ * sign-in, and the moderator names attached to
  * decisions taken about this member (`mutedBy`, `moderatedBy`, `handledBy`) or
  * about something sent to them (`createdBy`) — the decision is theirs to see,
  * the name of the staff member who took it is not.
@@ -57,6 +58,7 @@ export const FORBIDDEN_KEYS: readonly string[] = [
   "secret",
   "tokenHash",
   "deviceCodeHash",
+  "calendarToken",
   "mutedBy",
   "moderatedBy",
   "handledBy",

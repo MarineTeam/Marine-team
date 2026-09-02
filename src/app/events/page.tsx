@@ -25,6 +25,13 @@ export default async function EventsPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-ink">{t.events.title}</h1>
         <p className="mt-1 text-sm text-sec">{t.events.subtitle}</p>
+        <p className="mt-2 text-sm">
+          {/* A plain link, not a button: subscribing is the browser's job, and
+              a phone offered an .ics URL knows what to do with it. */}
+          <a href="/events/calendar.ics" className="text-accent hover:underline">
+            {t.events.subscribeToCalendar}
+          </a>
+        </p>
       </div>
 
       {events.length === 0 ? (

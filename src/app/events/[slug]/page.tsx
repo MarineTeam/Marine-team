@@ -111,6 +111,14 @@ export default async function EventPage(props: { params: Promise<{ slug: string 
         </div>
       )}
 
+      {!event.memberOnly && (
+        <p className="text-sm">
+          <a href={`/events/${event.slug}/event.ics`} className="text-accent hover:underline">
+            {t.events.addToCalendar}
+          </a>
+        </p>
+      )}
+
       <EventSignup
         slug={event.slug}
         state={state}

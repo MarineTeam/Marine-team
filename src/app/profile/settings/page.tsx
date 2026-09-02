@@ -7,6 +7,8 @@ import { DeviceSettingsForm } from "@/components/device-settings-form";
 import { BottomNavEditor } from "@/components/bottom-nav-editor";
 import { DeleteAccount } from "@/components/delete-account";
 import { DownloadMyData } from "@/components/download-my-data";
+import { CalendarSubscription } from "@/components/calendar-subscription";
+import { siteUrl } from "@/lib/seo";
 import { SignInMethods } from "@/components/sign-in-methods";
 
 /**
@@ -79,8 +81,11 @@ export default async function ProfileSettingsPage() {
       <section className="space-y-3 border-t border-sep pt-6">
         <div>
           <h2 className="text-lg font-semibold text-ink">Your data</h2>
-          <p className="mt-1 text-sm text-sec">Take a copy, or close the account for good.</p>
+          <p className="mt-1 text-sm text-sec">Put your diary in your calendar, take a copy, or close the account for good.</p>
         </div>
+        <CalendarSubscription
+          initialUrl={user.calendarToken ? siteUrl(`/api/calendar/${user.calendarToken}/marine-team.ics`) : null}
+        />
         <DownloadMyData />
         <DeleteAccount email={user.email} />
       </section>

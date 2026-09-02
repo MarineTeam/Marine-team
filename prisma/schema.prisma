@@ -149,6 +149,11 @@ model User {
   /// turned off "a new sermon is up" has not asked to miss "no service
   /// tomorrow, the road is closed".
   broadcastEmails       Boolean               @default(true)
+  /// The secret in this member's personal calendar-feed URL, or null until
+  /// they ask for one. A calendar app cannot log in, so the URL is the
+  /// credential — which is why it is generated on request, shown once in the
+  /// place that generates it, and replaced rather than repaired if it leaks.
+  calendarToken         String?               @unique
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
   pendingNotifications  PendingNotification[]

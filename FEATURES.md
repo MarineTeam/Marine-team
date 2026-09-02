@@ -1012,6 +1012,46 @@ lands on the right one.
   dates as links — somebody who has just missed one wants to know when the next
   is more than anything else on that page.
 
+### In your own calendar (`.ics`)
+
+Everything this app knows the date of can be read by Google Calendar, Outlook,
+Apple Calendar and every phone. Three feeds, each with a different answer to
+"who is this for":
+
+- **One event** — `Add to my calendar` on its page, at
+  `/events/<slug>/event.ics`. A members-only event refuses this outright rather
+  than gating it on a session: the URL is opened by a calendar application, and
+  there is nobody there to check.
+- **What's on** — `/events/calendar.ics`, a public feed to subscribe to once.
+  Member-only events are absent for the same reason.
+- **Your own diary** — what you're serving at, what you've signed up for, and
+  the dates a rota names you on, at
+  `/api/calendar/<token>/marine-team.ics`. Made on request from
+  `/profile/settings`, and **the token in the URL is the whole of the
+  authentication**, because a calendar app cannot log in. So: nobody has one
+  until they ask, it can be **replaced** (which stops every calendar following
+  the old link) or **stopped**, it is never cached by a shared cache, it carries
+  `X-Robots-Tag: noindex`, and it is on the export's forbidden-key list so it
+  can never travel in a downloaded file.
+
+Details that decide whether a calendar shows the right thing:
+
+- **A declined rota date is written as `STATUS:CANCELLED`, not left out.**
+  Omitting it would leave the entry sitting on the phone of the one person who
+  already said no.
+- **An all-day event's `DTEND` is the following day**, because DTEND is
+  exclusive — writing the same day is what makes all-day events vanish from
+  month view in some clients.
+- **A repeating event is one entry per date, not one `RRULE`.** That matches how
+  it is stored — each date is a real event with its own place count and its own
+  page — and a cancelled week is simply absent, with no `EXDATE` list to keep in
+  step. `RELATED-TO` groups them.
+- **Lines fold at 75 octets without splitting a character.** Octets, not
+  characters: cutting between the bytes of an em dash produces a black diamond
+  halfway through a word, which a calendar shows rather than rejecting.
+- **A sign-up on the waiting list says so** in its title, which is exactly the
+  thing somebody forgets between signing up and the day.
+
 Not yet: `CalendarEvent` (the rota side) still carries `recurrenceRule` and
 `recurrenceEndDate` columns that nothing reads. The core they need now exists;
 wiring it up means deciding how expanded dates travel through the offline

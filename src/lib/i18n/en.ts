@@ -55,6 +55,9 @@ export const en = {
     title: "Events",
     subtitle: "What's on, and how to sign up.",
     nothingComingUp: "Nothing coming up.",
+    subscribeToCalendar: "Subscribe in your calendar",
+    addToCalendar: "Add to my calendar",
+
     signUpOpen: "Sign-up open",
     signUpClosed: "Sign-up closed",
     signUpNotOpen: "Sign-up not open yet",
