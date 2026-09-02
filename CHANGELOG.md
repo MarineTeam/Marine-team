@@ -21,6 +21,20 @@ All notable changes to this project are documented here. Format follows
   `userId`. Two exports a minute per member; each is audit-logged. Not behind
   a plugin: it answers a question a member is entitled to ask.
 
+- **Recurring events.** A weekly Bible study is now a rule set up once at
+  `/admin/events` rather than twelve events typed twelve times, kept filled in
+  six months ahead by a daily job. A series is not itself an event: every date
+  is an ordinary `Event` row with its own slug, capacity and sign-up list, and
+  its URL says which week it is for. The form offers the five repeats a church
+  diary contains and shows the rule back as a sentence before saving; times are
+  a wall clock and a zone, so 19:30 stays 19:30 across a clock change. Removing
+  one date sticks, editing never rewrites the past, changing the timing leaves
+  booked dates where they are, and stopping a series never deletes a date
+  somebody has signed up for.
+- `lib/recurrence.ts`: an RFC 5545 RRULE subset — parse, expand, describe, and
+  wall-clock-to-instant — refusing at parse time any rule part it cannot
+  compute, rather than ignoring it and answering with the wrong dates.
+
 ## [2.0.0] - 2026-09-03
 
 The release this app stops being a video library and starts being the thing a

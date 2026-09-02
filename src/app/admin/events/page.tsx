@@ -1,4 +1,5 @@
 import { EventsManager } from "@/components/events-manager";
+import { SeriesManager } from "@/components/series-manager";
 import { isPluginEnabled } from "@/lib/plugins";
 
 /**
@@ -23,6 +24,7 @@ export default async function AdminEventsPage() {
           </p>
         )}
       </div>
+      <SeriesManager />
       <EventsManager />
     </div>
   );

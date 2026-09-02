@@ -15,7 +15,7 @@ wall it never asked for.
 | `/search` | one search across titles, descriptions, transcripts and hymn text |
 | `/services` | the running order for a service, and the hymns in it |
 | `/calendar` | the rota, for people with no account |
-| `/events` | what's on, and signing up |
+| `/events` | what's on, and signing up (including things that repeat) |
 | `/forms` | connect cards and sign-up forms |
 | `/prayer` | the prayer wall |
 | `/groups` | small groups |
@@ -961,6 +961,61 @@ What's on, at `/events`, and who is coming.
 - **Organisers get the list**, on screen and as a CSV for the door, a
   mail-merge or a spreadsheet — with a column saying who is a member, which is
   the one thing the sign-up form didn't ask.
+
+### Something that repeats
+
+A weekly Bible study used to be twelve events typed twelve times. Now it is a
+rule, set up at `/admin/events`, kept filled in six months ahead by a daily job.
+
+**A series is not itself an event.** Every date it produces is an ordinary
+`Event` row with its own slug, capacity and sign-up list, because "is there a
+place for me on the 14th" is a different question from "is there a place on the
+21st" and only a real row can answer both. The occurrence's URL says which week
+it is for — `/events/prayer-meeting-2026-01-06` — so a link in a newsletter
+lands on the right one.
+
+- **The rule is real RRULE** (`FREQ=WEEKLY;BYDAY=TU`), the syntax every calendar
+  exports, but nobody types it: the form offers the five repeats a church diary
+  actually contains — weekly on chosen days, daily, monthly on the same date,
+  monthly on the nth weekday, monthly on the last weekday — and the monthly ones
+  read their weekday off the first date rather than asking twice. What it comes
+  to is shown back as a sentence ("Every month on the last Saturday") before it
+  is saved, because `FREQ=MONTHLY;BYDAY=-1SA` is not something anybody should
+  have to read to check they picked the right one.
+- **Times are a wall clock and a zone, not instants.** "Tuesdays at 19:30" is
+  19:30 in January and in July; a series expanded as instants loses an hour
+  every March. The hour that never happens on the morning the clocks go forward
+  resolves forward, to when people actually arrive, and the hour that happens
+  twice in October resolves to the first of them. See `lib/recurrence.ts`.
+- **The sign-up window moves with each date.** Stored as "opens 14 days before,
+  closes 2 days before" rather than as two instants — copying one pair onto
+  every date would close December's sign-up in September.
+- **Removing one date sticks.** The date goes onto the series' exclusion list in
+  the same transaction as the event is deleted, so tonight's generator doesn't
+  see the gap in the rule and put the cancelled meeting straight back.
+- **Editing never rewrites the past.** A title corrected in March renames every
+  date still to come and leaves February's alone — that is what happened, and a
+  diary that revises it is a worse record than a paper one.
+- **Changing the timing leaves booked dates where they are.** Empty future dates
+  are cleared out and laid down again from the new rule; a date somebody has
+  signed up for stays put, listed under the series, so the organiser can see
+  which ones didn't move and ring round. Moving a meeting somebody has booked is
+  a conversation, not a database write.
+- **Stopping a series never deletes somebody's place.** Future dates with nobody
+  down for them are removed; anything past, and anything with a sign-up on it,
+  survives as an ordinary one-off event. A sign-up is a promise to a person, and
+  unscheduling is not a way to break it.
+- **Generating is idempotent**, so the daily job, a missed run and an admin
+  pressing save all produce one diary. A unique index on (series, date) is the
+  backstop; the generator asking what already exists is what stops it firing.
+- **Members see it on the event page**: the series in words, and the next few
+  dates as links — somebody who has just missed one wants to know when the next
+  is more than anything else on that page.
+
+Not yet: `CalendarEvent` (the rota side) still carries `recurrenceRule` and
+`recurrenceEndDate` columns that nothing reads. The core they need now exists;
+wiring it up means deciding how expanded dates travel through the offline
+snapshot's delta sync, which is a separate piece of work.
 
 ## Forms and connect cards
 

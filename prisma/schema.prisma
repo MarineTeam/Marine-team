@@ -2048,12 +2048,86 @@ model Event {
   /// How many extra people one registration may bring. 0 means just yourself.
   maxGuests    Int       @default(0)
 
+  /// The repeating thing this is one date of, when it is one. Null for the
+  /// one-off events that most of them are.
+  ///
+  /// `SetNull` rather than `Cascade`, deliberately: an occurrence is a real
+  /// event with real names on it, and stopping a series repeating must never
+  /// be a way to delete somebody's place. Detaching leaves what was booked
+  /// exactly where it was.
+  series         EventSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  seriesId       String?
+  /// Which of the series' dates this is. Kept as a plain calendar day, which
+  /// is what the rule produces, so regenerating can tell what already exists
+  /// without recomputing every timezone conversion.
+  occurrenceDate DateTime?    @db.Date
+
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
   registrations EventRegistration[]
 
+  @@unique([seriesId, occurrenceDate])
   @@index([published, startsAt])
   @@index([startsAt])
+}
+
+/// A repeating event: the rule, and the template each date is made from.
+///
+/// A series is not itself an event. That is the whole design: every date a
+/// series produces is an ordinary `Event` row with its own slug, its own
+/// capacity and its own sign-up list, because "is there a place for me on the
+/// 14th" is a different question from "is there a place for me on the 21st".
+/// Modelling the series as the first event instead — which the calendar port's
+/// `CalendarEvent.parentEventId` does — makes deleting the first meeting of the
+/// year an act that deletes the year.
+///
+/// Times are stored as a wall clock and a zone rather than as instants,
+/// because "Tuesdays at 19:30" is a wall clock. See lib/recurrence.ts.
+model EventSeries {
+  id String @id @default(cuid())
+
+  /// An RFC 5545 RRULE, e.g. "FREQ=WEEKLY;BYDAY=TU". Validated on write.
+  rule            String
+  /// The IANA zone the times below are read in.
+  timeZone        String   @default("UTC")
+  /// The first date the rule runs from, and always an occurrence itself.
+  startDate       DateTime @db.Date
+  /// "19:30". Null when the occurrences are all-day.
+  startTime       String?
+  /// How long one occurrence lasts. Null for something with no stated finish.
+  durationMinutes Int?
+  allDay          Boolean  @default(false)
+
+  /// The template every generated occurrence is stamped from.
+  title       String
+  description String?
+  location    String?
+  published   Boolean @default(false)
+  memberOnly  Boolean @default(false)
+
+  registration     Boolean @default(false)
+  capacity         Int?
+  waitlist         Boolean @default(true)
+  maxGuests        Int     @default(0)
+  /// The sign-up window, relative to each occurrence rather than absolute:
+  /// "opens two weeks before" is what a repeating event means, and copying one
+  /// pair of instants onto every date would close December's sign-up in
+  /// September.
+  opensDaysBefore  Int?
+  closesDaysBefore Int?
+
+  /// The last day occurrences have been created up to, so extending the
+  /// horizon is cheap and repeatable.
+  generatedThrough DateTime?  @db.Date
+  /// Dates an organiser took out of the series. Kept so that generating again
+  /// doesn't quietly put them back.
+  excludedDates    DateTime[] @db.Date
+
+  events    Event[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([generatedThrough])
 }
 
 enum RegistrationStatus {

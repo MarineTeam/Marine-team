@@ -4,6 +4,7 @@ import { errorResponse } from "@/lib/api-guard";
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { notifyPromoted, updateEvent } from "@/lib/events";
+import { removeOccurrence } from "@/lib/event-series-query";
 import { ensureCapability, ensureStaff } from "@/lib/permissions";
 import { slugify } from "@/lib/slug";
 
@@ -61,7 +62,14 @@ export async function DELETE(_request: NextRequest, context: { params: Promise<{
     const user = await ensureStaff();
     await ensureCapability(user, "manage_events");
     const { id } = await context.params;
-    const event = await prisma.event.delete({ where: { id } });
+    const event = await prisma.event.findUnique({ where: { id }, select: { id: true, title: true } });
+    if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    // Through removeOccurrence rather than a plain delete: when this date
+    // belongs to a repeating event, the deletion has to be recorded on the
+    // series as well, or tonight's generator sees the gap in the rule and puts
+    // the cancelled meeting straight back.
+    await removeOccurrence(id);
     await logAudit(user.email, "delete", "event", event.id, event.title);
     return NextResponse.json({ ok: true });
   } catch (error) {

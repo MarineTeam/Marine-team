@@ -11,6 +11,7 @@ import {
   registrationMessage,
   registrationState,
 } from "@/lib/events";
+import { describeSeries, shapeOf } from "@/lib/event-series";
 import { currentMessages } from "@/lib/i18n/locale";
 import { isPluginEnabled } from "@/lib/plugins";
 import { getDisplayName } from "@/lib/profile";
@@ -52,6 +53,27 @@ export default async function EventPage(props: { params: Promise<{ slug: string 
   const state = registrationState(event, event.taken);
   const left = placesLeft(event, event.taken);
 
+  // When this is one date of a repeating thing, say so and offer the next few.
+  // A member who has found the wrong week should not have to go back to the
+  // list and count — and somebody who has just missed one wants to know when
+  // the next is more than anything else on the page.
+  const series = event.seriesId
+    ? await prisma.eventSeries.findUnique({ where: { id: event.seriesId } })
+    : null;
+  const alsoOn = series
+    ? await prisma.event.findMany({
+        where: {
+          seriesId: series.id,
+          published: true,
+          id: { not: event.id },
+          startsAt: { gte: new Date() },
+        },
+        orderBy: { startsAt: "asc" },
+        take: 4,
+        select: { slug: true, title: true, startsAt: true, endsAt: true, allDay: true },
+      })
+    : [];
+
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-10">
       <p className="text-sm">
@@ -68,6 +90,25 @@ export default async function EventPage(props: { params: Promise<{ slug: string 
 
       {event.description && (
         <div className="text-sm whitespace-pre-wrap text-ink">{event.description}</div>
+      )}
+
+      {series && (
+        <div className="rounded-lg border border-sep p-4">
+          <p className="text-sm font-medium text-ink">{describeSeries(shapeOf(series))}</p>
+          {alsoOn.length > 0 ? (
+            <ul className="mt-2 space-y-1">
+              {alsoOn.map((other) => (
+                <li key={other.slug} className="text-sm">
+                  <Link href={`/events/${other.slug}`} className="text-accent hover:underline">
+                    {eventWhen(other)}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1 text-sm text-sec">No other dates are up yet.</p>
+          )}
+        </div>
       )}
 
       <EventSignup
