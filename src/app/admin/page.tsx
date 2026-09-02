@@ -66,6 +66,7 @@ export default async function AdminOverview() {
     canManagePermissions: true,
     canManagePlugins: true,
     canViewAuditLog: true,
+    canManageApiKeys: true,
     canViewAnalytics: true,
     canManageVideosSiteWide: true,
     canManageFiles: true,

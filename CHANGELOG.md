@@ -31,6 +31,17 @@ All notable changes to this project are documented here. Format follows
   one date sticks, editing never rewrites the past, changing the timing leaves
   booked dates where they are, and stopping a series never deletes a date
   somebody has signed up for.
+- **A read API at `/api/v1`.** Keys made at `/admin/api-keys` let another
+  system read this one — catalogue, events, rotas, groups and totals. Every
+  endpoint is a read; there is no way to write through it. A key is stored only
+  as its SHA-256 and shown once; scopes have no hierarchy, so `events:read`
+  never implies `events:registrations`; and a small group's address has no scope
+  at all, because an address travels with a leader's yes and a machine cannot be
+  given one. Cursor paging, 120 requests a minute per key counted in a single
+  atomic `UPDATE`, and `GET /api/v1` describes the whole thing without a key.
+  Responses go through the same `assertNoSecrets` guard as the member data
+  export, now shared in `lib/no-secrets.ts`.
+- New capability **`manage_api_keys`**, site-wide only.
 - **Small-group waiting lists.** A full group takes names in order instead of
   closing the door, and a place opening — somebody leaving, a leader removing
   somebody, or the capacity being raised — moves the longest-waiting person to a

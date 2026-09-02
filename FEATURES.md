@@ -34,6 +34,7 @@ wall it never asked for.
 | `/admin/broadcasts` | one message to everybody |
 | `/admin/video-feeds` | importing from YouTube or Vimeo |
 | `/admin/plugins` `/admin/branding` `/admin/permissions` | how the site behaves |
+| `/admin/api-keys` | keys another system uses to read this one |
 
 ## Public site
 
@@ -361,6 +362,63 @@ that forgets its `where` exports the whole congregation, and does it quietly.
 Rate-limited to two exports a minute per member (counted from the audit log,
 which also records each one), since it is the most expensive thing any
 logged-in member can ask for.
+
+## The read API (`/api/v1`)
+
+Another system reading this one: a noticeboard in the foyer, a spreadsheet, the
+main church website, a migration off some other platform. Until now the answer
+to "can I get our own data out" was an admin running queries by hand.
+
+**Everything is a read.** There is no way to change anything through the API in
+v1, and that is a deliberate order of work rather than an oversight: a token
+that can rewrite the diary is a much bigger decision than one that can read it,
+and shipping the read half first means nobody has to make both at once.
+`/api/v1` says so in its own response.
+
+- **A key is a password a machine keeps in a config file**, so it is treated
+  like one. Only its SHA-256 is stored, it is shown once at `/admin/api-keys`
+  and never again, and the list afterwards shows a prefix (`mt_live_A1b2C3…`),
+  who made it and when it was last used — the three things anybody wants after
+  deciding one has leaked. Revoking keeps the row, so the record survives the
+  key.
+- **Scopes, with no hierarchy.** `events:read` gives you "forty people are
+  coming"; `events:registrations` gives you their phone numbers, and one does
+  *not* follow from the other. The two scopes that carry personal data are
+  badged as such on the form, because a form that describes them in the same
+  tone as the rest is a form where both get ticked without thinking.
+- **A group's address has no scope at all.** It is not that you need a special
+  one — there is no combination of ticks that returns it, because an address
+  travels only with a leader's yes and a machine cannot be given one. The
+  member list is out for the same reason: a directory of groups is a different
+  thing from a directory of who is in which home group.
+- **`assertNoSecrets` is the last thing before the bytes leave**, and it is the
+  same guard the member data export uses, from the same list. Both are places
+  where a query quietly changing shape becomes a leak; one list is what stops
+  the two drifting apart. It **throws** rather than filtering, because a
+  credential reaching that point means a query changed.
+- **Content comes back including drafts and members-only items**, with flags. A
+  key is the organisation reading its own catalogue, and hiding half of it
+  would make the API useless for the reporting and migration jobs it exists
+  for. What a *visitor* may see is a different question, answered on the pages.
+- **Cursor paging, not offset.** Rows are added while a caller reads, and
+  `?offset=50` silently skips or repeats whatever moved across the boundary. A
+  page asks for one row more than it needs, which is how "is there another
+  page" gets answered without a `COUNT` over the whole table.
+- **120 requests a minute per key**, counted in a *single* `UPDATE` rather than
+  a read followed by a write. Under 30-way concurrency the atomic version
+  serves exactly the number of requests that were left; the read-then-write
+  version served **60 where 30 remained**. A refused request still counts,
+  since it still cost a lookup.
+- **`GET /api/v1` needs no key** and describes the whole thing — scopes,
+  endpoints, filters, paging, limits. An API whose own documentation needs a
+  credential wastes the first five minutes on the wrong problem.
+
+Endpoints: `/me`, `/categories`, `/series`, `/videos`, `/files`, `/events`,
+`/events/{id}/registrations`, `/schedules`, `/calendar-events`, `/groups`,
+`/analytics`. Files filter on `addedSince` rather than `updatedSince`, because
+`FileAsset` has no `updatedAt` — a file is replaced rather than edited, and
+calling it the same thing would let a sync job believe it had seen every
+change.
 
 ## Share links
 

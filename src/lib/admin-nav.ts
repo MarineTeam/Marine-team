@@ -23,6 +23,7 @@ export type AdminAccess = {
   canManagePermissions: boolean;
   canManagePlugins: boolean;
   canViewAuditLog: boolean;
+  canManageApiKeys: boolean;
   canViewAnalytics: boolean;
   canManageVideosSiteWide: boolean;
   canManageFiles: boolean;
@@ -134,6 +135,10 @@ export const ADMIN_GROUPS: AdminGroup[] = [
       { href: "/admin/downloads", label: "Downloads", visible: (a) => a.canManagePlugins },
       { href: "/admin/announcements", label: "Announcements", visible: (a) => a.canManagePlugins },
       { href: "/admin/webhooks", label: "Webhooks", visible: (a) => a.canManagePlugins },
+      // With the other outward-facing integrations rather than under members:
+      // a key is how another system reads this one, which is the same shelf
+      // webhooks sit on.
+      { href: "/admin/api-keys", label: "API keys", visible: (a) => a.canManageApiKeys },
     ],
   },
   {

@@ -17,6 +17,11 @@ export const CAPABILITIES = [
   { key: "manage_events", label: "Manage events, forms and groups", hint: "Publish events and see who signed up, build forms, and keep the small-group list" },
   { key: "moderate_prayer", label: "Moderate the prayer wall", hint: "Approve, hide and mark answered the requests members post" },
   { key: "view_audit_log", label: "View audit log", hint: "See the history of admin/editor actions" },
+  // Its own capability rather than folded into managing users or plugins: a
+  // key is standing machine access to the catalogue and, if the scope is
+  // ticked, to people's names and phone numbers. Granting that is a different
+  // decision from either of those, and it should have to be made on purpose.
+  { key: "manage_api_keys", label: "Manage API keys", hint: "Create and revoke keys that let another system read this one" },
   { key: "view_analytics", label: "View analytics", hint: "See the views dashboard and trending content" },
 ] as const;
 
@@ -31,6 +36,7 @@ export const SITE_WIDE_ONLY_CAPABILITIES: CapabilityKey[] = [
   "manage_plugins",
   "view_audit_log",
   "view_analytics",
+  "manage_api_keys",
   "manage_categories",
   "manage_events",
   "moderate_prayer",

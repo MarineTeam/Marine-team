@@ -1065,6 +1065,49 @@ model ReadingMark {
   @@index([fileId])
 }
 
+/// A machine's way in: a long-lived key an admin creates so another system can
+/// read this one.
+///
+/// The key itself is never stored. Only its SHA-256 is, the same way a password
+/// would be, because a database that leaks must not hand somebody a working key
+/// — and because "show it to me again" is a request that should be impossible
+/// to satisfy rather than merely refused. What is stored beside the hash is the
+/// first few characters, so a list of keys is legible to the person who made
+/// them without any of them being usable.
+model ApiKey {
+  id String @id @default(cuid())
+
+  /// What it is for, in the admin's words: "the noticeboard in the foyer".
+  name      String
+  /// SHA-256 of the whole key, hex. The key is shown once, at creation.
+  hashedKey String @unique
+  /// The first characters of the key, for telling one row from another.
+  prefix    String
+
+  /// What this key may read. Never write — see lib/api-keys.ts.
+  scopes String[] @default([])
+
+  /// The admin who made it, so a key has somebody's name against it.
+  createdByEmail String
+
+  /// Optional expiry. A key with a date on it is one somebody has thought
+  /// about; a key without one lives until it is revoked.
+  expiresAt DateTime?
+  revokedAt DateTime?
+
+  lastUsedAt DateTime?
+
+  /// A fixed-window rate limit, counted on the row itself. In-memory counters
+  /// are useless here for the same reason as everywhere else in this app: this
+  /// runs on serverless functions with no shared process state.
+  windowStartedAt DateTime @default(now())
+  windowCount     Int      @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([revokedAt])
+}
+
 // Append-only record of admin/editor actions, kept even if the acting user
 // or the entity they touched is later deleted.
 model AuditLog {

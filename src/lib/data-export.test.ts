@@ -1,14 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import {
-  FORBIDDEN_KEYS,
-  assertExportSafe,
-  exportFilename,
-  pushServiceOf,
-  totalRecords,
-  unsafeKeysIn,
-} from "./data-export";
+import { assertExportSafe, exportFilename, pushServiceOf, totalRecords } from "./data-export";
+import { FORBIDDEN_KEYS, unsafeKeysIn } from "./no-secrets";
 
 describe("unsafeKeysIn", () => {
   it("finds a credential nested inside an array", () => {

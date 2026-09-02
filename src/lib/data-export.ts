@@ -1,3 +1,4 @@
+import { assertNoSecrets } from "@/lib/no-secrets";
 import { slugify } from "@/lib/slug";
 import { toIsoDate } from "@/lib/dates";
 
@@ -36,69 +37,14 @@ import { toIsoDate } from "@/lib/dates";
 export const EXPORT_FORMAT_VERSION = 1;
 
 /**
- * Key names that must never appear in an export at any depth.
+ * Refuses to answer with a document carrying a credential.
  *
- * These are the columns that are *credentials*, not facts: the Web Push pair
- * that lets the holder push to a browser, the secret in a personal calendar
- * feed's URL, the hashes behind a share-link passphrase and a television's
- * sign-in, and the moderator names attached to
- * decisions taken about this member (`mutedBy`, `moderatedBy`, `handledBy`) or
- * about something sent to them (`createdBy`) — the decision is theirs to see,
- * the name of the staff member who took it is not.
- *
- * Matched on the exact key, so `auth` here does not catch `auth0Id`, which is
- * the member's own identifier and belongs in the file.
- */
-export const FORBIDDEN_KEYS: readonly string[] = [
-  "auth",
-  "p256dh",
-  "passwordHash",
-  "passwordSalt",
-  "salt",
-  "secret",
-  "tokenHash",
-  "deviceCodeHash",
-  "calendarToken",
-  "mutedBy",
-  "moderatedBy",
-  "handledBy",
-  "createdBy",
-];
-
-/**
- * Every path in `value` whose last segment is a forbidden key.
- *
- * Walks arrays as well as objects: nearly everything in an export is a list, so
- * a check that only descended into objects would pass on every real document
- * while catching nothing.
- */
-export function unsafeKeysIn(value: unknown, path = "$"): string[] {
-  if (Array.isArray(value)) {
-    return value.flatMap((item, index) => unsafeKeysIn(item, `${path}[${index}]`));
-  }
-  if (value === null || typeof value !== "object") return [];
-  const found: string[] = [];
-  for (const [key, child] of Object.entries(value)) {
-    const here = `${path}.${key}`;
-    if (FORBIDDEN_KEYS.includes(key)) found.push(here);
-    found.push(...unsafeKeysIn(child, here));
-  }
-  return found;
-}
-
-/**
- * Throws rather than answering with a document carrying a credential.
- *
- * Deliberately a hard failure and not a filter: a key reaching here means a
- * query started selecting something it shouldn't, and quietly stripping it
- * would hide that until the next column arrives. A member seeing "export
- * failed" is recoverable; a leaked push key is not.
+ * The list and the walk live in `no-secrets.ts`, shared with the read API:
+ * both are places where a query quietly changing shape becomes a leak, and one
+ * list is what stops the two drifting apart.
  */
 export function assertExportSafe(doc: unknown): void {
-  const unsafe = unsafeKeysIn(doc);
-  if (unsafe.length > 0) {
-    throw new Error(`Refusing to export: ${unsafe.join(", ")}`);
-  }
+  assertNoSecrets(doc, "export");
 }
 
 /**
