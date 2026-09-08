@@ -708,9 +708,10 @@ share passwords use `password_hash` from the start) and `/admin/tools/import`
 in the port that reads it in resumable batches, maps table and column names,
 converts arrays, and reports counts per table against the export's manifest.
 Files in Bunny Storage need no move if the Files slot is Bunny; the importer
-offers to pull them to local disk in batches otherwise. Auth0 users keep their identities; the importer creates no
-local passwords, so those members either keep signing in through Auth0/OIDC
-or use "forgot password" once local is enabled.
+offers to pull them to local disk in batches otherwise. Auth0 users keep
+their identities; the importer creates no local passwords, so those members
+either keep signing in through Auth0/OIDC or use "forgot password" once local
+is enabled.
 
 ## Running on shared hosting
 
