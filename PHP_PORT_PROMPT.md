@@ -17,15 +17,17 @@ installer, done. No shell, no Node, no Composer on the server, no daemons, no
 Redis. Everything an administrator will ever need to do after that happens in
 the browser, because on shared hosting the browser is all they have.
 
-Three things the current app hard-wires to one vendor become **swappable
-services**, chosen during install and changeable later from the admin area
-without touching code:
+What the current app hard-wires to one vendor or to an environment variable
+becomes a set of **swappable services**, chosen during install and changeable
+later from the admin area without touching code:
 
 | | Options | Notes |
 | --- | --- | --- |
 | Sign-in | Local accounts (password, magic link), Auth0, OpenID Connect with presets (Google, Microsoft Entra ID, Apple, Okta, Keycloak, Authentik, Zitadel, Logto, Kinde, Clerk), Clerk, Supabase Auth, Firebase Authentication | Local works immediately. Every external provider needs the site reachable over HTTPS first. |
 | Video | bunny.net Stream, YouTube, Vimeo, shared links from Dropbox, Google Drive and OneDrive/SharePoint, Internet Archive, S3-compatible storage (Cloudflare R2, Backblaze B2, Wasabi, AWS S3), a direct link, the host's own disk | Uploads go straight from the browser to the provider. Bunny, YouTube and Vimeo transcode; the file-based ones play the MP4 they are given. Only Bunny, S3 and the host's disk can keep a members-only video from anyone holding its link. |
 | Email | SMTP (presets for the host's own mail server, Google Workspace, Microsoft 365, Zoho, Fastmail and the API providers' relays), PHP `mail()`, Resend, Mailgun, SendGrid, Postmark, Amazon SES, Brevo, Microsoft 365 via Graph | If your host blocks outbound HTTPS, SMTP is usually the one that works; if it blocks the SMTP ports instead, the HTTPS API ones are. |
+| Files | The host's own disk, Bunny Storage | Local disk works immediately. Bunny Storage adds a CDN and a token-protected pull zone. |
+| Text messages | Twilio, Vonage, MessageBird (Bird), Plivo, Sinch, Telnyx, Amazon SNS, ClickSend, Textlocal, BulkSMS, a JSON webhook | Optional; nothing is texted until a member gives their own number and opts in. Choose by country: sender ID and registration rules differ. |
 
 Any of them can be changed later under **Admin → Services**. Switching runs the
 new service's connection test first, and refuses the switch if it fails. The
@@ -288,10 +290,11 @@ never depend on the cache being warm or present.
    `BrandSettings` defaults), the site's language default, timezone, and the
    first administrator as a **local account** — email and password. This local
    admin exists even if Auth0 or OIDC is chosen next; it is the recovery path.
-4. **Services**: for each of Sign-in, Video, Email, Files, pick a provider and
-   fill its fields, with a **Test** button per provider. Local sign-in, local
-   file storage and `mail()` are preselected so the wizard can finish with
-   nothing external configured; each other provider can be "set up later".
+4. **Services**: for each of Sign-in, Video, Email, Files and Text messages,
+   pick a provider and fill its fields, with a **Test** button per provider.
+   Local sign-in, local file storage and `mail()` are preselected and Text
+   messages defaults to off, so the wizard can finish with nothing external
+   configured; each other provider can be "set up later".
    External sign-in providers are greyed out with the reason until the wizard
    is reached over HTTPS.
 5. **Finish**: write `installed.lock`, print the cron line for the host's
@@ -366,9 +369,9 @@ Slots the port has, and what "test" means for each:
   **Email** below. Every one ends by sending a message to the admin; `mail()`
   alone also needs the admin to type back the six-digit code that message
   carried, because `mail()` returning true proves nothing about delivery.
-- **files** (Local disk, Bunny Storage) — this fourth slot is not in the
-  table above and is added because the port can't exist without deciding
-  where PDFs, audio and other uploads live. Local disk is the default and
+- **files** (Local disk, Bunny Storage) — this slot was not in the original
+  brief and is added because the port can't exist without deciding where
+  PDFs, audio and other uploads live. Local disk is the default and
   works with no account anywhere: files under `storage/uploads/` (never under
   the document root), streamed by the app route with Range support. Bunny
   Storage is the current behaviour, with the private pull zone, token
@@ -377,9 +380,17 @@ Slots the port has, and what "test" means for each:
   backend holds it; switching applies to new uploads and an admin tool
   migrates existing files in batches.
 
+- **sms** (Twilio, Vonage, MessageBird, Plivo, Sinch, Telnyx, Amazon SNS,
+  ClickSend, Textlocal, BulkSMS, a JSON webhook) — each provider's test is in
+  the table under **Text messages** below; every one ends with a text to the
+  admin's own phone carrying a code the admin types back, because a provider
+  accepting a message says nothing about a carrier delivering it. Off by
+  default; the broadcast composer offers the channel and says what is
+  missing, as now.
+
 The remaining env-driven integrations become settings groups on the same
 page, same generated forms, same test button, but optional and not
-install-time: **SMS** (Twilio or JSON webhook), **Web Push** (VAPID pair,
+install-time: **Web Push** (VAPID pair,
 generated in PHP with a button), **Transcription** (URL, key, model, max
 bytes), **Google Sheets** (service-account JSON; the JWT is signed with
 `openssl_sign` RS256 and exchanged for an access token, replacing
@@ -407,7 +418,8 @@ never touches a core screen. A new provider is:
   tables in this document, saying honestly what it can and can't do;
 - and per slot: a video provider's `VideoCapabilities` and `PlayerSpec`; a
   sign-in provider's flow kind and how `sub`, `email_verified` and the
-  membership claim are derived; an email provider's error mapping; a files
+  membership claim are derived; an email provider's error mapping; an SMS
+  provider's sender kind and its receipt and reply webhooks; a files
   provider's streaming and signing rules.
 
 The providers each section lists as "later" are expected to fit without
@@ -828,6 +840,75 @@ an admin must set the password instead.
 Gmail API with domain-wide delegation for a Workspace that forbids app
 passwords. Inbound mail is out of scope.
 
+## Text messages
+
+Texting is its own slot rather than a settings group: a church picks a
+texting provider by country and price the way it picks an email provider,
+and switches it for the same reasons. `SmsProvider::send(To, Body)` returns
+the provider's message id or throws an `SmsError` carrying the provider's own
+sentence ("is not a valid phone number"), which the broadcast screen shows
+beside the recipient's name — what `sms-send.ts` does for Twilio today. The
+provider-independent half stays in the one module the composer also loads in
+the browser: `sms.ts`'s E.164 normalisation with the default country code (a
+national number with no default is refused, never guessed at) and GSM-7
+versus UCS-2 segment counting, so the cost on screen is the cost that goes
+out.
+
+Consent stays the app's rule, not the provider's: `smsOptIn` is set only by
+the member, is never inferred from a number a sign-up form collected, and
+`planDelivery` decides who is texted before any provider is asked. A text
+carries the opt-out instruction its destination country expects whenever the
+provider doesn't append one itself.
+
+Every provider declares the kind of sender it takes — a phone number, an
+alphanumeric sender ID, or a provider-side messaging service — and the
+settings row shows the country rules that decide whether a text arrives: the
+US and Canada refuse alphanumeric senders and need A2P 10DLC registration at
+the provider before a long code delivers reliably; toll-free numbers need
+verification; the UK and most of Europe accept an alphanumeric sender.
+"Accepted and never arrived" is usually one of these, which is why the test
+below goes end to end.
+
+**Test before switching**: the credentials call in the table, then a text to a
+number the admin types, carrying a six-digit code the admin types back. The
+switch commits only on the code — a text the provider accepted but that never
+arrived (an unregistered sender, a sandbox, a sender ID the country rejects)
+is exactly the failure this catches.
+
+| Provider | Send | Credentials test |
+| --- | --- | --- |
+| Twilio | `POST /2010-04-01/Accounts/{sid}/Messages.json`, basic auth (account SID and token, or an API key), form `To`, `From` or `MessagingServiceSid`, `Body`, optional `StatusCallback` | `GET /2010-04-01/Accounts/{sid}.json`; the From number or messaging service exists on the account |
+| Vonage | SMS API `POST rest.nexmo.com/sms/json`; `messages[0].status` of `0` is success, `error-text` otherwise | `GET rest.nexmo.com/account/get-balance` |
+| MessageBird (Bird) | `POST rest.messagebird.com/messages` with `Authorization: AccessKey`; a second mode for Bird's workspace-and-channel endpoint, since the company renamed and accounts are moving | `GET rest.messagebird.com/balance`, or the workspace's channel list in the second mode |
+| Plivo | `POST api.plivo.com/v1/Account/{id}/Message/`, basic auth, JSON `src`, `dst`, `text` | `GET api.plivo.com/v1/Account/{id}/` |
+| Sinch | `POST {region}.sms.api.sinch.com/xms/v1/{plan}/batches`, bearer; the region is chosen on the row | `GET …/batches?page_size=1` |
+| Telnyx | `POST api.telnyx.com/v2/messages`, bearer, `from` or `messaging_profile_id` | `GET api.telnyx.com/v2/messaging_profiles` |
+| Amazon SNS | `Publish` with `PhoneNumber`, `SMSType=Transactional`, optional `SenderID`; SigV4 through the shared signer | `GetSMSAttributes`; a warning while the account is in the SMS sandbox or still at the default monthly spend limit |
+| ClickSend | `POST rest.clicksend.com/v3/sms/send`, basic auth | `GET rest.clicksend.com/v3/account` |
+| Textlocal (UK, India) | `POST api.txtlocal.com/send/` | the same call with `test=1`, which Textlocal validates without sending, then `GET /balance/` |
+| BulkSMS | `POST api.bulksms.com/v1/messages`, basic auth, JSON `to`, `from`, `body` | `GET api.bulksms.com/v1/profile` |
+| JSON webhook | `POST` of `{to, from, body}` with an optional bearer, as `SMS_WEBHOOK_URL` does now — a gateway of the church's own, a national provider with an API of its own, an office phone system | `POST {"ping": true}` answered 2xx; the docs say what a gateway must implement |
+
+**Delivery receipts and replies** are optional per provider.
+`/api/sms/status/<provider>` takes the provider's status callback with its
+signature checked — Twilio's `X-Twilio-Signature`, Vonage's signed JWT,
+MessageBird's signature header, Telnyx's Ed25519 signature, each a pure-PHP
+check — and moves the `broadcast_recipients` row from accepted to delivered
+or failed with the provider's reason, so `/admin/broadcasts` can say
+"reached" rather than "sent". `/api/sms/inbound/<provider>` takes replies,
+and a reply that is a stop word (`STOP`, `UNSUBSCRIBE`, `CANCEL`, `END`,
+`QUIT`, and the Spanish catalogue's equivalents) switches that member's
+`smsOptIn` off and writes an audit row. Providers that handle stop words
+themselves on US and Canadian numbers are noted; the app still honours the
+reply, because the same number can be on the list under a different provider
+tomorrow. Both endpoints are unauthenticated by design and verified by
+signature; a provider with no signature scheme gets a per-install secret in
+its callback URL instead.
+
+**Later**: Infobip, Africa's Talking, 46elks, Esendex, SignalWire, Bandwidth,
+SMSGlobal, Clockwork. WhatsApp through the providers that offer it is a
+different channel with different consent rules and is out of scope here.
+
 ## Plugins
 
 A plugin is a directory under `plugins/<slug>/` containing `plugin.php` with
@@ -1206,8 +1287,9 @@ first party too big to fit; consent rules in `planDelivery`.
   provider — presign, a browser PUT that proves CORS, presigned GET playback;
   and for real on the host's own disk, including a chunked upload through the
   2 MB limit and a members-only stream answering Range requests.
-- **Sign-in and email providers** likewise: fixtures for Auth0, Clerk,
-  Supabase, Firebase and every email API; the OIDC provider end to end
+- **Sign-in, email and SMS providers** likewise: fixtures for Auth0, Clerk,
+  Supabase, Firebase, every email API, and every SMS API together with each
+  provider's signed status callback and a stop-word reply; the OIDC provider end to end
   against a Dex or Keycloak container in the smoke test, including a preset;
   the token flow end to end with a JWT minted by the test against a local
   JWKS; SMTP against Mailpit; and the trial-mode switch proven by a test that
@@ -1278,9 +1360,9 @@ and carry on — don't stall on it.
   resume and report progress, downloads and Cast answer with the right
   reason, and a members-only video on a provider that can't enforce it says
   so where the admin sets the flag.
-- Every core sign-in and email provider passes its fixture tests and its
-  test-before-switch, and `SERVICES.md` has a row for each provider in every
-  slot saying what it can't do as plainly as what it can.
+- Every core sign-in, email and SMS provider passes its fixture tests and
+  its test-before-switch, and `SERVICES.md` has a row for each provider in
+  every slot saying what it can't do as plainly as what it can.
 - A plugin that throws, parse-fails, or exhausts memory on load is
   deactivated automatically with the reason visible; the site stays up; a
   plugin throwing in a hook is contained; `/admin/plugins` is reachable with
