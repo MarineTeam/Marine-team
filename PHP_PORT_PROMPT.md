@@ -24,7 +24,7 @@ without touching code:
 | | Options | Notes |
 | --- | --- | --- |
 | Sign-in | Auth0, OpenID Connect, local accounts | Local works immediately. Auth0 and OIDC need the site reachable over HTTPS first. |
-| Video | bunny.net Stream | Videos upload straight from the browser to the provider. |
+| Video | bunny.net Stream, YouTube, Vimeo, Dropbox shared links, S3-compatible storage (Cloudflare R2, Backblaze B2, Wasabi, AWS S3), a direct link, the host's own disk | Uploads go straight from the browser to the provider. Bunny, YouTube and Vimeo transcode; the file-based ones play the MP4 they are given. Only Bunny, S3 and the host's disk can keep a members-only video from anyone holding its link. |
 | Email | Resend, SMTP, PHP `mail()` | If your host blocks outbound HTTPS, SMTP is usually the one that works. |
 
 Any of them can be changed later under **Admin → Services**. Switching runs the
@@ -55,10 +55,11 @@ specification; this prompt tells you what changes and what must not.
 - `src/lib/current-user.ts`, `src/lib/authorization.ts`,
   `src/lib/identity-linking.ts`, `src/lib/auth0.ts`, `src/proxy.ts`,
   `auth0-actions/README.md` — the access model.
-- `src/lib/bunny.ts`, `src/lib/email.ts`, `src/lib/sms-send.ts`,
-  `src/lib/push.ts`, `src/lib/transcribe.ts`, `src/lib/video-feeds.ts`,
-  `src/lib/sheets/` — every external integration, each a plain `fetch` against
-  a REST API. None of them uses an SDK worth keeping.
+- `src/lib/bunny.ts`, `src/lib/video-source.ts`, `src/lib/tv-feed.ts`,
+  `src/lib/email.ts`, `src/lib/sms-send.ts`, `src/lib/push.ts`,
+  `src/lib/transcribe.ts`, `src/lib/video-feeds.ts`, `src/lib/sheets/` —
+  every external integration, each a plain `fetch` against a REST API. None
+  of them uses an SDK worth keeping.
 - `.env.example` — the complete configuration surface. Every variable here
   becomes either an installer question, an Admin → Services setting, or goes
   away because it was Vercel-specific.
@@ -351,9 +352,10 @@ Slots the port has, and what "test" means for each:
   trial mode for that admin's session alone, they finish a login in a second
   tab, and the switch commits. No admin can lock themselves out by typing a
   wrong client id.
-- **video** (bunny.net Stream) — `GET /library/{id}` with the API key must
-  succeed; the CDN hostname must answer; if a token-auth key is set, a signed
-  thumbnail URL must return 200 while an unsigned one returns 403.
+- **video** (bunny.net Stream, YouTube, Vimeo, Dropbox, S3-compatible, direct
+  link, the host's own disk) — each provider's test is under **Video** below.
+  This slot chooses where *new* videos go; every provider that has ever been
+  configured keeps playing the videos it holds, so a switch re-hosts nothing.
 - **email** (Resend, SMTP, `mail()`) — Resend: an authenticated API call
   (`GET /domains`) succeeds and `from` is on a verified domain. SMTP: connect,
   STARTTLS/TLS as configured, EHLO, AUTH, then send a test message to the
@@ -445,33 +447,163 @@ Admin → Services both refuse them otherwise and say why.
 
 ## Video
 
-`VideoProvider` is the interface behind everything `src/lib/bunny.ts` does
-for Stream: `create(title): id`, `browserUpload(id): {endpoint, headers…}`,
-`get(id)`, `delete(id)`, `embedUrl(id, start?)`, `thumbnailUrl(id, file?)`,
-`mp4Url(id, height)` with `probe`, `setThumbnail`, `addCaption`,
-`deleteCaption`, `listLibrary()`, `mapStatus()`. Bunny Stream is the one
-implementation and everything Bunny-specific in the current code is preserved
-in it:
+The Video slot is **where new videos go**, not the only player. A library can
+hold videos on several providers at once — it already does, through
+`Video.source` — so every provider with saved configuration keeps playing the
+videos it holds after the default changes, each video row records its own
+provider, and a switch re-hosts nothing. The switch test applies to the new
+default.
 
-- **Upload straight from the browser** with TUS: PHP creates the placeholder
-  (`POST /library/{id}/videos`), returns the presigned tuple —
+`VideoProvider` is the interface. Providers declare what they can do and the
+admin screens show it, rather than promising the same thing of all of them:
+
+```php
+interface VideoProvider extends ServiceProvider {
+    public function capabilities(): VideoCapabilities;
+        // upload, link, transcodes, thumbnails, duration, captions, mp4,
+        // enforcesPrivacy, progressEvents — each true or false
+    public function createUpload(string $title, UploadHints $hints): UploadTicket;
+        // a placeholder at the provider, plus what the browser must do next
+    public function matchesLink(string $url): bool;
+    public function resolveLink(string $url): LinkedVideo;
+        // canonical id, title, duration, thumbnail, playable URL(s)
+    public function get(string $id): VideoInfo;          // status, duration, thumbnail, renditions
+    public function delete(string $id): void;
+    public function player(string $id, PlayerOptions $o): PlayerSpec;
+        // {kind: 'iframe', src} or {kind: 'native', sources[], tracks[], poster}
+    public function thumbnailUrl(string $id, ?string $file): ?string;
+    public function setThumbnail(string $id, string $imageUrl): void;
+    public function mp4(string $id, int $maxHeight): Mp4Result;   // ok(url, height) | reason
+    public function captions(string $id): ?CaptionOps;           // list, add, delete — or null
+}
+```
+
+`UploadTicket` tells the one vendored uploader which of five things to do, and
+in none of them does an API key reach the browser: `tus` (endpoint, headers,
+metadata — Bunny and Vimeo), `put` or `multipart` (presigned URLs —
+S3-compatible), `resumable` (a session URL PHP opened with the provider's
+OAuth token — YouTube, Dropbox), or `chunked` (slices through PHP — the host's
+own disk). Adding a video in `/admin/videos` is two tabs: **Upload**, to the
+default provider, and **Link**, a pasted URL that each link-capable provider
+is asked to `matchesLink()`, with the first match resolving it.
+
+Providers in the core, and what each honestly offers:
+
+| Provider | Upload from the browser | Transcodes, adaptive | Thumbnail and duration | Captions | MP4 for downloads and Cast | Keeps a members-only video from anyone with the link | Limits the screen must state |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| bunny.net Stream | TUS | yes | from the provider | API | MP4 fallback | yes: signed embed, token auth | paid, cheap |
+| YouTube | link; optional Data API resumable upload | yes | from the provider | on YouTube | no | no: unlisted is a secret, not a lock | default API quota allows about six uploads a day; an unverified app's uploads are locked private |
+| Vimeo | TUS through the API | yes | from the provider | API | file links on paid plans | partly: domain-restricted embed on paid plans | free tier is 500 MB a week |
+| Dropbox shared link | link; optional API upload with a short-lived token | no: must already be H.264/AAC MP4 | captured and read in the browser | VTT sidecar via the Files slot | yes, it is a file | no | 20 GB a day on Basic, 200 GB on paid; links pause past that |
+| S3-compatible (Cloudflare R2, Backblaze B2, Wasabi, AWS S3) | presigned PUT, multipart above the single-PUT limit | no | captured and read in the browser | VTT sidecar | yes | yes: presigned GET per request | bucket CORS must allow the site; egress pricing varies, R2's is free |
+| Direct link | link only | no; HLS `.m3u8` through vendored hls.js | captured and read in the browser | VTT sidecar | yes when it is a file | no | whatever hosts the file |
+| The host's own disk | chunked through PHP | no | captured and read in the browser | VTT sidecar | yes | yes, at the cost of PHP bandwidth | the plan's disk and bandwidth; the last resort |
+
+What must be right per provider:
+
+- **bunny.net Stream** keeps everything `src/lib/bunny.ts` does for Stream:
+  the placeholder via `POST /library/{id}/videos`; the TUS presign
   `sha256(libraryId . apiKey . expirationTime . videoId)` with a one-hour
-  expiry, endpoint `https://video.bunnycdn.com/tusupload` — and the vendored
-  `tus-js-client` streams the file. The API key never reaches the browser and
-  the bytes never reach PHP. After the upload the browser calls
-  `/api/admin/videos/[id]/sync-status`, as now.
-- **Embed and thumbnail URLs** are signed per request when a token-auth key is
-  configured: `sha256_hex(tokenAuthKey . videoId . expires)`, unsigned
-  otherwise. The `t=` start parameter feeds resume, chapters and `?t=` links.
-- **MP4 fallback** for Downloads and Cast follows `resolveMp4Source`: read
-  `hasMP4Fallback` and `availableResolutions`, cache them on the video row,
-  pick the highest at or under the configured height, and answer with the
-  same four distinct reasons.
-- **Captions** live in Bunny; **status sync** polls `PROCESSING` videos;
-  **"import from the Bunny library"** lists what's there.
-- `Video.source` (`BUNNY`, `YOUTUBE`, `VIMEO`) and the three players stay; the
-  YouTube/Vimeo feed import is an integration, not a video *host*, and stays
-  under Admin → Video feeds with its three-way sync rule intact.
+  expiry against `https://video.bunnycdn.com/tusupload`, the vendored
+  `tus-js-client` streaming the file and the browser calling
+  `/api/admin/videos/[id]/sync-status` afterwards; embed and thumbnail URLs
+  signed per request as `sha256_hex(tokenAuthKey . videoId . expires)` when a
+  token-auth key is set and unsigned otherwise; the `t=` start parameter; MP4
+  fallback per `resolveMp4Source` — read `hasMP4Fallback` and
+  `availableResolutions`, cache them on the row, pick the highest at or under
+  the configured height, answer with the same four reasons; captions in
+  Bunny; status polling of `PROCESSING` videos; "import from the Bunny
+  library". Test: `GET /library/{id}` with the API key succeeds, the CDN
+  hostname answers, and with token auth a signed thumbnail URL returns 200
+  while an unsigned one returns 403.
+- **YouTube**: link mode parses watch, `youtu.be`, shorts and embed URLs;
+  plays in `youtube-nocookie.com` with `rel=0`, as `video-source.ts` does now;
+  thumbnail from `i.ytimg.com`; title and duration from the Data API when a
+  key is set, from oEmbed otherwise. Upload mode is optional and needs an
+  OAuth client — a Google Cloud project, the channel owner's one-time consent
+  stored as a refresh token, the `youtube.upload` scope — after which PHP
+  opens a resumable session and the browser PUTs the file to it; new uploads
+  default to unlisted. The settings page says that the default Data API quota
+  allows about six uploads a day and that an app Google has not verified has
+  its uploads set private. Test: `videos.list` with the key; with OAuth,
+  refresh the token and `channels.list mine=true`. Importing a channel or
+  playlist stays under Admin → Video feeds.
+- **Vimeo**: link mode via oEmbed or `GET /videos/{id}`; embed on
+  `player.vimeo.com` with `dnt=1`, as now; upload via `POST /me/videos` with
+  `upload.approach=tus`, the browser PATCHing to the returned `upload_link`;
+  privacy set from the video's members-only flag (`unlisted`, and `disable`
+  plus a domain whitelist on plans that allow it); captions as text tracks;
+  MP4 from `files` on plans that expose them, otherwise the reason "your
+  Vimeo plan doesn't give file links". Test: `GET /me` shows the `upload`
+  scope and the remaining quota.
+- **Dropbox shared link**: paste `dropbox.com/s/…`, `/scl/fi/…` or
+  `dl.dropboxusercontent.com`; normalise to a direct URL (`dl=1`), HEAD it to
+  confirm `video/*` and Range support, play in a native `<video>`. Optional
+  upload through an app-folder OAuth app: PHP holds the refresh token, mints
+  a four-hour access token for the admin's browser, the browser runs
+  `upload_session/start`, `append_v2`, `finish`, and PHP creates the shared
+  link. Say on screen that the link itself is the credential and that Dropbox
+  pauses links that pass its daily bandwidth. Test: refresh the token and
+  `users/get_current_account`; a link-only configuration has nothing to test
+  and the row says so.
+- **S3-compatible**: endpoint, region, bucket, key id, secret, optional public
+  base URL or CDN. SigV4 presigning in pure PHP; one presigned PUT up to the
+  provider's single-object limit and presigned multipart above it; playback
+  through a fifteen-minute presigned GET minted per request after
+  `canViewVideo` — which is what makes this provider enforce members-only —
+  or through the public base URL when the admin marks the bucket public.
+  Thumbnail and duration captured by the browser on upload and stored beside
+  the object. Test: from the server, presign, PUT, GET and DELETE a probe
+  object; from the browser during the same test, PUT a one-byte object with
+  a presigned URL, which proves the bucket's CORS.
+- **Direct link**: any HTTPS URL; HEAD for `Content-Type: video/*` or
+  `application/vnd.apple.mpegurl`; native player; vendored, prebuilt hls.js
+  for `.m3u8` where the browser has no native HLS. No configuration, so no
+  test; always available.
+- **The host's own disk**: chunked upload as under **Uploads through PHP**,
+  stored under `storage/videos/` with an unguessable name; a public video is
+  published as `public/media/videos/<random>.mp4` so Apache serves it without
+  PHP; a members-only video stays in `storage/` and streams through the app
+  route with Range support, `X-Sendfile` where the host has it. The settings
+  page shows free disk space and says plainly this is for a church with a few
+  videos. Test: the directory is writable and the public path serves a probe
+  file.
+
+Rules that cut across providers:
+
+- **One player module, two kinds.** `iframe` for Bunny, YouTube and Vimeo;
+  `native` (`<video>`) for everything file-based. Both take a start time for
+  resume, chapters and `?t=` links — swapping the iframe `src` as now, setting
+  `currentTime` on native — and both report progress where the provider
+  allows: native `timeupdate`, YouTube's IFrame API, Vimeo's Player SDK,
+  Bunny's Player.js. The watch-progress heartbeat becomes accurate on those
+  and keeps its elapsed-time fallback elsewhere. The autoplay and playback
+  speed device settings apply wherever the player kind can honour them.
+- **Members-only is honest.** Marking a video members-only on a provider
+  whose `enforcesPrivacy` is false shows, at that moment, "the page is gated;
+  the video's own URL is not", and the admin list badges it. The television
+  feed lists a video only when its provider can hand a Roku a stream it can
+  play — HLS from Bunny, an MP4 URL from the file-based providers — and keeps
+  its members-only-on-video-and-series rule.
+- **Downloads and Cast** go through `mp4()` and its reasons;
+  `resolveMp4Source` is the Bunny implementation of it. YouTube's answer is
+  "not from this provider", said as such.
+- **Captions** on file-based providers are `.vtt` files uploaded through the
+  Files slot and attached as `<track>` elements; Bunny and Vimeo use their
+  APIs; YouTube's are managed on YouTube.
+- **Thumbnails** can be replaced by an admin on any provider. For file-based
+  ones the uploader captures a frame in the browser (`<video>` to a canvas,
+  when CORS allows it) at upload or link time and otherwise asks for an
+  image.
+- **Live streaming** is unchanged: `LiveStream` rows point at a stream hosted
+  elsewhere.
+- **Feed import** from a YouTube channel or playlist and a Vimeo account or
+  showcase stays under Admin → Video feeds with the three-way sync rule
+  intact; imported rows are ordinary `youtube` and `vimeo` rows.
+- **Cloudflare Stream, Mux, PeerTube and Wistia** are not in the core but must
+  fit the interface without changes — each has a placeholder-plus-direct-
+  upload flow like Bunny's — and `PLUGINS.md` uses a video provider plugin
+  as its worked example.
 
 ## Email
 
@@ -651,6 +783,13 @@ quoted PascalCase), and the import tool below maps names. Rules:
   CURRENT_TIMESTAMP(3)`; `@db.Date` → `DATE`.
 - Enums → `VARCHAR(32)` with the allowed values enforced in PHP (MySQL `ENUM`
   alterations rewrite the table).
+- `Video.source` becomes `videos.provider VARCHAR(32)` (`bunny`, `youtube`,
+  `vimeo`, `dropbox`, `s3`, `direct`, `host`, or a plugin's id); `external_id`
+  is whatever identifies the video at that provider (Bunny guid, YouTube id,
+  S3 key, a hash of a direct URL); `provider_data JSON` holds the rest (the
+  direct URL, thumbnail and caption keys, Dropbox path, Vimeo privacy,
+  renditions). The unique index stays `(provider, external_id)`; the importer
+  maps `BUNNY`/`YOUTUBE`/`VIMEO` and `bunnyVideoId` onto it.
 - `Json` → `JSON` (MariaDB aliases it to `LONGTEXT` with a validity check;
   fine).
 - `String[]` (`Category.tags`, `Series.tags`, `Video.scriptureRefs`,
@@ -852,6 +991,12 @@ first party too big to fit; consent rules in `planDelivery`.
   the reason, installs one that exhausts memory on load and asserts the same,
   switches email from `mail()` to a Mailpit SMTP with a failing then a
   passing test and asserts only the second commits, and runs `/cron/run`.
+- **Video providers** are tested against recorded HTTP fixtures for Bunny,
+  YouTube, Vimeo and Dropbox (no live accounts in CI); end to end against
+  MinIO for the S3-compatible provider — presign, a browser PUT that proves
+  CORS, presigned GET playback; and for real on the host's own disk,
+  including a chunked upload through the 2 MB limit and a members-only
+  stream answering Range requests.
 - **Static checks**: PHPStan level 6 or higher, PSR-12 via PHP-CS-Fixer,
   `php -l` across the tree on 8.2/8.3/8.4, a grep that fails on the banned
   process functions, and a check that no template echoes an unescaped
@@ -876,11 +1021,13 @@ session can pick up where this one stopped without re-deriving the state.
    the services registry with the Files slot on local disk and Email on
    `mail()`, jobs with both triggers, the plugin and theme loaders with the
    auto-deactivation paths and their tests, the default theme skeleton.
-3. **Library**: categories, series, videos (Bunny Stream provider with the
-   browser upload), files, search, trash, audit, permissions and scoped
-   grants, viewer restrictions, share links, downloads, feeds, sitemap,
-   metadata. Then Auth0 and OIDC providers, Resend and SMTP providers, the
-   Bunny Storage files provider.
+3. **Library**: categories, series, videos — the Bunny Stream provider with
+   its browser upload first, then the link providers (YouTube, Vimeo,
+   Dropbox, direct) and the player module for both kinds; S3-compatible and
+   the host's own disk once the chunked uploader exists — files, search,
+   trash, audit, permissions and scoped grants, viewer restrictions, share
+   links, downloads, feeds, sitemap, metadata. Then Auth0 and OIDC providers,
+   Resend and SMTP providers, the Bunny Storage files provider.
 4. **Bundled plugins**, simplest first (favorites, watch-later, view-counts,
    social-share, ratings, likes, related, up-next, watch-history, profiles,
    chapters, transcripts, recommendations, announcements, webhooks,
@@ -909,6 +1056,11 @@ and carry on — don't stall on it.
   every switch is preceded by its provider's test, a failing test refuses the
   switch, and an admin cannot switch sign-in into a state they can't sign in
   from.
+- Every core video provider does what its row in the **Video** table says:
+  upload where it can, link by pasted URL where it can, both player kinds
+  resume and report progress, downloads and Cast answer with the right
+  reason, and a members-only video on a provider that can't enforce it says
+  so where the admin sets the flag.
 - A plugin that throws, parse-fails, or exhausts memory on load is
   deactivated automatically with the reason visible; the site stays up; a
   plugin throwing in a hook is contained; `/admin/plugins` is reachable with
@@ -928,7 +1080,9 @@ and carry on — don't stall on it.
 
 Do not build a Node runtime dependency, a JavaScript bundler step, a Docker
 requirement for production, a queue server, WebSockets, a second ORM, or a
-Vercel-shaped deployment. Do not proxy video through PHP. Do not keep pooled
+Vercel-shaped deployment. Do not proxy video through PHP, other than the
+host-disk provider's members-only files, which is that provider's documented
+cost. Do not keep pooled
 and direct database URLs, `force-dynamic`, React `cache()`, Prisma, or any
 other artefact of the platform this is leaving; keep the reasons they existed
 where those reasons still apply.
