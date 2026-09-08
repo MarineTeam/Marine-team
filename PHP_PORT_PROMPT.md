@@ -23,12 +23,14 @@ without touching code:
 
 | | Options | Notes |
 | --- | --- | --- |
-| Sign-in | Auth0, OpenID Connect, local accounts | Local works immediately. Auth0 and OIDC need the site reachable over HTTPS first. |
-| Video | bunny.net Stream, YouTube, Vimeo, Dropbox shared links, S3-compatible storage (Cloudflare R2, Backblaze B2, Wasabi, AWS S3), a direct link, the host's own disk | Uploads go straight from the browser to the provider. Bunny, YouTube and Vimeo transcode; the file-based ones play the MP4 they are given. Only Bunny, S3 and the host's disk can keep a members-only video from anyone holding its link. |
-| Email | Resend, SMTP, PHP `mail()` | If your host blocks outbound HTTPS, SMTP is usually the one that works. |
+| Sign-in | Local accounts (password, magic link), Auth0, OpenID Connect with presets (Google, Microsoft Entra ID, Apple, Okta, Keycloak, Authentik, Zitadel, Logto, Kinde, Clerk), Clerk, Supabase Auth, Firebase Authentication | Local works immediately. Every external provider needs the site reachable over HTTPS first. |
+| Video | bunny.net Stream, YouTube, Vimeo, shared links from Dropbox, Google Drive and OneDrive/SharePoint, Internet Archive, S3-compatible storage (Cloudflare R2, Backblaze B2, Wasabi, AWS S3), a direct link, the host's own disk | Uploads go straight from the browser to the provider. Bunny, YouTube and Vimeo transcode; the file-based ones play the MP4 they are given. Only Bunny, S3 and the host's disk can keep a members-only video from anyone holding its link. |
+| Email | SMTP (presets for the host's own mail server, Google Workspace, Microsoft 365, Zoho, Fastmail and the API providers' relays), PHP `mail()`, Resend, Mailgun, SendGrid, Postmark, Amazon SES, Brevo, Microsoft 365 via Graph | If your host blocks outbound HTTPS, SMTP is usually the one that works; if it blocks the SMTP ports instead, the HTTPS API ones are. |
 
 Any of them can be changed later under **Admin → Services**. Switching runs the
-new service's connection test first, and refuses the switch if it fails.
+new service's connection test first, and refuses the switch if it fails. The
+lists above are the first release, not the ceiling: every slot is a registry,
+and **Adding a provider later** below is the whole procedure for another one.
 
 And the port gets **WordPress-like plugin and theme functionality**: a
 `plugins/` directory of self-contained packages with a header, an activation
@@ -107,8 +109,9 @@ These describe the host the port must run on. Treat each as a test case.
    sign-in, SMTP, `mail()`, local file storage) keep working.
 8. **No HTTPS at first.** A site is often set up on a temporary hostname before
    its certificate exists. Local sign-in, video, and email all work over plain
-   HTTP; Auth0 and OIDC are offered but refuse to be activated until the site
-   is reached over HTTPS (redirect URIs must be `https://`).
+   HTTP; every external sign-in provider is offered but refuses to be
+   activated until the site is reached over HTTPS (redirect URIs must be
+   `https://`, and tokens must not cross the wire in clear).
 9. **A writable directory is the only state outside the database.** Default
    `storage/` inside the install; the installer offers to put it above the
    document root when the host allows and protects it with `.htaccess` when it
@@ -289,8 +292,8 @@ never depend on the cache being warm or present.
    fill its fields, with a **Test** button per provider. Local sign-in, local
    file storage and `mail()` are preselected so the wizard can finish with
    nothing external configured; each other provider can be "set up later".
-   Auth0 and OIDC are greyed out with the reason until the wizard is reached
-   over HTTPS.
+   External sign-in providers are greyed out with the reason until the wizard
+   is reached over HTTPS.
 5. **Finish**: write `installed.lock`, print the cron line for the host's
    control panel (see **Scheduled jobs**) and say what happens if they don't
    add it, and land on `/admin`.
@@ -315,8 +318,8 @@ A **service** is a slot the core depends on through an interface; a
 slot: `slot`, `provider`, `config` (JSON, secrets encrypted with `app_key`
 using `sodium` or `openssl` AES-256-GCM), `updated_at`, `updated_by`.
 Providers are registered in code — core ones in `app/Services/`, more through
-the `services.providers` hook so a plugin can add a Vimeo video host or a
-Mailgun email provider. Each provider declares:
+the `services.providers` hook so a plugin can add a Mux video host or a
+Mailjet email provider. Each provider declares:
 
 ```php
 interface ServiceProvider {
@@ -346,22 +349,23 @@ usually the one that works" a thing the screen says rather than the manual.
 
 Slots the port has, and what "test" means for each:
 
-- **auth** (Local, Auth0, OIDC) — see below. Beyond the automated test, the
-  switch *away* from the current provider completes only after the switching
-  admin has signed in through the new one: the new provider is enabled in
-  trial mode for that admin's session alone, they finish a login in a second
-  tab, and the switch commits. No admin can lock themselves out by typing a
-  wrong client id.
+- **auth** (local accounts, Auth0, OpenID Connect with presets, Clerk,
+  Supabase Auth, Firebase Authentication) — each provider's test is under
+  **Sign-in providers** below. Beyond the automated test, the switch *away*
+  from the current provider completes only after the switching admin has
+  signed in through the new one: the new provider is enabled in trial mode
+  for that admin's session alone, they finish a login in a second tab, and
+  the switch commits. No admin can lock themselves out by typing a wrong
+  client id.
 - **video** (bunny.net Stream, YouTube, Vimeo, Dropbox, S3-compatible, direct
   link, the host's own disk) — each provider's test is under **Video** below.
   This slot chooses where *new* videos go; every provider that has ever been
   configured keeps playing the videos it holds, so a switch re-hosts nothing.
-- **email** (Resend, SMTP, `mail()`) — Resend: an authenticated API call
-  (`GET /domains`) succeeds and `from` is on a verified domain. SMTP: connect,
-  STARTTLS/TLS as configured, EHLO, AUTH, then send a test message to the
-  admin. `mail()`: the function exists and a test message with a six-digit
-  code is sent to the admin; the switch commits only when the admin types the
-  code back, because `mail()` returning true proves nothing about delivery.
+- **email** (SMTP, `mail()`, Resend, Mailgun, SendGrid, Postmark, Amazon SES,
+  Brevo, Microsoft 365 via Graph) — each provider's test is in the table under
+  **Email** below. Every one ends by sending a message to the admin; `mail()`
+  alone also needs the admin to type back the six-digit code that message
+  carried, because `mail()` returning true proves nothing about delivery.
 - **files** (Local disk, Bunny Storage) — this fourth slot is not in the
   table above and is added because the port can't exist without deciding
   where PDFs, audio and other uploads live. Local disk is the default and
@@ -387,20 +391,90 @@ bytes), **Google Sheets** (service-account JSON; the JWT is signed with
 login). Every place the current app says "set `SOME_VAR`" now names the
 setting and links to it.
 
+### Adding a provider later
+
+Every slot's provider list *is* the registry, and the registry is the only
+thing the admin screens read, so adding a provider — in the core under
+`app/Services/<Slot>/`, or in a plugin whose header says `Provides: <slot>` —
+never touches a core screen. A new provider is:
+
+- one class implementing the slot's interface and `ServiceProvider`;
+- its `configSchema()`, which is the whole of its admin form;
+- its `test()`, written to fail with a sentence a volunteer can act on;
+- recorded HTTP fixtures for the test and the main calls, so CI covers it
+  without an account;
+- a row in `SERVICES.md`'s table for that slot, in the same columns as the
+  tables in this document, saying honestly what it can and can't do;
+- and per slot: a video provider's `VideoCapabilities` and `PlayerSpec`; a
+  sign-in provider's flow kind and how `sub`, `email_verified` and the
+  membership claim are derived; an email provider's error mapping; a files
+  provider's streaming and signing rules.
+
+The providers each section lists as "later" are expected to fit without
+changing an interface. If one doesn't, change the interface in the core and
+record it under "Deviations" in `PORT_MAP.md`, rather than special-casing
+that provider.
+
 ## Sign-in providers
+
+The slot holds one **primary** provider. Local sign-in can stay enabled
+beside it — for `ADMIN` accounts by default, for members when the admin says
+so — which is what the lockout rule below relies on. Several external
+providers active at once is not required; the identity model already allows
+it, so a later version can offer it without a migration.
 
 Keep the identity model: a `users` row per person, `user_identities` rows
 keyed by `sub` with `provider`, `email`, `email_verified`. `decideLinking()`
 from `src/lib/identity-linking.ts` ports as-is and stays the only way an
 incoming identity is attached to a member: sub first; a never-seen sub may
 attach by email only when the provider verified it; an unverified match is
-refused indistinguishably from any other denial. `authorizeIdentity()` and
-the four `AUTHORIZATION_MODE`s port with their fail-closed defaults; the
-organisation check simply reports "not applicable" for providers without
-organisations, which under `BOTH` means the allowlist decides. Refusals
-record `unauthorized_access_attempts` with the same reasons, the same
-once-an-hour dedupe, the admin email on first refusal, and the 90-day prune.
+refused indistinguishably from any other denial. `sub` is stored namespaced
+as `<provider id>|<the provider's own sub>` for every provider except Auth0,
+whose subs (`google-oauth2|…`) are already globally unique and are kept
+verbatim so imported identities still match. `authorizeIdentity()` and the
+four `AUTHORIZATION_MODE`s port with their fail-closed defaults; the
+organisation check becomes a **membership claim** any provider may supply
+(Auth0's `org_id`, an OIDC `groups` value, Entra's `tid`, Clerk's `org_id`,
+Google's `hd`), and a provider without one reports "not applicable", which
+under `BOTH` means the allowlist decides. Refusals record
+`unauthorized_access_attempts` with the same reasons, the same once-an-hour
+dedupe, the admin email on first refusal, and the 90-day prune.
 `/access-denied` stays one plain sentence.
+
+**Three flow kinds** are all the interface has to know about:
+
+```php
+interface AuthProvider extends ServiceProvider {
+    public function flow(): string;                 // 'form' | 'redirect' | 'token'
+    public function routes(Router $r): void;         // its own /auth/* routes
+    public function logoutUrl(?string $returnTo): ?string;
+    public function membershipClaim(): ?string;      // what stands in for Auth0's org_id, if anything
+    public function registrationCheck(): ?RegistrationCheck;
+        // how the provider can ask "may this address sign up" before creating an account
+}
+```
+
+- **`form`** — the provider renders and handles its own forms: local
+  accounts; Supabase's password and magic-link modes.
+- **`redirect`** — start → provider → `/auth/callback`, with `state`, `nonce`
+  and PKCE checked: Auth0, OpenID Connect and every preset, Supabase's social
+  sign-in, Clerk used as an OIDC provider.
+- **`token`** — the provider's own script, which the browser loads from the
+  provider's CDN (the host's outbound rules don't apply to the browser),
+  signs the person in; the browser POSTs the resulting JWT to `/auth/token`;
+  PHP verifies it against the provider's JWKS or secret, derives the
+  identity, and only then writes the app session: Clerk native, Firebase
+  Authentication, Supabase through `supabase-js`.
+
+Whatever the flow, one function turns a verified assertion into an `Identity`
+(`sub`, `provider`, `email`, `email_verified`, `name`, `picture`,
+`membership`), and `authorizeIdentity` and `decideLinking` run on it
+unchanged. Every provider except local requires the site to be HTTPS —
+redirect URIs must be `https://`, and a token or a password must not cross
+the wire in clear — and both the installer and Admin → Services refuse them
+otherwise and say why.
+
+Providers in the core:
 
 - **Local accounts** (`provider = 'local'`). Passwords with
   `password_hash(PASSWORD_ARGON2ID)` where available, bcrypt otherwise; a
@@ -411,10 +485,13 @@ once-an-hour dedupe, the admin email on first refusal, and the 90-day prune.
   Action's job survives), `/auth/verify/[token]`, `/auth/reset` and
   `/auth/reset/[token]` (via the email service; a reset link is single-use,
   expires in an hour, and a request for an unknown address answers exactly
-  like a known one). Login throttling is per account and per IP, in the
-  database. Password change and a "sign out everywhere" button live on
-  `/profile/settings`. Optional TOTP second factor for admins is welcome but
-  not required by this prompt.
+  like a known one). **Magic link** is a mode of the same provider: a
+  single-use sign-in link by email, valid fifteen minutes, offered as the
+  first button when the admin turns it on — for the members who will never
+  keep a password — and needing the email service. Login throttling is per
+  account and per IP, in the database. Password change and "sign out
+  everywhere" live on `/profile/settings`. Test: nothing external; the row
+  says "always available".
 - **Auth0**. Authorization Code with PKCE against the tenant's OIDC
   endpoints, the `organization` parameter sent under the same rules
   `src/lib/auth0.ts` documents (exactly one configured and required → send it;
@@ -425,25 +502,67 @@ once-an-hour dedupe, the admin email on first refusal, and the 90-day prune.
   the registration-check endpoint for the Pre-User-Registration Action
   (`auth0-actions/` stays valid; update its README for the new setting names).
   ID tokens are verified against the tenant's JWKS (cached in the file cache
-  with the `kid` rotation handled), `nonce` and `state` checked, and the
-  session cookie is only written after `authorizeIdentity` says yes — the
-  thing `src/proxy.ts` exists to enforce is natural here because the app owns
-  the cookie.
-- **OpenID Connect** (generic). Issuer URL → discovery document → PKCE code
+  with `kid` rotation handled), `nonce` and `state` checked, and the session
+  cookie is only written after `authorizeIdentity` says yes — what
+  `src/proxy.ts` exists to enforce is natural here because the app owns the
+  cookie. Test: discovery and JWKS fetch, and the redirect URI is HTTPS.
+- **OpenID Connect**, generic. Issuer URL → discovery document → PKCE code
   flow → JWKS verification (RS256/ES256), `email`, `email_verified`, `name`,
-  `picture` claims, an optional groups claim and value that stands in for the
-  organisation check, and an optional logout endpoint. Tested against
-  Keycloak, Authentik, Microsoft Entra ID and Google, with a note per
-  provider in the docs (Google doesn't send `email_verified` for every
-  account type; Entra needs the `email` optional claim).
-- **Lockout prevention** is a rule, not a hope: the bootstrap local admin
-  always exists; the trial-mode switch above; and a break-glass that needs no
-  shell — creating an empty file `storage/enable-local-login` re-enables
-  local sign-in for `ADMIN` accounts on the next request and shows a banner
-  until it is deleted. Document it in `INSTALL.md` under "Locked out".
+  `picture`, an optional membership claim and required value, an optional
+  end-session endpoint. **Presets** fill the discovery URL, scopes, claim
+  mapping and the notes for a named provider and are otherwise this same
+  provider: Google (with `hd` as the membership claim for a Workspace
+  domain; not every account type carries `email_verified`), Microsoft Entra
+  ID (`tid` or `groups` as membership; the `email` optional claim must be
+  enabled), Sign in with Apple (the client secret is an ES256 JWT signed with
+  the Apple key and regenerated before it expires; `response_mode=form_post`;
+  the name arrives on the first sign-in only; private-relay addresses), Okta,
+  Keycloak, Authentik, Zitadel, Logto, Kinde, and **Clerk as an OIDC
+  provider** (discovery on the instance's Frontend API domain, `org_id` as
+  membership). Test: discovery, JWKS, and the redirect URI is HTTPS.
+- **Clerk**, native. ClerkJS, loaded from the instance's Frontend API domain,
+  mounts Clerk's sign-in on `/auth/login`; on success the browser posts the
+  session JWT to `/auth/token`; PHP verifies it against the Frontend API's
+  `/.well-known/jwks.json`, takes `sub` (`user_…`) and `org_id`, and gets the
+  address and its verification from a JWT template the docs tell the admin to
+  create (`email`, `email_verified`) or, failing that, from the Backend API
+  (`GET /v1/users/{id}` with the secret key). Production instances need the
+  DNS records Clerk asks for and an HTTPS site. Test: fetch the JWKS, and
+  `GET /v1/users?limit=1` with the secret key.
+- **Supabase Auth**. GoTrue's REST API, pure HTTP from PHP, no SDK: password
+  (`POST /auth/v1/token?grant_type=password`), magic link
+  (`POST /auth/v1/otp`, then `POST /auth/v1/verify` with the `token_hash`
+  from the link), and any social provider Supabase has enabled through its
+  PKCE flow (`GET /auth/v1/authorize?provider=…&code_challenge=…` →
+  `/auth/callback?code=` → `POST /auth/v1/token?grant_type=pkce`). The
+  access token is verified locally — HS256 with the project's JWT secret, or
+  the project's JWKS when it uses asymmetric signing keys — with
+  `GET /auth/v1/user` as the fallback; `email_confirmed_at` is
+  `email_verified`. Sign-up through `/auth/v1/signup` only when
+  self-registration is on and the allowlist says yes; reset through
+  `/auth/v1/recover`; Supabase's "before user created" auth hook can call
+  `/api/auth/registration-check` the way the Auth0 Action does. Test:
+  `GET /auth/v1/settings` with the anon key, and `GET /auth/v1/admin/users?per_page=1`
+  with the service-role key when one is given.
+- **Firebase Authentication**. Token flow: the Firebase JS SDK (and
+  optionally FirebaseUI) from Google's CDN signs the person in; PHP verifies
+  the ID token's RS256 signature against Google's published certificates
+  (cached per their `Cache-Control`), `iss = https://securetoken.google.com/<project>`,
+  `aud = <project>`, and takes `sub`, `email`, `email_verified`, `name`,
+  `picture`. Test: fetch the certificates and the project's public
+  configuration with the web API key.
 
-Auth0 and OIDC also require `APP_BASE_URL` to be HTTPS; the installer and
-Admin → Services both refuse them otherwise and say why.
+**Later**, and expected to fit without changing the interface: passkeys
+(WebAuthn) on local accounts with a single-file pure-PHP library; SAML for a
+diocese or denomination's identity provider; Stytch, Descope and Hanko by
+their token flows; more than one external provider active at once.
+
+**Lockout prevention** is a rule, not a hope: the bootstrap local admin
+always exists; every switch of this slot completes only after the switching
+admin has signed in through the new provider in trial mode; and a break-glass
+that needs no shell — creating an empty file `storage/enable-local-login`
+re-enables local sign-in for `ADMIN` accounts on the next request and shows a
+banner until it is deleted. Document it in `INSTALL.md` under "Locked out".
 
 ## Video
 
@@ -478,14 +597,18 @@ interface VideoProvider extends ServiceProvider {
 }
 ```
 
-`UploadTicket` tells the one vendored uploader which of five things to do, and
-in none of them does an API key reach the browser: `tus` (endpoint, headers,
-metadata — Bunny and Vimeo), `put` or `multipart` (presigned URLs —
-S3-compatible), `resumable` (a session URL PHP opened with the provider's
-OAuth token — YouTube, Dropbox), or `chunked` (slices through PHP — the host's
-own disk). Adding a video in `/admin/videos` is two tabs: **Upload**, to the
-default provider, and **Link**, a pasted URL that each link-capable provider
-is asked to `matchesLink()`, with the first match resolving it.
+`UploadTicket` tells the one vendored uploader which of six things to do, and
+in none of them does a long-lived credential reach the browser: `tus`
+(endpoint, headers, metadata — Bunny and Vimeo), `put` or `multipart`
+(presigned URLs — S3-compatible), `resumable` (a pre-authorised session URL
+PHP opened with the provider's OAuth token, which the browser PUTs to with no
+credential of its own — YouTube, Google Drive, OneDrive), `dropbox` (a
+four-hour access token for the admin's browser and Dropbox's upload-session
+calls), or `chunked` (slices through PHP — the host's own disk).
+
+Adding a video in `/admin/videos` is two tabs: **Upload**, to the default
+provider, and **Link**, a pasted URL that each link-capable provider is asked
+to `matchesLink()`, with the first match resolving it.
 
 Providers in the core, and what each honestly offers:
 
@@ -495,6 +618,9 @@ Providers in the core, and what each honestly offers:
 | YouTube | link; optional Data API resumable upload | yes | from the provider | on YouTube | no | no: unlisted is a secret, not a lock | default API quota allows about six uploads a day; an unverified app's uploads are locked private |
 | Vimeo | TUS through the API | yes | from the provider | API | file links on paid plans | partly: domain-restricted embed on paid plans | free tier is 500 MB a week |
 | Dropbox shared link | link; optional API upload with a short-lived token | no: must already be H.264/AAC MP4 | captured and read in the browser | VTT sidecar via the Files slot | yes, it is a file | no | 20 GB a day on Basic, 200 GB on paid; links pause past that |
+| Google Drive shared link | link; optional resumable upload through the Drive API | no | from the Drive API with a browser-restricted key; otherwise captured | VTT sidecar | yes with the API key; no in preview-embed mode | no | Drive is not a CDN: a much-watched file trips its per-file download quota for a day |
+| OneDrive / SharePoint shared link | link; optional upload through a Graph upload session | no | from the shares or Graph API; otherwise captured | VTT sidecar | yes | no for the link; the Business download URL is short-lived | Microsoft throttles hot files; a tenant can forbid anonymous links |
+| Internet Archive | link only | no; the Archive derives an H.264 copy after upload | from the metadata API and `services/img` | VTT sidecar | yes | no, everything there is public | free; playback speed varies |
 | S3-compatible (Cloudflare R2, Backblaze B2, Wasabi, AWS S3) | presigned PUT, multipart above the single-PUT limit | no | captured and read in the browser | VTT sidecar | yes | yes: presigned GET per request | bucket CORS must allow the site; egress pricing varies, R2's is free |
 | Direct link | link only | no; HLS `.m3u8` through vendored hls.js | captured and read in the browser | VTT sidecar | yes when it is a file | no | whatever hosts the file |
 | The host's own disk | chunked through PHP | no | captured and read in the browser | VTT sidecar | yes | yes, at the cost of PHP bandwidth | the plan's disk and bandwidth; the last resort |
@@ -546,6 +672,48 @@ What must be right per provider:
   pauses links that pass its daily bandwidth. Test: refresh the token and
   `users/get_current_account`; a link-only configuration has nothing to test
   and the row says so.
+- **Google Drive shared link**: paste `drive.google.com/file/d/<id>/view`,
+  `open?id=`, or `uc?id=`. Two modes, chosen on the settings row. *Preview
+  embed* needs no key: an iframe on `drive.google.com/file/d/<id>/preview`,
+  Google's own player, no MP4, no progress events, no start time. *Drive
+  API* needs an API key restricted to the site's HTTP referrers with the
+  Drive API enabled: metadata from `files/<id>?fields=name,size,mimeType,
+  videoMediaMetadata,thumbnailLink`, playback in a native `<video>` straight
+  from `files/<id>?alt=media&key=…`, which supports Range and CORS for files
+  shared with anyone with the link. Never use the `uc?export=download` path —
+  it interposes a virus-scan page above about 100 MB. Optional upload with
+  OAuth (`drive.file` scope): PHP opens a resumable session, the browser
+  PUTs chunks to it, PHP grants `anyone: reader`. Say on screen that Drive
+  is not a CDN and that a much-watched file is refused for a day once it
+  passes its download quota. Test: with a key, `GET files/<known public id>`;
+  in embed mode there is nothing to test and the row says so.
+- **OneDrive / SharePoint shared link**: paste a `1drv.ms`, `onedrive.live.com`,
+  `<tenant>-my.sharepoint.com` or `<tenant>.sharepoint.com` link. The link is
+  encoded as `u!` plus its base64url form. *Personal OneDrive* resolves
+  anonymously through `api.onedrive.com/v1.0/shares/<encoded>/root` for
+  name, size, `video.duration` and thumbnails, and streams from
+  `…/root/content`, which redirects to a Range-capable URL. *OneDrive for
+  Business and SharePoint* need an Entra app registration with the
+  `Files.Read.All` application permission: PHP takes a client-credentials
+  token, resolves `graph.microsoft.com/v1.0/shares/<encoded>/driveItem`, and
+  hands the player the pre-authenticated, short-lived
+  `@microsoft.graph.downloadUrl` minted per request after `canViewVideo` —
+  the link is still the credential, but the URL the page carries expires.
+  Optional upload for either: Graph's `createUploadSession` returns a
+  pre-authenticated `uploadUrl` the browser PUTs to in ranges, then PHP
+  creates an anonymous view link — and says so when the tenant forbids
+  those. Test: personal, resolve a known public share; Business, obtain the
+  client-credentials token and resolve a share link the admin pastes into
+  the test, which proves the permission and the consent together.
+- **Internet Archive**: paste `archive.org/details/<identifier>`; read
+  `archive.org/metadata/<identifier>` for the files, pick the H.264 or MPEG4
+  derivative, play it natively from `archive.org/download/<identifier>/<file>`
+  (Range and CORS both fine), thumbnail from
+  `archive.org/services/img/<identifier>`, duration from the file's `length`.
+  Everything there is public, so members-only is page-level only and the
+  screen says so. No configuration, so no test. Upload through the Archive's
+  S3-like API is a "later" item: its `LOW key:secret` authorisation is not
+  SigV4, so the S3-compatible provider doesn't cover it.
 - **S3-compatible**: endpoint, region, bucket, key id, secret, optional public
   base URL or CDN. SigV4 presigning in pure PHP; one presigned PUT up to the
   provider's single-object limit and presigned multipart above it; playback
@@ -600,10 +768,14 @@ Rules that cut across providers:
 - **Feed import** from a YouTube channel or playlist and a Vimeo account or
   showcase stays under Admin → Video feeds with the three-way sync rule
   intact; imported rows are ordinary `youtube` and `vimeo` rows.
-- **Cloudflare Stream, Mux, PeerTube and Wistia** are not in the core but must
-  fit the interface without changes — each has a placeholder-plus-direct-
-  upload flow like Bunny's — and `PLUGINS.md` uses a video provider plugin
-  as its worked example.
+- **Later**, and expected to fit the interface without changes: hosts with
+  a placeholder-plus-direct-upload flow like Bunny's — Cloudflare Stream
+  (one-time upload URLs, TUS), Mux (signed direct uploads), Wistia, JW
+  Player, PeerTube; embed-only sources — Rumble, Facebook video, Twitch for
+  live; and link sources — Box shared links (direct links on paid plans),
+  Backblaze B2's native API, Internet Archive upload. `PLUGINS.md` uses a
+  video provider plugin as its worked example, and **Adding a provider
+  later** is the procedure.
 
 ## Email
 
@@ -611,14 +783,50 @@ Rules that cut across providers:
 `text` body and an `html` body, and an optional `replyTo`. Everything that
 sends — notifications, broadcasts (one row per recipient per channel, marked
 as it goes, batch loop driven from the browser exactly as `broadcast-send.ts`
-does), password resets, verification, the admin refusal alert, the `mail()`
-confirmation code — goes through it. Providers: **Resend** (HTTPS API, as
-`email.ts` does today), **SMTP** (PHPMailer: host, port, encryption
-none/STARTTLS/TLS, username, password, from, timeout), **PHP `mail()`**
-(from, optional `-f` sender; the docs are honest that deliverability depends
-on the host's SPF and DKIM). Unconfigured email is a first-class state: sends
-become recorded no-ops, the screens that need email say so, and local
-sign-in's reset flow explains that an admin must set the password instead.
+does), password resets and magic links, verification, the admin refusal
+alert, the `mail()` confirmation code — goes through it. Every send writes an
+`email_log` row (to, subject, provider, status, provider message id, error),
+shown at `/admin/email` with a resend button, because on shared hosting the
+log is the only way to learn a message never left.
+
+The two sentences the Services page says, both true: if the host blocks
+outbound HTTPS, SMTP is usually the one that works; if it blocks the SMTP
+ports (25, 465, 587) instead — common too — the HTTPS API providers are.
+Every API provider below also offers an SMTP relay, and the SMTP provider
+has a preset for each, so nothing forces one transport.
+
+Providers in the core, and what "test" means for each. Every test ends by
+sending a message to the admin; the `mail()` test alone also requires the
+admin to type back the six-digit code it carried before the switch commits,
+because `mail()` returning true proves nothing about delivery.
+
+| Provider | Talks over | Test before switching |
+| --- | --- | --- |
+| SMTP (PHPMailer) | 25 / 465 / 587 | connect, STARTTLS or TLS as configured, EHLO, AUTH, then the test message |
+| PHP `mail()` | the host's own mail transfer agent | the function exists; the code-confirmed test message |
+| Resend | HTTPS | `GET /domains`; `from` is on a verified domain |
+| Mailgun | HTTPS, US or EU endpoint | `GET /v3/domains/<domain>` shows the domain active |
+| SendGrid | HTTPS | `GET /v3/scopes` includes `mail.send`; `from` is among the verified senders |
+| Postmark | HTTPS | `GET /server` with the server token; `from` is a confirmed sender signature |
+| Amazon SES | HTTPS, SigV4 (the same signer as the S3 video and files providers) | `GetAccount`; the `from` identity's verification status; a warning while the account is in the sandbox |
+| Brevo | HTTPS | `GET /v3/account` |
+| Microsoft 365 via Graph | HTTPS | a client-credentials token, then `GET /users/<from>`; the docs explain the `Mail.Send` application permission, admin consent, and an application access policy limiting it to that mailbox — this provider exists because SMTP AUTH is off by default in new tenants |
+
+SMTP **presets** fill host, port and encryption and say which credential goes
+where: the host's own mail server (the installer's first suggestion — on
+cPanel that is `localhost:25` with no authentication or the mailbox's own
+credentials, and it is usually what works), Google Workspace / Gmail with an
+app password, Microsoft 365 (SMTP AUTH must be enabled for the mailbox),
+Zoho, Fastmail, and the relays of Mailgun, SendGrid, Postmark, Amazon SES,
+Brevo and SMTP2GO.
+
+Unconfigured email is a first-class state: sends become recorded no-ops, the
+screens that need email say so, and local sign-in's reset flow explains that
+an admin must set the password instead.
+
+**Later**: MailerSend, SparkPost, Mailjet, Elastic Email, Mailtrap, and the
+Gmail API with domain-wide delegation for a Workspace that forbids app
+passwords. Inbound mail is out of scope.
 
 ## Plugins
 
@@ -784,7 +992,8 @@ quoted PascalCase), and the import tool below maps names. Rules:
 - Enums → `VARCHAR(32)` with the allowed values enforced in PHP (MySQL `ENUM`
   alterations rewrite the table).
 - `Video.source` becomes `videos.provider VARCHAR(32)` (`bunny`, `youtube`,
-  `vimeo`, `dropbox`, `s3`, `direct`, `host`, or a plugin's id); `external_id`
+  `vimeo`, `dropbox`, `gdrive`, `onedrive`, `archive`, `s3`, `direct`,
+  `host`, or a plugin's id); `external_id`
   is whatever identifies the video at that provider (Bunny guid, YouTube id,
   S3 key, a hash of a direct URL); `provider_data JSON` holds the rest (the
   direct URL, thumbnail and caption keys, Dropbox path, Vimeo privacy,
@@ -992,11 +1201,17 @@ first party too big to fit; consent rules in `planDelivery`.
   switches email from `mail()` to a Mailpit SMTP with a failing then a
   passing test and asserts only the second commits, and runs `/cron/run`.
 - **Video providers** are tested against recorded HTTP fixtures for Bunny,
-  YouTube, Vimeo and Dropbox (no live accounts in CI); end to end against
-  MinIO for the S3-compatible provider — presign, a browser PUT that proves
-  CORS, presigned GET playback; and for real on the host's own disk,
-  including a chunked upload through the 2 MB limit and a members-only
-  stream answering Range requests.
+  YouTube, Vimeo, Dropbox, Google Drive, OneDrive and Internet Archive (no
+  live accounts in CI); end to end against MinIO for the S3-compatible
+  provider — presign, a browser PUT that proves CORS, presigned GET playback;
+  and for real on the host's own disk, including a chunked upload through the
+  2 MB limit and a members-only stream answering Range requests.
+- **Sign-in and email providers** likewise: fixtures for Auth0, Clerk,
+  Supabase, Firebase and every email API; the OIDC provider end to end
+  against a Dex or Keycloak container in the smoke test, including a preset;
+  the token flow end to end with a JWT minted by the test against a local
+  JWKS; SMTP against Mailpit; and the trial-mode switch proven by a test that
+  fails to complete the second-tab login and asserts nothing changed.
 - **Static checks**: PHPStan level 6 or higher, PSR-12 via PHP-CS-Fixer,
   `php -l` across the tree on 8.2/8.3/8.4, a grep that fails on the banned
   process functions, and a check that no template echoes an unescaped
@@ -1026,8 +1241,10 @@ session can pick up where this one stopped without re-deriving the state.
    Dropbox, direct) and the player module for both kinds; S3-compatible and
    the host's own disk once the chunked uploader exists — files, search,
    trash, audit, permissions and scoped grants, viewer restrictions, share
-   links, downloads, feeds, sitemap, metadata. Then Auth0 and OIDC providers,
-   Resend and SMTP providers, the Bunny Storage files provider.
+   links, downloads, feeds, sitemap, metadata. Then the remaining sign-in
+   providers (Auth0, OpenID Connect and its presets, Clerk, Supabase Auth,
+   Firebase), the remaining email providers, and the Bunny Storage files
+   provider.
 4. **Bundled plugins**, simplest first (favorites, watch-later, view-counts,
    social-share, ratings, likes, related, up-next, watch-history, profiles,
    chapters, transcripts, recommendations, announcements, webhooks,
@@ -1061,6 +1278,9 @@ and carry on — don't stall on it.
   resume and report progress, downloads and Cast answer with the right
   reason, and a members-only video on a provider that can't enforce it says
   so where the admin sets the flag.
+- Every core sign-in and email provider passes its fixture tests and its
+  test-before-switch, and `SERVICES.md` has a row for each provider in every
+  slot saying what it can't do as plainly as what it can.
 - A plugin that throws, parse-fails, or exhausts memory on load is
   deactivated automatically with the reason visible; the site stays up; a
   plugin throwing in a hook is contained; `/admin/plugins` is reachable with
