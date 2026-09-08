@@ -1,9 +1,39 @@
 # Prompt: port Marine Team to PHP + MySQL/MariaDB for ordinary shared hosting
 
-Paste everything below the rule into a fresh coding-agent session that has this
-repository checked out. It is written to the agent doing the port. The current
-Next.js code stays untouched; it is the reference implementation the port is
-measured against.
+This is written to the agent doing the port. Set up a fresh coding-agent
+session one of the two ways below, then paste everything under the rule.
+
+**Recommended: a new repository, with this one beside it as a read-only
+reference.** The port is a different runtime with its own CI, its own release
+artefact (a zip) and its own plugin ecosystem, so it wants its own history;
+a branch that can never merge is the wrong tool for it. But this document is
+written against this repository's files — `README.md`, `FEATURES.md`,
+`prisma/schema.prisma`, the tests — and an agent that can't open them will
+reinvent instead of port. So:
+
+1. Create the new repository (say `marine-team-php`) and add this one as a
+   submodule pinned to a commit:
+   `git submodule add <this repository's URL> reference/nextjs`. In a hosted
+   session that doesn't initialise submodules, run
+   `git submodule update --init --depth 1` from the setup script, or attach
+   this repository to the session as a second, read-only source instead.
+2. Copy this file to the new repository's root as `PORT_PROMPT.md`.
+3. Every path in this document that isn't part of the new tree —
+   `README.md`, `FEATURES.md`, `src/…`, `prisma/…`, `public/…`,
+   `scripts/…`, `auth0-actions/…` — means that file under
+   `reference/nextjs/`. Never edit anything there.
+4. The one change the port makes to the Next.js repository is
+   `scripts/export-for-php.mjs` (see **Database**). Open it as a pull request
+   against this repository, not as an edit inside the submodule.
+
+**Also fine: a `php/` directory on a branch of this repository**, if two
+repositories are more than you want to manage today. Everything this document
+describes then lives under `php/`, the reference is the tree above it, and
+`git subtree split -P php` moves it to a repository of its own later with its
+history intact. Touch nothing outside `php/` except the export script.
+
+Either way, the Next.js code is the reference implementation the port is
+measured against, and it stays untouched.
 
 ---
 
@@ -1126,8 +1156,9 @@ fails halfway must be re-runnable (`IF NOT EXISTS`, checks before `ALTER`).
 Both MySQL 8 and MariaDB 10.6 run every migration in CI.
 
 **Data import from a running Next.js deployment** is a deliverable, not an
-afterthought: add `scripts/export-for-php.mjs` to *this* repository (Prisma,
-every table to newline-delimited JSON in a zip, ids and timestamps verbatim,
+afterthought: add `scripts/export-for-php.mjs` to the Next.js repository, as
+a pull request there (Prisma, every table to newline-delimited JSON in a
+zip, ids and timestamps verbatim,
 no secrets that don't transfer — push subscriptions and television tokens are
 dropped; share-link password hashes are kept in their `scrypt$salt$key`
 form, which the port verifies with a small vendored pure-PHP scrypt (RFC
