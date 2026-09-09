@@ -6,6 +6,16 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Serverless function storage cut by 53%** — 25.4 GB to 11.8 GB per
+  deployment. Prisma ships a WASM query engine and query compiler for every
+  database it supports, and Next's file tracing cannot tell which one a running
+  app picks, so all five went into all 305 functions. Measured on a clean
+  build, one API route traced 82.8 MB of which 98% was Prisma and 44.7 MB was
+  CockroachDB, MySQL, SQLite and SQL Server — databases this app can never
+  speak. `outputFileTracingExcludes` in `next.config.ts` drops them.
+
 ### Added
 
 - **Download my data** (`GET /api/profile/export`). A member can take one JSON
