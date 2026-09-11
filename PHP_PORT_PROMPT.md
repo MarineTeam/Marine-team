@@ -17,6 +17,10 @@ reinvent instead of port. So:
    session that doesn't initialise submodules, run
    `git submodule update --init --depth 1` from the setup script, or attach
    this repository to the session as a second, read-only source instead.
+   Pin it at a commit that includes the small-group attendance, discussion
+   guides, member directory and group-conversation work this document
+   describes: `16309c3` on `claude/pdf-epub-caching-nav-u98bn0` until that
+   branch is merged, then `main`.
 2. Copy this file to the new repository's root as `PORT_PROMPT.md`.
 3. Every path in this document that isn't part of the new tree —
    `README.md`, `FEATURES.md`, `src/…`, `prisma/…`, `public/…`,
@@ -81,7 +85,7 @@ specification; this prompt tells you what changes and what must not.
   shaped the way it is. The reasoning carries over even where the mechanism
   doesn't.
 - `FEATURES.md` — the feature list, with the URL map under "Where things are".
-- `prisma/schema.prisma` — 90 models, 32 enums. Column comments are load-bearing.
+- `prisma/schema.prisma` — 95 models, 34 enums. Column comments are load-bearing.
 - `prisma/migrations/0_init/migration.sql` and the migrations after it — the DDL
   as it actually exists; a starting point for the MySQL schema.
 - `src/lib/plugins.ts`, `src/lib/capabilities.ts` — the plugin registry (31
@@ -94,6 +98,11 @@ specification; this prompt tells you what changes and what must not.
   `src/lib/transcribe.ts`, `src/lib/video-feeds.ts`, `src/lib/sheets/` —
   every external integration, each a plain `fetch` against a REST API. None
   of them uses an SDK worth keeping.
+- `src/lib/attendance.ts`, `src/lib/guides.ts`, `src/lib/directory.ts`,
+  `src/lib/group-messages.ts` — the four newest features (small-group
+  attendance, discussion guides, the member directory, group conversations),
+  each a pure rules module with a `-query.ts` beside it and a test file; their
+  invariants are listed under **Feature inventory**.
 - `.env.example` — the complete configuration surface. Every variable here
   becomes either an installer question, an Admin → Services setting, or goes
   away because it was Vercel-specific.
@@ -104,9 +113,9 @@ specification; this prompt tells you what changes and what must not.
   offline shell. Both are already framework-free and port nearly verbatim.
 - `CHANGELOG.md` — for the decisions that were reversed and why.
 
-The app is roughly 74,000 lines of TypeScript across 88 pages, 213 API routes,
-137 components and 121 library modules, with 62 test files. Plan for that; see **Work plan** at
-the end.
+The app is roughly 77,000 lines of TypeScript across 91 pages, 218 API routes,
+139 components and 129 library modules, with 66 test files. Plan for that; see
+**Work plan** at the end.
 
 ## Non-negotiables
 
@@ -1273,11 +1282,11 @@ is in `app/Modules/`; everything else is a bundled plugin.
 | Library (core) | `/`, `/categories/[slug]`, `/series/[slug]`, `/videos/[slug]`, `/tags/[tag]`, `/speakers`, `/speakers/[slug]`, `/scripture`, `/scripture/[book]`, `/search`, `/recently-added`, `/feed.xml`, `/series/[slug]/podcast.xml`, `/sitemap.xml` | `/admin`, `/admin/categories`, `/admin/series`, `/admin/videos`, `/admin/files`, `/admin/speakers`, `/admin/trash`, `/admin/media-check`, `/admin/home-rows` | `content.ts`, `bunny.ts`, `video-source.ts`, `download-source.ts`, `podcast-mirror.ts`, `slug.ts`, `reorder.ts`, `drafts.ts`, `cover.ts`, `seo.ts`, `json-ld.ts`, `content-language.ts` |
 | Access (core) | `/auth/*`, `/access-denied`, `/link` | `/admin/users`, `/admin/authorized-emails`, `/admin/access-attempts`, `/admin/permissions`, `/admin/audit`, `/admin/api-keys` | `current-user.ts`, `authorization.ts`, `identity-linking.ts`, `permissions.ts`, `capabilities.ts`, `audit.ts`, `api-keys*.ts`, `api-v1.ts`, `no-secrets.ts` |
 | Site (core) | `/api/manifest`, `/api/locale`, `/profile`, `/profile/settings`, `/profile/inbox` | `/admin/branding`, `/admin/plugins`, `/admin/analytics`, `/admin/query-monitor`, `/admin/video-feeds` | `branding.ts`, `i18n/`, `nav.ts`, `nav-tabs.ts`, `device-settings.ts`, `standalone.ts`, `inbox.ts`, `profile.ts`, `data-export.ts`, `video-feeds.ts`, `video-feed-sync.ts`, `query-monitor.ts` |
-| Member plugins | `/favorites`, `/watch-later`, `/playlists`, `/playlists/[id]`, `/subscriptions`, `/recently-played`, `/s/[token]`, `/share/*`, `/profile/shared-links`, `/profile/downloads` | `/admin/comments`, `/admin/announcements`, `/admin/webhooks`, `/admin/share-links`, `/admin/downloads` | `plugins.ts`, `share-links.ts`, `share-access.ts`, `share-password.ts`, `downloads.ts`, `download-platform.ts`, `push.ts`, `webhooks.ts`, `outline.ts` |
+| Member plugins | `/favorites`, `/watch-later`, `/playlists`, `/playlists/[id]`, `/subscriptions`, `/recently-played`, `/s/[token]`, `/share/*`, `/profile/shared-links`, `/profile/downloads`, `/directory` (under the `profiles` plugin; opt-in from `/profile/settings` via `PATCH /api/profile`) | `/admin/comments`, `/admin/announcements`, `/admin/webhooks`, `/admin/share-links`, `/admin/downloads` | `plugins.ts`, `share-links.ts`, `share-access.ts`, `share-password.ts`, `downloads.ts`, `download-platform.ts`, `push.ts`, `webhooks.ts`, `outline.ts`, `directory*.ts` |
 | Live (plugin) | `/live`, `/api/live/*` | `/admin/live` | `live-chat.ts` |
 | Books, hymnals, services (plugins) | `/books/[fileId]`, `/read/[fileId]`, `/hymns/[fileId]`, `/present/[fileId]`, `/services`, `/services/[id]`, `/profile/rota`, `/api/offline/*`, `/api/hymnals/search`, `/api/hymns/lookup` | `/admin/services`, `/admin/services/report`, `/admin/teams` | `hymnal.ts`, `book-contents.ts`, `page-offset.ts`, `reader*.ts`, `toc-nav.ts`, `verses.ts`, `services.ts`, `rota.ts`, `offline-*.ts`, `fingerprint.ts`, `ocr-client.ts` |
 | Schedules (plugin) | `/calendar`, `/api/schedules/*`, `/api/calendar-events`, `/api/sync/snapshot`, `/api/calendar/[token]/marine-team.ics`, `/api/profile/calendar` | `/admin/schedules`, `/admin/schedules/[id]`, `/admin/people` | `schedules/`, `sheets/`, `calendar-feed*.ts`, `ics.ts`, `names.ts` |
-| Events, forms, prayer, groups, broadcasts (plugins) | `/events`, `/events/[slug]`, `/events/calendar.ics`, `/events/[slug]/event.ics`, `/forms`, `/forms/[slug]`, `/prayer`, `/groups`, `/groups/[slug]`, `/profile/events`, `/profile/groups` | `/admin/events`, `/admin/forms`, `/admin/prayer`, `/admin/groups`, `/admin/broadcasts` | `events.ts`, `event-series*.ts`, `recurrence.ts`, `forms*.ts`, `prayer*.ts`, `groups*.ts`, `broadcast*.ts`, `sms*.ts` |
+| Events, forms, prayer, groups, broadcasts (plugins) | `/events`, `/events/[slug]`, `/events/calendar.ics`, `/events/[slug]/event.ics`, `/forms`, `/forms/[slug]`, `/prayer`, `/groups`, `/groups/[slug]` (with the group's thread, `/api/groups/[slug]/messages`, and its roll, `/api/groups/[slug]/meetings`), `/guides`, `/guides/[slug]`, `/profile/events`, `/profile/groups` | `/admin/events`, `/admin/forms`, `/admin/prayer`, `/admin/groups`, `/admin/broadcasts`, `/api/admin/guides` (gated by `manage_events`; the original has only the API, so give it an `/admin/guides` page) | `events.ts`, `event-series*.ts`, `recurrence.ts`, `forms*.ts`, `prayer*.ts`, `groups*.ts`, `attendance*.ts`, `guides*.ts`, `group-messages*.ts`, `broadcast*.ts`, `sms*.ts` |
 | Television (plugin) | `/tv`, `/link`, `/profile/devices`, `/api/tv/*` | — | `tv-pairing.ts`, `tv-session.ts`, `tv-feed*.ts`, `tv-nav.ts` |
 | Read API (core) | `/api/v1/*` | `/admin/api-keys` | `api-v1.ts`, `api-keys-query.ts` |
 
@@ -1290,7 +1299,24 @@ author's name leaves; `presentGroup` as the only place an address travels;
 conditional update; the three-way compare in feed sync; revoke never gated
 by the share-links plugin; the heartbeat never un-completing a video;
 `Serializable` avoided in favour of row locks; promotion stopping at the
-first party too big to fit; consent rules in `planDelivery`.
+first party too big to fit; consent rules in `planDelivery`. From the four
+newest features: the attendance roll reaching a member as a list of at most
+one row — their own — never a flag or a count, and reaching nobody outside the
+group; *apologies* a status of its own, never a shade of absent; one meeting
+per group per day under a unique index, so two leaders opening the form at
+once can't make two half-rolls; a roll refused for an evening that hasn't
+happened, and only current members markable, checked against the database
+rather than the form; `presentGuide` leaving `leaderNotes` off a member's
+shape rather than sending it empty, and notes readable by whoever leads any
+group without a capability; `inTheThread` re-read from the database on every
+request, a site manager outside the group getting nothing from it, a hidden
+message dropped in the query *and* in the filter, mute keeping somebody in
+the group, and thread notifications carrying the first line only, to active
+members minus the author and the muted; directory listing off by default
+with each contact detail its own separate yes, leaving the directory clearing
+those flags, search never matching a contact detail even a published one,
+and the page `noindex` behind sign-in; a member's own group messages in their
+data export, taken-down ones labelled as such.
 
 ## Testing and CI
 
