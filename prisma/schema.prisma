@@ -197,6 +197,7 @@ model User {
   prayerRequests        PrayerRequest[]
   prayers               PrayerIntercession[]
   smallGroups           SmallGroupMember[]
+  groupAttendance       GroupAttendance[]
   broadcastsReceived    BroadcastRecipient[]
   liveChatMessages      LiveChatMessage[]
   liveChatMutes         LiveChatMute[]
@@ -2460,9 +2461,10 @@ model SmallGroup {
   /// closed door, and it costs the leader nothing until a place appears.
   waitlist   Boolean @default(true)
 
-  members   SmallGroupMember[]
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  members            SmallGroupMember[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  smallGroupMeetings SmallGroupMeeting[]
 
   @@index([published])
 }
@@ -2504,6 +2506,81 @@ model SmallGroupMember {
   @@unique([groupId, userId])
   @@index([userId, status])
   @@index([groupId, status])
+}
+
+/// One evening a small group met.
+///
+/// A row rather than a computed date, because a group's schedule is free text
+/// ("alternate Wednesdays") and always will be — there is nothing to expand.
+/// A meeting exists because somebody says it happened, which is also the only
+/// honest source for whether it did.
+model SmallGroupMeeting {
+  id      String     @id @default(cuid())
+  group   SmallGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId String
+
+  /// The day it met. A calendar day, not an instant — see lib/dates.ts.
+  date DateTime @db.Date
+
+  /// What they looked at, in the leader's words.
+  topic String?
+
+  /// How many people came who are not members of the group.
+  ///
+  /// A number, never names. Somebody who came once to a house group has not
+  /// consented to being on a list, and a leader who wants to follow up has a
+  /// connect card for that — which does ask. A count answers "how did it go"
+  /// without quietly building a directory of visitors.
+  visitorCount Int @default(0)
+
+  /// Set when the meeting didn't happen. Kept rather than deleted: "we didn't
+  /// meet that week" is a different fact from "nobody recorded anything", and
+  /// only one of them needs chasing.
+  cancelled Boolean @default(false)
+
+  /// The leader's own notes. Never shown to members — see lib/attendance.ts.
+  leaderNotes String?
+
+  /// Who wrote it down, so a roll has somebody's name against it.
+  recordedByEmail String?
+
+  attendance GroupAttendance[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One meeting per group per day. Two leaders opening the form at once must
+  /// not produce two rolls that each hold half the answers.
+  @@unique([groupId, date])
+  @@index([groupId, date])
+}
+
+enum AttendanceStatus {
+  PRESENT
+  /// They said they couldn't come. Deliberately not the same as ABSENT: a
+  /// group that can't tell "let us know" from "vanished" chases the wrong
+  /// person, and the whole point of keeping a roll is knowing who to ring.
+  APOLOGIES
+  ABSENT
+}
+
+/// One member, at one meeting.
+model GroupAttendance {
+  id        String            @id @default(cuid())
+  meeting   SmallGroupMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  meetingId String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+
+  status AttendanceStatus @default(PRESENT)
+  /// "Away with work" — what they said when they sent apologies.
+  note   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([meetingId, userId])
+  @@index([userId])
 }
 
 /// Who a broadcast goes to.
