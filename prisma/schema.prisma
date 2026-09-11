@@ -376,6 +376,7 @@ model Series {
   shareLinks        ShareLink[]
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
+  discussionGuides  DiscussionGuide[]
 
   @@index([language])
 }
@@ -507,6 +508,7 @@ model Video {
   shareLinks           ShareLink[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
+  discussionGuides     DiscussionGuide[]
 
   /// One row per video per source: a re-sync updates rather than duplicates.
   @@unique([source, externalId])
@@ -2508,6 +2510,65 @@ model SmallGroupMember {
   @@index([groupId, status])
 }
 
+enum GuideItemKind {
+  /// Something to talk about.
+  QUESTION
+  /// A passage to read together.
+  SCRIPTURE
+  /// A line of context for everybody.
+  NOTE
+  /// For whoever is leading, and for nobody else. See lib/guides.ts — the
+  /// visible shape of a guide has no field these can be rendered from.
+  LEADER_NOTE
+}
+
+/// Something for a group to work through: the questions after a sermon.
+///
+/// Attached to a series or a video when it follows one, and free-standing when
+/// it doesn't — a study on prayer belongs to no sermon. A meeting points at the
+/// guide it used, so "what did we do in June" has an answer.
+model DiscussionGuide {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  title       String
+  description String?
+
+  /// What it follows, when it follows something.
+  series   Series? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  seriesId String?
+  video    Video?  @relation(fields: [videoId], references: [id], onDelete: SetNull)
+  videoId  String?
+
+  /// Drafts stay off the members' list until somebody is happy with it.
+  published Boolean @default(false)
+
+  items    DiscussionGuideItem[]
+  meetings SmallGroupMeeting[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([published, updatedAt])
+  @@index([seriesId])
+  @@index([videoId])
+}
+
+/// One line of a guide, in the order it is worked through.
+model DiscussionGuideItem {
+  id      String          @id @default(cuid())
+  guide   DiscussionGuide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+  guideId String
+
+  kind      GuideItemKind @default(QUESTION)
+  body      String
+  /// A reference the item hangs on, e.g. "Romans 8:28-30".
+  reference String?
+
+  position Int @default(0)
+
+  @@index([guideId, position])
+}
+
 /// One evening a small group met.
 ///
 /// A row rather than a computed date, because a group's schedule is free text
@@ -2541,6 +2602,10 @@ model SmallGroupMeeting {
   /// The leader's own notes. Never shown to members — see lib/attendance.ts.
   leaderNotes String?
 
+  /// What they worked through, when they used one.
+  guide   DiscussionGuide? @relation(fields: [guideId], references: [id], onDelete: SetNull)
+  guideId String?
+
   /// Who wrote it down, so a roll has somebody's name against it.
   recordedByEmail String?
 
@@ -2553,6 +2618,7 @@ model SmallGroupMeeting {
   /// not produce two rolls that each hold half the answers.
   @@unique([groupId, date])
   @@index([groupId, date])
+  @@index([guideId])
 }
 
 enum AttendanceStatus {
