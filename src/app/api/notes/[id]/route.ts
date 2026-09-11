@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-guard";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
@@ -14,24 +15,32 @@ async function ensureOwnNote(userId: string, id: string) {
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { id } = await params;
-  if (!(await ensureOwnNote(user.id, id))) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const { id } = await params;
+    if (!(await ensureOwnNote(user.id, id))) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const body = updateSchema.parse(await request.json());
-  const note = await prisma.sermonNote.update({ where: { id }, data: body });
-  return NextResponse.json(note);
+    const body = updateSchema.parse(await request.json());
+    const note = await prisma.sermonNote.update({ where: { id }, data: body });
+    return NextResponse.json(note);
+  } catch (error) {
+    return errorResponse(error);
+  }
 }
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { id } = await params;
-  if (!(await ensureOwnNote(user.id, id))) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const { id } = await params;
+    if (!(await ensureOwnNote(user.id, id))) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await prisma.sermonNote.delete({ where: { id } });
-  return NextResponse.json({ ok: true });
+    await prisma.sermonNote.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return errorResponse(error);
+  }
 }

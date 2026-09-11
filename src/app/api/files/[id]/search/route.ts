@@ -23,7 +23,7 @@ import { canViewFile, getReadableFile, searchBookText } from "@/lib/content";
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const query = request.nextUrl.searchParams.get("q")?.trim() ?? "";
+    const query = (request.nextUrl.searchParams.get("q")?.trim() ?? "").slice(0, 200);
 
     const [user, file] = await Promise.all([getCurrentUser(), getReadableFile(id)]);
     if (!file) return NextResponse.json({ error: "Not found" }, { status: 404 });

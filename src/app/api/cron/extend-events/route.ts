@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cronGuard } from "@/lib/cron-guard";
 import { extendAllSeries } from "@/lib/event-series-query";
 
 /**
@@ -17,10 +18,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (secret && request.headers.get("authorization") !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 401 });
-  }
+  const refused = cronGuard(request);
+  if (refused) return refused;
 
   const result = await extendAllSeries();
   return NextResponse.json({ ranAt: new Date().toISOString(), ...result });

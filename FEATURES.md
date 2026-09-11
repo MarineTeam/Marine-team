@@ -2063,6 +2063,48 @@ link.
   when the bar itself is — i.e. never for anyone but an enabled-and-`ADMIN`
   viewer — so it costs nothing for ordinary visitors.
 
+## Security
+
+The decisions that hold, and where each one lives. An audit in September 2026
+found no authorisation bypass, injection or leaked secret; what it found was
+the hardening below, all of which is now in place.
+
+- **Every response carries the headers** a site should: `X-Frame-Options:
+  SAMEORIGIN` and `frame-ancestors 'self'` (the reader and players frame this
+  origin's own pages; nobody else may), `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: strict-origin-when-cross-origin`, a `Permissions-Policy`.
+  Set in `next.config.ts`; HSTS comes from the platform. There is no
+  script-source CSP yet — the inline scripts in the layout need nonces first.
+- **The image optimizer is off** (`images.unoptimized: true`). Every image
+  already rendered `unoptimized`; the config flag is what removes the
+  `/_next/image` route, which would otherwise fetch and decode any same-origin
+  path — uploaded files included — through `sharp`.
+- **An upload is what its extension says, from a short list**
+  (`lib/upload-types.ts`). The browser's `file.type` is never stored or
+  served. Reader formats and plain media are shown inline; documents are
+  downloads; anything not on the list is an opaque download with `nosniff`
+  and `sandbox`, whatever was recorded about it. SVG is not an image here.
+  Objects are named `files/<id>.<ext>` and nothing of the client's name
+  survives.
+- **Scheduled jobs fail closed** (`lib/cron-guard.ts`): a production
+  deployment without `CRON_SECRET` answers 503 to every `/api/cron/*` call
+  rather than running the job for whoever asks.
+- **Push subscriptions go only to push services** (`lib/push-endpoint.ts`):
+  `https:` to a known browser push host, at most eight per member. The server
+  POSTs to every stored endpoint on every notification, so a URL a member
+  chose would have made it POST wherever they liked.
+- **Writes labelled cross-site by the browser are refused in the proxy**
+  (`lib/cross-site.ts`), as a second layer behind the session cookie's
+  `SameSite=Lax`. Callers with no `Sec-Fetch-Site` header — Auth0's
+  registration check, a television, an API key — are unaffected.
+- **View counts throttle on the server** (`lib/view-key.ts`): an HMAC of the
+  caller's address, never the address, kept for a day. A cookie alone was
+  the throttle before, and a script doesn't send one.
+- **Webhook URLs must be public** (`lib/public-url.ts`): loopback, private,
+  link-local and bare names are refused when saved.
+- Every member route answers through `errorResponse`, which maps validation
+  and database errors to 400/404 and never echoes an upstream message.
+
 ## Technical notes
 
 - **Bunny's Stream iframe embed does support postMessage control**, via

@@ -1,15 +1,46 @@
 import type { NextConfig } from "next";
 
-// No remote image optimization is configured: every <Image> in this app
-// renders `unoptimized`. Bunny thumbnail/cover URLs are frequently
-// short-lived signed URLs (BUNNY_STREAM_TOKEN_AUTH_KEY), and Next's image
-// optimizer re-fetches the origin URL server-side outside the request that
-// generated it (cache misses/revalidation) — a signed URL that was valid
-// when rendered can 401/403 by the time the optimizer re-fetches it,
-// surfacing as a broken image (`OPTIMIZED_EXTERNAL_IMAGE_REQUEST_UNAUTHORIZED`).
-// Series/category cover images are also freeform admin-pasted URLs (any
-// host), which `remotePatterns` can't cover without allowing `**` anyway.
+// Every <Image> in this app renders `unoptimized`, and `images.unoptimized`
+// below says so where it matters. The two are not the same thing: the prop
+// changes what a component emits, while the config flag is what removes the
+// `/_next/image` route — and that route will fetch and decode any same-origin
+// path it is given, uploaded files included, through sharp. Two reasons never
+// to want it here. Bunny thumbnail/cover URLs are short-lived signed URLs
+// (BUNNY_STREAM_TOKEN_AUTH_KEY), and the optimizer re-fetches them outside the
+// request that made them, so a URL that was valid when rendered can 401 by the
+// time it is fetched again (`OPTIMIZED_EXTERNAL_IMAGE_REQUEST_UNAUTHORIZED`).
+// And an image decoder reachable by URL is attack surface with nothing to
+// show for it — GHSA-2xp9-vwfh-vxw4 was exactly that, in AVIF.
 const nextConfig: NextConfig = {
+  images: { unoptimized: true },
+
+  /**
+   * Headers every response carries.
+   *
+   * Transport security comes from the platform (Vercel adds HSTS itself); the
+   * rest has to be said here. SAMEORIGIN rather than DENY because the reader
+   * and the players frame this origin's own pages; nobody else may.
+   *
+   * There is deliberately no script-source CSP yet. The two inline scripts
+   * and the inline branding style in src/app/layout.tsx need nonces or
+   * hashes before one can be enforced, and the reader and player origins
+   * need listing — that is its own change, to be run report-only first.
+   */
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
+        ],
+      },
+    ];
+  },
+
   /**
    * Keep Prisma's engines for databases we don't use out of every function.
    *

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { objectName, refusedUploadMessage, uploadType } from "@/lib/upload-types";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
@@ -90,9 +91,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // The type is decided by the extension, from a short list — never from
+    // `file.type`, which is whatever the uploading page claimed. And the
+    // object is named by its id alone: the client's basename used to be
+    // appended, and added nothing but a way to put `..` into a storage path.
+    const type = uploadType(file.name);
+    const bunnyPath = objectName(crypto.randomUUID(), file.name);
+    if (!type || !bunnyPath) {
+      return NextResponse.json({ error: refusedUploadMessage() }, { status: 415 });
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer());
-    const bunnyPath = `files/${crypto.randomUUID()}-${file.name}`;
-    const url = await bunnyStorageUpload(bunnyPath, buffer, file.type);
+    const url = await bunnyStorageUpload(bunnyPath, buffer, type.mime);
 
     const created = await prisma.fileAsset.create({
       data: {
@@ -100,7 +110,7 @@ export async function POST(request: NextRequest) {
         bunnyPath,
         url,
         sizeBytes: file.size,
-        mimeType: file.type || null,
+        mimeType: type.mime,
         seriesId: resolvedSeriesId,
         categoryId: resolvedCategoryId,
         memberOnly,

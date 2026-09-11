@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { objectName, refusedUploadMessage, uploadType } from "@/lib/upload-types";
 import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureContentAccess } from "@/lib/permissions";
@@ -160,9 +161,15 @@ async function fromUpload(form: FormData): Promise<NewBytes | { error: string; s
   // URL, so writing different bytes to the same path leaves the CDN — and
   // every browser holding a copy — serving the old file until something
   // expires. A new path can't be stale.
-  const bunnyPath = `files/${crypto.randomUUID()}-${file.name}`;
-  const url = await bunnyStorageUpload(bunnyPath, Buffer.from(await file.arrayBuffer()), file.type);
-  return { bunnyPath, url, sizeBytes: file.size, mimeType: file.type || null };
+  // Same rule as a first upload: the type comes from the extension and a
+  // list, the object is named by its id, and the browser's claim about the
+  // type is not consulted. See lib/upload-types.ts for why.
+  const type = uploadType(file.name);
+  const bunnyPath = objectName(crypto.randomUUID(), file.name);
+  if (!type || !bunnyPath) return { error: refusedUploadMessage(), status: 415 };
+
+  const url = await bunnyStorageUpload(bunnyPath, Buffer.from(await file.arrayBuffer()), type.mime);
+  return { bunnyPath, url, sizeBytes: file.size, mimeType: type.mime };
 }
 
 /** An object already in Bunny Storage, adopted the way the importer does it. */

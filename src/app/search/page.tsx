@@ -16,7 +16,9 @@ export default async function SearchPage({
     getCurrentUser(),
     getSearchFilterOptions(),
   ]);
-  const query = (q ?? "").trim();
+  // Capped: a trigram similarity over every row is the cost of each query,
+  // and a page anybody can load should not be able to make it a big one.
+  const query = (q ?? "").trim().slice(0, 100);
   const sortValue = sort === "newest" ? "newest" : "relevance";
   const results = query
     ? await searchContent(query, Boolean(user), {

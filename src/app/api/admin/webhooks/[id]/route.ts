@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { isPublicHttpUrl } from "@/lib/public-url";
 import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureCapability } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
-  url: z.string().url().optional(),
+  url: z.string().url().refine(isPublicHttpUrl, "The URL must be a public address.").optional(),
   secret: z.string().trim().max(200).nullable().optional(),
   active: z.boolean().optional(),
 });

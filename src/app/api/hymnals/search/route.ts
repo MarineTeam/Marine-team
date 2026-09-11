@@ -17,7 +17,7 @@ import { searchHymnsInCategory } from "@/lib/content";
 export async function GET(request: NextRequest) {
   try {
     const categoryId = request.nextUrl.searchParams.get("category");
-    const query = request.nextUrl.searchParams.get("q") ?? "";
+    const query = (request.nextUrl.searchParams.get("q") ?? "").slice(0, 100);
     if (!categoryId) return NextResponse.json({ error: "Missing category" }, { status: 400 });
 
     const user = await getCurrentUser();

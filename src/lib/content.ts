@@ -1449,12 +1449,29 @@ export async function getUserVideoReaction(userId: string, videoId: string) {
 
 // --- View events (trending + analytics) -------------------------------------
 
-export async function logSeriesView(seriesId: string, userId: string | null) {
-  await prisma.viewEvent.create({ data: { seriesId, userId } });
+export async function logSeriesView(seriesId: string, userId: string | null, ipHash: string | null = null) {
+  await prisma.viewEvent.create({ data: { seriesId, userId, ipHash } });
 }
 
-export async function logVideoView(videoId: string, userId: string | null) {
-  await prisma.viewEvent.create({ data: { videoId, userId } });
+export async function logVideoView(videoId: string, userId: string | null, ipHash: string | null = null) {
+  await prisma.viewEvent.create({ data: { videoId, userId, ipHash } });
+}
+
+/**
+ * Blanks the throttle key on view events older than a day.
+ *
+ * The key is an HMAC of an address (lib/view-key.ts), kept only to tell a
+ * repeat view apart from a new one within the throttle window. After that it
+ * is nothing but a column that could one day be joined to something, so the
+ * digest job clears it. Returns how many rows it touched.
+ */
+export async function pruneViewKeys(olderThanHours = 24): Promise<number> {
+  const cutoff = new Date(Date.now() - olderThanHours * 60 * 60 * 1000);
+  const { count } = await prisma.viewEvent.updateMany({
+    where: { ipHash: { not: null }, createdAt: { lt: cutoff } },
+    data: { ipHash: null },
+  });
+  return count;
 }
 
 /** Published series with the most views in the last `days` days, for a homepage "Trending" row. */

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth0 } from "@/lib/auth0";
+import { isCrossSiteWrite } from "@/lib/cross-site";
 
 /** The SDK's session cookie, plus the numbered chunks it splits into when large. */
 const SESSION_COOKIE = "__session";
@@ -20,6 +21,12 @@ const SESSION_COOKIE = "__session";
  * authorization checks behind this are free to use Prisma.
  */
 export async function proxy(request: NextRequest) {
+  // The second layer behind the session cookie's SameSite=Lax — see
+  // lib/cross-site.ts. Refused here, before any route runs.
+  if (isCrossSiteWrite(request)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const response = await auth0.middleware(request);
 
   const location = response.headers.get("location") ?? "";

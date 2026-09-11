@@ -8,6 +8,7 @@ import { promoteFromWaitlist, viewerFor } from "@/lib/groups-query";
 import { isPluginEnabled } from "@/lib/plugins";
 import { getDisplayName } from "@/lib/profile";
 import { notifySubscribers } from "@/lib/push";
+import { rateLimitResponse, windowStart } from "@/lib/rate-limit";
 
 /**
  * Asking to join, and leaving.
@@ -20,12 +21,27 @@ import { notifySubscribers } from "@/lib/push";
 
 const joinSchema = z.object({ note: z.string().trim().max(500).nullish() });
 
+/** Asks per member per hour. Ten groups in an hour is not a person choosing one. */
+const ASKS_PER_HOUR = 10;
+/**
+ * Join notifications per leader per group per hour. A member who asks,
+ * withdraws and asks again in a loop leaves no row behind to count, so the
+ * cap is on what reaches the leaders' phones rather than on the asking.
+ */
+const NOTIFIES_PER_LEADER_PER_HOUR = 20;
+
 export async function POST(request: NextRequest, context: { params: Promise<{ slug: string }> }) {
   try {
     if (!(await isPluginEnabled("groups"))) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const { slug } = await context.params;
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Sign in to ask to join a group." }, { status: 403 });
+
+    const limited = await rateLimitResponse(
+      () => prisma.smallGroupMember.count({ where: { userId: user.id, createdAt: { gte: windowStart(3600) } } }),
+      ASKS_PER_HOUR,
+    );
+    if (limited) return limited;
 
     const group = await prisma.smallGroup.findUnique({
       where: { slug },
@@ -56,7 +72,16 @@ export async function POST(request: NextRequest, context: { params: Promise<{ sl
     const leaders = group.members.filter(
       (member) => member.role === "LEADER" && member.status === "ACTIVE",
     );
-    if (leaders.length > 0) {
+    // Each ask writes one inbox row per leader at this URL, so recent rows
+    // here are recent asks; past the cap the ask is still recorded, the
+    // leaders just aren't paged about it until the hour is up.
+    const recentPages =
+      leaders.length > 0
+        ? await prisma.notification.count({
+            where: { url: `/groups/${group.slug}`, createdAt: { gte: windowStart(3600) } },
+          })
+        : 0;
+    if (leaders.length > 0 && recentPages < NOTIFIES_PER_LEADER_PER_HOUR * leaders.length) {
       await notifySubscribers(
         status === "WAITLIST"
           ? {

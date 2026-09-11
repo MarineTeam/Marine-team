@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cronGuard } from "@/lib/cron-guard";
 import { sendNextBatch, unfinishedBroadcasts } from "@/lib/broadcast-send";
 import { purgeExpiredPairings } from "@/lib/tv-session";
 
@@ -20,10 +21,8 @@ export const maxDuration = 60;
 const BUDGET_MS = 50_000;
 
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (secret && request.headers.get("authorization") !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 401 });
-  }
+  const refused = cronGuard(request);
+  if (refused) return refused;
 
   const started = Date.now();
   const finished: { id: string; sent: number; failed: number; remaining: number }[] = [];

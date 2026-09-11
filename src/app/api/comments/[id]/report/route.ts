@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-guard";
 import { getCurrentUser } from "@/lib/current-user";
 import { reportComment } from "@/lib/content";
 import { prisma } from "@/lib/db";
@@ -8,13 +9,17 @@ export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { id } = await params;
-  const comment = await prisma.comment.findUnique({ where: { id }, select: { id: true } });
-  if (!comment) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const { id } = await params;
+    const comment = await prisma.comment.findUnique({ where: { id }, select: { id: true } });
+    if (!comment) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await reportComment(id, user.id);
-  return NextResponse.json({ ok: true });
+    await reportComment(id, user.id);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return errorResponse(error);
+  }
 }

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cronGuard } from "@/lib/cron-guard";
 import { prisma } from "@/lib/db";
 import { sendDigestToUser } from "@/lib/push";
 import { pruneAccessAttempts } from "@/lib/authorization";
+import { pruneViewKeys } from "@/lib/content";
+import { VIEW_KEY_RETENTION_HOURS } from "@/lib/view-key";
 
 /**
  * Runs once a day (see the "crons" entry in vercel.json), batching every
@@ -11,10 +14,8 @@ import { pruneAccessAttempts } from "@/lib/authorization";
  * can't be hit to mass-send pushes from outside.
  */
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (secret && request.headers.get("authorization") !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 401 });
-  }
+  const refused = cronGuard(request);
+  if (refused) return refused;
 
   const pending = await prisma.pendingNotification.findMany({ orderBy: { createdAt: "asc" } });
   const byUser = new Map<string, typeof pending>();
@@ -39,10 +40,14 @@ export async function GET(request: NextRequest) {
   // path: a site being probed shouldn't pay for cleanup on every refusal, and
   // this job already runs daily with the right authorization.
   const attemptsPruned = await pruneAccessAttempts();
+  // Same reasoning for the view throttle keys (lib/view-key.ts): a day is
+  // all they are for, and after that they are only a column to be careful of.
+  const viewKeysPruned = await pruneViewKeys(VIEW_KEY_RETENTION_HOURS);
 
   return NextResponse.json({
     usersNotified: byUser.size,
     itemsCleared: pending.length,
     attemptsPruned,
+    viewKeysPruned,
   });
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { servePolicy } from "@/lib/upload-types";
 import { getCurrentUser } from "@/lib/current-user";
 import { errorResponse } from "@/lib/api-guard";
 import { canViewFile, getReadableFile } from "@/lib/content";
@@ -60,22 +61,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Could not load this file" }, { status: 502 });
     }
 
-    // A reader needs the precise type; everything else is served as whatever
-    // was recorded at upload, falling back to a type browsers won't try to
-    // interpret rather than guessing.
-    const format = readerFormat(file.mimeType, file.bunnyPath);
-    const contentType =
-      format === "pdf"
-        ? "application/pdf"
-        : format === "epub"
-          ? "application/epub+zip"
-          : (file.mimeType ?? "application/octet-stream");
+    // Decided from the path alone. The stored type is a claim — the browser's
+    // at upload, or whatever the storage dashboard was told for an import —
+    // and serving a claim inline is how an uploaded page would run as this
+    // origin. Anything that isn't a reader format or plain media is a
+    // download; anything not on the list at all is an opaque one that a
+    // browser will not render. See lib/upload-types.ts.
+    const policy = servePolicy(file.bunnyPath);
+    const format = readerFormat(policy.contentType, file.bunnyPath);
 
-    const headers = new Headers();
-    headers.set("Content-Type", contentType);
+    const headers = new Headers(policy.headers);
+    headers.set("Content-Type", policy.contentType);
+    const wantsDownload = request.nextUrl.searchParams.get("download") === "1";
     headers.set(
       "Content-Disposition",
-      request.nextUrl.searchParams.get("download") === "1"
+      wantsDownload || !policy.inline
         ? `attachment; ${contentDispositionFilename(file.title, file.bunnyPath)}`
         : "inline",
     );

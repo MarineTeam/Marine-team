@@ -1472,11 +1472,16 @@ model ViewEvent {
   video     Video?   @relation(fields: [videoId], references: [id], onDelete: Cascade)
   videoId   String?
   userId    String?
+  /// An HMAC of the viewer's address, so a repeat view from the same place
+  /// within the throttle window is not counted twice. Not the address, and
+  /// blanked after a day by the digest job — see lib/view-key.ts.
+  ipHash    String?
   createdAt DateTime @default(now())
 
   @@index([seriesId, createdAt])
   @@index([videoId, createdAt])
   @@index([createdAt])
+  @@index([ipHash, createdAt])
 }
 
 /// A hymn somebody actually opened.

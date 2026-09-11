@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cronGuard } from "@/lib/cron-guard";
 import { prisma } from "@/lib/db";
 import { bunnyGetStreamVideo, mapBunnyStreamStatus } from "@/lib/bunny";
 
@@ -23,10 +24,8 @@ const MP4_REFRESH_BATCH = 25;
  * this is where a repaired video gets picked back up.
  */
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (secret && request.headers.get("authorization") !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 401 });
-  }
+  const refused = cronGuard(request);
+  if (refused) return refused;
 
   // Bunny's own, only: an imported video is never PROCESSING here, and if one
   // somehow were there is no encode to ask about.

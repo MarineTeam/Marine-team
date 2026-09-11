@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-guard";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
@@ -20,60 +21,68 @@ const postSchema = z.object({
 
 /** Public: anyone who can see the series/video's page can read its comments. */
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const { type, id } = querySchema.parse({
-    type: searchParams.get("type"),
-    id: searchParams.get("id"),
-  });
+  try {
+    const { searchParams } = new URL(request.url);
+    const { type, id } = querySchema.parse({
+      type: searchParams.get("type"),
+      id: searchParams.get("id"),
+    });
 
-  return NextResponse.json(await getComments(type, id));
+    return NextResponse.json(await getComments(type, id));
+  } catch (error) {
+    return errorResponse(error);
+  }
 }
 
 /** Posting a comment requires being an authorized, logged-in user. */
 export async function POST(request: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const limited = await rateLimitResponse(
-    () => prisma.comment.count({ where: { userId: user.id, createdAt: { gte: windowStart(60) } } }),
-    5,
-  );
-  if (limited) return limited;
+    const limited = await rateLimitResponse(
+      () => prisma.comment.count({ where: { userId: user.id, createdAt: { gte: windowStart(60) } } }),
+      5,
+    );
+    if (limited) return limited;
 
-  const { type, id, body, parentId } = postSchema.parse(await request.json());
+    const { type, id, body, parentId } = postSchema.parse(await request.json());
 
-  const categoryId =
-    type === "series"
-      ? (await prisma.series.findUnique({ where: { id }, select: { categoryId: true } }))?.categoryId ?? null
-      : (await prisma.video.findUnique({ where: { id }, select: { series: { select: { categoryId: true } } } }))
-          ?.series?.categoryId ?? null;
-  if (!(await isPluginEnabled("comments", categoryId))) {
-    return NextResponse.json({ error: "Comments are disabled here" }, { status: 403 });
-  }
-
-  // Threading is one level deep: a reply to a reply attaches to that
-  // reply's own top-level parent instead, so `replies` never nests further.
-  let resolvedParentId: string | undefined;
-  if (parentId) {
-    const parent = await prisma.comment.findUnique({
-      where: { id: parentId },
-      select: { id: true, parentId: true, seriesId: true, videoId: true },
-    });
-    if (!parent || (type === "series" ? parent.seriesId !== id : parent.videoId !== id)) {
-      return NextResponse.json({ error: "Comment not found" }, { status: 404 });
+    const categoryId =
+      type === "series"
+        ? (await prisma.series.findUnique({ where: { id }, select: { categoryId: true } }))?.categoryId ?? null
+        : (await prisma.video.findUnique({ where: { id }, select: { series: { select: { categoryId: true } } } }))
+            ?.series?.categoryId ?? null;
+    if (!(await isPluginEnabled("comments", categoryId))) {
+      return NextResponse.json({ error: "Comments are disabled here" }, { status: 403 });
     }
-    resolvedParentId = parent.parentId ?? parent.id;
-  }
 
-  const comment = await prisma.comment.create({
-    data: {
-      userId: user.id,
-      body,
-      seriesId: type === "series" ? id : undefined,
-      videoId: type === "video" ? id : undefined,
-      parentId: resolvedParentId,
-    },
-    include: { user: { select: { id: true, name: true, displayName: true, email: true, picture: true } } },
-  });
-  return NextResponse.json(comment, { status: 201 });
+    // Threading is one level deep: a reply to a reply attaches to that
+    // reply's own top-level parent instead, so `replies` never nests further.
+    let resolvedParentId: string | undefined;
+    if (parentId) {
+      const parent = await prisma.comment.findUnique({
+        where: { id: parentId },
+        select: { id: true, parentId: true, seriesId: true, videoId: true },
+      });
+      if (!parent || (type === "series" ? parent.seriesId !== id : parent.videoId !== id)) {
+        return NextResponse.json({ error: "Comment not found" }, { status: 404 });
+      }
+      resolvedParentId = parent.parentId ?? parent.id;
+    }
+
+    const comment = await prisma.comment.create({
+      data: {
+        userId: user.id,
+        body,
+        seriesId: type === "series" ? id : undefined,
+        videoId: type === "video" ? id : undefined,
+        parentId: resolvedParentId,
+      },
+      include: { user: { select: { id: true, name: true, displayName: true, email: true, picture: true } } },
+    });
+    return NextResponse.json(comment, { status: 201 });
+  } catch (error) {
+    return errorResponse(error);
+  }
 }

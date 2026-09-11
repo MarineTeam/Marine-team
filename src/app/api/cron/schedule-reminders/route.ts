@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cronGuard } from "@/lib/cron-guard";
 import { errorResponse } from "@/lib/api-guard";
 import { sendScheduleReminders } from "@/lib/schedules/reminders";
 
@@ -13,10 +14,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const secret = process.env.CRON_SECRET;
-    if (secret && request.headers.get("authorization") !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 401 });
-    }
+    const refused = cronGuard(request);
+    if (refused) return refused;
     return NextResponse.json(await sendScheduleReminders());
   } catch (error) {
     return errorResponse(error);

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cronGuard } from "@/lib/cron-guard";
 import { errorResponse } from "@/lib/api-guard";
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
@@ -20,8 +21,10 @@ export const maxDuration = 60;
 
 async function handle(request: NextRequest) {
   try {
-    const secret = process.env.CRON_SECRET;
-    const fromCron = !secret || request.headers.get("authorization") === `Bearer ${secret}`;
+    // Null means the cron token was right — or, in development only, that
+    // none is configured. An unconfigured production deployment answers 503
+    // to the scheduler and still lets an admin run this by hand below.
+    const fromCron = cronGuard(request) === null;
 
     let actorEmail: string | undefined;
     if (!fromCron) {

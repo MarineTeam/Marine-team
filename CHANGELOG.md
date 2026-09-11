@@ -6,6 +6,80 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Security
+
+Findings of a full audit of the application, all fixed in one pass. Nothing
+here was an authorisation bypass, an injection or a leaked secret — the audit
+found none — but two of them compounded into a way for the least-trusted
+staff tier to take over an admin session, and the rest are the hardening a
+deployment should have had.
+
+- **Next.js 16.2.11 → 16.3.4** (with `sharp` 0.35.4). 16.2 carried two
+  critical advisories, one of them remote code execution through the image
+  optimizer when an AVIF is decoded (GHSA-2xp9-vwfh-vxw4). The optimizer route
+  was live: every `<Image>` rendered `unoptimized`, but that is a component
+  prop, and only `images.unoptimized: true` in `next.config.ts` removes
+  `/_next/image` — which would fetch and decode any same-origin path, uploaded
+  files included. It is set now, so the route is gone for good.
+- **Uploads are typed by their extension, from a list — never by what the
+  browser claimed.** `admin/files` stored the browser's `file.type` and the
+  content route served it back verbatim, inline, for anything that wasn't a
+  PDF or EPUB. Anybody with editor rights on one series could upload
+  `notes.html` as `text/html` and have it run as this origin in the browser
+  of whichever admin opened the link. Now `lib/upload-types.ts` decides both
+  the stored type and the served one; only reader formats and plain media are
+  shown inline; documents are downloads; anything not on the list — including
+  files uploaded before the rule existed — is an opaque download with
+  `nosniff` and a `sandbox` policy. SVG is deliberately not an image here.
+  Objects are named `files/<id>.<ext>`: the client's basename used to be
+  appended and added nothing but a way to put `..` into a storage path.
+- **Security headers on every response**: `X-Frame-Options: SAMEORIGIN`,
+  `frame-ancestors 'self'`, `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: strict-origin-when-cross-origin`, a `Permissions-Policy`.
+  Transport security was already the platform's (Vercel adds HSTS); the rest
+  had never been set. A script-source CSP is still to come — the inline
+  scripts in the layout need nonces first, and it should run report-only
+  before it is enforced.
+- **Scheduled jobs fail closed.** All eight `/api/cron/*` routes checked the
+  bearer token with `if (secret && …)`, so with `CRON_SECRET` unset every
+  one of them ran for anybody — paid transcription calls included. One shared
+  `cronGuard` now answers 503 in production when the variable is missing,
+  401 on a mismatch (compared in constant time), and stays open only in
+  development. `sync-schedules` keeps its admin-session path.
+- **Web Push subscriptions must point at a push service.** The subscribe
+  route took any URL, and the server POSTs a signed body to every stored
+  endpoint on every notification — a member could make it POST wherever they
+  liked, as often as they liked, because nothing capped rows either. Endpoints
+  are now `https:` to one of the browsers' push services (extendable with
+  `PUSH_SERVICE_HOSTS`), and a member holds at most eight, oldest evicted.
+- **View counts can't be scripted up.** `/api/view-events` throttled repeat
+  views with a cookie it had set on the caller, which a script simply doesn't
+  send. It now also keys on an HMAC of the caller's address (`ViewEvent.ipHash`,
+  never the address, blanked after a day by the digest job), refuses an id
+  that doesn't exist with a 404 rather than a foreign-key 500, and answers
+  through `errorResponse` like everything else.
+- **Cross-site writes are refused at the door.** The session cookie's
+  `SameSite=Lax` was the only thing standing between another site's page and
+  `/api/*`; `src/proxy.ts` now also refuses any write the browser itself labels
+  `Sec-Fetch-Site: cross-site`. Servers and televisions send no such header
+  and are unaffected.
+- **Webhook URLs must be public addresses** (`lib/public-url.ts`): loopback,
+  private, link-local and bare names are refused when a webhook is saved.
+- Small-group asks are limited to ten an hour per member, and what an ask
+  pages the leaders with is capped per group per hour — the withdraw-and-ask
+  loop left no row behind to count, so the cap is on the notifications.
+- Search inputs are capped (100 characters on `/search`, whose trigram
+  similarity runs over every published row; 200 in a book).
+- Fifteen member routes that let a validation or database error surface as a
+  framework 500 now answer through `errorResponse` with a 400 or 404.
+- Every other advisory `npm audit` reported is cleared: `@xmldom/xmldom`
+  0.9.12, `brace-expansion` 5.0.9, `minimatch` 10.2.6 and `js-yaml` 4.3.2 by
+  override, `vitest` and `@vitest/coverage-v8` to 4.1.11. What remains is
+  one chain — `deepmerge-ts` under `@prisma/config` under the Prisma CLI —
+  which runs only when the schema is generated at build time, and whose
+  "fix" npm proposes is a downgrade to Prisma 6.12; it waits on a Prisma
+  release instead.
+
 ### Fixed
 
 - **Serverless function storage cut by 53%** — 25.4 GB to 11.8 GB per
