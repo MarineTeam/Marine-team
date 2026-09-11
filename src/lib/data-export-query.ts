@@ -382,6 +382,10 @@ export async function buildExport(user: User, at = new Date()) {
        * settings page that can replace it and nowhere else.
        */
       calendarLinkActive: user.calendarToken !== null,
+      directoryListed: user.directoryListed,
+      directoryShowEmail: user.directoryShowEmail,
+      directoryShowPhone: user.directoryShowPhone,
+      directoryNote: user.directoryNote,
     },
 
     signInMethods: identities.map((row) => ({

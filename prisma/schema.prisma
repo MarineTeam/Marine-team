@@ -149,6 +149,18 @@ model User {
   /// turned off "a new sermon is up" has not asked to miss "no service
   /// tomorrow, the road is closed".
   broadcastEmails       Boolean               @default(true)
+  /// Whether this member appears in the members' directory.
+  ///
+  /// Off, and off by default, and that default is the whole feature: a
+  /// directory somebody is in because they never found the setting is a
+  /// directory built without consent. Being listed publishes a name; each
+  /// contact detail below is its own separate yes.
+  directoryListed       Boolean               @default(false)
+  directoryShowEmail    Boolean               @default(false)
+  directoryShowPhone    Boolean               @default(false)
+  /// A line they write themselves — "ask me about the youth group".
+  directoryNote         String?
+
   /// The secret in this member's personal calendar-feed URL, or null until
   /// they ask for one. A calendar app cannot log in, so the URL is the
   /// credential — which is why it is generated on request, shown once in the
@@ -202,6 +214,8 @@ model User {
   liveChatMessages      LiveChatMessage[]
   liveChatMutes         LiveChatMute[]
   tvDevices             TvDevice[]
+
+  @@index([directoryListed, authorized])
 }
 
 /**

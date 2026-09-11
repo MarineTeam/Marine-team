@@ -8,6 +8,7 @@ import { BottomNavEditor } from "@/components/bottom-nav-editor";
 import { DeleteAccount } from "@/components/delete-account";
 import { DownloadMyData } from "@/components/download-my-data";
 import { CalendarSubscription } from "@/components/calendar-subscription";
+import { DirectorySettings } from "@/components/directory-settings";
 import { siteUrl } from "@/lib/seo";
 import { SignInMethods } from "@/components/sign-in-methods";
 
@@ -55,6 +56,20 @@ export default async function ProfileSettingsPage() {
           currentPhone={user.phone}
           currentSmsOptIn={user.smsOptIn}
           currentBroadcastEmails={user.broadcastEmails}
+        />
+      </section>
+
+      <section className="space-y-3 border-t border-sep pt-6">
+        <div>
+          <h2 className="text-lg font-semibold text-ink">Being found</h2>
+          <p className="mt-1 text-sm text-sec">Whether other members can look you up, and what they see.</p>
+        </div>
+        <DirectorySettings
+          listed={user.directoryListed}
+          showEmail={user.directoryShowEmail}
+          showPhone={user.directoryShowPhone}
+          note={user.directoryNote}
+          hasPhone={Boolean(user.phone)}
         />
       </section>
 

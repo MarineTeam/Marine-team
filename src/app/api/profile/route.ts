@@ -15,6 +15,11 @@ const schema = z.object({
   phone: z.string().trim().max(40).nullish(),
   smsOptIn: z.boolean().optional(),
   broadcastEmails: z.boolean().optional(),
+  /** The members' directory. Off unless somebody says otherwise — see lib/directory.ts. */
+  directoryListed: z.boolean().optional(),
+  directoryShowEmail: z.boolean().optional(),
+  directoryShowPhone: z.boolean().optional(),
+  directoryNote: z.string().trim().max(200).nullish(),
 });
 
 /**
@@ -51,6 +56,24 @@ export async function PATCH(request: NextRequest) {
         ? { smsOptIn: body.smsOptIn && Boolean(body.phone ?? user.phone) }
         : {}),
       ...(body.broadcastEmails !== undefined ? { broadcastEmails: body.broadcastEmails } : {}),
+
+      // Leaving the directory takes the contact flags with it, so somebody who
+      // opts out and back in a year later does not silently republish a phone
+      // number they had forgotten was ticked.
+      ...(body.directoryListed !== undefined
+        ? body.directoryListed
+          ? { directoryListed: true }
+          : { directoryListed: false, directoryShowEmail: false, directoryShowPhone: false }
+        : {}),
+      // Publishing a detail requires being listed at all: a stale form must not
+      // be able to set "show my phone" on somebody who is not in the directory.
+      ...(body.directoryShowEmail !== undefined
+        ? { directoryShowEmail: body.directoryShowEmail && (body.directoryListed ?? user.directoryListed) }
+        : {}),
+      ...(body.directoryShowPhone !== undefined
+        ? { directoryShowPhone: body.directoryShowPhone && (body.directoryListed ?? user.directoryListed) }
+        : {}),
+      ...(body.directoryNote !== undefined ? { directoryNote: body.directoryNote?.trim() || null } : {}),
     },
   });
   return NextResponse.json({ ok: true });
