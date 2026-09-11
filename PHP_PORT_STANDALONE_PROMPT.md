@@ -7,7 +7,7 @@ its configuration reference and its offline shell are embedded as Appendices
 A–J at the end, and every instruction above them is written against those
 appendices rather than against source files.
 
-It is large — about 589 KB, roughly 150k tokens. Put it in the
+It is large — about 601 KB, roughly 153k tokens. Put it in the
 empty repository as `PORT_PROMPT.md`, commit it, and start the session with:
 "Read `PORT_PROMPT.md` in full, appendices included, then begin at step 1 of
 its work plan." An agent that reads only the top half builds a lookalike;
@@ -295,7 +295,11 @@ never depend on the cache being warm or present.
 ## Install and upgrade
 
 `/install` is a wizard the front controller serves until
-`storage/installed.lock` exists, after which it 404s.
+`storage/installed.lock` exists, after which it 404s. Its first screen asks
+for the contents of `storage/install.key`, which it has just written: proof
+that whoever is installing can read the files, since a site on a temporary
+hostname is reachable by anyone who guesses it (see **Security
+requirements**).
 
 1. **Requirements**: PHP version and extensions, `storage/` writable, a
    rewrite test (the wizard fetches a known pretty URL from itself and reports
@@ -358,6 +362,7 @@ interface ServiceProvider {
     public static function configSchema(): array;     // fields: key, label, type, secret?, help, required?
     public static function requiresHttps(): bool;
     public static function requiresOutboundHttps(): bool;
+    public static function cspSources(): array;       // origins the Content Security Policy must allow for it
     public function __construct(array $config);
     public function test(): TestResult;               // ok | fail(message for a person)
 }
@@ -510,7 +515,9 @@ Whatever the flow, one function turns a verified assertion into an `Identity`
 unchanged. Every provider except local requires the site to be HTTPS —
 redirect URIs must be `https://`, and a token or a password must not cross
 the wire in clear — and both the installer and Admin → Services refuse them
-otherwise and say why.
+otherwise and say why. Every provider hands the post-login destination
+through one `safeReturnTo()`, which accepts only a relative path under the
+base path.
 
 Providers in the core:
 
@@ -807,6 +814,11 @@ Rules that cut across providers:
 - **Feed import** from a YouTube channel or playlist and a Vimeo account or
   showcase stays under Admin → Video feeds with the three-way sync rule
   intact; imported rows are ordinary `youtube` and `vimeo` rows.
+- **A pasted link is a request the server makes on the admin's behalf.**
+  Every link resolution and every HEAD goes through `Http::fetchUntrusted()`
+  — host resolved and checked against private and metadata ranges on each
+  redirect hop, ten-second timeout, capped body — as **Security
+  requirements** specifies.
 - **Later**, and expected to fit the interface without changes: hosts with
   a placeholder-plus-direct-upload flow like Bunny's — Cloudflare Stream
   (one-time upload URLs, TUS), Mux (signed direct uploads), Wistia, JW
@@ -998,7 +1010,8 @@ capabilities, jobs, service providers, nav items, and translations. They may
 read core data through the module services (`Library`, `Access`, `Users`,
 …), never by reaching into another plugin's tables. Plugin JS is a plain
 module under `plugins/<slug>/assets/`, served through a route that maps
-`/plugins/<slug>/assets/*` to it with the right cache headers; plugin CSS
+`/plugins/<slug>/assets/*` to it with the right cache headers and refuses
+anything executable or hidden; plugin CSS
 uses the same custom properties.
 
 **The 31 features in `PLUGIN_META` (Appendix E) become bundled plugins** in `plugins/`,
@@ -1311,6 +1324,179 @@ those flags, search never matching a contact detail even a published one,
 and the page `noindex` behind sign-in; a member's own group messages in their
 data export, taken-down ones labelled as such.
 
+## Security requirements
+
+Shared hosting changes the threat model: the app shares a machine, and often
+a database server, with strangers; the administrator has no shell; an upload
+is the deployment path; and a site is often reachable on a temporary
+hostname before anyone has told the congregation about it. Each item below
+is a requirement with a test where one is possible, and the security pass in
+the **Work plan** walks every route against this list.
+
+**Installer and configuration**
+
+- The installer is reachable by anyone who finds the site before it is
+  installed, so it requires proof of file access: on its first hit it writes
+  `storage/install.key` (32 random bytes, hex) and asks for the contents,
+  which only the host's file manager or FTP can show — the same access as
+  owning the site. `installed.lock` closes it. A `config.php` with no lock (a
+  half-finished install) shows the key prompt again rather than resuming.
+- `storage/` must not be web-readable. The installer writes a probe file and
+  fetches it over HTTP; if it is served, the wizard refuses to continue until
+  the directory is moved above the document root or the rewrite denies it
+  (`.htaccess` on Apache; the nginx docs give the `location` block). Every
+  directory the app writes to also carries an `index.php` that exits, against
+  `AllowOverride None`, and `Options -Indexes`.
+- `storage/config.php` holds the database credentials and `app_key`; the
+  `services` table holds provider secrets encrypted with `app_key` (AES-256-GCM
+  through `sodium` or `openssl`, a random nonce per value, the key never in
+  the database). Secrets are write-only in every form and are never echoed,
+  exported, logged, or written in the clear into a backup.
+- Debug mode is off by default; `display_errors` is forced off at bootstrap
+  whatever `php.ini` says; no response carries a stack trace, a query, or a
+  file path to anyone but an `ADMIN` with debug on.
+- The table prefix is validated as `[a-z0-9_]{1,16}`, and no SQL identifier
+  is ever built from request input.
+
+**Sessions, CSRF and headers**
+
+- Session ids are 32 random bytes and the database stores their SHA-256, so
+  a database read does not yield a usable session. Ids are regenerated on
+  login and on any privilege change; lifetimes are 30 days absolute and 7
+  days idle; "sign out everywhere" deletes the member's rows. The cookie is
+  `HttpOnly`, `SameSite=Lax`, `Secure` on HTTPS, scoped to the base path, and
+  carries the `__Host-` prefix when the site sits at a domain root over HTTPS.
+- Every state-changing request carries the session's CSRF token (form field
+  or `X-CSRF-Token`), compared in constant time, with an `Origin` /
+  `Sec-Fetch-Site` check as defence in depth. GET never changes state. The
+  only exemptions are bearer-authenticated `/api/v1`, `/cron/run`, and the
+  signature-verified webhook receivers.
+- `returnTo` and every other post-action destination are accepted only as a
+  relative path under the base path; a scheme, a leading `//`, or a backslash
+  falls back to `/`.
+- Headers on every response: `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: strict-origin-when-cross-origin`,
+  `X-Frame-Options: SAMEORIGIN` (the presenter and television screens
+  included), a `Permissions-Policy` granting only what the player needs,
+  `Strict-Transport-Security` only after the admin confirms HTTPS is
+  permanent, and a Content Security Policy with a per-response nonce for the
+  two inline init scripts and the branding `<style>`; plugins and themes get
+  the nonce from `View::nonce()`. Providers declare the origins they need
+  through `cspSources()` — ClerkJS, Firebase, the YouTube and Vimeo frames,
+  the Cast SDK, TUS endpoints, S3 hosts — so the policy is assembled from what
+  is active rather than opened wide.
+
+**Accounts and sign-in**
+
+- Passwords: Argon2id where available, bcrypt at cost 12 otherwise; at least
+  12 characters, checked against a short list of the commonest; no maximum
+  under 200. Reset and magic-link tokens are 32 random bytes, stored hashed,
+  single-use, bound to one account, expiring in 60 and 15 minutes. A request
+  for an unknown address answers identically and takes the same time.
+- Login, reset, magic link, share-link unlock, television pairing and
+  API-key authentication are throttled per account and per IP in the
+  database with exponential backoff; these counters are among the ones
+  tested under concurrency.
+- Changing a local account's email sends a verification to the *new* address
+  and a notice to the old one, and applies only when the new one is verified.
+  A provider-side change that `decideLinking` would rename a member onto is
+  held the same way.
+- Only an `ADMIN` grants `ADMIN`; no permission group can carry it;
+  `manage_users` cannot promote. Role and allowlist are re-read per request.
+- JWT verification, for Auth0, OIDC, Clerk, Supabase and Firebase alike: the
+  accepted algorithms are pinned per provider — never `none`, and never both
+  an HMAC and an asymmetric algorithm for one issuer — and `iss`, `aud` or
+  `azp`, `exp`, `nbf` and `iat` (60 seconds of skew) are checked, plus
+  `nonce` on ID tokens. JWKS is fetched over TLS, cached, and refreshed on an
+  unknown `kid` at most once a minute. The token flow's POST to `/auth/token`
+  carries the CSRF token, so a third party cannot log a victim into the
+  attacker's account.
+- Supabase's service-role key, Clerk's secret key and every OAuth client
+  secret are server-only; the browser sees only anon keys, publishable keys
+  and client ids.
+
+**Requests the server makes**
+
+- Everything that fetches a URL somebody typed — the direct-link, Dropbox,
+  Google Drive, OneDrive and Internet Archive providers, the JSON SMS webhook,
+  the transcription URL, the Webhooks plugin, a cover image URL if it is ever
+  fetched server-side — goes through one `Http::fetchUntrusted()`, which
+  resolves the host itself, refuses loopback, private, link-local and cloud
+  metadata ranges (`169.254.169.254` included) on *every* hop of a redirect,
+  allows only `http` and `https`, caps the body it reads, and times out in
+  ten seconds. Provider-specific calls use fixed hosts and never take a host
+  from input. The cron loopback request goes to the configured base URL only.
+
+**Files and uploads**
+
+- Every upload is typed by `finfo` on its bytes, never by extension, against
+  an allowlist per purpose: images JPEG, PNG, WebP, GIF; documents PDF and
+  EPUB; audio MP3, M4A, OGG; captions VTT and SRT; video MP4 and WebM. SVG is
+  not an image here — it can carry script, and the branding logo is on every
+  page. Images are re-encoded through GD when it exists; without it they are
+  served with `nosniff` and, outside an `<img>`, as attachments.
+- Stored names are random; the original name lives only in the database and
+  is sanitised before it becomes a `Content-Disposition` filename (no CR, LF,
+  quotes or path characters). A Range request may name one range.
+  `X-Sendfile` paths are built from the stored name, never from input.
+- Nothing under `storage/uploads`, `public/media`, `plugins/*/assets` or
+  `themes/*/assets` executes: an `.htaccess` there turns the PHP handler off
+  (`php_flag engine off`, `RemoveHandler`, `SetHandler default-handler`), the
+  asset route refuses `.php`, `.phtml`, `.phar` and dotfiles, and the nginx
+  docs say the same.
+- Chunked uploads are addressed by a random id, assembled only under
+  `storage/tmp/<id>/`, size-capped by the admin's setting and swept after a
+  day; `..` and absolute paths are refused by construction.
+- Plugin and theme zips: refuse entries with `..`, absolute paths or
+  symlinks, and archives over 10,000 files or 200 MB uncompressed (zip slip
+  and zip bombs); extract into `storage/tmp`, verify the manifest, then move.
+  A plugin is code and runs as the site; only `manage_plugins` installs one,
+  and the page says so.
+- Release zips uploaded through `/admin/update` are signed: the maintainer's
+  Ed25519 public key ships in the app, the archive's checksum is signed at
+  build, and `sodium_crypto_sign_verify_detached` rejects anything else
+  before a file is touched.
+
+**Data**
+
+- Prepared statements everywhere; `LIKE` arguments have `%` and `_` escaped;
+  `ORDER BY` columns and directions come from allowlists; FULLTEXT queries are
+  stripped of boolean operators.
+- Every `POST` and `PATCH` body is validated against an explicit field
+  allowlist per route — the port of the `zod` schemas; unknown fields are
+  dropped, never spread into an update.
+- Templates escape by default; the raw helper is the only exception and CI
+  greps for it. Email bodies are escaped the way `email.ts` does, and `mail()`
+  and SMTP reject CR or LF in any address or subject.
+- Logs mask `Authorization` headers, cookies, tokens, passwords and API keys
+  before writing; `/admin/logs` is `ADMIN` only.
+- Backups are written under `storage/tmp` with a random name, streamed, and
+  deleted after download; the `services` rows keep their secrets encrypted in
+  the dump.
+- The data export and `/api/v1` keep `assertNoSecrets`; the directory,
+  prayer, small-group, attendance and thread rules under **Feature inventory**
+  are security rules and are tested as such.
+
+**Abuse**
+
+- Public write endpoints — forms, event sign-up, prayer requests, comments,
+  live chat, share-link unlock, the registration check — are rate-limited per
+  IP and per account in the database, with a honeypot field on the public
+  forms; a CAPTCHA (Turnstile or hCaptcha) is an optional integration, off by
+  default.
+- Inbound SMS and delivery-receipt webhooks verify signatures, reject
+  timestamps older than five minutes, and are rate-limited.
+- The page-view cron trigger fires at most once a minute per install and
+  holds a database lock, so it cannot be used to make the site hammer itself.
+
+**Dependencies and process**
+
+- Vendored libraries are pinned with checksums recorded in `MANIFEST`; CI
+  runs `composer audit` and fails on a known vulnerability; the release build
+  records every version.
+- The security pass in the **Work plan** walks every route against this
+  section and records the result per route in `PORT_MAP.md`.
+
 ## Testing and CI
 
 - **PHPUnit** unit tests for every pure module: Appendix D lists the
@@ -1344,6 +1530,20 @@ data export, taken-down ones labelled as such.
   the token flow end to end with a JWT minted by the test against a local
   JWKS; SMTP against Mailpit; and the trial-mode switch proven by a test that
   fails to complete the second-tab login and asserts nothing changed.
+- **Security tests**, one per item under **Security requirements** where a
+  test is possible: the installer refuses without the install key and
+  refuses while `storage/` is web-readable; a state-changing request without
+  the CSRF token is refused; `returnTo` with a scheme or `//` lands on `/`;
+  a JWT with `alg: none`, a wrong `aud`, an expired `exp`, or an HMAC
+  signature under the asymmetric issuer is refused; a session id read from
+  the database cannot be presented as a cookie; a plugin zip with `../` in a
+  path, a symlink, or a `.php` under `assets/` is refused or not executed; an
+  SVG or a PHP file disguised as a JPEG is refused; a direct link to
+  `127.0.0.1`, `10.0.0.1`, `169.254.169.254` or a host that redirects to one
+  is refused; `%` and `_` in a search do not act as wildcards; the security
+  headers are present on a page, an API response and a file response; a
+  `mail()` subject with CR LF is refused; and a log line written during a
+  failed login contains no password.
 - **Static checks**: PHPStan level 6 or higher, PSR-12 via PHP-CS-Fixer,
   `php -l` across the tree on 8.2/8.3/8.4, a grep that fails on the banned
   process functions, and a check that no template echoes an unescaped
@@ -1388,8 +1588,9 @@ session can pick up where this one stopped without re-deriving the state.
    and sheets, events and series, forms, prayer, groups, broadcasts and SMS,
    live streaming and chat, television, the read API, the data export and
    import.
-6. **Hardening and docs**: the smoke test green, a security pass over every
-   route's auth and CSRF, `INSTALL.md` written for a volunteer with
+6. **Hardening and docs**: the smoke test green, the **Security requirements**
+   checklist walked route by route and recorded in `PORT_MAP.md`,
+   `INSTALL.md` written for a volunteer with
    screenshots' worth of detail and a "Locked out" section, `PLUGINS.md`,
    `THEMES.md`, `UPGRADING.md`, and the migration guide from a Vercel
    deployment.
@@ -1427,6 +1628,9 @@ and carry on — don't stall on it.
 - The export from the Next.js deployment imports and the counts match.
 - CI is green on MySQL 8 and MariaDB 10.6, PHPStan passes, the banned-function
   grep is clean.
+- Every item under **Security requirements** has a passing test or a recorded
+  manual check, and the route-by-route security review in `PORT_MAP.md` has
+  no open rows.
 - `PORT_MAP.md` has no `todo` rows, and every `dropped` row has a reason a
   maintainer would accept.
 
