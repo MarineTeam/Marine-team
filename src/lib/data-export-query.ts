@@ -178,6 +178,7 @@ export async function buildExport(user: User, at = new Date()) {
     prayerRequests,
     intercessions,
     groupMemberships,
+    groupMessages,
     notifications,
     broadcasts,
     chatMessages,
@@ -272,6 +273,17 @@ export async function buildExport(user: User, at = new Date()) {
         createdAt: true,
         group: { select: { name: true, slug: true, area: true, address: true, meetsWhen: true } },
       },
+    }),
+    prisma.groupMessage.findMany({
+      ...where,
+      select: {
+        authorName: true,
+        body: true,
+        hidden: true,
+        createdAt: true,
+        group: { select: { name: true } },
+      },
+      orderBy: { createdAt: "asc" },
     }),
     prisma.notification.findMany({
       ...where,
@@ -591,6 +603,23 @@ export async function buildExport(user: User, at = new Date()) {
         askedAt: iso(row.createdAt),
       };
     }),
+
+    /**
+     * What they themselves wrote in their groups' conversations.
+     *
+     * Theirs only — scoped by the same `where` as everything else here, so
+     * this export is one person's words and never the rest of the group's.
+     * Messages a leader took down are included and labelled: it is still what
+     * this person wrote, and hiding the fact it was hidden would answer the
+     * one question somebody makes a data request to ask.
+     */
+    groupMessages: groupMessages.map((row) => ({
+      group: row.group.name,
+      nameShown: row.authorName,
+      body: row.body,
+      takenDownByLeader: row.hidden,
+      postedAt: iso(row.createdAt),
+    })),
 
     messages: {
       notifications: notifications.map((row) => ({

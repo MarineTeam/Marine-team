@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GroupPanel } from "@/components/group-panel";
+import { GroupThread } from "@/components/group-thread";
 import { getCurrentUser } from "@/lib/current-user";
 import { getGroup, viewerFor } from "@/lib/groups-query";
 import { format } from "@/lib/i18n";
@@ -53,6 +54,10 @@ export default async function GroupPage(props: { params: Promise<{ slug: string 
       )}
 
       <GroupPanel slug={group.slug} standing={group.standing} state={group.joinState} t={t.groups} />
+
+      {/* Renders nothing for anybody outside the group — the API decides, and
+          hands the component an empty list and a sentence. */}
+      <GroupThread slug={group.slug} />
     </div>
   );
 }

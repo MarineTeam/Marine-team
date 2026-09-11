@@ -72,7 +72,7 @@ export const MAX_LENGTH = 500;
  * screenful — which is the cheapest form of shouting and the one a length
  * limit alone doesn't stop.
  */
-export function cleanMessage(raw: string): CleanMessage {
+export function cleanMessage(raw: string, max: number = MAX_LENGTH): CleanMessage {
   const body = raw
     .replace(/\r\n?/g, "\n")
     .replace(/[ \t]+/g, " ")
@@ -80,8 +80,8 @@ export function cleanMessage(raw: string): CleanMessage {
     .trim();
 
   if (!body) return { ok: false, reason: "Write something first." };
-  if (body.length > MAX_LENGTH) {
-    return { ok: false, reason: `That's longer than ${MAX_LENGTH} characters.` };
+  if (body.length > max) {
+    return { ok: false, reason: `That's longer than ${max} characters.` };
   }
   return { ok: true, body };
 }
