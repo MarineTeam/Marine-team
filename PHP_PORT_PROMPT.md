@@ -17,10 +17,10 @@ reinvent instead of port. So:
    session that doesn't initialise submodules, run
    `git submodule update --init --depth 1` from the setup script, or attach
    this repository to the session as a second, read-only source instead.
-   Pin it at a commit that includes the small-group attendance, discussion
-   guides, member directory and group-conversation work this document
-   describes: `16309c3` on `claude/pdf-epub-caching-nav-u98bn0` until that
-   branch is merged, then `main`.
+   Pin it at `0b9df34` on `main` or later — the commit that closes the
+   security audit and puts the rota's names behind a sign-in, on top of the
+   small-group attendance, discussion guides, member directory and
+   group-conversation work this document describes.
 2. Copy this file to the new repository's root as `PORT_PROMPT.md`.
 3. Every path in this document that isn't part of the new tree —
    `README.md`, `FEATURES.md`, `src/…`, `prisma/…`, `public/…`,
@@ -1214,6 +1214,11 @@ hitting `/cron/run?token=<cron token>`:
   band. A `lock_until` claimed with a conditional `UPDATE` stops two
   triggers running one job at once.
 
+With no cron token configured, `/cron/run` answers 503 and runs nothing.
+The installer generates the token, so only a broken install ever sees
+this — and a broken install must not be a public job runner. A wrong token
+is a 401, compared in constant time. **Security requirements** says why.
+
 `/admin/jobs` shows each job, when it last ran, whether a real cron is
 detected, and a **Run now** button. Daily is no longer a platform limit, so
 the default intervals are what the feature wants (status sync every 15
@@ -1298,7 +1303,7 @@ is in `app/Modules/`; everything else is a bundled plugin.
 | Member plugins | `/favorites`, `/watch-later`, `/playlists`, `/playlists/[id]`, `/subscriptions`, `/recently-played`, `/s/[token]`, `/share/*`, `/profile/shared-links`, `/profile/downloads`, `/directory` (under the `profiles` plugin; opt-in from `/profile/settings` via `PATCH /api/profile`) | `/admin/comments`, `/admin/announcements`, `/admin/webhooks`, `/admin/share-links`, `/admin/downloads` | `plugins.ts`, `share-links.ts`, `share-access.ts`, `share-password.ts`, `downloads.ts`, `download-platform.ts`, `push.ts`, `webhooks.ts`, `outline.ts`, `directory*.ts` |
 | Live (plugin) | `/live`, `/api/live/*` | `/admin/live` | `live-chat.ts` |
 | Books, hymnals, services (plugins) | `/books/[fileId]`, `/read/[fileId]`, `/hymns/[fileId]`, `/present/[fileId]`, `/services`, `/services/[id]`, `/profile/rota`, `/api/offline/*`, `/api/hymnals/search`, `/api/hymns/lookup` | `/admin/services`, `/admin/services/report`, `/admin/teams` | `hymnal.ts`, `book-contents.ts`, `page-offset.ts`, `reader*.ts`, `toc-nav.ts`, `verses.ts`, `services.ts`, `rota.ts`, `offline-*.ts`, `fingerprint.ts`, `ocr-client.ts` |
-| Schedules (plugin) | `/calendar`, `/api/schedules/*`, `/api/calendar-events`, `/api/sync/snapshot`, `/api/calendar/[token]/marine-team.ics`, `/api/profile/calendar` | `/admin/schedules`, `/admin/schedules/[id]`, `/admin/people` | `schedules/`, `sheets/`, `calendar-feed*.ts`, `ics.ts`, `names.ts` |
+| Schedules (plugin) | `/calendar`, `/api/schedules/*`, `/api/calendar-events`, `/api/sync/snapshot`, `/api/people` (the dates for anyone, the names for members: the page and the event and snapshot endpoints answer a signed-out reader with events that have nobody on them, `/api/people` is a 403 without a session), `/api/calendar/[token]/marine-team.ics`, `/api/profile/calendar` | `/admin/schedules`, `/admin/schedules/[id]`, `/admin/people` | `schedules/` (`visibility.ts` and `viewer.ts` decide who sees names), `sheets/`, `calendar-feed*.ts`, `ics.ts`, `names.ts` |
 | Events, forms, prayer, groups, broadcasts (plugins) | `/events`, `/events/[slug]`, `/events/calendar.ics`, `/events/[slug]/event.ics`, `/forms`, `/forms/[slug]`, `/prayer`, `/groups`, `/groups/[slug]` (with the group's thread, `/api/groups/[slug]/messages`, and its roll, `/api/groups/[slug]/meetings`), `/guides`, `/guides/[slug]`, `/profile/events`, `/profile/groups` | `/admin/events`, `/admin/forms`, `/admin/prayer`, `/admin/groups`, `/admin/broadcasts`, `/api/admin/guides` (gated by `manage_events`; the original has only the API, so give it an `/admin/guides` page) | `events.ts`, `event-series*.ts`, `recurrence.ts`, `forms*.ts`, `prayer*.ts`, `groups*.ts`, `attendance*.ts`, `guides*.ts`, `group-messages*.ts`, `broadcast*.ts`, `sms*.ts` |
 | Television (plugin) | `/tv`, `/link`, `/profile/devices`, `/api/tv/*` | — | `tv-pairing.ts`, `tv-session.ts`, `tv-feed*.ts`, `tv-nav.ts` |
 | Read API (core) | `/api/v1/*` | `/admin/api-keys` | `api-v1.ts`, `api-keys-query.ts` |
@@ -1329,7 +1334,21 @@ members minus the author and the muted; directory listing off by default
 with each contact detail its own separate yes, leaving the directory clearing
 those flags, search never matching a contact detail even a published one,
 and the page `noindex` behind sign-in; a member's own group messages in their
-data export, taken-down ones labelled as such.
+data export, taken-down ones labelled as such. And from the last change
+before this document was pinned, **rota names are for members**: the
+schedules module came from an app built for people who never log in and
+published every volunteer's name beside the days they are at the building,
+while the directory next to it needed opt-in *and* sign-in for a name to
+appear. The structure stays public — which rotas, what days, what notes —
+and the people need a sign-in. `visibleEvents`/`visiblePeople` hand a
+signed-out reader events with nobody on them rather than names to hide,
+the same optional-field shape the group address uses; `/api/people` is a
+403 without a session; a `personId` filter is refused signed out ("which
+days is this id on" is "who is this", sideways); and a signed-out offline
+sync is always a *full*, nameless snapshot, so a copy saved on a shared
+laptop while somebody was signed in is replaced on its next update rather
+than kept. Choosing your name on the calendar therefore needs a sign-in;
+the per-device preference still works once there is one.
 
 ## Security requirements
 
@@ -1433,6 +1452,17 @@ the **Work plan** walks every route against this list.
   allows only `http` and `https`, caps the body it reads, and times out in
   ten seconds. Provider-specific calls use fixed hosts and never take a host
   from input. The cron loopback request goes to the configured base URL only.
+- Web Push subscriptions are URLs the browser hands the page and the page
+  hands the server, and the server then POSTs a signed body to every one of
+  them on every notification. Accept only `https:` endpoints whose host is
+  one of the browsers' push services — `fcm.googleapis.com`,
+  `android.googleapis.com`, `push.services.mozilla.com`,
+  `notify.windows.com`, `push.apple.com`, `push.samsungosp.com`, matched on
+  a label boundary, with a setting that adds a suffix for a browser not on
+  the list — and no more than eight per member, the oldest evicted when a
+  ninth arrives. `Http::fetchUntrusted()`'s rules apply to the send as well.
+  The original accepted any URL and capped nothing: one member could make
+  the server POST wherever they liked, a thousand times per notification.
 
 **Files and uploads**
 
@@ -1442,6 +1472,27 @@ the **Work plan** walks every route against this list.
   not an image here — it can carry script, and the branding logo is on every
   page. Images are re-encoded through GD when it exists; without it they are
   served with `nosniff` and, outside an `<img>`, as attachments.
+- The type stored and the type served both come from that allowlist and
+  never from the request: the extension and the bytes must agree with one
+  entry or the upload is refused (415), and the object is stored as
+  `<random id>.<ext>` with nothing of the client's name in the path. On the
+  way out, `Content-Type` is decided from the stored extension alone — never
+  from a stored MIME string, which for an imported object is whatever a
+  dashboard was told. Only PDF, EPUB, audio and raster images may be served
+  `inline`; documents are `attachment`; anything not on the list at all —
+  including a file that predates the rule — is `application/octet-stream`,
+  `attachment`, `nosniff`, with `Content-Security-Policy: sandbox`, the
+  combination a browser refuses to interpret. The original shipped a version
+  that trusted the browser's `file.type` and served it back inline: a series
+  editor could upload `notes.html` as `text/html` and have it run as the
+  site in the browser of any admin who opened the link. That is the finding
+  this bullet exists for.
+- Images are decoded by GD once, at upload, after `getimagesize` has read
+  the dimensions from the header and refused anything over 40 megapixels —
+  never again on request, and never from a URL. The original's image
+  optimizer route decoded whatever same-origin path it was handed, uploads
+  included, and carried a critical advisory for it; the port has no such
+  route, and `<img>` tags point at the stored file.
 - Stored names are random; the original name lives only in the database and
   is sanitised before it becomes a `Content-Disposition` filename (no CR, LF,
   quotes or path characters). A Range request may name one range.
@@ -1481,8 +1532,8 @@ the **Work plan** walks every route against this list.
   deleted after download; the `services` rows keep their secrets encrypted in
   the dump.
 - The data export and `/api/v1` keep `assertNoSecrets`; the directory,
-  prayer, small-group, attendance and thread rules under **Feature inventory**
-  are security rules and are tested as such.
+  prayer, small-group, attendance, thread and rota-name rules under
+  **Feature inventory** are security rules and are tested as such.
 
 **Abuse**
 
@@ -1495,6 +1546,25 @@ the **Work plan** walks every route against this list.
   timestamps older than five minutes, and are rate-limited.
 - The page-view cron trigger fires at most once a minute per install and
   holds a database lock, so it cannot be used to make the site hammer itself.
+- Scheduled jobs fail closed: `/cron/run` with no cron token configured
+  answers 503 and runs nothing, and a wrong token is a 401 compared in
+  constant time. The original's eight cron routes each checked
+  `if (secret && …)`, which with the variable unset ran every job for
+  anybody — transcription (paid per call), broadcast sends, feed syncs — so a
+  preview environment without the variable was a public job runner. Never
+  `if (token) { check }`.
+- View counts throttle on the server, not only in a cookie: an HMAC of the
+  caller's address under `app_key`, one count per address per item per
+  thirty minutes, the key column blanked by the daily job after a day so it
+  is a throttle and not a record. An id that doesn't exist is a 404, never a
+  foreign-key 500. A cookie the caller sets on itself was the whole throttle
+  once; a script simply doesn't send one.
+- Small-group asks: ten per member per hour, and what an ask pages the
+  leaders with is capped per leader per group per hour — a member who asks,
+  withdraws and asks again leaves no row behind to count, so the cap is on
+  the notifications. Search inputs are capped: 100 characters on the site
+  search, whose similarity query runs over every published row, 200 inside
+  a book.
 
 **Dependencies and process**
 
