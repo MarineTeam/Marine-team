@@ -7,7 +7,7 @@ its configuration reference and its offline shell are embedded as Appendices
 A–J at the end, and every instruction above them is written against those
 appendices rather than against source files.
 
-It is large — about 573 KB, roughly 146k tokens. Put it in the
+It is large — about 589 KB, roughly 150k tokens. Put it in the
 empty repository as `PORT_PROMPT.md`, commit it, and start the session with:
 "Read `PORT_PROMPT.md` in full, appendices included, then begin at step 1 of
 its work plan." An agent that reads only the top half builds a lookalike;
@@ -25,6 +25,9 @@ for the files, and do not stop because they are missing.
 The one place the original deployment is still needed is the data import in
 **Database**, which is written as a script run from a laptop against the old
 database, not as a change to the old repository.
+
+The appendices were generated from commit `16309c3` of the original
+repository.
 
 ---
 
@@ -75,12 +78,12 @@ the application *is*.
   and the reasoning behind each decision. Where they say Postgres, Prisma,
   Vercel, environment variables or React, the sections above say what
   replaces it.
-- **Appendix B — Data model.** The Prisma schema, verbatim: 90 models, 32
-  enums, and column comments that carry rules the prose doesn't repeat.
+- **Appendix B — Data model.** The Prisma schema, verbatim: 95 models,
+  34 enums, and column comments that carry rules the prose doesn't repeat.
 - **Appendix C — URL inventory.** Every page and every API route with its
   HTTP methods. This is the compatibility contract's list.
 - **Appendix D — Rules pinned by tests.** The titles of every case in the
-  original 62-file test suite, file by file: the edge cases a rewrite loses.
+  original 66-file test suite, file by file: the edge cases a rewrite loses.
 - **Appendix E — Plugins and capabilities.** The 31 bundled features and the
   15 capabilities, as the original registers them.
 - **Appendix F — Scheduled jobs.** The original cron schedule.
@@ -93,8 +96,8 @@ the application *is*.
 - **Appendix J — Auth0 Actions.** The two Actions and their README, which
   stay valid for the Auth0 sign-in provider.
 
-The app is roughly 74,000 lines of TypeScript across 88 pages, 213 API routes,
-137 components and 121 library modules, with 62 test files. Plan for that; see
+The app is roughly 77,000 lines of TypeScript across 91 pages, 218 API routes,
+139 components and 129 library modules, with 66 test files. Plan for that; see
 **Work plan** at the end.
 
 ## Non-negotiables
@@ -1272,11 +1275,11 @@ is in `app/Modules/`; everything else is a bundled plugin.
 | Library (core) | `/`, `/categories/[slug]`, `/series/[slug]`, `/videos/[slug]`, `/tags/[tag]`, `/speakers`, `/speakers/[slug]`, `/scripture`, `/scripture/[book]`, `/search`, `/recently-added`, `/feed.xml`, `/series/[slug]/podcast.xml`, `/sitemap.xml` | `/admin`, `/admin/categories`, `/admin/series`, `/admin/videos`, `/admin/files`, `/admin/speakers`, `/admin/trash`, `/admin/media-check`, `/admin/home-rows` | `content.ts`, `bunny.ts`, `video-source.ts`, `download-source.ts`, `podcast-mirror.ts`, `slug.ts`, `reorder.ts`, `drafts.ts`, `cover.ts`, `seo.ts`, `json-ld.ts`, `content-language.ts` |
 | Access (core) | `/auth/*`, `/access-denied`, `/link` | `/admin/users`, `/admin/authorized-emails`, `/admin/access-attempts`, `/admin/permissions`, `/admin/audit`, `/admin/api-keys` | `current-user.ts`, `authorization.ts`, `identity-linking.ts`, `permissions.ts`, `capabilities.ts`, `audit.ts`, `api-keys*.ts`, `api-v1.ts`, `no-secrets.ts` |
 | Site (core) | `/api/manifest`, `/api/locale`, `/profile`, `/profile/settings`, `/profile/inbox` | `/admin/branding`, `/admin/plugins`, `/admin/analytics`, `/admin/query-monitor`, `/admin/video-feeds` | `branding.ts`, `i18n/`, `nav.ts`, `nav-tabs.ts`, `device-settings.ts`, `standalone.ts`, `inbox.ts`, `profile.ts`, `data-export.ts`, `video-feeds.ts`, `video-feed-sync.ts`, `query-monitor.ts` |
-| Member plugins | `/favorites`, `/watch-later`, `/playlists`, `/playlists/[id]`, `/subscriptions`, `/recently-played`, `/s/[token]`, `/share/*`, `/profile/shared-links`, `/profile/downloads` | `/admin/comments`, `/admin/announcements`, `/admin/webhooks`, `/admin/share-links`, `/admin/downloads` | `plugins.ts`, `share-links.ts`, `share-access.ts`, `share-password.ts`, `downloads.ts`, `download-platform.ts`, `push.ts`, `webhooks.ts`, `outline.ts` |
+| Member plugins | `/favorites`, `/watch-later`, `/playlists`, `/playlists/[id]`, `/subscriptions`, `/recently-played`, `/s/[token]`, `/share/*`, `/profile/shared-links`, `/profile/downloads`, `/directory` (under the `profiles` plugin; opt-in from `/profile/settings` via `PATCH /api/profile`) | `/admin/comments`, `/admin/announcements`, `/admin/webhooks`, `/admin/share-links`, `/admin/downloads` | `plugins.ts`, `share-links.ts`, `share-access.ts`, `share-password.ts`, `downloads.ts`, `download-platform.ts`, `push.ts`, `webhooks.ts`, `outline.ts`, `directory*.ts` |
 | Live (plugin) | `/live`, `/api/live/*` | `/admin/live` | `live-chat.ts` |
 | Books, hymnals, services (plugins) | `/books/[fileId]`, `/read/[fileId]`, `/hymns/[fileId]`, `/present/[fileId]`, `/services`, `/services/[id]`, `/profile/rota`, `/api/offline/*`, `/api/hymnals/search`, `/api/hymns/lookup` | `/admin/services`, `/admin/services/report`, `/admin/teams` | `hymnal.ts`, `book-contents.ts`, `page-offset.ts`, `reader*.ts`, `toc-nav.ts`, `verses.ts`, `services.ts`, `rota.ts`, `offline-*.ts`, `fingerprint.ts`, `ocr-client.ts` |
 | Schedules (plugin) | `/calendar`, `/api/schedules/*`, `/api/calendar-events`, `/api/sync/snapshot`, `/api/calendar/[token]/marine-team.ics`, `/api/profile/calendar` | `/admin/schedules`, `/admin/schedules/[id]`, `/admin/people` | `schedules/`, `sheets/`, `calendar-feed*.ts`, `ics.ts`, `names.ts` |
-| Events, forms, prayer, groups, broadcasts (plugins) | `/events`, `/events/[slug]`, `/events/calendar.ics`, `/events/[slug]/event.ics`, `/forms`, `/forms/[slug]`, `/prayer`, `/groups`, `/groups/[slug]`, `/profile/events`, `/profile/groups` | `/admin/events`, `/admin/forms`, `/admin/prayer`, `/admin/groups`, `/admin/broadcasts` | `events.ts`, `event-series*.ts`, `recurrence.ts`, `forms*.ts`, `prayer*.ts`, `groups*.ts`, `broadcast*.ts`, `sms*.ts` |
+| Events, forms, prayer, groups, broadcasts (plugins) | `/events`, `/events/[slug]`, `/events/calendar.ics`, `/events/[slug]/event.ics`, `/forms`, `/forms/[slug]`, `/prayer`, `/groups`, `/groups/[slug]` (with the group's thread, `/api/groups/[slug]/messages`, and its roll, `/api/groups/[slug]/meetings`), `/guides`, `/guides/[slug]`, `/profile/events`, `/profile/groups` | `/admin/events`, `/admin/forms`, `/admin/prayer`, `/admin/groups`, `/admin/broadcasts`, `/api/admin/guides` (gated by `manage_events`; the original has only the API, so give it an `/admin/guides` page) | `events.ts`, `event-series*.ts`, `recurrence.ts`, `forms*.ts`, `prayer*.ts`, `groups*.ts`, `attendance*.ts`, `guides*.ts`, `group-messages*.ts`, `broadcast*.ts`, `sms*.ts` |
 | Television (plugin) | `/tv`, `/link`, `/profile/devices`, `/api/tv/*` | — | `tv-pairing.ts`, `tv-session.ts`, `tv-feed*.ts`, `tv-nav.ts` |
 | Read API (core) | `/api/v1/*` | `/admin/api-keys` | `api-v1.ts`, `api-keys-query.ts` |
 
@@ -1289,7 +1292,24 @@ author's name leaves; `presentGroup` as the only place an address travels;
 conditional update; the three-way compare in feed sync; revoke never gated
 by the share-links plugin; the heartbeat never un-completing a video;
 `Serializable` avoided in favour of row locks; promotion stopping at the
-first party too big to fit; consent rules in `planDelivery`.
+first party too big to fit; consent rules in `planDelivery`. From the four
+newest features: the attendance roll reaching a member as a list of at most
+one row — their own — never a flag or a count, and reaching nobody outside the
+group; *apologies* a status of its own, never a shade of absent; one meeting
+per group per day under a unique index, so two leaders opening the form at
+once can't make two half-rolls; a roll refused for an evening that hasn't
+happened, and only current members markable, checked against the database
+rather than the form; `presentGuide` leaving `leaderNotes` off a member's
+shape rather than sending it empty, and notes readable by whoever leads any
+group without a capability; `inTheThread` re-read from the database on every
+request, a site manager outside the group getting nothing from it, a hidden
+message dropped in the query *and* in the filter, mute keeping somebody in
+the group, and thread notifications carrying the first line only, to active
+members minus the author and the muted; directory listing off by default
+with each contact detail its own separate yes, leaving the directory clearing
+those flags, search never matching a contact detail even a published one,
+and the page `noindex` behind sign-in; a member's own group messages in their
+data export, taken-down ones labelled as such.
 
 ## Testing and CI
 
@@ -3573,6 +3593,74 @@ The home groups and studies that meet during the week, at `/groups`.
 - Members see their groups at `/profile/groups`, and can leave or withdraw a
   request at any time.
 
+##### Who came
+
+A leader writes the roll up on the night, at `/api/groups/<slug>/meetings`.
+
+- **The roll goes to the people whose job it is to ring round.** A member sees
+  their own evenings; other members see nothing, not even a count. That is
+  enforced by handing a page a list of at most one row rather than a flag, so
+  there is nothing there to total by accident.
+- **Apologies is a real answer, not a shade of absent.** It is the distinction
+  the whole exercise exists for: a group that can't tell "let us know" from
+  "vanished" rings the wrong person.
+- **A quietly-missing list** names people nobody has marked present for three
+  meetings running who didn't send apologies for the last one — the prompt to
+  pick up the phone, which is the only reason to keep a roll at all.
+- A cancelled week counts against nobody, at either end. A roll can't be
+  written for an evening that hasn't happened.
+- Only people currently in the group can be marked, checked against the
+  database rather than trusted from the form.
+
+##### Discussion guides
+
+The questions a group works through, at `/guides`, written once and used by
+every group.
+
+- **Leader notes are absent from what a member is given**, not hidden in the
+  markup. The shape handed to a member page has no `leaderNotes` on it at all,
+  so a page cannot print an answer it was never given.
+- Anybody who leads any group sees them — the person hosting Tuesday doesn't
+  need a capability granted to read the notes for Tuesday.
+
+##### The group's conversation
+
+A thread on the group's own page, for the six days it isn't meeting.
+
+- **Only people actually in the group read or write it.** Not somebody whose
+  request is unanswered, not somebody on the waiting list — as private as the
+  address, and for the same reason. Standing is re-read on every request rather
+  than carried, so somebody removed on Monday has a tab that stops working on
+  Tuesday.
+- **A site manager outside the group gets nothing.** The one place this departs
+  from the address rule: an address is an operational fact somebody running the
+  site may need; a conversation isn't. Putting them in the group works, and
+  leaves a row saying so.
+- **Taking a message down hides it rather than deleting it**, so the same
+  message can't be reposted past the leader who decided about it. Authors
+  remove their own. Hidden is dropped in the query *and* in the filter, so a
+  message hidden between two polls can't arrive in the second one.
+- **Mute keeps somebody in the group and stops the notifications** — the thing
+  people actually want when a thread gets busy. The alternative they otherwise
+  reach for is leaving.
+- Notifications carry the first line only. A group thread is exactly the place
+  where the whole of a message shouldn't be sitting on a lock screen.
+- Their own messages are in their data export, including ones a leader took
+  down, labelled as such.
+
+#### Member directory
+
+Who else is here, at `/directory` — behind sign-in and `noindex`.
+
+- **Nobody is in it by default.** A member puts themselves in from **Profile →
+  Settings**, one field at a time: an email address or a phone number appears
+  only because that person ticked that box. A church directory is the document
+  most likely to be forwarded outside the church, so it holds only what people
+  chose to put in it.
+- **A listing goes when the person does.** Leaving or being unauthorized takes
+  them out without anybody remembering to tidy up, because the listing is a
+  view of live rows rather than a copy.
+
 #### Announcements
 
 One message to everybody, or to one group, from `/admin/broadcasts`.
@@ -4624,6 +4712,18 @@ model User {
   /// turned off "a new sermon is up" has not asked to miss "no service
   /// tomorrow, the road is closed".
   broadcastEmails       Boolean               @default(true)
+  /// Whether this member appears in the members' directory.
+  ///
+  /// Off, and off by default, and that default is the whole feature: a
+  /// directory somebody is in because they never found the setting is a
+  /// directory built without consent. Being listed publishes a name; each
+  /// contact detail below is its own separate yes.
+  directoryListed       Boolean               @default(false)
+  directoryShowEmail    Boolean               @default(false)
+  directoryShowPhone    Boolean               @default(false)
+  /// A line they write themselves — "ask me about the youth group".
+  directoryNote         String?
+
   /// The secret in this member's personal calendar-feed URL, or null until
   /// they ask for one. A calendar app cannot log in, so the URL is the
   /// credential — which is why it is generated on request, shown once in the
@@ -4672,10 +4772,14 @@ model User {
   prayerRequests        PrayerRequest[]
   prayers               PrayerIntercession[]
   smallGroups           SmallGroupMember[]
+  groupAttendance       GroupAttendance[]
+  groupMessages         GroupMessage[]
   broadcastsReceived    BroadcastRecipient[]
   liveChatMessages      LiveChatMessage[]
   liveChatMutes         LiveChatMute[]
   tvDevices             TvDevice[]
+
+  @@index([directoryListed, authorized])
 }
 
 /**
@@ -4850,6 +4954,7 @@ model Series {
   shareLinks        ShareLink[]
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
+  discussionGuides  DiscussionGuide[]
 
   @@index([language])
 }
@@ -4981,6 +5086,7 @@ model Video {
   shareLinks           ShareLink[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
+  discussionGuides     DiscussionGuide[]
 
   /// One row per video per source: a re-sync updates rather than duplicates.
   @@unique([source, externalId])
@@ -6935,9 +7041,11 @@ model SmallGroup {
   /// closed door, and it costs the leader nothing until a place appears.
   waitlist   Boolean @default(true)
 
-  members   SmallGroupMember[]
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  members            SmallGroupMember[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  smallGroupMeetings SmallGroupMeeting[]
+  groupMessages      GroupMessage[]
 
   @@index([published])
 }
@@ -6970,6 +7078,9 @@ model SmallGroupMember {
 
   role   GroupRole         @default(MEMBER)
   status GroupMemberStatus @default(REQUESTED)
+  /// Keeps them in the group but stops the thread notifying them — the same
+  /// shape as a muted subscription.
+  muted  Boolean           @default(false)
   /// What they said when they asked.
   note   String?
 
@@ -6979,6 +7090,173 @@ model SmallGroupMember {
   @@unique([groupId, userId])
   @@index([userId, status])
   @@index([groupId, status])
+}
+
+/// A message in a small group's own thread.
+///
+/// Not live chat: that opens around a stream and closes after it. This is the
+/// thread a group keeps between meetings — "running ten minutes late", "here's
+/// the passage for Tuesday" — and it is as private as the address, for the
+/// same reason. Only people actually in the group may read it.
+model GroupMessage {
+  id      String     @id @default(cuid())
+  group   SmallGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId String
+  user    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String
+
+  /// The name as it stood when they wrote it, so a later change of display
+  /// name doesn't rewrite what a conversation looked like.
+  authorName String
+  body       String
+
+  /// Taken down by a leader. Kept rather than deleted, so the same message
+  /// can't be reposted past them and the decision survives.
+  hidden Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([groupId, id])
+  @@index([userId])
+}
+
+enum GuideItemKind {
+  /// Something to talk about.
+  QUESTION
+  /// A passage to read together.
+  SCRIPTURE
+  /// A line of context for everybody.
+  NOTE
+  /// For whoever is leading, and for nobody else. See lib/guides.ts — the
+  /// visible shape of a guide has no field these can be rendered from.
+  LEADER_NOTE
+}
+
+/// Something for a group to work through: the questions after a sermon.
+///
+/// Attached to a series or a video when it follows one, and free-standing when
+/// it doesn't — a study on prayer belongs to no sermon. A meeting points at the
+/// guide it used, so "what did we do in June" has an answer.
+model DiscussionGuide {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  title       String
+  description String?
+
+  /// What it follows, when it follows something.
+  series   Series? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  seriesId String?
+  video    Video?  @relation(fields: [videoId], references: [id], onDelete: SetNull)
+  videoId  String?
+
+  /// Drafts stay off the members' list until somebody is happy with it.
+  published Boolean @default(false)
+
+  items    DiscussionGuideItem[]
+  meetings SmallGroupMeeting[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([published, updatedAt])
+  @@index([seriesId])
+  @@index([videoId])
+}
+
+/// One line of a guide, in the order it is worked through.
+model DiscussionGuideItem {
+  id      String          @id @default(cuid())
+  guide   DiscussionGuide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+  guideId String
+
+  kind      GuideItemKind @default(QUESTION)
+  body      String
+  /// A reference the item hangs on, e.g. "Romans 8:28-30".
+  reference String?
+
+  position Int @default(0)
+
+  @@index([guideId, position])
+}
+
+/// One evening a small group met.
+///
+/// A row rather than a computed date, because a group's schedule is free text
+/// ("alternate Wednesdays") and always will be — there is nothing to expand.
+/// A meeting exists because somebody says it happened, which is also the only
+/// honest source for whether it did.
+model SmallGroupMeeting {
+  id      String     @id @default(cuid())
+  group   SmallGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId String
+
+  /// The day it met. A calendar day, not an instant — see lib/dates.ts.
+  date DateTime @db.Date
+
+  /// What they looked at, in the leader's words.
+  topic String?
+
+  /// How many people came who are not members of the group.
+  ///
+  /// A number, never names. Somebody who came once to a house group has not
+  /// consented to being on a list, and a leader who wants to follow up has a
+  /// connect card for that — which does ask. A count answers "how did it go"
+  /// without quietly building a directory of visitors.
+  visitorCount Int @default(0)
+
+  /// Set when the meeting didn't happen. Kept rather than deleted: "we didn't
+  /// meet that week" is a different fact from "nobody recorded anything", and
+  /// only one of them needs chasing.
+  cancelled Boolean @default(false)
+
+  /// The leader's own notes. Never shown to members — see lib/attendance.ts.
+  leaderNotes String?
+
+  /// What they worked through, when they used one.
+  guide   DiscussionGuide? @relation(fields: [guideId], references: [id], onDelete: SetNull)
+  guideId String?
+
+  /// Who wrote it down, so a roll has somebody's name against it.
+  recordedByEmail String?
+
+  attendance GroupAttendance[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One meeting per group per day. Two leaders opening the form at once must
+  /// not produce two rolls that each hold half the answers.
+  @@unique([groupId, date])
+  @@index([groupId, date])
+  @@index([guideId])
+}
+
+enum AttendanceStatus {
+  PRESENT
+  /// They said they couldn't come. Deliberately not the same as ABSENT: a
+  /// group that can't tell "let us know" from "vanished" chases the wrong
+  /// person, and the whole point of keeping a roll is knowing who to ring.
+  APOLOGIES
+  ABSENT
+}
+
+/// One member, at one meeting.
+model GroupAttendance {
+  id        String            @id @default(cuid())
+  meeting   SmallGroupMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  meetingId String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+
+  status AttendanceStatus @default(PRESENT)
+  /// "Away with work" — what they said when they sent apologies.
+  note   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([meetingId, userId])
+  @@index([userId])
 }
 
 /// Who a broadcast goes to.
@@ -7253,7 +7531,7 @@ model TvDevice {
 
 # Appendix C — URL inventory
 
-88 pages and 213 routes, from the original `src/app` tree. `[x]`
+91 pages and 218 routes, from the original `src/app` tree. `[x]`
 is a path parameter. Layouts wrap `/admin/*` (the admin shell, which
 requires staff) and `/profile/*` (the profile shell, which requires a
 member); `/sitemap.xml` is generated from `getSitemapData()` as Appendix A
@@ -7308,6 +7586,7 @@ describes. Every path here must answer in the port.
 - `/books/[fileId]`
 - `/calendar`
 - `/categories/[slug]`
+- `/directory`
 - `/events`
 - `/events/[slug]`
 - `/favorites`
@@ -7315,6 +7594,8 @@ describes. Every path here must answer in the port.
 - `/forms/[slug]`
 - `/groups`
 - `/groups/[slug]`
+- `/guides`
+- `/guides/[slug]`
 - `/hymns/[fileId]`
 - `/link`
 - `/live`
@@ -7410,6 +7691,8 @@ describes. Every path here must answer in the port.
 | `/api/admin/groups/[id]` | GET PATCH DELETE |
 | `/api/admin/groups` | GET POST |
 | `/api/admin/guest-login` | GET PATCH |
+| `/api/admin/guides/[id]` | GET PATCH DELETE |
+| `/api/admin/guides` | GET POST |
 | `/api/admin/home-rows/[id]` | PATCH DELETE |
 | `/api/admin/home-rows` | GET POST |
 | `/api/admin/live/[id]` | PATCH DELETE |
@@ -7495,6 +7778,9 @@ describes. Every path here must answer in the port.
 | `/api/files/[id]/search` | GET |
 | `/api/forms/[slug]` | POST |
 | `/api/groups/[slug]/join` | POST DELETE |
+| `/api/groups/[slug]/meetings` | GET POST |
+| `/api/groups/[slug]/messages/[messageId]` | DELETE |
+| `/api/groups/[slug]/messages` | GET POST PATCH |
 | `/api/groups/[slug]/requests/[memberId]` | PATCH |
 | `/api/groups/[slug]/requests` | GET |
 | `/api/groups` | GET |
@@ -7648,6 +7934,36 @@ matching section of Appendix A says what the behaviour is.
 - **updatedSince**
   - reads a timestamp
   - ignores one it can't read rather than refusing the request
+
+## lib/attendance.test.ts
+
+- **canKeepRoll**
+  - is the group's leaders and whoever keeps the group list
+  - is not an ordinary member
+- **visibleAttendance**
+  - gives a leader the roll
+  - gives a member their own row and nothing else
+  - gives somebody outside the group nothing at all
+  - never lets a member infer the size of the room
+- **summariseRoll**
+  - counts each answer, and everybody who was in the room
+  - keeps apologies out of both present and absent
+  - refuses a negative visitor count rather than subtracting from the room
+- **attendanceRate**
+  - counts the last few meetings, most recent first
+  - ignores a week the group didn't meet, at both ends
+  - counts a member with no row at all as missed
+  - does not count apologies as coming
+  - honours the window
+- **quietlyMissing**
+  - names somebody who has missed the last three without a word
+  - takes somebody off the list the moment they send apologies
+  - keeps somebody whose apologies were weeks ago and has said nothing since
+  - says nothing at all until there are enough meetings to judge
+  - skips cancelled meetings when counting the run
+- **canRecordFor**
+  - allows the night itself and anything before it
+  - refuses a meeting that hasn't happened
 
 ## lib/authorization.test.ts
 
@@ -7918,6 +8234,30 @@ matching section of Appendix A says what the behaviour is.
   - stamps one of the two classes the stylesheet keys off
   - swallows its own errors, so a blocked localStorage can't halt the page
 
+## lib/directory.test.ts
+
+- **listed**
+  - needs them to have asked
+  - drops somebody whose access was withdrawn
+  - drops somebody with no name to show
+- **directoryName**
+  - prefers the name they chose
+  - never falls back to an email address
+- **presentMember**
+  - publishes a name and nothing else by default
+  - treats each contact detail as its own separate yes
+  - leaves the field off rather than sending an empty one
+  - carries no other account field out with it
+- **visibleDirectory**
+  - shows only those who asked and still have access, by name
+  - sorts without caring about case
+- **searchDirectory**
+  - matches a name and a note
+  - never matches a contact detail, even a published one
+  - returns everybody for an empty query
+- **directoryStanding**
+  - says plainly where somebody stands
+
 ## lib/download-source.test.ts
 
 - **resolveMp4Source**
@@ -8054,6 +8394,46 @@ matching section of Appendix A says what the behaviour is.
 - **submissionRow**
   - lays the answers out under their labels
 
+## lib/group-messages.test.ts
+
+- **inTheThread**
+  - is people actually in the group
+  - is not people whose ask is unanswered, or who were turned down
+- **canModerate**
+  - is this group's leaders
+  - is not a member
+  - is not a site manager who isn't in the group
+  - is a site manager who *is* in the group, because they lead by capability
+- **threadState**
+  - names why somebody can't see it
+  - has a sentence for every state but open
+- **visibleThread**
+  - gives members the messages, without the hidden one
+  - gives somebody outside the group nothing at all
+  - keeps a hidden message hidden from the leader who hid it too
+  - lets an author remove their own and nobody else's
+  - lets a leader remove anything
+  - carries no user ids out
+- **canRemoveMessage**
+  - is the author, or a leader of the group
+  - is not another member
+  - is not the author once they've left the group
+  - is not a site manager outside the group
+- **cleanGroupMessage**
+  - collapses the runs that turn one message into a screenful
+  - refuses an empty one
+  - takes a paragraph, which the stream chat wouldn't
+  - stops at the limit and says what it is
+- **notifiable**
+  - is active members other than the author, minus the muted
+  - never tells somebody about their own message
+  - doesn't reach people who aren't in the group yet
+- **latest**
+  - returns the newest page, in reading order
+  - copes with fewer messages than a page
+  - doesn't mutate what it was given
+  - breaks a tie on id so the order is stable
+
 ## lib/groups.test.ts
 
 - **standingIn**
@@ -8092,6 +8472,29 @@ matching section of Appendix A says what the behaviour is.
   - still keeps the address from somebody who is only waiting
   - tells somebody on the list where they stand
   - says closed rather than full when the group isn't taking anybody
+
+## lib/guides.test.ts
+
+- **presentGuide**
+  - gives a member the questions, the scripture and the notes
+  - never lets a leader note reach a member, in any field
+  - leaves the field off entirely rather than sending an empty one
+  - gives the notes to whoever is leading
+  - gives them to whoever keeps the group list
+  - withholds them from somebody who only asked to join, or is waiting
+  - withholds them from a signed-out reader
+  - omits the field when a leader opens a guide that has no notes
+  - reads in the order it was written, whatever order the rows arrive in
+- **isMemberKind**
+  - names exactly the three anybody may read
+- **canSeeLeaderNotes**
+  - is leading this group, or keeping the group list
+- **canOpenGuide**
+  - lets anybody open a published guide
+  - keeps a draft to staff
+- **describeGuide**
+  - counts questions, not items
+  - calls a guide with no questions a handout
 
 ## lib/hymnal.test.ts
 
