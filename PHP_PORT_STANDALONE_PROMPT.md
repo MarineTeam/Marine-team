@@ -7,7 +7,7 @@ its configuration reference and its offline shell are embedded as Appendices
 A–J at the end, and every instruction above them is written against those
 appendices rather than against source files.
 
-It is large — about 601 KB, roughly 153k tokens. Put it in the
+It is large — about 615 KB, roughly 160k tokens. Put it in the
 empty repository as `PORT_PROMPT.md`, commit it, and start the session with:
 "Read `PORT_PROMPT.md` in full, appendices included, then begin at step 1 of
 its work plan." An agent that reads only the top half builds a lookalike;
@@ -26,8 +26,9 @@ The one place the original deployment is still needed is the data import in
 **Database**, which is written as a script run from a laptop against the old
 database, not as a change to the old repository.
 
-The appendices were generated from commit `16309c3` of the original
-repository.
+The appendices were generated from commit `0b9df34` on `main` of the original
+repository — the commit that closes the security audit and puts the rota's
+names behind a sign-in.
 
 ---
 
@@ -83,7 +84,7 @@ the application *is*.
 - **Appendix C — URL inventory.** Every page and every API route with its
   HTTP methods. This is the compatibility contract's list.
 - **Appendix D — Rules pinned by tests.** The titles of every case in the
-  original 66-file test suite, file by file: the edge cases a rewrite loses.
+  original 73-file test suite, file by file: the edge cases a rewrite loses.
 - **Appendix E — Plugins and capabilities.** The 31 bundled features and the
   15 capabilities, as the original registers them.
 - **Appendix F — Scheduled jobs.** The original cron schedule.
@@ -96,8 +97,8 @@ the application *is*.
 - **Appendix J — Auth0 Actions.** The two Actions and their README, which
   stay valid for the Auth0 sign-in provider.
 
-The app is roughly 77,000 lines of TypeScript across 91 pages, 218 API routes,
-139 components and 129 library modules, with 66 test files. Plan for that; see
+The app is roughly 78,000 lines of TypeScript across 91 pages, 218 API routes,
+139 components and 137 library modules, with 73 test files. Plan for that; see
 **Work plan** at the end.
 
 ## Non-negotiables
@@ -1204,6 +1205,11 @@ hitting `/cron/run?token=<cron token>`:
   band. A `lock_until` claimed with a conditional `UPDATE` stops two
   triggers running one job at once.
 
+With no cron token configured, `/cron/run` answers 503 and runs nothing.
+The installer generates the token, so only a broken install ever sees
+this — and a broken install must not be a public job runner. A wrong token
+is a 401, compared in constant time. **Security requirements** says why.
+
 `/admin/jobs` shows each job, when it last ran, whether a real cron is
 detected, and a **Run now** button. Daily is no longer a platform limit, so
 the default intervals are what the feature wants (status sync every 15
@@ -1291,7 +1297,7 @@ is in `app/Modules/`; everything else is a bundled plugin.
 | Member plugins | `/favorites`, `/watch-later`, `/playlists`, `/playlists/[id]`, `/subscriptions`, `/recently-played`, `/s/[token]`, `/share/*`, `/profile/shared-links`, `/profile/downloads`, `/directory` (under the `profiles` plugin; opt-in from `/profile/settings` via `PATCH /api/profile`) | `/admin/comments`, `/admin/announcements`, `/admin/webhooks`, `/admin/share-links`, `/admin/downloads` | `plugins.ts`, `share-links.ts`, `share-access.ts`, `share-password.ts`, `downloads.ts`, `download-platform.ts`, `push.ts`, `webhooks.ts`, `outline.ts`, `directory*.ts` |
 | Live (plugin) | `/live`, `/api/live/*` | `/admin/live` | `live-chat.ts` |
 | Books, hymnals, services (plugins) | `/books/[fileId]`, `/read/[fileId]`, `/hymns/[fileId]`, `/present/[fileId]`, `/services`, `/services/[id]`, `/profile/rota`, `/api/offline/*`, `/api/hymnals/search`, `/api/hymns/lookup` | `/admin/services`, `/admin/services/report`, `/admin/teams` | `hymnal.ts`, `book-contents.ts`, `page-offset.ts`, `reader*.ts`, `toc-nav.ts`, `verses.ts`, `services.ts`, `rota.ts`, `offline-*.ts`, `fingerprint.ts`, `ocr-client.ts` |
-| Schedules (plugin) | `/calendar`, `/api/schedules/*`, `/api/calendar-events`, `/api/sync/snapshot`, `/api/calendar/[token]/marine-team.ics`, `/api/profile/calendar` | `/admin/schedules`, `/admin/schedules/[id]`, `/admin/people` | `schedules/`, `sheets/`, `calendar-feed*.ts`, `ics.ts`, `names.ts` |
+| Schedules (plugin) | `/calendar`, `/api/schedules/*`, `/api/calendar-events`, `/api/sync/snapshot`, `/api/people` (the dates for anyone, the names for members: the page and the event and snapshot endpoints answer a signed-out reader with events that have nobody on them, `/api/people` is a 403 without a session), `/api/calendar/[token]/marine-team.ics`, `/api/profile/calendar` | `/admin/schedules`, `/admin/schedules/[id]`, `/admin/people` | `schedules/` (`visibility.ts` and `viewer.ts` decide who sees names), `sheets/`, `calendar-feed*.ts`, `ics.ts`, `names.ts` |
 | Events, forms, prayer, groups, broadcasts (plugins) | `/events`, `/events/[slug]`, `/events/calendar.ics`, `/events/[slug]/event.ics`, `/forms`, `/forms/[slug]`, `/prayer`, `/groups`, `/groups/[slug]` (with the group's thread, `/api/groups/[slug]/messages`, and its roll, `/api/groups/[slug]/meetings`), `/guides`, `/guides/[slug]`, `/profile/events`, `/profile/groups` | `/admin/events`, `/admin/forms`, `/admin/prayer`, `/admin/groups`, `/admin/broadcasts`, `/api/admin/guides` (gated by `manage_events`; the original has only the API, so give it an `/admin/guides` page) | `events.ts`, `event-series*.ts`, `recurrence.ts`, `forms*.ts`, `prayer*.ts`, `groups*.ts`, `attendance*.ts`, `guides*.ts`, `group-messages*.ts`, `broadcast*.ts`, `sms*.ts` |
 | Television (plugin) | `/tv`, `/link`, `/profile/devices`, `/api/tv/*` | — | `tv-pairing.ts`, `tv-session.ts`, `tv-feed*.ts`, `tv-nav.ts` |
 | Read API (core) | `/api/v1/*` | `/admin/api-keys` | `api-v1.ts`, `api-keys-query.ts` |
@@ -1322,7 +1328,21 @@ members minus the author and the muted; directory listing off by default
 with each contact detail its own separate yes, leaving the directory clearing
 those flags, search never matching a contact detail even a published one,
 and the page `noindex` behind sign-in; a member's own group messages in their
-data export, taken-down ones labelled as such.
+data export, taken-down ones labelled as such. And from the last change
+before this document was pinned, **rota names are for members**: the
+schedules module came from an app built for people who never log in and
+published every volunteer's name beside the days they are at the building,
+while the directory next to it needed opt-in *and* sign-in for a name to
+appear. The structure stays public — which rotas, what days, what notes —
+and the people need a sign-in. `visibleEvents`/`visiblePeople` hand a
+signed-out reader events with nobody on them rather than names to hide,
+the same optional-field shape the group address uses; `/api/people` is a
+403 without a session; a `personId` filter is refused signed out ("which
+days is this id on" is "who is this", sideways); and a signed-out offline
+sync is always a *full*, nameless snapshot, so a copy saved on a shared
+laptop while somebody was signed in is replaced on its next update rather
+than kept. Choosing your name on the calendar therefore needs a sign-in;
+the per-device preference still works once there is one.
 
 ## Security requirements
 
@@ -1426,6 +1446,17 @@ the **Work plan** walks every route against this list.
   allows only `http` and `https`, caps the body it reads, and times out in
   ten seconds. Provider-specific calls use fixed hosts and never take a host
   from input. The cron loopback request goes to the configured base URL only.
+- Web Push subscriptions are URLs the browser hands the page and the page
+  hands the server, and the server then POSTs a signed body to every one of
+  them on every notification. Accept only `https:` endpoints whose host is
+  one of the browsers' push services — `fcm.googleapis.com`,
+  `android.googleapis.com`, `push.services.mozilla.com`,
+  `notify.windows.com`, `push.apple.com`, `push.samsungosp.com`, matched on
+  a label boundary, with a setting that adds a suffix for a browser not on
+  the list — and no more than eight per member, the oldest evicted when a
+  ninth arrives. `Http::fetchUntrusted()`'s rules apply to the send as well.
+  The original accepted any URL and capped nothing: one member could make
+  the server POST wherever they liked, a thousand times per notification.
 
 **Files and uploads**
 
@@ -1435,6 +1466,27 @@ the **Work plan** walks every route against this list.
   not an image here — it can carry script, and the branding logo is on every
   page. Images are re-encoded through GD when it exists; without it they are
   served with `nosniff` and, outside an `<img>`, as attachments.
+- The type stored and the type served both come from that allowlist and
+  never from the request: the extension and the bytes must agree with one
+  entry or the upload is refused (415), and the object is stored as
+  `<random id>.<ext>` with nothing of the client's name in the path. On the
+  way out, `Content-Type` is decided from the stored extension alone — never
+  from a stored MIME string, which for an imported object is whatever a
+  dashboard was told. Only PDF, EPUB, audio and raster images may be served
+  `inline`; documents are `attachment`; anything not on the list at all —
+  including a file that predates the rule — is `application/octet-stream`,
+  `attachment`, `nosniff`, with `Content-Security-Policy: sandbox`, the
+  combination a browser refuses to interpret. The original shipped a version
+  that trusted the browser's `file.type` and served it back inline: a series
+  editor could upload `notes.html` as `text/html` and have it run as the
+  site in the browser of any admin who opened the link. That is the finding
+  this bullet exists for.
+- Images are decoded by GD once, at upload, after `getimagesize` has read
+  the dimensions from the header and refused anything over 40 megapixels —
+  never again on request, and never from a URL. The original's image
+  optimizer route decoded whatever same-origin path it was handed, uploads
+  included, and carried a critical advisory for it; the port has no such
+  route, and `<img>` tags point at the stored file.
 - Stored names are random; the original name lives only in the database and
   is sanitised before it becomes a `Content-Disposition` filename (no CR, LF,
   quotes or path characters). A Range request may name one range.
@@ -1474,8 +1526,8 @@ the **Work plan** walks every route against this list.
   deleted after download; the `services` rows keep their secrets encrypted in
   the dump.
 - The data export and `/api/v1` keep `assertNoSecrets`; the directory,
-  prayer, small-group, attendance and thread rules under **Feature inventory**
-  are security rules and are tested as such.
+  prayer, small-group, attendance, thread and rota-name rules under
+  **Feature inventory** are security rules and are tested as such.
 
 **Abuse**
 
@@ -1488,6 +1540,25 @@ the **Work plan** walks every route against this list.
   timestamps older than five minutes, and are rate-limited.
 - The page-view cron trigger fires at most once a minute per install and
   holds a database lock, so it cannot be used to make the site hammer itself.
+- Scheduled jobs fail closed: `/cron/run` with no cron token configured
+  answers 503 and runs nothing, and a wrong token is a 401 compared in
+  constant time. The original's eight cron routes each checked
+  `if (secret && …)`, which with the variable unset ran every job for
+  anybody — transcription (paid per call), broadcast sends, feed syncs — so a
+  preview environment without the variable was a public job runner. Never
+  `if (token) { check }`.
+- View counts throttle on the server, not only in a cookie: an HMAC of the
+  caller's address under `app_key`, one count per address per item per
+  thirty minutes, the key column blanked by the daily job after a day so it
+  is a throttle and not a record. An id that doesn't exist is a 404, never a
+  foreign-key 500. A cookie the caller sets on itself was the whole throttle
+  once; a script simply doesn't send one.
+- Small-group asks: ten per member per hour, and what an ask pages the
+  leaders with is capped per leader per group per hour — a member who asks,
+  withdraws and asks again leaves no row behind to count, so the cap is on
+  the notifications. Search inputs are capped: 100 characters on the site
+  search, whose similarity query runs over every published row, 200 inside
+  a book.
 
 **Dependencies and process**
 
@@ -3497,15 +3568,24 @@ against a service's running order. This one puts **names** against recurring
 rotas, and most of those names have no account and are not going to make one.
 Gated by the **Schedules** plugin.
 
-##### For everybody
+##### For everybody — and what is only for members
 
-- **Choose your name once.** No account, no password: it is a preference on
-  that device, like the theme, and grants access to nothing — every schedule
-  here is readable by anyone with the URL either way. "Everyone" is a
-  first-class answer.
+- **The dates are public; the names need a sign-in.** Which rotas exist, on
+  what days, with what notes and where — anyone with the URL. *Who* is on them
+  — members. The calendar app this came from published every name to anyone,
+  and ported as-is that sat oddly beside a directory that needs opt-in *and*
+  sign-in before a name appears. Now the rule is the same as everywhere else
+  here, and it is enforced the same way: a signed-out reader is handed events
+  with nobody on them (`lib/schedules/visibility.ts`), not events with names
+  to be hidden. `/api/people` is a 403 without a session; the event and
+  snapshot endpoints strip people and refuse a `personId` filter.
+- **Choose your name once**, signed in: it is a preference on that device,
+  like the theme, so it differs between your phone and the church laptop.
+  "Everyone" is a first-class answer.
 - **What's next**, a **list** by day, or a **month grid**, filtered to one
   schedule with the chip row and to yourself with **Only mine**.
-- The page is **not indexed**: it carries people's names.
+- The page is **not indexed**: even without names it says when the building
+  is in use.
 
 ##### For whoever keeps the rota (`/admin/schedules`)
 
@@ -3547,7 +3627,10 @@ remember to press update to find out they are on for Sunday.
 With no connection at all, it appears on the offline screen beside the saved
 books, videos and service orders: pick your name — the same name the app
 uses, so choosing it in one place settles it in both — and see what you are on
-for, with the day named the way the app names it.
+for, with the day named the way the app names it. Saved while signed out, the
+copy holds the dates and no names; and a signed-out sync always fetches a
+*full* snapshot, so a copy saved on a shared laptop while somebody was signed
+in stops carrying their names the next time it updates.
 
 Two things the payload never says, the device works out for itself, because
 getting either wrong means somebody turning up when they shouldn't:
@@ -4643,6 +4726,52 @@ link.
   when the bar itself is — i.e. never for anyone but an enabled-and-`ADMIN`
   viewer — so it costs nothing for ordinary visitors.
 
+#### Security
+
+The decisions that hold, and where each one lives. An audit in September 2026
+found no authorisation bypass, injection or leaked secret; what it found was
+the hardening below, all of which is now in place.
+
+- **Every response carries the headers** a site should: `X-Frame-Options:
+  SAMEORIGIN` and `frame-ancestors 'self'` (the reader and players frame this
+  origin's own pages; nobody else may), `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: strict-origin-when-cross-origin`, a `Permissions-Policy`.
+  Set in `next.config.ts`; HSTS comes from the platform. There is no
+  script-source CSP yet — the inline scripts in the layout need nonces first.
+- **The image optimizer is off** (`images.unoptimized: true`). Every image
+  already rendered `unoptimized`; the config flag is what removes the
+  `/_next/image` route, which would otherwise fetch and decode any same-origin
+  path — uploaded files included — through `sharp`.
+- **An upload is what its extension says, from a short list**
+  (`lib/upload-types.ts`). The browser's `file.type` is never stored or
+  served. Reader formats and plain media are shown inline; documents are
+  downloads; anything not on the list is an opaque download with `nosniff`
+  and `sandbox`, whatever was recorded about it. SVG is not an image here.
+  Objects are named `files/<id>.<ext>` and nothing of the client's name
+  survives.
+- **Scheduled jobs fail closed** (`lib/cron-guard.ts`): a production
+  deployment without `CRON_SECRET` answers 503 to every `/api/cron/*` call
+  rather than running the job for whoever asks.
+- **Push subscriptions go only to push services** (`lib/push-endpoint.ts`):
+  `https:` to a known browser push host, at most eight per member. The server
+  POSTs to every stored endpoint on every notification, so a URL a member
+  chose would have made it POST wherever they liked.
+- **Writes labelled cross-site by the browser are refused in the proxy**
+  (`lib/cross-site.ts`), as a second layer behind the session cookie's
+  `SameSite=Lax`. Callers with no `Sec-Fetch-Site` header — Auth0's
+  registration check, a television, an API key — are unaffected.
+- **View counts throttle on the server** (`lib/view-key.ts`): an HMAC of the
+  caller's address, never the address, kept for a day. A cookie alone was
+  the throttle before, and a script doesn't send one.
+- **Webhook URLs must be public** (`lib/public-url.ts`): loopback, private,
+  link-local and bare names are refused when saved.
+- **Rota names are for members** (`lib/schedules/visibility.ts`): the
+  schedules and their dates are public, the people on them need a sign-in,
+  and a signed-out reader is handed events with nobody on them rather than
+  names to hide.
+- Every member route answers through `errorResponse`, which maps validation
+  and database errors to 400/404 and never echoes an upstream message.
+
 #### Technical notes
 
 - **Bunny's Stream iframe embed does support postMessage control**, via
@@ -4759,6 +4888,7 @@ GitHub Actions runs the type check, lint, that suite, and
 push to `main` (`.github/workflows/ci.yml`). The schema check is why an
 unformatted `schema.prisma` fails CI — run `npx prisma format` before
 committing schema edits.
+
 # Appendix B — Data model (prisma/schema.prisma, verbatim)
 
 The datasource block at the top is Postgres-specific and is superseded by
@@ -6239,11 +6369,16 @@ model ViewEvent {
   video     Video?   @relation(fields: [videoId], references: [id], onDelete: Cascade)
   videoId   String?
   userId    String?
+  /// An HMAC of the viewer's address, so a repeat view from the same place
+  /// within the throttle window is not counted twice. Not the address, and
+  /// blanked after a day by the digest job — see lib/view-key.ts.
+  ipHash    String?
   createdAt DateTime @default(now())
 
   @@index([seriesId, createdAt])
   @@index([videoId, createdAt])
   @@index([createdAt])
+  @@index([ipHash, createdAt])
 }
 
 /// A hymn somebody actually opened.
@@ -8384,11 +8519,29 @@ matching section of Appendix A says what the behaviour is.
   - prefers the name they chose
   - never falls back to an email address
 
+## lib/cron-guard.test.ts
+
+- **cronVerdict**
+  - lets the right bearer token through
+  - refuses a wrong token, a missing header, and a token of another length
+  - fails closed in production when no secret is configured
+  - stays open in development when no secret is configured
+  - still checks a secret that is set, in development too
+
 ## lib/cron.test.ts
 
 - **the scheduled jobs**
   - has crons to check
   - doesn't fire two jobs at the same minute
+
+## lib/cross-site.test.ts
+
+- **isCrossSiteWrite**
+  - refuses a write to the API that the browser labels cross-site
+  - lets same-origin, same-site and typed-in requests through
+  - lets a caller with no such header through — servers and televisions
+  - never touches a read, wherever it came from
+  - covers only the API, not pages or the SDK's auth routes
 
 ## lib/data-export.test.ts
 
@@ -8973,6 +9126,28 @@ matching section of Appendix A says what the behaviour is.
 - **canDelete**
   - is the writer's, and the moderator's
 
+## lib/public-url.test.ts
+
+- **isPublicHttpUrl**
+  - accepts ordinary public endpoints
+  - refuses loopback, private and link-local addresses
+  - refuses names that only mean something inside a network
+  - does not block a public range that merely neighbours a private one
+  - refuses other schemes, credentials, and non-URLs
+
+## lib/push-endpoint.test.ts
+
+- **isPushServiceEndpoint**
+  - accepts the endpoints real browsers hand out
+  - refuses anything else — including hosts that merely contain a service's name
+  - refuses plain http even to a real service, and credentials in the URL
+  - refuses what isn't a URL at all
+  - lets a deployment add a host suffix by environment
+- **subscriptionsToEvict**
+  - evicts nothing while there is room for one more
+  - evicts the oldest to leave room for exactly one more
+  - evicts as many as it takes when a member is already far over
+
 ## lib/reader-cache.test.ts
 
 - **bookCacheTag**
@@ -9173,6 +9348,27 @@ matching section of Appendix A says what the behaviour is.
   - narrows to selected schedules
   - combines a person and a schedule filter
   - keeps the schedules in the order an admin arranged
+
+## lib/schedules/visibility.test.ts
+
+- **canSeeNames**
+  - is anybody signed in, and nobody else
+- **visibleEvent**
+  - keeps everything for a member
+  - keeps the structure and drops the people for a stranger
+  - never leaves a name behind anywhere in the stripped shape
+  - does not mutate the event it was given
+- **visiblePeople**
+  - is the list for a member and nothing for a stranger
+  - hands a member a copy, not the array itself
+- **visibleSnapshot**
+  - is untouched for a member
+  - carries no people, no names on events, and no person ids for a stranger
+  - keeps everything that isn't a person
+- **visibleEvents**
+  - applies the rule to every event
+- **NAMES_WITHHELD**
+  - tells them what to do about it
 
 ## lib/services.test.ts
 
@@ -9476,6 +9672,31 @@ matching section of Appendix A says what the behaviour is.
   - falls back rather than printing an empty name
   - caps a name long enough to fill the screen
 
+## lib/upload-types.test.ts
+
+- **extensionOf**
+  - takes the last extension, lower-cased, without the dot
+  - ignores a query or fragment
+  - is empty for no extension or a dotfile
+- **uploadType**
+  - knows the reader's formats and common media
+  - refuses anything that can run as a page
+  - refuses an unknown extension, and no extension
+  - is decided by the extension, not by a type the browser claims
+- **objectName**
+  - keeps the id and the extension, and nothing of the client's name
+  - cannot be steered out of the files/ prefix
+  - is null for a refused type
+- **servePolicy**
+  - shows a reader format or media inline, with nosniff
+  - forces a download for a document
+  - serves anything off the list as an opaque download that can't render
+  - never consults a stored MIME type
+- **the list itself**
+  - has no type that a browser would render as a document with script
+  - only shows inline what cannot carry a script
+  - names the allowed extensions in the refusal
+
 ## lib/validation/schemas.test.ts
 
 - **spreadsheet configuration**
@@ -9569,6 +9790,14 @@ matching section of Appendix A says what the behaviour is.
   - has nowhere to send somebody for a video that lives here
 - **sourceName**
   - names the three
+
+## lib/view-key.test.ts
+
+- **viewKey**
+  - is stable for the same address under the same secret
+  - differs by address and by secret
+  - is not the address, and is short enough to index
+  - is null with nothing to key on
 
 # Appendix E — Plugins and capabilities (verbatim from the original registries)
 
@@ -9889,6 +10118,10 @@ VAPID_PRIVATE_KEY=""
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=""
 # Contact address push services may use to reach you about your usage
 VAPID_SUBJECT="mailto:you@example.com"
+# Web Push endpoints are accepted only for the browsers' own push services
+# (Chrome, Firefox, Edge, Safari, Samsung — see src/lib/push-endpoint.ts).
+# A browser not on that list can be allowed by host suffix, comma-separated.
+PUSH_SERVICE_HOSTS=""
 
 # Email (for the Notifications plugin's opt-in email channel, alongside Web
 # Push above). Optional — leave unset and sendEmail() becomes a no-op. Get an
@@ -9897,11 +10130,12 @@ VAPID_SUBJECT="mailto:you@example.com"
 RESEND_API_KEY=""
 EMAIL_FROM=""
 
-# Shared secret for the daily notification-digest cron
-# (/api/cron/notification-digest, scheduled in vercel.json). When set, the
-# route requires "Authorization: Bearer $CRON_SECRET" — Vercel Cron sends this
-# automatically. Leave unset locally; set it in production so the route can't
-# be hit from outside to mass-send push notifications.
+# Bearer token for the scheduled jobs under /api/cron/* (see the "crons" in
+# vercel.json). Vercel Cron sends "Authorization: Bearer $CRON_SECRET"
+# automatically when it is set. REQUIRED in production: a production
+# deployment without it answers 503 to every cron call rather than running
+# the job for whoever asks (transcription is paid per call). Leave unset
+# locally and the routes stay open for curl.
 CRON_SECRET=""
 
 # Query Monitor: a WordPress-Query-Monitor-style debug bar (query count/time,
