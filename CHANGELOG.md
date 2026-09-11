@@ -74,6 +74,37 @@ All notable changes to this project are documented here. Format follows
   following day (DTEND is exclusive), and lines fold at 75 **octets** without
   splitting a character. The feed token is on the data export's forbidden-key
   list, so it can never travel in a downloaded file.
+- **Small-group attendance.** A leader writes up who came on the night, from
+  `/api/groups/<slug>/meetings`. The roll goes to the group's own leaders and to
+  nobody else — a member sees their own evenings and not even a count of
+  anybody else's, enforced by returning a one-row list rather than a flag, so a
+  page cannot total what it was never given. *Apologies* is a first-class answer
+  rather than a flavour of absent, which is the whole point of writing any of it
+  down: a group that can't tell "let us know" from "vanished" chases the wrong
+  person. A quietly-missing list names people nobody has marked present for
+  three meetings running, and a cancelled week counts against nobody at either
+  end. The future is refused — a roll records what happened.
+- **Discussion guides** at `/guides`. The questions a group works through,
+  written once at `/api/admin/guides` and used by every group. Leader notes are
+  *absent* from what a member is given rather than hidden in the markup: the
+  type has no unconditional `leaderNotes`, so a page cannot print the answer it
+  wasn't handed. Anybody who leads any group sees them.
+- **Member directory** at `/directory`. Opt-in, one member at a time, from
+  **Profile → Settings**: nobody is in it by default, an email or phone number
+  appears only if that person ticked that box, and the page is `noindex` and
+  behind sign-in. A listing goes when the person leaves or is unauthorized,
+  without anybody tidying up.
+- **Group conversations.** A thread per small group, on the group's page. Only
+  active members read or write it — not people who have asked, not people on
+  the waiting list — and standing is re-read on every request, so somebody
+  removed on Monday has a tab that stops working on Tuesday. A site manager
+  outside the group gets nothing: running the website is not a reason to read a
+  conversation. Leaders take a message down rather than delete it, so it can't
+  be reposted past them; authors remove their own; hidden is dropped in the
+  query *and* in the filter, so a message hidden between two polls can't arrive
+  in the second. Mute keeps somebody in the group and stops the notifications.
+  Their own messages, including ones taken down and labelled as such, are in
+  their data export.
 - `lib/recurrence.ts`: an RFC 5545 RRULE subset — parse, expand, describe, and
   wall-clock-to-instant — refusing at parse time any rule part it cannot
   compute, rather than ignoring it and answering with the wrong dates.

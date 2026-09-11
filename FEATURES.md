@@ -1217,6 +1217,74 @@ The home groups and studies that meet during the week, at `/groups`.
 - Members see their groups at `/profile/groups`, and can leave or withdraw a
   request at any time.
 
+### Who came
+
+A leader writes the roll up on the night, at `/api/groups/<slug>/meetings`.
+
+- **The roll goes to the people whose job it is to ring round.** A member sees
+  their own evenings; other members see nothing, not even a count. That is
+  enforced by handing a page a list of at most one row rather than a flag, so
+  there is nothing there to total by accident.
+- **Apologies is a real answer, not a shade of absent.** It is the distinction
+  the whole exercise exists for: a group that can't tell "let us know" from
+  "vanished" rings the wrong person.
+- **A quietly-missing list** names people nobody has marked present for three
+  meetings running who didn't send apologies for the last one — the prompt to
+  pick up the phone, which is the only reason to keep a roll at all.
+- A cancelled week counts against nobody, at either end. A roll can't be
+  written for an evening that hasn't happened.
+- Only people currently in the group can be marked, checked against the
+  database rather than trusted from the form.
+
+### Discussion guides
+
+The questions a group works through, at `/guides`, written once and used by
+every group.
+
+- **Leader notes are absent from what a member is given**, not hidden in the
+  markup. The shape handed to a member page has no `leaderNotes` on it at all,
+  so a page cannot print an answer it was never given.
+- Anybody who leads any group sees them — the person hosting Tuesday doesn't
+  need a capability granted to read the notes for Tuesday.
+
+### The group's conversation
+
+A thread on the group's own page, for the six days it isn't meeting.
+
+- **Only people actually in the group read or write it.** Not somebody whose
+  request is unanswered, not somebody on the waiting list — as private as the
+  address, and for the same reason. Standing is re-read on every request rather
+  than carried, so somebody removed on Monday has a tab that stops working on
+  Tuesday.
+- **A site manager outside the group gets nothing.** The one place this departs
+  from the address rule: an address is an operational fact somebody running the
+  site may need; a conversation isn't. Putting them in the group works, and
+  leaves a row saying so.
+- **Taking a message down hides it rather than deleting it**, so the same
+  message can't be reposted past the leader who decided about it. Authors
+  remove their own. Hidden is dropped in the query *and* in the filter, so a
+  message hidden between two polls can't arrive in the second one.
+- **Mute keeps somebody in the group and stops the notifications** — the thing
+  people actually want when a thread gets busy. The alternative they otherwise
+  reach for is leaving.
+- Notifications carry the first line only. A group thread is exactly the place
+  where the whole of a message shouldn't be sitting on a lock screen.
+- Their own messages are in their data export, including ones a leader took
+  down, labelled as such.
+
+## Member directory
+
+Who else is here, at `/directory` — behind sign-in and `noindex`.
+
+- **Nobody is in it by default.** A member puts themselves in from **Profile →
+  Settings**, one field at a time: an email address or a phone number appears
+  only because that person ticked that box. A church directory is the document
+  most likely to be forwarded outside the church, so it holds only what people
+  chose to put in it.
+- **A listing goes when the person does.** Leaving or being unauthorized takes
+  them out without anybody remembering to tidy up, because the listing is a
+  view of live rows rather than a copy.
+
 ## Announcements
 
 One message to everybody, or to one group, from `/admin/broadcasts`.
