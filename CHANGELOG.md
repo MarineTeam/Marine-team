@@ -58,6 +58,19 @@ deployment should have had.
   never the address, blanked after a day by the digest job), refuses an id
   that doesn't exist with a 404 rather than a foreign-key 500, and answers
   through `errorResponse` like everything else.
+- **Rota names need a sign-in.** The schedules module was ported from an app
+  built for people who never log in, and it published every volunteer's name
+  beside the days they are at the building, to anyone with the URL — while
+  the directory next to it needed opt-in *and* sign-in for a name to appear.
+  The structure stays public: which rotas, what days, what notes. The people
+  are for members. `lib/schedules/visibility.ts` hands a signed-out reader
+  events with nobody on them, the same optional-field shape the group address
+  uses, so a page cannot print what it wasn't given; `/api/people` is a 403
+  without a session; the event endpoints refuse a `personId` filter signed
+  out; a signed-out offline sync is always a full, nameless snapshot, so a
+  copy saved on a shared laptop while somebody was signed in is replaced.
+  The viewer-dependent endpoints are now `private, no-store` rather than
+  edge-cached, since a shared cache cannot tell a member from a stranger.
 - **Cross-site writes are refused at the door.** The session cookie's
   `SameSite=Lax` was the only thing standing between another site's page and
   `/api/*`; `src/proxy.ts` now also refuses any write the browser itself labels

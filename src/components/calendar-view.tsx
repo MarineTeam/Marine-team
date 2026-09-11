@@ -17,20 +17,26 @@ type View = "next" | "list" | "month";
 /**
  * The calendar, as everybody else sees it.
  *
- * Whoever is looking chooses their name once — on this device, with no
- * account, because most people on a rota have none — and from then on the
- * app can answer "what am I on for" rather than "here is everything". That
- * choice is a device preference like the theme, and grants access to nothing:
- * every schedule here is readable by anyone who has the URL either way.
+ * A member chooses their name once — on this device, so it differs between
+ * their phone and the church laptop — and from then on the app can answer
+ * "what am I on for" rather than "here is everything". The choice is a device
+ * preference like the theme; it grants nothing, because the names were only
+ * handed to this component in the first place if the reader is signed in.
+ *
+ * `namesWithheld` is the server saying it handed over no people: the picker
+ * and "Only mine" mean nothing then, and a remembered name is left alone
+ * rather than applied to a list it isn't in.
  */
 export function CalendarView({
   schedules,
   events,
   people,
+  namesWithheld = false,
 }: {
   schedules: Schedule[];
   events: CalendarEvent[];
   people: Person[];
+  namesWithheld?: boolean;
 }) {
   const [view, setView] = useState<View>("next");
   const [scheduleId, setScheduleId] = useState<string | null>(null);
@@ -42,11 +48,12 @@ export function CalendarView({
   // survives a reload and differs between somebody's phone and the church
   // laptop — which is the right answer for both.
   useEffect(() => {
+    if (namesWithheld) return;
     const stored = readDeviceSettings().calendarPersonId;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (stored) setPersonId(stored);
     if (stored) setOnlyMine(true);
-  }, []);
+  }, [namesWithheld]);
 
   function chooseName(id: string | null) {
     setPersonId(id);
@@ -69,34 +76,37 @@ export function CalendarView({
   return (
     <div className="space-y-5">
       {/* Who this is, asked once. "Everyone" is a first-class answer — the
-          calendar is worth reading without picking anybody. */}
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <label className="flex items-center gap-2">
-          <span className="text-sec">You are</span>
-          <select
-            value={personId ?? ""}
-            onChange={(e) => chooseName(e.target.value || null)}
-            className="rounded-md border border-sep px-2 py-1.5"
-          >
-            <option value="">Everyone</option>
-            {people.map((person) => (
-              <option key={person.id} value={person.id}>
-                {person.displayName}
-              </option>
-            ))}
-          </select>
-        </label>
-        {me && (
-          <label className="flex items-center gap-1.5 text-sec">
-            <input
-              type="checkbox"
-              checked={onlyMine}
-              onChange={(e) => setOnlyMine(e.target.checked)}
-            />
-            Only mine
+          calendar is worth reading without picking anybody. Not shown at all
+          when there are no names to pick from. */}
+      {!namesWithheld && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <label className="flex items-center gap-2">
+            <span className="text-sec">You are</span>
+            <select
+              value={personId ?? ""}
+              onChange={(e) => chooseName(e.target.value || null)}
+              className="rounded-md border border-sep px-2 py-1.5"
+            >
+              <option value="">Everyone</option>
+              {people.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.displayName}
+                </option>
+              ))}
+            </select>
           </label>
-        )}
-      </div>
+          {me && (
+            <label className="flex items-center gap-1.5 text-sec">
+              <input
+                type="checkbox"
+                checked={onlyMine}
+                onChange={(e) => setOnlyMine(e.target.checked)}
+              />
+              Only mine
+            </label>
+          )}
+        </div>
+      )}
 
       {schedules.length > 1 && (
         <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">

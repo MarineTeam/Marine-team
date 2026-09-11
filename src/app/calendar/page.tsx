@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import { getCurrentUser } from "@/lib/current-user";
 import { isPluginEnabled } from "@/lib/plugins";
 import { listEvents, listPeople, listPublicSchedules } from "@/lib/schedules/query";
+import { canSeeNames, NAMES_WITHHELD, visibleEvents, visiblePeople } from "@/lib/schedules/visibility";
 import { CalendarView } from "@/components/calendar-view";
 import { SaveCalendarButton } from "@/components/save-calendar-button";
 
@@ -16,36 +19,58 @@ export const metadata: Metadata = {
 };
 
 /**
- * The rotas, for everybody.
+ * The rotas: the dates for everybody, the names for members.
  *
- * No login: whoever opens it picks their name once on that device and sees
- * what they are on for. That was the calendar app's central requirement —
- * most people on a church rota have no account and are not going to make one
- * — and it survives the port intact.
+ * The calendar app this came from had no login at all — whoever opened it
+ * picked their name once and saw what they were on for — and that put every
+ * volunteer's name beside the days they are at the building, for anyone with
+ * the URL. The port kept the "pick your name once on this device" part, and
+ * moved it behind a sign-in. Signed out, the page still shows which rotas
+ * exist and when; it is `visibleEvents`/`visiblePeople` that decide, so the
+ * names are absent from what this page is handed rather than hidden by it.
  */
 export default async function CalendarPage() {
   if (!(await isPluginEnabled("schedules"))) notFound();
 
-  const [schedules, events, people] = await Promise.all([
+  const [user, schedules, allEvents, allPeople] = await Promise.all([
+    getCurrentUser(),
     listPublicSchedules(),
     listEvents({}),
     listPeople(),
   ]);
+  const viewer = { signedIn: user !== null };
+  const events = visibleEvents(allEvents, viewer);
+  const people = visiblePeople(allPeople, viewer);
+  const namesWithheld = !canSeeNames(viewer);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-ink">Calendar</h1>
         <p className="mt-2 text-sec">
-          {schedules.length === 0
-            ? "No schedules have been set up yet."
-            : "Choose your name to see what you're on for."}
+          {schedules.length === 0 ? (
+            "No schedules have been set up yet."
+          ) : namesWithheld ? (
+            <>
+              {NAMES_WITHHELD}{" "}
+              <Link href="/auth/login?returnTo=/calendar" className="text-accent hover:underline">
+                Sign in
+              </Link>
+            </>
+          ) : (
+            "Choose your name to see what you're on for."
+          )}
         </p>
       </div>
 
       {schedules.length > 0 && (
         <>
-          <CalendarView schedules={schedules} events={events} people={people} />
+          <CalendarView
+            schedules={schedules}
+            events={events}
+            people={people}
+            namesWithheld={namesWithheld}
+          />
           <SaveCalendarButton />
         </>
       )}

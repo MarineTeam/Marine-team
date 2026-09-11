@@ -917,15 +917,24 @@ against a service's running order. This one puts **names** against recurring
 rotas, and most of those names have no account and are not going to make one.
 Gated by the **Schedules** plugin.
 
-### For everybody
+### For everybody — and what is only for members
 
-- **Choose your name once.** No account, no password: it is a preference on
-  that device, like the theme, and grants access to nothing — every schedule
-  here is readable by anyone with the URL either way. "Everyone" is a
-  first-class answer.
+- **The dates are public; the names need a sign-in.** Which rotas exist, on
+  what days, with what notes and where — anyone with the URL. *Who* is on them
+  — members. The calendar app this came from published every name to anyone,
+  and ported as-is that sat oddly beside a directory that needs opt-in *and*
+  sign-in before a name appears. Now the rule is the same as everywhere else
+  here, and it is enforced the same way: a signed-out reader is handed events
+  with nobody on them (`lib/schedules/visibility.ts`), not events with names
+  to be hidden. `/api/people` is a 403 without a session; the event and
+  snapshot endpoints strip people and refuse a `personId` filter.
+- **Choose your name once**, signed in: it is a preference on that device,
+  like the theme, so it differs between your phone and the church laptop.
+  "Everyone" is a first-class answer.
 - **What's next**, a **list** by day, or a **month grid**, filtered to one
   schedule with the chip row and to yourself with **Only mine**.
-- The page is **not indexed**: it carries people's names.
+- The page is **not indexed**: even without names it says when the building
+  is in use.
 
 ### For whoever keeps the rota (`/admin/schedules`)
 
@@ -967,7 +976,10 @@ remember to press update to find out they are on for Sunday.
 With no connection at all, it appears on the offline screen beside the saved
 books, videos and service orders: pick your name — the same name the app
 uses, so choosing it in one place settles it in both — and see what you are on
-for, with the day named the way the app names it.
+for, with the day named the way the app names it. Saved while signed out, the
+copy holds the dates and no names; and a signed-out sync always fetches a
+*full* snapshot, so a copy saved on a shared laptop while somebody was signed
+in stops carrying their names the next time it updates.
 
 Two things the payload never says, the device works out for itself, because
 getting either wrong means somebody turning up when they shouldn't:
@@ -2102,6 +2114,10 @@ the hardening below, all of which is now in place.
   the throttle before, and a script doesn't send one.
 - **Webhook URLs must be public** (`lib/public-url.ts`): loopback, private,
   link-local and bare names are refused when saved.
+- **Rota names are for members** (`lib/schedules/visibility.ts`): the
+  schedules and their dates are public, the people on them need a sign-in,
+  and a signed-out reader is handed events with nobody on them rather than
+  names to hide.
 - Every member route answers through `errorResponse`, which maps validation
   and database errors to 400/404 and never echoes an upstream message.
 
