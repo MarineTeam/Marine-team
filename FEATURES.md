@@ -2118,6 +2118,12 @@ the hardening below, all of which is now in place.
   schedules and their dates are public, the people on them need a sign-in,
   and a signed-out reader is handed events with nobody on them rather than
   names to hide.
+- **Only a site admin may take the Admin role away** (`lib/user-admin.ts`),
+  not only grant it. `manage_users` can be granted through a permission group
+  by anybody holding `manage_permissions` — to themselves included — so a rule
+  that guarded promotion and left demotion, suspension and deletion open was a
+  way for one staff member to remove every administrator and be the only one
+  left who could let people back in.
 - Every member route answers through `errorResponse`, which maps validation
   and database errors to 400/404 and never echoes an upstream message.
 

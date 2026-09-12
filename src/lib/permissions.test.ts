@@ -1,13 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const groupAssignmentFindManyMock = vi.fn();
+// A member's assignments now arrive as one join rather than one query per
+// capability, so the capability filter that used to be in the WHERE clause is
+// applied in memory. The rows here therefore carry their group's capabilities,
+// and the mock stands in for that query.
+const assignmentsQueryMock = vi.fn();
 const categoryFindManyMock = vi.fn();
 const seriesFindUniqueMock = vi.fn();
 const categoryChainIdsMock = vi.fn();
 
 vi.mock("@/lib/db", () => ({
   prisma: {
-    groupAssignment: { findMany: (...args: unknown[]) => groupAssignmentFindManyMock(...args) },
+    $queryRaw: (...args: unknown[]) => assignmentsQueryMock(...args),
+    categoryEditor: { findMany: async () => [] },
+    seriesEditor: { findMany: async () => [] },
     category: { findMany: (...args: unknown[]) => categoryFindManyMock(...args) },
     series: { findUnique: (...args: unknown[]) => seriesFindUniqueMock(...args) },
   },
@@ -24,45 +30,54 @@ const admin = { id: "u2", role: "ADMIN" } as Parameters<typeof hasCapability>[0]
 
 describe("hasCapability", () => {
   beforeEach(() => {
-    groupAssignmentFindManyMock.mockReset();
+    assignmentsQueryMock.mockReset();
     categoryChainIdsMock.mockReset();
     seriesFindUniqueMock.mockReset().mockResolvedValue({ categoryId: null });
   });
 
   it("always passes for an admin, without querying assignments", async () => {
     expect(await hasCapability(admin, "manage_users")).toBe(true);
-    expect(groupAssignmentFindManyMock).not.toHaveBeenCalled();
+    expect(assignmentsQueryMock).not.toHaveBeenCalled();
   });
 
   it("fails when the user has no matching assignment", async () => {
-    groupAssignmentFindManyMock.mockResolvedValue([]);
+    assignmentsQueryMock.mockResolvedValue([]);
     expect(await hasCapability(member, "manage_users")).toBe(false);
   });
 
   it("passes on a site-wide assignment (no category or series), even with no scope given", async () => {
-    groupAssignmentFindManyMock.mockResolvedValue([{ categoryId: null, seriesId: null }]);
+    assignmentsQueryMock.mockResolvedValue([{ categoryId: null, seriesId: null, capabilities: ["manage_users"] }]);
     expect(await hasCapability(member, "manage_users")).toBe(true);
   });
 
   it("fails a scoped-only assignment when no scope is given", async () => {
-    groupAssignmentFindManyMock.mockResolvedValue([{ categoryId: "cat1", seriesId: null }]);
+    assignmentsQueryMock.mockResolvedValue([{ categoryId: "cat1", seriesId: null, capabilities: ["manage_series"] }]);
     expect(await hasCapability(member, "manage_series")).toBe(false);
   });
 
   it("passes when the assignment's seriesId exactly matches the requested scope", async () => {
-    groupAssignmentFindManyMock.mockResolvedValue([{ categoryId: null, seriesId: "series1" }]);
+    assignmentsQueryMock.mockResolvedValue([{ categoryId: null, seriesId: "series1", capabilities: ["manage_series"] }]);
     expect(await hasCapability(member, "manage_series", { seriesId: "series1" })).toBe(true);
   });
 
   it("passes when the assignment's category is an ancestor of the scoped category", async () => {
-    groupAssignmentFindManyMock.mockResolvedValue([{ categoryId: "grandparent", seriesId: null }]);
+    assignmentsQueryMock.mockResolvedValue([{ categoryId: "grandparent", seriesId: null, capabilities: ["manage_series"] }]);
     categoryChainIdsMock.mockResolvedValue(["child", "parent", "grandparent"]);
     expect(await hasCapability(member, "manage_series", { categoryId: "child" })).toBe(true);
     expect(categoryChainIdsMock).toHaveBeenCalledWith("child");
   });
 
+  it("fails when the assignment's group doesn't carry the capability at all", async () => {
+    // This used to be the WHERE clause's job and is now a filter in memory,
+    // so it is worth a case of its own.
+    assignmentsQueryMock.mockResolvedValue([
+      { categoryId: null, seriesId: null, capabilities: ["manage_files", "publish_content"] },
+    ]);
+    expect(await hasCapability(member, "manage_users")).toBe(false);
+  });
+
   it("fails when the assignment's category is outside the scoped category's chain", async () => {
-    groupAssignmentFindManyMock.mockResolvedValue([{ categoryId: "unrelated", seriesId: null }]);
+    assignmentsQueryMock.mockResolvedValue([{ categoryId: "unrelated", seriesId: null, capabilities: ["manage_series"] }]);
     categoryChainIdsMock.mockResolvedValue(["child", "parent", "grandparent"]);
     expect(await hasCapability(member, "manage_series", { categoryId: "child" })).toBe(false);
   });

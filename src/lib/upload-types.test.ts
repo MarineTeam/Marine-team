@@ -92,8 +92,40 @@ describe("servePolicy", () => {
     expect(servePolicy("files/abc-evil.svg").contentType).toBe("application/octet-stream");
   });
 
-  it("never consults a stored MIME type", () => {
-    expect(servePolicy.length).toBe(1);
+  it("falls back to an exact stored MIME match when the path says nothing", () => {
+    // An import named `books/hymnal`, or an upload from before the rule. The
+    // reader page types these from the stored MIME, so the route must agree or
+    // the reader opens on an attachment.
+    expect(servePolicy("books/hymnal", "application/pdf")).toMatchObject({
+      contentType: "application/pdf",
+      inline: true,
+    });
+    expect(servePolicy("books/psalms", "application/epub+zip").contentType).toBe("application/epub+zip");
+    expect(servePolicy("books/hymnal.bin", "application/pdf").contentType).toBe("application/pdf");
+  });
+
+  it("never lets a stored MIME reach the header as itself", () => {
+    // The fallback matches against the list, so it can only ever resolve to a
+    // type on it. Nothing a browser executes is on it.
+    for (const claimed of ["text/html", "image/svg+xml", "application/xhtml+xml", "text/javascript"]) {
+      expect(servePolicy("files/x.unknown", claimed)).toMatchObject({
+        contentType: "application/octet-stream",
+        inline: false,
+      });
+    }
+  });
+
+  it("prefers the path over the stored type when both say something", () => {
+    // The extension was checked on the way in; the stored string may be a
+    // claim from a dashboard.
+    expect(servePolicy("files/x.pdf", "application/epub+zip").contentType).toBe("application/pdf");
+    expect(servePolicy("files/x.docx", "application/pdf").inline).toBe(false);
+  });
+
+  it("is unchanged with no stored type to fall back to", () => {
+    expect(servePolicy("files/x.unknown")).toMatchObject({ contentType: "application/octet-stream", inline: false });
+    expect(servePolicy("files/x.unknown", null).inline).toBe(false);
+    expect(servePolicy("files/x.unknown", "  ").inline).toBe(false);
   });
 });
 

@@ -21,12 +21,18 @@ import { rateLimitResponse, windowStart } from "@/lib/rate-limit";
 
 const joinSchema = z.object({ note: z.string().trim().max(500).nullish() });
 
-/** Asks per member per hour. Ten groups in an hour is not a person choosing one. */
+/**
+ * Memberships this member may start in an hour. Ten groups in an hour is not
+ * somebody choosing one — but note what it does *not* stop: withdrawing
+ * deletes the row, so an ask/withdraw loop never accumulates against this.
+ * The cap below is the one that stops that, and it is the load-bearing one.
+ */
 const ASKS_PER_HOUR = 10;
 /**
- * Join notifications per leader per group per hour. A member who asks,
- * withdraws and asks again in a loop leaves no row behind to count, so the
- * cap is on what reaches the leaders' phones rather than on the asking.
+ * Join notifications per leader per group per hour. Counted from the inbox
+ * rows an ask leaves behind, because those survive a withdrawal when the
+ * membership does not — which is what makes this the cap that holds when
+ * somebody loops. `Notification` is indexed on (url, createdAt) for it.
  */
 const NOTIFIES_PER_LEADER_PER_HOUR = 20;
 

@@ -1863,6 +1863,10 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, createdAt])
+  /// The group-join throttle counts recent rows by url (see the join route):
+  /// these are the one place a notification is looked up by anything but its
+  /// recipient, and without this the count is a scan of every row ever sent.
+  @@index([url, createdAt])
 }
 
 // The deployment's own skin: the name shown in the header and the three accent

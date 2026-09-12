@@ -67,7 +67,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // origin. Anything that isn't a reader format or plain media is a
     // download; anything not on the list at all is an opaque one that a
     // browser will not render. See lib/upload-types.ts.
-    const policy = servePolicy(file.bunnyPath);
+    const policy = servePolicy(file.bunnyPath, file.mimeType);
     const format = readerFormat(policy.contentType, file.bunnyPath);
 
     const headers = new Headers(policy.headers);

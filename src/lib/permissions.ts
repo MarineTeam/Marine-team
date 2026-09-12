@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
@@ -13,31 +14,62 @@ const CONTENT_CAPABILITIES: CapabilityKey[] = [
   "publish_content",
 ];
 
+type Assignment = { categoryId: string | null; seriesId: string | null; capabilities: string[] };
+
+/**
+ * Every permission-group assignment this member holds, read once per request.
+ *
+ * Each check used to run its own `groupAssignment` query filtered by the
+ * capability it cared about, so rendering the admin shell for a non-admin cost
+ * one query per capability in the nav — five before the page itself asked
+ * anything. A member has a handful of assignments at most; fetching them once
+ * and filtering in memory is one query for all of it, and React's `cache`
+ * keeps it to one for the whole request.
+ *
+ * Keyed by the id rather than the user object, so a caller that rebuilt the
+ * object still hits the same entry.
+ */
+const assignmentsOf = cache(async (userId: string): Promise<Assignment[]> => {
+  // One statement rather than a Prisma `include`, which without the
+  // `relationJoins` preview feature fetches the groups in a second round
+  // trip — and this wants to be one query whether the cache above is in play
+  // or not. Parameterised, like every other raw query in this codebase.
+  return prisma.$queryRaw<Assignment[]>`
+    SELECT a."categoryId", a."seriesId", g."capabilities"
+    FROM "GroupAssignment" a
+    JOIN "PermissionGroup" g ON g."id" = a."groupId"
+    WHERE a."userId" = ${userId}
+  `;
+});
+
+/** The same test the `hasSome: CONTENT_CAPABILITIES` filter made in SQL. */
+function isContentGroup(assignment: Assignment): boolean {
+  return assignment.capabilities.some((key) => CONTENT_CAPABILITIES.includes(key as CapabilityKey));
+}
+
+/** The legacy editor rows, also read once per request. */
+const editorGrantsOf = cache(async (userId: string) => {
+  const [categories, series] = await Promise.all([
+    prisma.categoryEditor.findMany({ where: { userId }, select: { categoryId: true } }),
+    prisma.seriesEditor.findMany({ where: { userId }, select: { seriesId: true } }),
+  ]);
+  return { categoryIds: categories.map((row) => row.categoryId), seriesIds: series.map((row) => row.seriesId) };
+});
+
 async function userHasSiteWideContentGroup(userId: string): Promise<boolean> {
-  const count = await prisma.groupAssignment.count({
-    where: {
-      userId,
-      categoryId: null,
-      seriesId: null,
-      group: { capabilities: { hasSome: CONTENT_CAPABILITIES } },
-    },
-  });
-  return count > 0;
+  const assignments = await assignmentsOf(userId);
+  return assignments.some((a) => !a.categoryId && !a.seriesId && isContentGroup(a));
 }
 
 async function userCanEditCategory(userId: string, categoryId: string): Promise<boolean> {
-  const chain = await categoryChainIds(categoryId);
-  const [legacyCount, groupCount] = await Promise.all([
-    prisma.categoryEditor.count({ where: { userId, categoryId: { in: chain } } }),
-    prisma.groupAssignment.count({
-      where: {
-        userId,
-        categoryId: { in: chain },
-        group: { capabilities: { hasSome: CONTENT_CAPABILITIES } },
-      },
-    }),
+  const [chain, assignments, editors] = await Promise.all([
+    categoryChainIds(categoryId),
+    assignmentsOf(userId),
+    editorGrantsOf(userId),
   ]);
-  if (legacyCount > 0 || groupCount > 0) return true;
+  const inChain = new Set(chain);
+  if (editors.categoryIds.some((id) => inChain.has(id))) return true;
+  if (assignments.some((a) => a.categoryId && inChain.has(a.categoryId) && isContentGroup(a))) return true;
   return userHasSiteWideContentGroup(userId);
 }
 
@@ -45,13 +77,9 @@ async function userCanEditSeries(
   userId: string,
   series: { id: string; categoryId: string | null },
 ): Promise<boolean> {
-  const [direct, directGroup] = await Promise.all([
-    prisma.seriesEditor.count({ where: { userId, seriesId: series.id } }),
-    prisma.groupAssignment.count({
-      where: { userId, seriesId: series.id, group: { capabilities: { hasSome: CONTENT_CAPABILITIES } } },
-    }),
-  ]);
-  if (direct > 0 || directGroup > 0) return true;
+  const [assignments, editors] = await Promise.all([assignmentsOf(userId), editorGrantsOf(userId)]);
+  if (editors.seriesIds.includes(series.id)) return true;
+  if (assignments.some((a) => a.seriesId === series.id && isContentGroup(a))) return true;
   if (await userHasSiteWideContentGroup(userId)) return true;
   if (!series.categoryId) return false;
   return userCanEditCategory(userId, series.categoryId);
@@ -75,12 +103,11 @@ export async function canEditSeries(
 /** Whether the user is an admin or has at least one editor/group assignment, for gating /admin entry. */
 export async function isStaff(user: User): Promise<boolean> {
   if (user.role === "ADMIN") return true;
-  const [categoryEditorCount, seriesEditorCount, groupAssignmentCount] = await Promise.all([
-    prisma.categoryEditor.count({ where: { userId: user.id } }),
-    prisma.seriesEditor.count({ where: { userId: user.id } }),
-    prisma.groupAssignment.count({ where: { userId: user.id } }),
-  ]);
-  return categoryEditorCount > 0 || seriesEditorCount > 0 || groupAssignmentCount > 0;
+  // The same two cached reads every capability check uses, rather than three
+  // counts of its own: a request that asks this and then asks anything else
+  // pays for one round of queries in total.
+  const [assignments, editors] = await Promise.all([assignmentsOf(user.id), editorGrantsOf(user.id)]);
+  return assignments.length > 0 || editors.categoryIds.length > 0 || editors.seriesIds.length > 0;
 }
 
 /** Resolves the current user, requiring admin or at least one editor/group assignment; throws a NextResponse otherwise. */
@@ -120,23 +147,17 @@ export async function getEditableScope(
   if (user.role === "ADMIN") return { isAdmin: true };
   if (await userHasSiteWideContentGroup(user.id)) return { isAdmin: true };
 
-  const [categoryEditors, seriesEditors, groupAssignments] = await Promise.all([
-    prisma.categoryEditor.findMany({ where: { userId: user.id }, select: { categoryId: true } }),
-    prisma.seriesEditor.findMany({ where: { userId: user.id }, select: { seriesId: true } }),
-    prisma.groupAssignment.findMany({
-      where: { userId: user.id, group: { capabilities: { hasSome: CONTENT_CAPABILITIES } } },
-      select: { categoryId: true, seriesId: true },
-    }),
-  ]);
+  const [assignments, editors] = await Promise.all([assignmentsOf(user.id), editorGrantsOf(user.id)]);
+  const contentGroups = assignments.filter(isContentGroup);
   return {
     isAdmin: false,
     categoryIds: [
-      ...categoryEditors.map((c) => c.categoryId),
-      ...groupAssignments.flatMap((g) => (g.categoryId ? [g.categoryId] : [])),
+      ...editors.categoryIds,
+      ...contentGroups.flatMap((a) => (a.categoryId ? [a.categoryId] : [])),
     ],
     seriesIds: [
-      ...seriesEditors.map((s) => s.seriesId),
-      ...groupAssignments.flatMap((g) => (g.seriesId ? [g.seriesId] : [])),
+      ...editors.seriesIds,
+      ...contentGroups.flatMap((a) => (a.seriesId ? [a.seriesId] : [])),
     ],
   };
 }
@@ -180,9 +201,7 @@ export async function hasCapability(
 ): Promise<boolean> {
   if (user.role === "ADMIN") return true;
 
-  const assignments = await prisma.groupAssignment.findMany({
-    where: { userId: user.id, group: { capabilities: { has: capability } } },
-  });
+  const assignments = (await assignmentsOf(user.id)).filter((a) => a.capabilities.includes(capability));
   if (assignments.length === 0) return false;
   if (assignments.some((a) => !a.categoryId && !a.seriesId)) return true;
   if (!scope) return false;
@@ -228,10 +247,7 @@ export async function getCapabilityScope(
 ): Promise<{ isAdmin: true } | { isAdmin: false; categoryIds: string[]; seriesIds: string[] }> {
   if (user.role === "ADMIN") return { isAdmin: true };
 
-  const assignments = await prisma.groupAssignment.findMany({
-    where: { userId: user.id, group: { capabilities: { has: capability } } },
-    select: { categoryId: true, seriesId: true },
-  });
+  const assignments = (await assignmentsOf(user.id)).filter((a) => a.capabilities.includes(capability));
   if (assignments.some((a) => !a.categoryId && !a.seriesId)) return { isAdmin: true };
 
   return {

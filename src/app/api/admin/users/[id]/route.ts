@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { errorResponse } from "@/lib/api-guard";
 import { ensureStaff, ensureCapability } from "@/lib/permissions";
 import { grantEmailAccess, suspendEmailAccess } from "@/lib/authorization";
+import { canChangeRole, canDeleteUser, canSetAuthorized, firstRefusal } from "@/lib/user-admin";
 
 const updateSchema = z.object({
   role: z.enum(["MEMBER", "ADMIN"]).optional(),
@@ -19,15 +20,20 @@ export async function PATCH(
     await ensureCapability(actor, "manage_users");
     const { id } = await params;
     const body = updateSchema.parse(await request.json());
-    if (id === actor.id && body.authorized === false) {
-      return NextResponse.json(
-        { error: "You can't revoke your own access" },
-        { status: 400 },
-      );
-    }
-    if (body.role === "ADMIN" && actor.role !== "ADMIN") {
-      return NextResponse.json({ error: "Only a site admin can grant the Admin role" }, { status: 403 });
-    }
+
+    // The target's current role decides what may be done to it, so it is read
+    // before the write rather than inferred from the request. See
+    // lib/user-admin.ts: `manage_users` grants ADMIN to nobody, and now takes
+    // it from nobody either.
+    const target = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } });
+    if (!target) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    const refusal = firstRefusal(
+      canChangeRole(actor, target, body.role),
+      canSetAuthorized(actor, target, body.authorized),
+    );
+    if (!refusal.ok) return NextResponse.json({ error: refusal.error }, { status: refusal.status });
+
     const user = await prisma.user.update({
       where: { id },
       data: { role: body.role, authorized: body.authorized },
@@ -62,12 +68,13 @@ export async function DELETE(
     const actor = await ensureStaff();
     await ensureCapability(actor, "manage_users");
     const { id } = await params;
-    if (id === actor.id) {
-      return NextResponse.json(
-        { error: "You can't remove your own access" },
-        { status: 400 },
-      );
-    }
+
+    const target = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } });
+    if (!target) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    const refusal = canDeleteUser(actor, target);
+    if (!refusal.ok) return NextResponse.json({ error: refusal.error }, { status: refusal.status });
+
     await prisma.user.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch (error) {

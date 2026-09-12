@@ -99,15 +99,36 @@ export type ServePolicy = {
 };
 
 /**
- * How to serve a stored object, decided from its path and nothing else.
+ * The entry whose MIME type is exactly this string, if there is one.
  *
- * The stored MIME type is not consulted: for files uploaded before this rule
- * existed it is the browser's claim, and for imported objects it is whatever
- * the storage dashboard was told. The path's extension is the one thing that
- * was checked on the way in, or that a person chose by hand.
+ * The fallback for a stored object whose *path* says nothing — an import from
+ * the storage dashboard named `books/hymnal`, or an upload from before the
+ * extension rule existed. It is safe to consult the stored type here in a way
+ * it is not safe to serve it, because the only types it can resolve to are the
+ * ones on the list, and the list contains nothing a browser executes: a stored
+ * `text/html` matches no entry and falls through to the opaque download.
+ *
+ * Without this, such a file was typed by the reader page (which reads the
+ * stored MIME) as a book and served by the content route as an attachment —
+ * so the reader opened on bytes the browser had already downloaded.
  */
-export function servePolicy(path: string): ServePolicy {
-  const type = uploadType(path);
+function byMime(mimeType: string | null | undefined): UploadType | null {
+  const mime = mimeType?.toLowerCase().trim();
+  if (!mime) return null;
+  return Object.values(UPLOAD_TYPES).find((type) => type.mime === mime) ?? null;
+}
+
+/**
+ * How to serve a stored object.
+ *
+ * The path's extension decides, because that is what was checked on the way
+ * in. A stored MIME type is consulted only when the path has no extension on
+ * the list at all, and then only for an exact match against the list itself —
+ * never as a string to echo into a header, which is what made an uploaded
+ * `text/html` run as this origin.
+ */
+export function servePolicy(path: string, storedMimeType?: string | null): ServePolicy {
+  const type = uploadType(path) ?? byMime(storedMimeType);
   const nosniff = { "X-Content-Type-Options": "nosniff" } as const;
   if (!type) {
     return {

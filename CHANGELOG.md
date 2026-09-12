@@ -8,6 +8,49 @@ All notable changes to this project are documented here. Format follows
 
 ### Security
 
+A second audit, run after the first one's fixes were in — with those fixes as
+the first thing it looked at, since a fix is where a new bug goes.
+
+- **Only a site admin may take the Admin role away, not just grant it.**
+  `manage_users` is a grantable capability, and whoever holds
+  `manage_permissions` can put it in a group and assign it to themselves. The
+  role route blocked *granting* ADMIN and nothing else: the same staff member
+  could demote every administrator, suspend them, or — the delete route
+  checked no role at all — remove their accounts, and then be the only person
+  who could let anybody back in. `lib/user-admin.ts` holds the missing half of
+  the rule, and the route reads the target's current role before writing
+  rather than inferring it from the request.
+- **Files whose stored path carries no known extension open in the reader
+  again.** The previous pass made the content route type a file from its path
+  alone, which was right for what it was fixing and wrong for an object
+  imported from storage as `books/hymnal`: the reader page called it a book
+  and the route sent it as an attachment. The stored type is now consulted as
+  a fallback, and only as an exact match against the upload allow-list — which
+  contains nothing a browser executes, so a stored `text/html` still falls
+  through to the opaque download it got before.
+- **The small-group join throttle no longer scans the notification table.**
+  It counts recent inbox rows by `url` — the count that actually holds when
+  somebody loops ask-and-withdraw, since those rows survive a withdrawal — and
+  that column had no index, so a path any signed-in member can trigger was a
+  sequential scan of every notification ever sent. Indexed on
+  `(url, createdAt)`.
+
+### Changed
+
+- **Permission checks are one read per request instead of one per check.**
+  Every `hasCapability`, `isStaff` and scope lookup ran its own
+  `groupAssignment` query filtered by the capability it cared about, so
+  rendering the admin shell for a non-admin cost a query per capability in the
+  nav before the page asked for anything. A member's assignments are now
+  fetched once — a single parameterised join, wrapped in React's `cache`, the
+  same mechanism `getCurrentUser` uses — and the capability filter runs in
+  memory. Verified identical to the old implementation over 495 comparisons
+  against a real database, across admins, legacy category and series editors,
+  scoped and site-wide permission groups, and category chains; and measured no
+  more expensive than before even with no request cache in play.
+
+#### The first audit
+
 Findings of a full audit of the application, all fixed in one pass. Nothing
 here was an authorisation bypass, an injection or a leaked secret — the audit
 found none — but two of them compounded into a way for the least-trusted
