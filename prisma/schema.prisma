@@ -186,6 +186,7 @@ model User {
   /// The name this account appears under on a rota, when they are the same
   /// person — see Person.
   person                Person?
+  followUps             FollowUp[]            @relation("FollowUpAssignee")
   groupAssignments      GroupAssignment[]
   ratings               Rating[]
   seriesWatchLater      SeriesWatchLater[]
@@ -2035,6 +2036,7 @@ model Person {
   events        CalendarEventPerson[]
   primaryFor    Household[]           @relation("HouseholdPrimaryContact")
   gifts         Gift[]
+  followUps     FollowUp[]
   checkins      CheckinRecord[]       @relation("CheckedInChild")
   broughtIn     CheckinRecord[]       @relation("CheckedInBy")
   collected     CheckinRecord[]       @relation("ReleasedTo")
@@ -2089,8 +2091,9 @@ model Household {
   /// Anything the office needs on the family rather than on a person.
   notes String?
 
-  members Person[] @relation("HouseholdMembers")
-  gifts   Gift[]
+  members   Person[]   @relation("HouseholdMembers")
+  gifts     Gift[]
+  followUps FollowUp[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2238,6 +2241,7 @@ model Event {
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
   registrations EventRegistration[]
+  bookings      ResourceBooking[]
 
   @@unique([seriesId, occurrenceDate])
   @@index([published, startsAt])
@@ -3237,4 +3241,134 @@ model Gift {
   @@index([householdId, givenAt])
   @@index([giverId, givenAt])
   @@index([status, givenAt])
+}
+
+
+/// Where a follow-up came from, which is most of what tells somebody how to
+/// start the conversation.
+enum FollowUpSource {
+  /// Somebody filled in a connect card.
+  FORM
+  /// A first sign-up for an event.
+  EVENT
+  /// A small group's roll says they have stopped coming.
+  GROUP_ABSENCE
+  /// Somebody typed it in.
+  MANUAL
+}
+
+enum FollowUpStatus {
+  OPEN
+  DONE
+  /// Looked at and decided against. Kept, because "we chose not to" is a
+  /// different fact from "nobody got to it", and only one needs chasing.
+  DISMISSED
+}
+
+/// A job with somebody's name and a date on it.
+///
+/// The app already worked out who had gone quiet (`quietlyMissing`) and
+/// collected connect cards, and neither turned into "Ruth, ring this person,
+/// by Friday". This is that missing half: the point where pastoral data stops
+/// being a report and becomes something a person does.
+model FollowUp {
+  id     String @id @default(cuid())
+  title  String
+  /// What is known so far, and what happened. Appended to rather than
+  /// replaced when somebody closes it — see `outcome`.
+  note   String?
+
+  /// Who it is about. Optional: a card can be filled in by somebody nobody
+  /// has a record for yet, and the job still needs doing.
+  person   Person?    @relation(fields: [personId], references: [id], onDelete: SetNull)
+  personId String?
+  /// Denormalised from the person at the time, so moving house later doesn't
+  /// silently re-address an old job.
+  household   Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
+  householdId String?
+
+  /// Whose job it is. Null means nobody has picked it up, which is a state
+  /// worth being able to see rather than hiding behind a default assignee.
+  assignedTo   User?   @relation("FollowUpAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedToId String?
+
+  status FollowUpStatus @default(OPEN)
+  source FollowUpSource @default(MANUAL)
+  /// The id of whatever prompted it — a submission, a registration, a group.
+  /// Paired with `source` it is what stops the same prompt raising a second
+  /// job every time the sweep runs.
+  sourceRef String?
+
+  /// A calendar day. A follow-up with no date is a follow-up that doesn't
+  /// happen, so the API fills one in rather than leaving it null.
+  dueOn DateTime @db.Date
+
+  /// What came of it, written when it is closed.
+  outcome     String?
+  completedAt DateTime?
+
+  createdByEmail String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One job per prompt: the nightly sweep must not raise a second card for
+  /// the same submission every time it runs.
+  @@unique([source, sourceRef])
+  @@index([status, dueOn])
+  @@index([assignedToId, status, dueOn])
+  @@index([personId])
+}
+
+/// What kind of thing is being booked.
+enum ResourceKind {
+  ROOM
+  VEHICLE
+  EQUIPMENT
+}
+
+/// A room, a minibus, a projector.
+model Resource {
+  id       String       @id @default(cuid())
+  name     String
+  kind     ResourceKind @default(ROOM)
+  /// How many people the room holds. Null for anything that isn't a room.
+  capacity Int?
+  notes    String?
+  active   Boolean      @default(true)
+  position Int          @default(0)
+
+  bookings ResourceBooking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, position])
+}
+
+/// One resource, held for one span of time.
+model ResourceBooking {
+  id         String   @id @default(cuid())
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  resourceId String
+
+  /// The event it is for, when there is one. `Cascade`: cancelling the event
+  /// frees the hall, which is the only sensible reading of deleting it.
+  event   Event?  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId String?
+
+  /// What it is for, when it isn't an event — "PAT testing", "deep clean".
+  title String
+
+  startsAt DateTime
+  endsAt   DateTime
+
+  createdByEmail String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// The index the overlap check runs against.
+  @@index([resourceId, startsAt, endsAt])
+  @@index([eventId])
 }
