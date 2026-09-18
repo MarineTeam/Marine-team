@@ -2034,6 +2034,9 @@ model Person {
   aliases       PersonAlias[]
   events        CalendarEventPerson[]
   primaryFor    Household[]           @relation("HouseholdPrimaryContact")
+  checkins      CheckinRecord[]       @relation("CheckedInChild")
+  broughtIn     CheckinRecord[]       @relation("CheckedInBy")
+  collected     CheckinRecord[]       @relation("ReleasedTo")
 
   deletedAt DateTime?
   createdAt DateTime  @default(now())
@@ -3046,4 +3049,89 @@ model TvDevice {
 
   @@index([userId, status])
   @@index([expiresAt])
+}
+
+
+/// A room, open on one day, that children are signed into.
+///
+/// A session is the unit everything else hangs off: the code is per household
+/// *per session*, so two siblings in different rooms carry the same code on
+/// both labels and whoever collects them has one ticket rather than two.
+model CheckinSession {
+  id   String   @id @default(cuid())
+  name String
+  /// The day it runs. A calendar day, not an instant — see lib/dates.ts.
+  date DateTime @db.Date
+
+  /// Where in the building, printed on the label so a parent can find it.
+  room String?
+
+  /// The ages the room is for. Both optional: a creche has an upper bound and
+  /// no lower one, and a holiday club often has neither. A child whose birth
+  /// date nobody has typed is never refused by these — see lib/checkin.ts.
+  minAge Int?
+  maxAge Int?
+
+  /// Closed for the day. Kept rather than deleted: a closed session still has
+  /// a register, and "nobody was collected" is a question somebody may ask
+  /// about it months later.
+  closedAt DateTime?
+
+  records CheckinRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+  @@index([closedAt, date])
+}
+
+/// One child, in one room, on one day.
+model CheckinRecord {
+  id        String         @id @default(cuid())
+  session   CheckinSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+
+  /// Who was signed in. `Cascade`: a person's records are part of that person.
+  child   Person @relation("CheckedInChild", fields: [childId], references: [id], onDelete: Cascade)
+  childId String
+
+  /// Who brought them, which is not always who collects them.
+  broughtBy   Person? @relation("CheckedInBy", fields: [broughtById], references: [id], onDelete: SetNull)
+  broughtById String?
+
+  /// The matching half, printed on the child's label and the adult's ticket.
+  ///
+  /// Stored in the clear, unlike every other secret in this app, and the
+  /// reason is physical: a volunteer has to read it off a sticker and compare
+  /// it by eye to a slip of paper. It is short-lived, room-scoped, and worth
+  /// nothing once the session closes — the protection is the guardian check
+  /// beside it, not the code's entropy.
+  securityCode String
+
+  checkedInAt  DateTime  @default(now())
+  checkedOutAt DateTime?
+
+  /// Who collected them. Null until they are.
+  releasedTo   Person? @relation("ReleasedTo", fields: [releasedToId], references: [id], onDelete: SetNull)
+  releasedToId String?
+
+  /// Which volunteer worked the desk, on each half.
+  checkedInByEmail String?
+  releasedByEmail  String?
+
+  /// Set when a leader released a child to somebody the rules would have
+  /// refused, with the reason they gave. Never blank when it is set, and the
+  /// audit log carries it too — an override that leaves no trace is the thing
+  /// this whole feature exists to prevent.
+  overrideReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// A child is in a room once per session. Two volunteers scanning the same
+  /// family at once must not produce two labels for one child.
+  @@unique([sessionId, childId])
+  @@index([sessionId, checkedOutAt])
+  @@index([childId])
 }
