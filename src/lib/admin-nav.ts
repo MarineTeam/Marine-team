@@ -35,6 +35,12 @@ export type AdminAccess = {
   canModeratePrayer: boolean;
   /** Anyone who can manage something that lands in the trash can empty it. */
   canSeeTrash: boolean;
+  /** The family records — households, birthdays, and the follow-up list. */
+  canManagePeople: boolean;
+  /** The check-in desk, and nothing else. The narrowest grant there is. */
+  canRunCheckin: boolean;
+  /** Money, which is its own decision — see capabilities.ts. */
+  canManageGiving: boolean;
 };
 
 type AdminLink = {
@@ -100,6 +106,12 @@ export const ADMIN_GROUPS: AdminGroup[] = [
       // books the hall.
       { href: "/admin/groups", label: "Small groups", visible: (a) => a.canManageEvents },
       { href: "/admin/prayer", label: "Prayer wall", visible: (a) => a.canModeratePrayer },
+      // The hall, the minibus, the projector. Part of keeping the diary, so
+      // the same gate: whoever publishes the event books the room for it.
+      { href: "/admin/resources", label: "Rooms & resources", visible: (a) => a.canManageEvents },
+      // Its own grant, and the narrowest one: a volunteer on the desk signs
+      // children in and out and is shown nothing else.
+      { href: "/admin/checkin", label: "Check-in", visible: (a) => a.canRunCheckin },
     ],
   },
   {
@@ -124,6 +136,20 @@ export const ADMIN_GROUPS: AdminGroup[] = [
       { href: "/admin/authorized-emails", label: "Who can sign in", visible: (a) => a.canManageUsers },
       { href: "/admin/permissions", label: "Permissions", visible: (a) => a.canManagePermissions },
       { href: "/admin/access-attempts", label: "Access attempts", visible: (a) => a.canViewAuditLog },
+      // The people behind the accounts — including everyone who has none.
+      { href: "/admin/households", label: "Households", visible: (a) => a.canManagePeople },
+      { href: "/admin/follow-ups", label: "Follow-ups", visible: (a) => a.canManagePeople },
+      // Replies to what /admin/broadcasts sends, so it sits beside it and
+      // shares its grant.
+      { href: "/admin/sms", label: "Text replies", visible: (a) => a.canManageUsers },
+    ],
+  },
+  {
+    label: "Giving",
+    links: [
+      { href: "/admin/giving", label: "Gifts", visible: (a) => a.canManageGiving },
+      { href: "/admin/giving/funds", label: "Funds", visible: (a) => a.canManageGiving },
+      { href: "/admin/giving/statements", label: "Statements", visible: (a) => a.canManageGiving },
     ],
   },
   {

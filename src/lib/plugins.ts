@@ -32,6 +32,12 @@ export const PLUGIN_META = [
   { slug: "groups", name: "Small groups", description: "A directory of home groups at /groups, with join requests a leader answers. The address is given only to people in the group." },
   { slug: "prayer", name: "Prayer wall", description: "A moderated wall of prayer requests at /prayer, with an anonymous option and an \"I prayed for this\" count. Nothing appears until it is let through." },
   { slug: "forms", name: "Forms", description: "Connect cards and sign-up forms built here rather than in code, filled in at /forms, with the responses kept and exportable." },
+  { slug: "households", name: "Households", description: "Family records: who lives with whom, birthdays and anniversaries, and the address the office keeps. What check-in and giving statements are both built on." },
+  { slug: "checkin", name: "Children's check-in", description: "Signs children into a room and releases them only to an adult of their own household, against a code printed at check-in." },
+  { slug: "giving", name: "Giving", description: "Records gifts from a hosted payment page — no card number ever reaches this app — with funds, a reconciliation view and per-household statements." },
+  { slug: "follow-ups", name: "Follow-ups", description: "Turns a connect card, a first-time sign-up or a member who has gone quiet into a job with somebody's name and a date on it." },
+  { slug: "resources", name: "Rooms and resources", description: "Books the hall, the minibus and the projector against an event, and refuses a double booking at the moment of saving." },
+  { slug: "sms-inbox", name: "Text replies", description: "Takes replies to the texts this app sends and threads them by number, so an answer to a broadcast lands somewhere a person will read it." },
 ] as const;
 
 export type PluginSlug = (typeof PLUGIN_META)[number]["slug"];

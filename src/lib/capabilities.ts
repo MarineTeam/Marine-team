@@ -23,6 +23,18 @@ export const CAPABILITIES = [
   // decision from either of those, and it should have to be made on purpose.
   { key: "manage_api_keys", label: "Manage API keys", hint: "Create and revoke keys that let another system read this one" },
   { key: "view_analytics", label: "View analytics", hint: "See the views dashboard and trending content" },
+  // Families, birth dates and who may collect whom. Deliberately not folded
+  // into managing users: that grant is about accounts and access, this one is
+  // about the people behind them, most of whom have no account at all.
+  { key: "manage_people", label: "Manage households", hint: "Keep the family records, birthdays and follow-ups" },
+  // The narrowest grant in the list, and on purpose: somebody running the
+  // desk on a Sunday needs to check children in and out and nothing else.
+  // It does not open the household list, and it is not implied by anything.
+  { key: "run_checkin", label: "Run check-in", hint: "Work the check-in desk: sign children in, and release them to whoever may collect them" },
+  // Money is its own decision, for the same reason an API key is: what a gift
+  // record says about somebody is not something the diary's keeper should
+  // acquire by being given the diary.
+  { key: "manage_giving", label: "Manage giving", hint: "Set up funds, see gifts, and produce statements" },
 ] as const;
 
 export type CapabilityKey = (typeof CAPABILITIES)[number]["key"];
@@ -40,4 +52,7 @@ export const SITE_WIDE_ONLY_CAPABILITIES: CapabilityKey[] = [
   "manage_categories",
   "manage_events",
   "moderate_prayer",
+  "manage_people",
+  "run_checkin",
+  "manage_giving",
 ];

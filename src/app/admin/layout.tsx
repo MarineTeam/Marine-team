@@ -58,6 +58,9 @@ async function resolveAdminAccess(user: User): Promise<AdminAccess> {
       canManageEvents: true,
       canModeratePrayer: true,
       canSeeTrash: true,
+      canManagePeople: true,
+      canRunCheckin: true,
+      canManageGiving: true,
     };
   }
 
@@ -75,6 +78,9 @@ async function resolveAdminAccess(user: User): Promise<AdminAccess> {
     canShareContent,
     canManageEvents,
     canModeratePrayer,
+    canManagePeople,
+    canRunCheckin,
+    canManageGiving,
     moderateScope,
   ] = await Promise.all([
     hasCapability(user, "manage_users"),
@@ -90,6 +96,9 @@ async function resolveAdminAccess(user: User): Promise<AdminAccess> {
     hasCapability(user, "share_content"),
     hasCapability(user, "manage_events"),
     hasCapability(user, "moderate_prayer"),
+    hasCapability(user, "manage_people"),
+    hasCapability(user, "run_checkin"),
+    hasCapability(user, "manage_giving"),
     getCapabilityScope(user, "moderate_comments"),
   ]);
 
@@ -113,5 +122,11 @@ async function resolveAdminAccess(user: User): Promise<AdminAccess> {
       moderateScope.categoryIds.length > 0 ||
       moderateScope.seriesIds.length > 0,
     canSeeTrash: canManageCategories || canManageSeries || canManageVideosSiteWide || canManageFiles,
+    canManagePeople,
+    // Anyone who keeps the household list can work the desk: the desk's whole
+    // job is reading that list back. The narrow grant exists for the volunteer
+    // who should have the desk and nothing else, not to keep the office out.
+    canRunCheckin: canRunCheckin || canManagePeople,
+    canManageGiving,
   };
 }

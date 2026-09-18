@@ -2009,8 +2009,31 @@ model Person {
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
   userId String? @unique
 
-  aliases PersonAlias[]
-  events  CalendarEventPerson[]
+  /// The family this person belongs to, when anybody has said so.
+  ///
+  /// `SetNull` rather than `Cascade`: deleting a household is a statement
+  /// about a family unit, not about the people in it, and it must never be a
+  /// way to delete somebody who is on next Sunday's rota.
+  household   Household? @relation("HouseholdMembers", fields: [householdId], references: [id], onDelete: SetNull)
+  householdId String?
+  /// Adult or child *within this household* — the thing that decides who may
+  /// collect whom, not a claim about age in general. A grandmother in her own
+  /// household is an adult there whatever her grandchildren's household says.
+  householdRole HouseholdRole @default(ADULT)
+
+  /// Only ever a birth date, never an age: an age is wrong the day after it
+  /// is typed. Absent for most people; asked for only where a room is graded
+  /// by age, which is check-in.
+  dateOfBirth DateTime? @db.Date
+
+  /// What the room needs to know before it takes the child: allergies, a
+  /// condition, who is not allowed to collect them. Never shown outside
+  /// check-in, and never on a label — a label is on a coat in a corridor.
+  medicalNotes String?
+
+  aliases       PersonAlias[]
+  events        CalendarEventPerson[]
+  primaryFor    Household[]           @relation("HouseholdPrimaryContact")
 
   deletedAt DateTime?
   createdAt DateTime  @default(now())
@@ -2018,6 +2041,57 @@ model Person {
 
   @@index([active, displayName])
   @@index([updatedAt])
+  @@index([householdId])
+}
+
+/// Whether somebody is an adult or a child *of this household*.
+enum HouseholdRole {
+  ADULT
+  CHILD
+}
+
+/// A family, as far as the church needs one.
+///
+/// The app had two tables of people — `User` for accounts and `Person` for the
+/// names on the rotas, most of whom never log in — and nothing at all for the
+/// unit almost every pastoral question is actually about. "Who may collect
+/// this child", "whose giving statement is this", "where do we send the
+/// Christmas card" are all household questions, and each of the three
+/// features that asks one was reinventing an answer.
+///
+/// Built on `Person` rather than `User` deliberately: a family is not a set of
+/// logins. Most children have no account and should not be given one, and the
+/// grandparent who comes every week may never have had one either.
+model Household {
+  id String @id @default(cuid())
+
+  /// "The Okonkwos", "Ruth & Sam Bell". Typed, never derived: families do not
+  /// share a surname as reliably as software wishes they did.
+  name String
+
+  /// Where they live. As private as a small group's address and for the same
+  /// reason — see lib/households.ts, which is the only place that decides who
+  /// may be given one.
+  address String?
+
+  /// The person to ring. Optional, and `SetNull` on delete, so removing
+  /// somebody from the church never leaves a household pointing at a ghost.
+  primaryContact   Person? @relation("HouseholdPrimaryContact", fields: [primaryContactId], references: [id], onDelete: SetNull)
+  primaryContactId String?
+
+  /// A wedding anniversary, when the household has one worth marking.
+  anniversary DateTime? @db.Date
+
+  /// Anything the office needs on the family rather than on a person.
+  notes String?
+
+  members Person[] @relation("HouseholdMembers")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([primaryContactId])
 }
 
 /// Extra spellings that resolve to the same person, so renaming somebody in a

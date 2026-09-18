@@ -16,6 +16,9 @@ const NOTHING: AdminAccess = {
   canManageEvents: false,
   canModeratePrayer: false,
   canSeeTrash: false,
+  canManagePeople: false,
+  canRunCheckin: false,
+  canManageGiving: false,
 };
 
 const EVERYTHING: AdminAccess = {
@@ -33,6 +36,9 @@ const EVERYTHING: AdminAccess = {
   canManageEvents: true,
   canModeratePrayer: true,
   canSeeTrash: true,
+  canManagePeople: true,
+  canRunCheckin: true,
+  canManageGiving: true,
 };
 
 const hrefs = (access: AdminAccess) =>
