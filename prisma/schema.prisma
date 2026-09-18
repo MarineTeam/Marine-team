@@ -2034,6 +2034,7 @@ model Person {
   aliases       PersonAlias[]
   events        CalendarEventPerson[]
   primaryFor    Household[]           @relation("HouseholdPrimaryContact")
+  gifts         Gift[]
   checkins      CheckinRecord[]       @relation("CheckedInChild")
   broughtIn     CheckinRecord[]       @relation("CheckedInBy")
   collected     CheckinRecord[]       @relation("ReleasedTo")
@@ -2089,6 +2090,7 @@ model Household {
   notes String?
 
   members Person[] @relation("HouseholdMembers")
+  gifts   Gift[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3134,4 +3136,105 @@ model CheckinRecord {
   @@unique([sessionId, childId])
   @@index([sessionId, checkedOutAt])
   @@index([childId])
+}
+
+
+/// Where a gift was given to.
+model GivingFund {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  description String?
+
+  /// Closed funds keep their history and take nothing new. Never deleted: a
+  /// statement for a past year has to name the fund the money went to.
+  active Boolean @default(true)
+
+  /// Whether gifts here belong on a tax statement. A building fund does; money
+  /// collected for somebody's leaving present does not, and a statement that
+  /// quietly includes it is a statement that is wrong.
+  taxDeductible Boolean @default(true)
+
+  position Int @default(0)
+
+  gifts Gift[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, position])
+}
+
+/// How a gift arrived.
+enum GiftSource {
+  /// Through the hosted payment page. The only source this app records itself.
+  ONLINE
+  CASH
+  CHEQUE
+  BANK_TRANSFER
+  /// Anything else, typed in by whoever counts.
+  OTHER
+}
+
+enum GiftStatus {
+  SETTLED
+  REFUNDED
+}
+
+/// One gift.
+///
+/// **No card number, expiry, name-on-card or token is stored here, and none
+/// ever reaches this app.** Payment happens on the processor's own hosted
+/// page; what comes back through the webhook is an amount, a currency, a fund
+/// and an opaque reference. That is the whole reason this feature is shaped
+/// the way it is: a church database is not a place to keep a card.
+model Gift {
+  id String @id @default(cuid())
+
+  /// Minor units — pence, cents — as an integer, never a float. Money that
+  /// has been through a binary fraction is money that fails to add up at the
+  /// end of the year.
+  amount   Int
+  /// ISO 4217, upper case.
+  currency String @default("GBP")
+
+  fund   GivingFund @relation(fields: [fundId], references: [id])
+  fundId String
+
+  /// Who gave it, when that is known. Anonymous gifts are real and common, so
+  /// both of these are optional — and `SetNull`, because deleting somebody
+  /// must never silently change what the accounts say was received.
+  giver     Person?    @relation(fields: [giverId], references: [id], onDelete: SetNull)
+  giverId   String?
+  /// Denormalised deliberately: a statement is addressed to the household as
+  /// it was at the time, and somebody moving house later must not rewrite a
+  /// statement already issued.
+  household Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
+  householdId String?
+
+  source GiftSource @default(ONLINE)
+  status GiftStatus @default(SETTLED)
+
+  /// The processor's own id for the payment. Unique, and the thing that makes
+  /// the webhook idempotent: the same event delivered twice records one gift.
+  externalId String? @unique
+
+  /// When the money was given, which is not when the row was written.
+  givenAt DateTime
+
+  /// What the giver typed on the payment page, and what the counter noted.
+  message String?
+  note    String?
+
+  /// Who typed it in, for anything that didn't arrive through the webhook.
+  recordedByEmail String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([givenAt])
+  @@index([fundId, givenAt])
+  @@index([householdId, givenAt])
+  @@index([giverId, givenAt])
+  @@index([status, givenAt])
 }
