@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { ApiError } from "@/lib/api-guard";
+import { ensureMayJoinTeam } from "@/lib/clearance-query";
 import { prisma } from "@/lib/db";
 import { notifySubscribers } from "@/lib/push";
 import { assignmentRole } from "@/lib/rota";
@@ -81,6 +82,11 @@ export async function takeCover(assignmentId: string, takerId: string, confirmed
     prisma.serviceBlockout.findMany({ where: { userId: takerId }, select: { startDate: true, endDate: true } }),
     prisma.serviceAssignment.count({ where: { planId: assignment.planId, userId: takerId } }),
   ]);
+
+  // Taking somebody's place puts you on their team, so the same clearance
+  // guard applies. Checked before the state machine, because "you aren't
+  // cleared for this" is a better answer than "somebody already took it".
+  await ensureMayJoinTeam(takerId, assignment.teamId);
 
   const state = coverState(assignment, { id: takerId, blockouts }, alreadyOn > 0);
   if (!canTake(state)) throw new ApiError(state === "not-open" ? 409 : 400, state.replace(/-/g, "_"), takeMessage(state));

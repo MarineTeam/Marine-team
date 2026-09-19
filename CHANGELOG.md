@@ -235,6 +235,26 @@ deployment should have had.
   in the second. Mute keeps somebody in the group and stops the notifications.
   Their own messages, including ones taken down and labelled as such, are in
   their data export.
+- **Safeguarding clearance** at `/admin/safeguarding`, which closes a hole the
+  check-in and rota features left open: the app knew exactly which adult was at
+  the door and could not say whether they had been checked. It records the
+  *fact* — that somebody saw the document, when, and what it clears the
+  volunteer to do until — and deliberately cannot hold the certificate: there is
+  no column, type or form field for a disclosure number, an offence or a scan,
+  and the reference box is labelled for the church's own filing. A team can
+  require a clearance, and an uncleared person is then **refused** rather than
+  warned about, on the roster, on a service, and on taking somebody's cover. The
+  check-in desk can require one too, checked on every request, so a clearance
+  withdrawn on the Saturday closes the desk on the Sunday without a login to
+  revoke. Withdrawn is kept distinct from expired — one is a decision, the other
+  a date nobody got to — and the row is flagged rather than deleted so somebody
+  stood down never later reads as never checked. The reason for a withdrawal
+  appears in no list, no refusal message and no audit line; it is fetched one
+  record at a time and that fetch is logged. Expiries go into the follow-up
+  queue, for people on a team that actually requires them. Verified against
+  Postgres (32 checks) and by mutation testing the rules module (25 mutants, all
+  killed).
+- New plugin **`safeguarding`**, and a new follow-up source `CLEARANCE`.
 - **Households.** People belong to families, and a church that only knows
   individuals asks for the same address four times and sends four letters to
   one door. A household groups members with a role — adult, child, other — and

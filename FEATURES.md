@@ -1396,6 +1396,46 @@ What is booked and when, at `/admin/resources`.
 - A refusal names what it clashed with and when, because "the hall is booked" is
   not a useful message.
 
+## Safeguarding
+
+Who has been checked, at `/admin/safeguarding`.
+
+- **The guard that was missing.** The app signs children into a room and
+  controls who may collect them, and schedules volunteers onto teams. Neither
+  knew whether the adult doing either had been checked. A church keeping its
+  children's register on a computer and its safeguarding status in a folder has
+  the two halves in the wrong places: the computer can say exactly which adult
+  was at the door and not whether they were cleared to be there.
+- **It records the fact, never the certificate.** That somebody saw the
+  document, on what date, and what it clears the volunteer to do until. There is
+  no field for a disclosure number, an offence or a scan — a criminal-records
+  certificate has its own retention rules, and the reference box says it is for
+  the church's own filing, because a box labelled only "reference" is a box
+  somebody types a disclosure number into.
+- **It refuses rather than warns.** A team can be set to require a clearance,
+  and then an uncleared person cannot be put on it — not on the roster, not on a
+  service, and not by taking somebody else's cover. A warning on a rota screen
+  is a thing somebody clicks past at half past eight on a Sunday morning.
+- **The desk closes without anybody revoking a login.** The check-in desk can be
+  set to require a clearance, and it is checked on every request: a clearance
+  withdrawn on the Saturday closes the desk on the Sunday.
+- **Withdrawn is not expired.** One is a date nobody got to, the other is a
+  decision somebody made, and a system that collapses them tells a later enquiry
+  the wrong story. The row is kept and flagged rather than deleted, so somebody
+  stood down never later reads as though they had simply never been checked.
+- **The reason for a withdrawal is asked for, never displayed.** It is not in the
+  register, not in the refusal message a rota keeper sees, and not in the audit
+  line. It is fetched for one record, by whoever asks for that record, and the
+  asking is logged.
+- **Expiries become jobs.** What is running out goes into the follow-up queue
+  with somebody's name and a date on it, far enough ahead that a check can
+  actually come back in the time. Only for people on a team that requires it —
+  chasing somebody for a check nothing asks of them is how a church teaches its
+  volunteers to ignore these.
+- Kept by whoever keeps the household records, and by nobody else. Whoever
+  schedules a service is told yes or no; they are not shown the register behind
+  it.
+
 ## Text replies
 
 Somewhere for an answer to land, at `/admin/sms`.

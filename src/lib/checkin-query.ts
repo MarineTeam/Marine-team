@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { Prisma, type User } from "@prisma/client";
 import { ApiError } from "@/lib/api-guard";
+import { ensureMayWorkDesk } from "@/lib/clearance-query";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
@@ -388,5 +389,11 @@ export async function requireDesk(): Promise<User> {
   if (!user || !(await hasCapability(user, "run_checkin"))) {
     throw new ApiError(404, "not_found", "Not found");
   }
+  // Holding the capability is not the same as being cleared to use it. The
+  // grant says the church meant this person to work the desk; the clearance
+  // says the paperwork behind that decision is current. Checked on every
+  // request rather than at sign-in, so a clearance withdrawn on Saturday
+  // closes the desk on Sunday without anybody remembering to revoke a login.
+  await ensureMayWorkDesk(user.id);
   return user;
 }

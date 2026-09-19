@@ -6,6 +6,7 @@ import { ensureStaff, ensureCapability } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { notifySubscribers } from "@/lib/push";
 import { personName } from "@/lib/rota";
+import { ensureMayJoinTeam } from "@/lib/clearance-query";
 
 /**
  * Asking somebody to serve at a service, and un-asking them.
@@ -43,6 +44,12 @@ export async function POST(request: NextRequest) {
     if (!plan || !team || !person) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+
+    // Before anything else is written: a team may require a clearance, and an
+    // uncleared volunteer is refused rather than warned about. A warning on
+    // this screen is a thing somebody clicks past at half past eight on a
+    // Sunday morning.
+    await ensureMayJoinTeam(person.id, team.id);
 
     const position = body.position?.trim() ?? "";
     const existing = await prisma.serviceAssignment.findUnique({

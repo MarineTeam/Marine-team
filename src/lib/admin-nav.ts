@@ -139,6 +139,10 @@ export const ADMIN_GROUPS: AdminGroup[] = [
       // The people behind the accounts — including everyone who has none.
       { href: "/admin/households", label: "Households", visible: (a) => a.canManagePeople },
       { href: "/admin/follow-ups", label: "Follow-ups", visible: (a) => a.canManagePeople },
+      // Same gate as the family records: who has been checked is kept by the
+      // same person who keeps the household list, and by nobody else. In
+      // particular not by whoever keeps the rota, who is told only yes or no.
+      { href: "/admin/safeguarding", label: "Safeguarding", visible: (a) => a.canManagePeople },
       // Replies to what /admin/broadcasts sends, so it sits beside it and
       // shares its grant.
       { href: "/admin/sms", label: "Text replies", visible: (a) => a.canManageUsers },

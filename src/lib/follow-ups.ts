@@ -147,6 +147,10 @@ export function defaultDueDays(source: FollowUpSource): number {
     // and a date somebody can actually meet is a date they meet.
     case "GROUP_ABSENCE":
       return 7;
+    // A criminal-records check takes weeks to come back, so a fortnight is
+    // the point at which chasing it is still useful rather than a formality.
+    case "CLEARANCE":
+      return 14;
     case "MANUAL":
       return 7;
   }
@@ -161,6 +165,10 @@ export function titleFor(source: FollowUpSource, who: string): string {
       return `${who} came to something for the first time`;
     case "GROUP_ABSENCE":
       return `${who} has stopped coming to their group`;
+    // Already a whole sentence from the clearance side, which knows whether
+    // it has expired or is about to. Rewording it here would lose that.
+    case "CLEARANCE":
+      return who;
     case "MANUAL":
       return who;
   }

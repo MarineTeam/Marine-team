@@ -182,6 +182,8 @@ model User {
   serviceTeams          ServiceTeamMember[]
   serviceAssignments    ServiceAssignment[]
   coveredForAssignments ServiceAssignment[]   @relation("AssignmentCoveredFor")
+  clearances            VolunteerClearance[]
+  clearancesVerified    VolunteerClearance[] @relation("ClearanceVerifiedBy")
   serviceBlockouts      ServiceBlockout[]
   /// The name this account appears under on a rota, when they are the same
   /// person — see Person.
@@ -742,6 +744,10 @@ model ServicePlan {
 model ServiceTeam {
   id        String              @id @default(cuid())
   name      String
+  /// What somebody must hold before they can be put on this team. Empty for
+  /// most teams — coffee does not need a criminal-records check, and a church
+  /// that requires one for everything ends up with a list nobody maintains.
+  requiredClearances ClearanceKind[] @default([])
   /// Ordering on the admin page and on a plan, so the list reads the way the
   /// church thinks of it rather than alphabetically.
   position  Int                 @default(0)
@@ -3255,6 +3261,8 @@ enum FollowUpSource {
   EVENT
   /// A small group's roll says they have stopped coming.
   GROUP_ABSENCE
+  /// A volunteer's safeguarding clearance is running out, or has run out.
+  CLEARANCE
   /// Somebody typed it in.
   MANUAL
 }
@@ -3418,4 +3426,92 @@ model SmsMessage {
 
   @@index([phone, createdAt])
   @@index([readAt, createdAt])
+}
+
+/// What a volunteer has been cleared for, and until when.
+///
+/// **This is not the certificate, and must never become it.** A criminal
+/// records check produces a document with its own retention rules — in England
+/// and Wales the guidance is that a church does not keep a copy of a DBS
+/// certificate at all beyond the time it takes to make the recruitment
+/// decision. What a church legitimately keeps is the *fact*: that somebody
+/// saw the document, on what date, and what it cleared them to do until.
+///
+/// So there is no field here for a disclosure number, the offences listed, or
+/// a scan. `reference` is for the church's own filing — "safeguarding folder
+/// 2026/14" — and is described that way in the interface, because a field
+/// labelled "reference" with nothing said about it is a field somebody types
+/// a disclosure number into.
+///
+/// Rows are kept rather than replaced on renewal: "cleared since 2019" is a
+/// different fact from "cleared", and an expiry that somebody let lapse for
+/// four months is exactly the thing a later enquiry asks about.
+model VolunteerClearance {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  kind ClearanceKind
+
+  /// The day somebody saw the document. A calendar day — see lib/dates.ts.
+  verifiedOn DateTime @db.Date
+  /// The day it stops counting. Required: a clearance with no end is a
+  /// clearance nobody ever revisits, which is the state this feature exists
+  /// to prevent.
+  expiresOn DateTime @db.Date
+
+  /// Who saw it. Denormalized alongside the relation for the same reason the
+  /// audit log denormalizes: removing somebody's account must not erase the
+  /// record of what they verified.
+  verifiedBy      User?   @relation("ClearanceVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+  verifiedById    String?
+  verifiedByEmail String
+
+  /// Where the paper lives in the church's own filing. Never the disclosure
+  /// number — see the note above.
+  reference String?
+
+  /// Withdrawn before its expiry, which is not the same as expired and must
+  /// not read as though it were.
+  withdrawnAt     DateTime?
+  withdrawnReason String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, kind])
+  @@index([expiresOn])
+}
+
+enum ClearanceKind {
+  /// A criminal-records check: DBS in England and Wales, PVG in Scotland,
+  /// AccessNI, Garda vetting, a state background check. One value rather than
+  /// one per jurisdiction, because the question the app asks is the same
+  /// everywhere — has somebody seen it, and is it still current.
+  BACKGROUND_CHECK
+  /// References taken up and seen.
+  REFERENCES
+  /// Safeguarding training completed.
+  TRAINING
+}
+
+/// Site-wide safeguarding settings.
+///
+/// A singleton, like AuthSettings and BrandSettings. The check-in desk's
+/// requirement lives here rather than on the session because it is a property
+/// of the job, not of Sunday: a church that requires a check to work the desk
+/// requires it every week, and a per-session setting is one somebody forgets
+/// to tick on the week it matters.
+model SafeguardingSettings {
+  id String @id @default("singleton")
+
+  /// What somebody must hold to work the check-in desk. Empty means the guard
+  /// is off — which is the default, because a church switching this on for
+  /// the first time would otherwise lock every volunteer out on a Sunday
+  /// morning before anybody had entered a single record.
+  checkinDeskRequires ClearanceKind[] @default([])
+
+  /// How many days ahead an expiry starts being chased.
+  warnDays Int @default(60)
+
+  updatedAt DateTime @updatedAt
 }

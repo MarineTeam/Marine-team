@@ -1,5 +1,6 @@
 import { Prisma, type FollowUpSource, type FollowUpStatus, type User } from "@prisma/client";
 import { ApiError } from "@/lib/api-guard";
+import { chaseTitle, expiring } from "@/lib/clearance-query";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
@@ -247,6 +248,23 @@ export async function gatherPrompts(since: Date): Promise<Prompt[]> {
         note: group.name,
       });
     }
+  }
+
+  // Clearances running out. Not bounded by `since` like the rest: an expiry
+  // is a standing state rather than something that happened yesterday, and a
+  // sweep that only looked at the last day would raise each one exactly once
+  // and then never mention it again — including after somebody dismissed it
+  // and forgot.
+  for (const chase of await expiring()) {
+    prompts.push({
+      source: "CLEARANCE",
+      // The clearance row, so a renewal raises a new job and the old one
+      // stays closed against the record it was actually about.
+      sourceRef: chase.clearanceId,
+      title: chaseTitle(chase),
+      personId: null,
+      note: null,
+    });
   }
 
   return prompts;
