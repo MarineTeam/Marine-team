@@ -1297,6 +1297,140 @@ Who else is here, at `/directory` — behind sign-in and `noindex`.
   them out without anybody remembering to tidy up, because the listing is a
   view of live rows rather than a copy.
 
+## Households
+
+People belong to families, at `/admin/households`.
+
+- **One address, one family.** A church that only knows individuals asks four
+  people for the same address and posts four letters through one door. A
+  household groups members with a role — adult, child, other — and is what an
+  address, a collection permission and a giving statement hang off.
+- **The address goes to the household's own people**, and to whoever keeps the
+  membership. Not to anybody else, and not to a site manager who happens to
+  have an admin login.
+- **Ages without birth dates.** How old somebody is gets answered without the
+  date ever being handed out, so a page cannot print one it was not given.
+  Birthdays and anniversaries coming up are built from the same function.
+- **Suggested names.** A new member with a surname and an address already in
+  the book is offered the household rather than starting a second one.
+
+## Children's check-in
+
+Signing a child in, and only letting the right person take them home, at
+`/admin/checkin`.
+
+- **Two things, not one.** The code presented has to match *and* the person
+  collecting has to be an adult of that child's household. Either alone is how
+  the wrong person walks out with a child: a code gets photographed, and a
+  household contains people who should not be collecting.
+- **The code can't be raced for.** It is derived from the session and the
+  household rather than allocated, so two desks signing families in at the same
+  moment cannot hand out one code twice or collide over it.
+- **An override exists and has to say why.** Sometimes the grandmother really is
+  at the door and the code is at home. The reason is written down and kept —
+  an override nobody has to explain is one that becomes the normal route.
+- **Lookalike characters are left out** of codes, the same way the television
+  pairing codes leave them out: nobody reads an O on a wristband at a noisy
+  door.
+- **Medical notes are written at registration and appear nowhere else** — not on
+  the desk list, not in a search result.
+
+## Giving
+
+Recording what came in, at `/admin/giving`.
+
+- **No card details are stored, because none ever arrive.** Payment happens on
+  the processor's own hosted page; what comes back is an amount, a currency, a
+  fund and an opaque reference. The parser keeps five fields and drops the rest,
+  and a test asserts no card detail survives it. A parser that keeps whatever it
+  is given is how a last-four ends up in a church database with nobody having
+  decided to put it there.
+- **Money is whole pence, everywhere.** A total that has been through a binary
+  fraction disagrees with the bank by a penny in December and nobody can say
+  which penny.
+- **A delivery can't be replayed.** It is signed with a timestamp, which stops
+  it being replayed tomorrow, and recorded against a unique reference, which
+  stops it being replayed now.
+- **Statements say what they left out.** Gifts to a fund that isn't claimable
+  are excluded from the total *and* reported as a figure, because somebody
+  comparing this to their bank statement needs the difference to be explicable.
+- **A refund is kept, not deleted**, and counted in no total: the accounts have
+  to show that money arrived and went back.
+- The tax year start is configurable and defaults to 6 April. With no webhook
+  secret set the endpoint answers 503 rather than trusting whatever posts to it.
+
+## Follow-ups
+
+Turning what the app knows into something a person does, at
+`/admin/follow-ups`.
+
+- **The missing half.** The app already knew who had gone quiet and already
+  collected connect cards. Neither turned into "Ruth, ring this person, by
+  Friday", so both stayed reports. A nightly sweep raises the jobs.
+- **Unclaimed is a state worth seeing**, and the list puts it first. A queue
+  where everything is the pastor's by default is a queue nobody else opens.
+- **Dismissed is not deleted, and does not come back.** "We looked and decided
+  against" is a different fact from "nobody got to it", and a card that
+  reappears the night after somebody dismissed it is how a church learns to
+  ignore the whole screen.
+- **Closing one means writing what came of it.** A job marked done with nothing
+  written taught nobody anything.
+- The office sees the queue. Everybody else sees only what is theirs — a
+  follow-up names somebody and often says why they are being rung.
+
+## Rooms and resources
+
+What is booked and when, at `/admin/resources`.
+
+- **The hall stops being double-booked.** Events had a free-text location and
+  nothing stopped two of them claiming it, which is discovered on the Saturday
+  by two groups standing in the same doorway.
+- **Back-to-back is allowed.** 11:00–12:00 and 12:00–13:00 do not clash; that is
+  how a hall is actually used, and a checker that calls it a conflict gets
+  switched off within a week.
+- **Two people saving at once get one booking and one honest refusal**, because
+  the check and the write happen together under the room's own lock.
+- **Capacity warns rather than refuses.** A fire-safety figure somebody typed
+  once and a guess at numbers are not grounds to turn a booking away — refusing
+  on two soft numbers is how people stop recording either.
+- A refusal names what it clashed with and when, because "the hall is booked" is
+  not a useful message.
+
+## Text replies
+
+Somewhere for an answer to land, at `/admin/sms`.
+
+- **A shared inbox.** A reply to "can you do Sunday?" used to reach a phone in
+  somebody's pocket and stop there.
+- **A thread is a phone number, not an account.** Most of the people a church
+  texts have no account, and a reply from a number nobody recognises is still a
+  reply somebody has to read — putting it in a "couldn't match" pile is how it
+  is never read. Where the number *is* recognised, the name is shown.
+- **STOP is acted on where it arrives**, not left in a list for a volunteer to
+  notice, and honoured on the way out too: a reply to somebody who opted out is
+  refused. START turns it back on.
+- **A gateway that retries files one message**, not two.
+- Twilio's own signature scheme and a shared-secret one for a self-hosted
+  gateway are both checked. With neither configured the endpoint answers 503 and
+  stores nothing — an inbox anybody can post into is worse than no inbox.
+
+## A leader writing to their group
+
+From the group's own page, alongside its conversation.
+
+- **The thread reaches whoever opens it; this reaches everybody**, in their
+  inbox. That is what a leader wants for "we're not meeting this week", and the
+  standing reason a WhatsApp group survives alongside all of this.
+- **A leader can only write to the group they lead.** The audience comes from
+  the page's own lookup, not from the request, so changing an id addresses
+  nobody.
+- **Email only.** A text costs money per recipient, and that decision belongs
+  with whoever keeps the membership rather than with every leader of every
+  group.
+- **The same consent rules as an announcement.** Somebody who turned
+  announcement emails off has turned them off here.
+- A few sends a day, not fifty.
+
 ## Announcements
 
 One message to everybody, or to one group, from `/admin/broadcasts`.
@@ -2018,14 +2152,42 @@ link.
 
 ## Scheduled jobs
 
-- `/api/cron/notification-digest` (daily): batches queued daily-digest push
+All nine share one `CRON_SECRET` bearer-token guard, and in production an
+unset secret makes them answer 503 rather than run unguarded. Times are the
+ones in `vercel.json`.
+
+- `/api/cron/transcribe` (02:00): works through the transcription queue.
+  Transcribing an hour of audio takes minutes — longer than a request is
+  allowed to live on most hosting, and far longer than anybody should watch a
+  spinner. Pressing the button queues; this picks it up.
+- `/api/cron/broadcasts` (03:45): finishes anything left half-sent, for the run
+  that stopped because somebody closed the tab. A half-delivered "no service
+  tomorrow" is worse than none, because the people who got it assume everyone
+  did.
+- `/api/cron/extend-events` (04:00): pushes every repeating event's horizon
+  forward a day. Without it a weekly Bible study quietly stops appearing six
+  months after somebody set it up, and the first anyone knows is a member
+  asking where it went.
+- `/api/cron/follow-up-sweep` (05:00): turns yesterday into jobs — connect
+  cards, first-time registrations, people quietly missing from their group.
+  Idempotent by source and reference, so running it twice raises nothing twice
+  and a dismissed card never comes back.
+- `/api/cron/sync-schedules` (05:30): imports every Google Sheets schedule
+  whose interval has elapsed. Only schedules actually due are touched, so
+  running it more often costs one query and no Google API calls.
+- `/api/cron/sync-video-status` (06:00): polls Bunny for every video still
+  stuck in `PROCESSING` and applies the same status/duration/thumbnail update
+  the admin's manual "Sync from Bunny" button does, so a video that finished
+  encoding doesn't sit unprocessed until someone clicks refresh. Never touches
+  `published` — an admin still decides when to publish.
+- `/api/cron/sync-video-feeds` (07:15): imports whatever is new on every
+  switched-on feed. A feed whose payload hasn't changed does no writes and no
+  second API call.
+- `/api/cron/notification-digest` (13:00): batches queued daily-digest push
   notifications — see Notifications above.
-- `/api/cron/sync-video-status` (daily): polls Bunny for every video still
-  stuck in `PROCESSING` and applies the same status/duration/thumbnail
-  update the admin's manual "Sync from Bunny" button does, so a video that
-  finished encoding doesn't sit unprocessed until someone happens to click
-  refresh. Never touches `published` — an admin still decides when to
-  publish. Both crons share the same `CRON_SECRET` bearer-token guard.
+- `/api/cron/schedule-reminders` (18:00): tells people what they are on for
+  tomorrow. It looks only at tomorrow, which is why it is a daily job rather
+  than an hourly sweep — running it twice sends twice.
 
 ## Query Monitor (`QUERY_MONITOR_ENABLED` env var)
 

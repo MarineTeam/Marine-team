@@ -235,6 +235,76 @@ deployment should have had.
   in the second. Mute keeps somebody in the group and stops the notifications.
   Their own messages, including ones taken down and labelled as such, are in
   their data export.
+- **Households.** People belong to families, and a church that only knows
+  individuals asks for the same address four times and sends four letters to
+  one door. A household groups members with a role — adult, child, other — and
+  is what an address, a collection permission and a giving statement now hang
+  off. Structural privacy throughout: `canSeeAddress` gives the address to the
+  household's own people and to whoever manages the membership, and to nobody
+  else; `ageOn` answers how old somebody is without ever handing out a birth
+  date, so a page cannot print one it was not given. Upcoming birthdays and
+  anniversaries come out of the same function.
+- **Children's check-in** at `/admin/checkin`. A child is signed into a session
+  and can only be collected by the right person: the code presented has to
+  match, *and* the collector has to be an adult of that child's household. Both,
+  because either alone is how the wrong person walks out with a child — a code
+  gets photographed, and a household has people in it who should not be
+  collecting. The security code is HMAC-derived from the session and the
+  household rather than allocated, so two desks signing in at once cannot race
+  for one. A supervisor override exists and **must** say why; the reason is
+  stored. Medical notes are written at registration and appear nowhere else.
+  Codes avoid the letter-digit lookalikes the TV pairing scheme already avoids.
+- **Giving** at `/admin/giving`. No card number, expiry, name-on-card or token
+  is stored, and none ever reaches this app: payment happens on the processor's
+  hosted page and what comes back is an amount, a currency, a fund and an opaque
+  reference. The webhook parser keeps five fields and drops everything else,
+  with a test asserting no card detail survives it — a parser that keeps
+  whatever it is given is how a last-four ends up in a church database with
+  nobody having decided to put it there. Money is an integer of minor units
+  everywhere, so a December total agrees with the bank. Deliveries are
+  authenticated by HMAC with a timestamp tolerance against replay-later and a
+  unique reference against replay-now; recording is idempotent on that
+  reference. Annual statements exclude gifts to funds that aren't claimable
+  **and say how much was excluded**, because somebody comparing the figure to
+  their bank statement needs the difference to be explicable. The tax year start
+  is configurable and defaults to 6 April. With `GIVING_WEBHOOK_SECRET` unset
+  the endpoint answers 503.
+- **Follow-ups** at `/admin/follow-ups`. The app already knew who had gone quiet
+  and already collected connect cards; neither turned into "Ruth, ring this
+  person, by Friday", so both stayed reports. A nightly sweep turns them into
+  jobs. Unassigned is a visible state rather than a default — a queue where
+  everything belongs to the pastor is a queue nobody else looks at — and the
+  list puts the unclaimed first. *Dismissed* is not deleted, and a dismissed
+  card does not come back the next night, which is the failure that teaches
+  people to ignore a queue. Closing as done requires writing what came of it.
+  The office sees the queue; everybody else sees only what is theirs.
+- **Rooms and resources** at `/admin/resources`. Events had a free-text location
+  and nothing stopped two of them claiming the hall, which is discovered on the
+  Saturday by two groups standing in the same doorway. Bookings are checked on a
+  half-open interval, so back-to-back is allowed and only a real overlap is
+  refused — a checker that calls 11:00–12:00 and 12:00–13:00 a clash gets
+  switched off within a week. The check runs inside a transaction under the
+  resource's row lock, so two people saving at the same instant produce one
+  booking and one honest refusal. Capacity is advisory: it warns and books
+  anyway, because a fire-safety figure and a guess at numbers are not grounds to
+  refuse.
+- **Text replies** at `/admin/sms`. A shared inbox for answers to the texts the
+  app sends, which previously reached a phone in somebody's pocket and stopped
+  there. A thread is a phone number, not an account: most of the people a church
+  texts have no account, and a reply from an unrecognised number is still a
+  reply somebody has to read. STOP is acted on where it arrives rather than left
+  for a volunteer to spot, and honoured outbound too — a reply to somebody who
+  opted out is refused. Twilio's signature scheme and a generic shared-secret
+  one are both verified; with neither secret configured the endpoint answers 503
+  and stores nothing.
+- **A leader writing to their own group.** The thread on a group's page reaches
+  whoever opens it; this reaches everybody, in their inbox, which is what a
+  leader wants for "we're not meeting this week". The audience comes from the
+  route's own lookup rather than the request body, so a leader cannot address
+  anybody they do not lead by changing an id. Email only — per-recipient cost
+  is a decision for whoever holds `manage_users` — and the same consent rules
+  as an admin broadcast, so somebody who turned announcement emails off has
+  turned them off here.
 - `lib/recurrence.ts`: an RFC 5545 RRULE subset — parse, expand, describe, and
   wall-clock-to-instant — refusing at parse time any rule part it cannot
   compute, rather than ignoring it and answering with the wrong dates.
