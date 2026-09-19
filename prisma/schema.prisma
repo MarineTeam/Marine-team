@@ -187,6 +187,7 @@ model User {
   /// person — see Person.
   person                Person?
   followUps             FollowUp[]            @relation("FollowUpAssignee")
+  smsMessages           SmsMessage[]
   groupAssignments      GroupAssignment[]
   ratings               Rating[]
   seriesWatchLater      SeriesWatchLater[]
@@ -2037,6 +2038,7 @@ model Person {
   primaryFor    Household[]           @relation("HouseholdPrimaryContact")
   gifts         Gift[]
   followUps     FollowUp[]
+  smsMessages   SmsMessage[]
   checkins      CheckinRecord[]       @relation("CheckedInChild")
   broughtIn     CheckinRecord[]       @relation("CheckedInBy")
   collected     CheckinRecord[]       @relation("ReleasedTo")
@@ -3371,4 +3373,49 @@ model ResourceBooking {
   /// The index the overlap check runs against.
   @@index([resourceId, startsAt, endsAt])
   @@index([eventId])
+}
+
+
+enum SmsDirection {
+  INBOUND
+  OUTBOUND
+}
+
+/// A text message, in either direction, threaded by the number it came from.
+///
+/// The app could already send texts and had nowhere for the replies to land,
+/// so an answer to "can you do Sunday?" went to a phone in somebody's pocket
+/// and no further. Threading is by **number**, not by account: most of the
+/// people a church texts have no account, and a reply from an unrecognised
+/// number is still a reply somebody needs to read.
+model SmsMessage {
+  id        String       @id @default(cuid())
+  direction SmsDirection
+
+  /// E.164 where it could be normalised, as sent otherwise. The thread key.
+  phone String
+  body  String
+
+  /// Whose number this turned out to be, when it is recognised. Both optional
+  /// and both `SetNull`: a message that arrived is a fact, and deleting an
+  /// account must not delete what somebody said.
+  user     User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId   String?
+  person   Person? @relation(fields: [personId], references: [id], onDelete: SetNull)
+  personId String?
+
+  /// The provider's own id, which makes delivery idempotent — a gateway that
+  /// retries must not put the same reply in the inbox twice.
+  providerId String? @unique
+
+  /// Null until somebody in the office has seen it.
+  readAt DateTime?
+
+  /// Who sent it, for an outbound one written from the inbox.
+  sentByEmail String?
+
+  createdAt DateTime @default(now())
+
+  @@index([phone, createdAt])
+  @@index([readAt, createdAt])
 }
