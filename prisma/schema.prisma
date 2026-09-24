@@ -3515,3 +3515,58 @@ model SafeguardingSettings {
 
   updatedAt DateTime @updatedAt
 }
+
+/// A headcount for one gathering, on one day.
+///
+/// **A count taken by a person, never inferred.** The tempting version derives
+/// attendance from check-ins and sign-ins, and it is wrong: counting digital
+/// traces systematically undercounts exactly the people a church most needs to
+/// notice — the elderly, visitors, anybody without an account. A headcount is a
+/// number a steward writes on the back of a service sheet, and this table's job
+/// is to take it, not to guess it.
+///
+/// It names nobody. That is practical as well as principled: this is the figure
+/// that travels to deacons' meetings and denominational returns, and a number
+/// carrying no personal data is one that can be sent anywhere without anybody
+/// having to think about it first.
+model ServiceAttendance {
+  id String @id @default(cuid())
+
+  /// The day it was taken. A calendar day, not an instant — see lib/dates.ts.
+  date DateTime @db.Date
+
+  /// Which gathering on that day: "10:30", "Evening", "Café church". Free text
+  /// because a church names its own services, and an enum here would be a list
+  /// somebody has to ask an administrator to extend.
+  gathering String
+
+  /// The parts, each separately unknown.
+  ///
+  /// All three are nullable and that is the point: a week nobody counted must
+  /// not become a zero. A zero is a claim that nobody came, and an attendance
+  /// chart that cannot tell the two apart is one that eventually frightens a
+  /// leadership team with a graph of its own missing paperwork.
+  adults   Int?
+  children Int?
+
+  /// Of whom were visiting — a **subset**, never an addend.
+  ///
+  /// The classic double-count: a visitor is an adult or a child who was there,
+  /// so adding them to the total counts them twice. The interface says "of
+  /// whom visiting" for the same reason. See lib/service-attendance.ts.
+  visitors Int?
+
+  /// Why this week is not like the others: "snow", "joint service", "funeral".
+  /// What keeps an outlier visible instead of being smoothed away as noise.
+  note String?
+
+  countedByEmail String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One count per gathering per day. A second steward submitting the same
+  /// service corrects the first rather than adding to it.
+  @@unique([date, gathering])
+  @@index([date])
+}

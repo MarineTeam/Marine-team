@@ -39,6 +39,7 @@ export const PLUGIN_META = [
   { slug: "resources", name: "Rooms and resources", description: "Books the hall, the minibus and the projector against an event, and refuses a double booking at the moment of saving." },
   { slug: "sms-inbox", name: "Text replies", description: "Takes replies to the texts this app sends and threads them by number, so an answer to a broadcast lands somewhere a person will read it." },
   { slug: "safeguarding", name: "Safeguarding", description: "Records that somebody saw a volunteer's clearance and until when — never the certificate itself — and refuses to put an uncleared person on a team that requires one." },
+  { slug: "attendance", name: "Attendance", description: "A headcount per gathering, taken by a steward rather than inferred from sign-ins, and the church-life dashboard built on it — the denominator every other number needs." },
 ] as const;
 
 export type PluginSlug = (typeof PLUGIN_META)[number]["slug"];

@@ -1396,6 +1396,66 @@ What is booked and when, at `/admin/resources`.
 - A refusal names what it clashed with and when, because "the hall is booked" is
   not a useful message.
 
+## Attendance
+
+How many people were here, at `/admin/attendance`.
+
+- **The denominator everything else needed.** The app could say which sermon was
+  watched most and which hymn this congregation looks up. It could not say how
+  many people were in the building on Sunday — so giving, check-in, group rolls
+  and follow-ups were each a figure with no population to divide by.
+- **A count taken by a person, never inferred.** Nothing derives it from
+  check-ins or sign-ins. Counting digital traces systematically undercounts
+  exactly the people a church most needs to notice: the elderly, visitors,
+  anybody without an account. This takes the number a steward writes on the back
+  of a service sheet.
+- **Missing is missing.** A week nobody counted is kept as unknown, never as
+  nought, and it stays unknown all the way through — out of the averages rather
+  than divided by, and drawn as a gap rather than a zero bar. A nought is a claim
+  that nobody came, and a chart that cannot tell the two apart eventually
+  frightens a leadership team with a graph of its own missing paperwork. A
+  genuine nought — a service called off for snow — is still a count, and is kept
+  as one.
+- **Visitors are counted within the total, never added to it.** A visitor is an
+  adult or a child who was there. The form says "of whom visiting", and a count
+  with more visitors than people is queried at the point of entry, because it
+  almost always means somebody read it as "plus".
+- **Trends over spans, not Sundays.** Weather, half-term and one large funeral
+  each move a single week enough to mean nothing. Eight weeks are compared with
+  the eight before, "level" is a band rather than a point, and on thin data it
+  says it does not know instead of answering badly.
+- **Odd counts are queried, never refused.** Easter really is three times a
+  normal Sunday, and a checker that refuses the true number is one somebody works
+  around by not recording Easter.
+- **It names nobody.** Practical as well as principled: this is the figure that
+  goes to deacons' meetings and denominational returns, and a number carrying no
+  personal data can be sent anywhere without anybody thinking about it first.
+- One count per gathering per day, so a second steward writing up the same
+  service corrects the first rather than adding a congregation to the chart.
+  Reading the chart needs `view_analytics`; writing a count needs
+  `manage_events` — the person who knows which services actually ran.
+
+## Church life (`/admin/dashboard`)
+
+The numbers about people, rather than the ones about content.
+
+- **Separate from `/admin/analytics` on purpose.** That page is views,
+  watch-through and hymn look-ups. This one is attendance, children signed in,
+  small-group membership, giving and the follow-up queue. The two answer
+  questions different enough that one page holding both would be read as
+  neither.
+- **You see only what you already have.** Giving appears for `manage_giving`,
+  the follow-up queue for `manage_people`, groups and check-in for
+  `manage_events`. A section somebody may not see is **absent from the payload**
+  rather than sent empty — a key that is merely null still tells you the money
+  exists and how curious to be about it.
+- **Giving per head divides by a real count**, or says it cannot. No assumed
+  congregation size, ever.
+- **Every tile opens the thing it counts.** A number nobody can check is a number
+  that gets quoted wrongly in a meeting.
+- It says how many weeks have no count, because every figure that divides by a
+  congregation is only as good as those.
+
 ## Safeguarding
 
 Who has been checked, at `/admin/safeguarding`.

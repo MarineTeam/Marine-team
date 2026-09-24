@@ -143,6 +143,9 @@ export const ADMIN_GROUPS: AdminGroup[] = [
       // same person who keeps the household list, and by nobody else. In
       // particular not by whoever keeps the rota, who is told only yes or no.
       { href: "/admin/safeguarding", label: "Safeguarding", visible: (a) => a.canManagePeople },
+      // Taking the count is keeping the diary: the person who knows which
+      // services actually ran is the person who scheduled them.
+      { href: "/admin/attendance", label: "Attendance", visible: (a) => a.canManageEvents || a.canViewAnalytics },
       // Replies to what /admin/broadcasts sends, so it sits beside it and
       // shares its grant.
       { href: "/admin/sms", label: "Text replies", visible: (a) => a.canManageUsers },
@@ -174,6 +177,9 @@ export const ADMIN_GROUPS: AdminGroup[] = [
   {
     label: "Insight",
     links: [
+      // Church life rather than content: how many people, not how many views.
+      // First in the group because it is the one somebody opens on a Monday.
+      { href: "/admin/dashboard", label: "Church life", visible: (a) => a.canViewAnalytics },
       { href: "/admin/analytics", label: "Analytics", visible: (a) => a.canViewAnalytics },
       { href: "/admin/audit", label: "Audit log", visible: (a) => a.canViewAuditLog },
       { href: "/admin/query-monitor", label: "Query Monitor", visible: (a) => a.canManagePlugins },

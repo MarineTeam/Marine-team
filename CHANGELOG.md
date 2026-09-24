@@ -235,6 +235,25 @@ deployment should have had.
   in the second. Mute keeps somebody in the group and stops the notifications.
   Their own messages, including ones taken down and labelled as such, are in
   their data export.
+- **Service attendance** at `/admin/attendance`, and the **church-life
+  dashboard** at `/admin/dashboard` built on it. The app could say which sermon
+  was watched most and could not say how many people were in the building on
+  Sunday — the denominator under giving, check-in, group rolls and follow-ups
+  alike. The count is taken by a person and never inferred from check-ins or
+  sign-ins, because counting digital traces undercounts exactly the people a
+  church most needs to notice. A week nobody counted stays unknown rather than
+  becoming a nought — out of the averages rather than divided by, drawn as a gap
+  rather than a zero bar — while a genuine nought is still a count. Visitors are
+  counted *within* the total and never added to it, and a count with more
+  visitors than people is queried at entry. Trends compare eight weeks with the
+  eight before, "level" is a band rather than a point, and thin data gets "not
+  enough to say" instead of a percentage. Odd counts are queried, never refused:
+  Easter really is three times a normal Sunday. The dashboard omits sections the
+  viewer may not see rather than blanking them — no `giving` key at all without
+  `manage_giving` — and giving per head divides by a real count or says it
+  cannot. Verified against Postgres (33 checks) and by mutation testing the
+  rules module (26 mutants, all killed).
+- New plugin **`attendance`**.
 - **Safeguarding clearance** at `/admin/safeguarding`, which closes a hole the
   check-in and rota features left open: the app knew exactly which adult was at
   the door and could not say whether they had been checked. It records the
