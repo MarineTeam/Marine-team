@@ -2339,6 +2339,50 @@ ones in `vercel.json`.
 
 ## Security
 
+### Who looked, not just who changed
+
+The audit log has recorded writes since the beginning. Reads are now recorded
+too, for the handful of screens that identify a person: the giving records, a
+giving statement, a household's details, a children's register, a text
+conversation, the safeguarding register, why a clearance was withdrawn, and a
+small group's attendance roll.
+
+- **Only reads that identify a person.** The catalogue, the events list and the
+  hymn index are not audited. A log that records everything is a log nobody
+  reads, and a log nobody reads is worse than none, because it gets mistaken for
+  oversight.
+- **One line per look, not per row**, and coalesced: opening the giving page is
+  one entry rather than four hundred, and refreshing it five times in a minute
+  is still one look. Coming back after lunch is a second — which is the
+  distinction somebody reviewing the log actually cares about.
+- **The log does not repeat what was read.** It says "the giving records", never
+  "Ruth Bell's £50". There is no column it could hold one in. That is what stops
+  an oversight record becoming a second, more widely readable copy of the data it
+  exists to protect. Where one person or household is the subject, their id is
+  recorded and nothing else — an id is resolvable only by somebody who already
+  has access to that record.
+- **A failed log never fails the read.** If the write cannot happen, the page
+  still loads. A church whose treasurer cannot open the accounts because a log
+  table is locked will have the logging taken out by the end of the week, which
+  is a worse outcome than a missing row.
+- **Two questions, and only two.** `GET /api/admin/read-log?subject=<id>` answers
+  the one a complaint starts with: who has been through this record. Without the
+  parameter it answers the other: what has each member of staff been reading.
+  There is deliberately no flat feed of every look — a wall of entries hides the
+  single pattern worth noticing, which is somebody going through records their
+  job does not touch.
+- Behind `view_audit_log`, like the write trail, but its own table and its own
+  endpoint: "who read this" and "who changed this" are asked by different people
+  for different reasons, and folding them together buries the rarer one.
+- Kept a year, then swept by the nightly digest job. The question it answers is
+  asked after a complaint, which does not arrive within a fortnight — but a read
+  log that grows for ever is one nobody can query and a liability of its own.
+- **Two things deliberately not audited**, written down so the list cannot
+  quietly grow to cover everything: the member directory, where everybody listed
+  opted in field by field and every member may read it; and a member's own data
+  export, where the reader and the subject are the same person.
+
+
 The decisions that hold, and where each one lives. An audit in September 2026
 found no authorisation bypass, injection or leaked secret; what it found was
 the hardening below, all of which is now in place.

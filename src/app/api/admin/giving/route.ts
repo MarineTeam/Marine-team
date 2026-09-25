@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { errorResponse } from "@/lib/api-guard";
+import { logRead } from "@/lib/read-audit-query";
 import { logAudit } from "@/lib/audit";
 import { isPluginEnabled } from "@/lib/plugins";
 import { parseMoney, taxYearOf, taxYearRange } from "@/lib/giving";
@@ -23,7 +24,8 @@ const notFound = () => NextResponse.json({ error: "Not found" }, { status: 404 }
 export async function GET(request: NextRequest) {
   try {
     if (!(await isPluginEnabled("giving"))) return notFound();
-    await requireGivingAccess();
+    const reader = await requireGivingAccess();
+    await logRead({ kind: "giving_list", actorEmail: reader.email });
 
     const url = new URL(request.url);
     const year = Number(url.searchParams.get("taxYear") ?? taxYearOf(new Date()));

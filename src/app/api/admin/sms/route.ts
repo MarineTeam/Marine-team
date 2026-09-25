@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { errorResponse } from "@/lib/api-guard";
+import { logRead } from "@/lib/read-audit-query";
 import { logAudit } from "@/lib/audit";
 import { isPluginEnabled } from "@/lib/plugins";
 import { inbox, markThreadRead, reply, requireInboxAccess } from "@/lib/sms-inbox-query";
@@ -20,7 +21,8 @@ const schema = z.discriminatedUnion("action", [
 export async function GET() {
   try {
     if (!(await isPluginEnabled("sms-inbox"))) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    await requireInboxAccess();
+    const reader = await requireInboxAccess();
+    await logRead({ kind: "sms_thread", actorEmail: reader.email });
     return NextResponse.json({ threads: await inbox() }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return errorResponse(error);

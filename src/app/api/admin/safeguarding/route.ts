@@ -15,6 +15,7 @@ import {
 import { isIsoDate } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { isPluginEnabled } from "@/lib/plugins";
+import { logRead } from "@/lib/read-audit-query";
 
 /**
  * The safeguarding register.
@@ -65,10 +66,15 @@ export async function GET(request: NextRequest) {
     // One record's withdrawal reason, asked for on purpose.
     const reasonFor = request.nextUrl.searchParams.get("reasonFor");
     if (reasonFor) {
+      // Now recorded in both places on purpose: the write log keeps the
+      // long-lived trail, and the read log is where somebody asking "who has
+      // been through this person's file" will actually look.
       await logAudit(user.email, "view", "clearance-reason", reasonFor, "withdrawal reason");
+      await logRead({ kind: "withdrawal_reason", actorEmail: user.email, subjectId: reasonFor });
       return NextResponse.json({ reason: await withdrawalReason(reasonFor) });
     }
 
+    await logRead({ kind: "safeguarding_register", actorEmail: user.email });
     const [people, chases, settings] = await Promise.all([
       register(),
       expiring(),

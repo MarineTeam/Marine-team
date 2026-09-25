@@ -3570,3 +3570,48 @@ model ServiceAttendance {
   @@unique([date, gathering])
   @@index([date])
 }
+
+/// Who looked at something that identifies a person.
+///
+/// The app has logged writes since the beginning; this is the other half, and
+/// for the data it has grown into it is the half that matters. "Who has been
+/// through my record" is a question a church may have to answer, and until this
+/// table nothing in the codebase could.
+///
+/// **It does not repeat what was read.** `kind` names a screen — the giving
+/// records, a children's register — and there is no column for an amount, an
+/// address or a note. That is what stops an oversight record becoming a second,
+/// more widely readable copy of the data it exists to protect. Where one person
+/// is the subject, `subjectId` holds their id and nothing else: an id is
+/// resolvable only by somebody who already has access to that record.
+///
+/// Coalesced on (kind, actor, subject) within half an hour, so working through
+/// a screen is one row rather than forty — the same shape as the view throttle
+/// in lib/view-key.ts, and for the same reason.
+model DataAccessLog {
+  id String @id @default(cuid())
+
+  /// One of lib/read-audit.ts's AUDITED_READS keys. Stored as text rather than
+  /// an enum so adding a screen needs no migration, and validated against that
+  /// list at the point of writing.
+  kind String
+
+  actorEmail String
+
+  /// Whose record, when a single person or household is the subject. Null for a
+  /// list. Not a foreign key: the subject may be a household, a group or a
+  /// session, and a log that cascades away when its subject is deleted is a log
+  /// that loses exactly the entries somebody would later ask about.
+  subjectId String?
+
+  at DateTime @default(now())
+
+  /// Swept after a year by the digest job. The question this answers is asked
+  /// after a complaint, which does not arrive within a fortnight — but a read
+  /// log that grows for ever is one nobody can query and a liability of its own.
+  @@index([at])
+  @@index([subjectId, at])
+  @@index([actorEmail, at])
+  /// The lookup the coalescing does on every audited read.
+  @@index([kind, actorEmail, at])
+}

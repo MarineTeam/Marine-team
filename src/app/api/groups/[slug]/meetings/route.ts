@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { canLead, standingIn } from "@/lib/groups";
 import { viewerFor } from "@/lib/groups-query";
 import { canKeepRoll, quietlyMissing, summariseRoll, visibleAttendance } from "@/lib/attendance";
+import { logRead } from "@/lib/read-audit-query";
 import { meetingsFor, myAttendance, openMeeting, recordRoll, rollHistory } from "@/lib/attendance-query";
 import { isPluginEnabled } from "@/lib/plugins";
 
@@ -64,6 +65,11 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ sl
       // Their own evenings, which is the whole of what they may have.
       return NextResponse.json({ mine: await myAttendance(group.id, user.id), meetings: null });
     }
+
+    // A roll records where a named person was on a given evening. The subject
+    // is the group rather than any one member, which is the unit a leader opens
+    // and the unit somebody would later ask about.
+    await logRead({ kind: "group_roll", actorEmail: user.email, subjectId: group.id });
 
     const meetings = await meetingsFor(group.id);
     const active = group.members.filter((m) => m.status === "ACTIVE").map((m) => m.userId);

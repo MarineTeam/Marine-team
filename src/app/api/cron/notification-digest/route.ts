@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { sendDigestToUser } from "@/lib/push";
 import { pruneAccessAttempts } from "@/lib/authorization";
 import { pruneViewKeys } from "@/lib/content";
+import { sweepReadLog } from "@/lib/read-audit-query";
 import { VIEW_KEY_RETENTION_HOURS } from "@/lib/view-key";
 
 /**
@@ -43,11 +44,16 @@ export async function GET(request: NextRequest) {
   // Same reasoning for the view throttle keys (lib/view-key.ts): a day is
   // all they are for, and after that they are only a column to be careful of.
   const viewKeysPruned = await pruneViewKeys(VIEW_KEY_RETENTION_HOURS);
+  // And the read log, on a much longer retention: "who saw this?" is asked
+  // after a complaint rather than within the fortnight, but a log that grows
+  // for ever is one nobody can query and a liability of its own.
+  const readsPruned = await sweepReadLog();
 
   return NextResponse.json({
     usersNotified: byUser.size,
     itemsCleared: pending.length,
     attemptsPruned,
     viewKeysPruned,
+    readsPruned,
   });
 }

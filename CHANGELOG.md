@@ -6,6 +6,27 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Reads are audited, not just writes.** The audit log has recorded who changed
+  things since the beginning; for the data this app has grown into, who *looked*
+  is the half that matters, and until now nothing in the codebase could answer
+  it. Eight screens that identify a person now record a look: the giving records
+  and statements, a household, a children's register, a text conversation, the
+  safeguarding register, a clearance withdrawal reason, and a group's attendance
+  roll. One line per look rather than per row, coalesced over half an hour, so
+  opening the giving page is one entry and refreshing it five times is still one.
+  The log deliberately cannot repeat what was read — `kind` names a screen and
+  there is no column for an amount, an address or a note — which is what stops an
+  oversight record becoming a second, more widely readable copy of the data it
+  protects. A failed log never fails the read. Two queries, no flat feed: who has
+  been through one record, and what each member of staff has been reading. Behind
+  `view_audit_log` but its own table and endpoint, kept a year and swept nightly.
+  The member directory and a member's own export are deliberately excluded, and
+  the reasons are written down so the list cannot quietly grow to cover
+  everything. Verified against Postgres (17 checks) and by mutation testing the
+  rules module (17 mutants, all killed on the first pass).
+
 ## [2.1.0] - 2026-09-25
 
 Nine features and two security audits. Minor rather than major: everything in

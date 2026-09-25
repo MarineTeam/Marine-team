@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { errorResponse } from "@/lib/api-guard";
+import { logRead } from "@/lib/read-audit-query";
 import { isPluginEnabled } from "@/lib/plugins";
 import { checkIn, closeSession, findFamilies, register, release, requireDesk } from "@/lib/checkin-query";
 
@@ -37,8 +38,11 @@ const notFound = () => NextResponse.json({ error: "Not found" }, { status: 404 }
 export async function GET(_request: NextRequest, context: { params: Promise<{ sessionId: string }> }) {
   try {
     if (!(await isPluginEnabled("checkin"))) return notFound();
-    await requireDesk();
+    const reader = await requireDesk();
     const { sessionId } = await context.params;
+    // The subject is the session, since a register is a room-full rather than
+    // one child, and the id is what somebody would later ask about.
+    await logRead({ kind: "checkin_register", actorEmail: reader.email, subjectId: sessionId });
     return NextResponse.json(await register(sessionId), {
       // The register carries medical notes. Nothing caches it, anywhere.
       headers: { "Cache-Control": "private, no-store" },

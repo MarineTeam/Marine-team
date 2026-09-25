@@ -3,6 +3,7 @@ import { z } from "zod";
 import { errorResponse } from "@/lib/api-guard";
 import { logAudit } from "@/lib/audit";
 import { isPluginEnabled } from "@/lib/plugins";
+import { logRead } from "@/lib/read-audit-query";
 import {
   deleteHousehold,
   getHousehold,
@@ -32,6 +33,10 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
     const { id } = await context.params;
     const household = await getHousehold(id, await householdViewer(user));
     if (!household) return notFound();
+    // Logged after the lookup, not before: a 404 is not somebody looking at a
+    // record, and logging the attempt would fill the register with ids that
+    // never existed.
+    await logRead({ kind: "household", actorEmail: user.email, subjectId: id });
     return NextResponse.json(household, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return errorResponse(error);
