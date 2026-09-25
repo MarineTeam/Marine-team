@@ -183,7 +183,7 @@ model User {
   serviceAssignments    ServiceAssignment[]
   coveredForAssignments ServiceAssignment[]   @relation("AssignmentCoveredFor")
   clearances            VolunteerClearance[]
-  clearancesVerified    VolunteerClearance[] @relation("ClearanceVerifiedBy")
+  clearancesVerified    VolunteerClearance[]  @relation("ClearanceVerifiedBy")
   serviceBlockouts      ServiceBlockout[]
   /// The name this account appears under on a rota, when they are the same
   /// person — see Person.
@@ -742,18 +742,18 @@ model ServicePlan {
 /// church names those differently and a table of positions would be a second
 /// thing to maintain for no extra answer.
 model ServiceTeam {
-  id        String              @id @default(cuid())
-  name      String
+  id                 String              @id @default(cuid())
+  name               String
   /// What somebody must hold before they can be put on this team. Empty for
   /// most teams — coffee does not need a criminal-records check, and a church
   /// that requires one for everything ends up with a list nobody maintains.
-  requiredClearances ClearanceKind[] @default([])
+  requiredClearances ClearanceKind[]     @default([])
   /// Ordering on the admin page and on a plan, so the list reads the way the
   /// church thinks of it rather than alphabetically.
-  position  Int                 @default(0)
-  createdAt DateTime            @default(now())
-  members   ServiceTeamMember[]
-  roles     ServiceAssignment[]
+  position           Int                 @default(0)
+  createdAt          DateTime            @default(now())
+  members            ServiceTeamMember[]
+  roles              ServiceAssignment[]
 }
 
 /// Somebody who can be scheduled on a team.
@@ -2022,8 +2022,8 @@ model Person {
   /// `SetNull` rather than `Cascade`: deleting a household is a statement
   /// about a family unit, not about the people in it, and it must never be a
   /// way to delete somebody who is on next Sunday's rota.
-  household   Household? @relation("HouseholdMembers", fields: [householdId], references: [id], onDelete: SetNull)
-  householdId String?
+  household     Household?    @relation("HouseholdMembers", fields: [householdId], references: [id], onDelete: SetNull)
+  householdId   String?
   /// Adult or child *within this household* — the thing that decides who may
   /// collect whom, not a claim about age in general. A grandmother in her own
   /// household is an adult there whatever her grandchildren's household says.
@@ -2039,15 +2039,15 @@ model Person {
   /// check-in, and never on a label — a label is on a coat in a corridor.
   medicalNotes String?
 
-  aliases       PersonAlias[]
-  events        CalendarEventPerson[]
-  primaryFor    Household[]           @relation("HouseholdPrimaryContact")
-  gifts         Gift[]
-  followUps     FollowUp[]
-  smsMessages   SmsMessage[]
-  checkins      CheckinRecord[]       @relation("CheckedInChild")
-  broughtIn     CheckinRecord[]       @relation("CheckedInBy")
-  collected     CheckinRecord[]       @relation("ReleasedTo")
+  aliases     PersonAlias[]
+  events      CalendarEventPerson[]
+  primaryFor  Household[]           @relation("HouseholdPrimaryContact")
+  gifts       Gift[]
+  followUps   FollowUp[]
+  smsMessages SmsMessage[]
+  checkins    CheckinRecord[]       @relation("CheckedInChild")
+  broughtIn   CheckinRecord[]       @relation("CheckedInBy")
+  collected   CheckinRecord[]       @relation("ReleasedTo")
 
   deletedAt DateTime?
   createdAt DateTime  @default(now())
@@ -3065,7 +3065,6 @@ model TvDevice {
   @@index([expiresAt])
 }
 
-
 /// A room, open on one day, that children are signed into.
 ///
 /// A session is the unit everything else hangs off: the code is per household
@@ -3150,7 +3149,6 @@ model CheckinRecord {
   @@index([childId])
 }
 
-
 /// Where a gift was given to.
 model GivingFund {
   id          String  @id @default(cuid())
@@ -3216,12 +3214,12 @@ model Gift {
   /// Who gave it, when that is known. Anonymous gifts are real and common, so
   /// both of these are optional — and `SetNull`, because deleting somebody
   /// must never silently change what the accounts say was received.
-  giver     Person?    @relation(fields: [giverId], references: [id], onDelete: SetNull)
-  giverId   String?
+  giver       Person?    @relation(fields: [giverId], references: [id], onDelete: SetNull)
+  giverId     String?
   /// Denormalised deliberately: a statement is addressed to the household as
   /// it was at the time, and somebody moving house later must not rewrite a
   /// statement already issued.
-  household Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
+  household   Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
   householdId String?
 
   source GiftSource @default(ONLINE)
@@ -3250,7 +3248,6 @@ model Gift {
   @@index([giverId, givenAt])
   @@index([status, givenAt])
 }
-
 
 /// Where a follow-up came from, which is most of what tells somebody how to
 /// start the conversation.
@@ -3282,16 +3279,16 @@ enum FollowUpStatus {
 /// by Friday". This is that missing half: the point where pastoral data stops
 /// being a report and becomes something a person does.
 model FollowUp {
-  id     String @id @default(cuid())
-  title  String
+  id    String  @id @default(cuid())
+  title String
   /// What is known so far, and what happened. Appended to rather than
   /// replaced when somebody closes it — see `outcome`.
-  note   String?
+  note  String?
 
   /// Who it is about. Optional: a card can be filled in by somebody nobody
   /// has a record for yet, and the job still needs doing.
-  person   Person?    @relation(fields: [personId], references: [id], onDelete: SetNull)
-  personId String?
+  person      Person?    @relation(fields: [personId], references: [id], onDelete: SetNull)
+  personId    String?
   /// Denormalised from the person at the time, so moving house later doesn't
   /// silently re-address an old job.
   household   Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
@@ -3302,8 +3299,8 @@ model FollowUp {
   assignedTo   User?   @relation("FollowUpAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   assignedToId String?
 
-  status FollowUpStatus @default(OPEN)
-  source FollowUpSource @default(MANUAL)
+  status    FollowUpStatus @default(OPEN)
+  source    FollowUpSource @default(MANUAL)
   /// The id of whatever prompted it — a submission, a registration, a group.
   /// Paired with `source` it is what stops the same prompt raising a second
   /// job every time the sweep runs.
@@ -3383,7 +3380,6 @@ model ResourceBooking {
   @@index([eventId])
 }
 
-
 enum SmsDirection {
   INBOUND
   OUTBOUND
@@ -3458,7 +3454,7 @@ model VolunteerClearance {
   /// The day it stops counting. Required: a clearance with no end is a
   /// clearance nobody ever revisits, which is the state this feature exists
   /// to prevent.
-  expiresOn DateTime @db.Date
+  expiresOn  DateTime @db.Date
 
   /// Who saw it. Denormalized alongside the relation for the same reason the
   /// audit log denormalizes: removing somebody's account must not erase the
