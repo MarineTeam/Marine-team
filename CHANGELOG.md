@@ -6,6 +6,33 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-09-25
+
+Nine features and two security audits. Minor rather than major: everything in
+it is additive, no existing route or response shape changed, and every
+migration is additive to existing data with nothing to back-fill.
+
+The shape of the release is one idea followed through. The app knew a great
+deal about content and very little about the people in the building, and the
+nine features close that gap in order: **households** give the church families
+rather than individuals, **check-in** and **safeguarding** make the children's
+work safe to run from a computer, **giving** records money without ever
+touching a card, **follow-ups** turn what the app already knew into somebody's
+job, **rooms** stop two groups claiming one hall, **text replies** give an
+answer somewhere to land, a **group broadcast** lets a leader write to their
+own people, and **attendance** finally supplies the headcount every other
+number needed to divide by.
+
+Two decisions recur across all of them, and are worth stating once rather than
+nine times. **A record that cannot be represented cannot be stored** — there is
+no type in the codebase for a card number, a disclosure certificate, or a
+child's medical notes outside the one form that takes them. And **what a viewer
+may not see is absent rather than blank**: the dashboard omits the giving key
+entirely, a discussion guide has no leader-notes field, a group roll returns a
+one-row list. A page cannot render what it was never handed, and a null still
+tells you the thing exists.
+
+
 ### Security
 
 A second audit, run after the first one's fixes were in — with those fixes as
