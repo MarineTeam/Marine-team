@@ -2339,6 +2339,55 @@ ones in `vercel.json`.
 
 ## Security
 
+### Gift Aid (`/admin/giving/gift-aid`)
+
+A UK church may reclaim the basic-rate tax on an eligible donation, which adds
+25% to it. Recording the gifts was never enough to do that.
+
+- **A fund being eligible is not enough.** `taxDeductible` on a fund says the
+  fund qualifies; HMRC needs a declaration from the *individual*. Statements
+  filtered on the fund alone, which is the right thing for a donor's own record
+  and overstates what can actually be claimed.
+- **Three conditions, not one**: a live declaration covering the day the gift was
+  given, an eligible fund, and not already on a claim. The last is what stops a
+  second claim taking the same donation twice.
+- **A withdrawal is about the future.** Gifts given before it stay claimable. A
+  withdrawal is not a statement that the donor never paid tax, and treating it
+  as retroactive would mean repaying claims that were correct when made. The
+  date is asked for rather than assumed to be today, because somebody ringing in
+  March to say they stopped paying tax last September is describing September.
+- **The blocked list gets as much room as the claim**, ordered by what it is
+  worth rather than by how many gifts: forty £2 collections above one £5,000 gift
+  with no declaration sends somebody after the wrong thing. Each reason says
+  whether anybody can do something about it — "nobody is named as the giver" is a
+  question somebody can answer, "the fund isn't eligible" is not.
+- **A gift with nobody named cannot be claimed at all**, however eligible its
+  fund, because HMRC claims against a person. Reported rather than dropped,
+  because somebody usually knows who put the envelope in.
+- **The claim rounds down.** 25% of an odd number of pence is not a whole number
+  of pence, and rounding up claims money that is not owed. Computed on the total
+  rather than per gift, so a hundred small donations do not lose a fraction each
+  and arrive at a figure HMRC disagrees with.
+- **Claiming is one transaction**, and the gifts are stamped inside it on
+  condition they are still unclaimed. Two treasurers pressing the button at the
+  same moment produce one claim and one honest refusal — a double claim to HMRC
+  is a repayment and a letter.
+- **A name and address is kept as declared**, not read through the household:
+  HMRC wants the address the declaration was made from, and a family that moves
+  in 2028 must not retroactively alter a claim submitted in 2026.
+- **The schedule is a file, one line per donor**, which is the shape HMRC's own
+  form takes. It comes out of the same function the screen uses, so the figure
+  the treasurer saw and the figure the church sends are the same arithmetic.
+- **What is running out of time has its own list.** A donation that passes the
+  four-year deadline is money the church was owed and cannot now ask for.
+- An unsent claim can be deleted, which releases its gifts. A submitted one
+  cannot: a claim HMRC has seen is a thing that happened, and deleting it while
+  the money is in flight is how a church ends up unable to explain a payment into
+  its own account.
+- Verbal declarations are listed separately, because HMRC requires written
+  confirmation to the donor and a church needs to find the ones still owed a
+  letter.
+
 ### Who looked, not just who changed
 
 The audit log has recorded writes since the beginning. Reads are now recorded

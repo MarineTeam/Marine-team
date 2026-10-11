@@ -8,6 +8,26 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Gift Aid** at `/admin/giving/gift-aid`, which closes an assumption in the
+  giving feature rather than adding a new one. `GivingFund.taxDeductible` says a
+  fund qualifies; HMRC needs a declaration from the individual, and nothing
+  recorded one — so a church reading "tax deductible" as "claimable" could have
+  been out by tens of thousands in either direction. Declarations now carry the
+  donor's name and address as declared (HMRC wants the address it was made from,
+  and `Person` holds one `displayName` where the claim schedule wants two
+  columns), whether the standard four-year back-dating applies, and how it was
+  made — with the verbal ones listed separately, since those are owed a letter.
+  A withdrawal applies from its date forward and leaves earlier gifts claimable,
+  because it is a statement about the future and the alternative is repaying
+  claims that were correct when made. Claiming is one transaction that stamps its
+  gifts on condition they are still unclaimed, so two treasurers claiming at once
+  get one claim and one refusal. The claim rounds down and is computed on the
+  total, never per gift. The blocked list is given as much room as the claim and
+  ordered by what it is worth, with each reason marked fixable or not. The
+  schedule exports as a file, one line per donor, from the same function the
+  screen uses. Verified against Postgres (36 checks) and by mutation testing the
+  rules module (31 mutants, all killed).
+
 - **Reads are audited, not just writes.** The audit log has recorded who changed
   things since the beginning; for the data this app has grown into, who *looked*
   is the half that matters, and until now nothing in the codebase could answer

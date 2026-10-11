@@ -2039,15 +2039,16 @@ model Person {
   /// check-in, and never on a label — a label is on a coat in a corridor.
   medicalNotes String?
 
-  aliases     PersonAlias[]
-  events      CalendarEventPerson[]
-  primaryFor  Household[]           @relation("HouseholdPrimaryContact")
-  gifts       Gift[]
-  followUps   FollowUp[]
-  smsMessages SmsMessage[]
-  checkins    CheckinRecord[]       @relation("CheckedInChild")
-  broughtIn   CheckinRecord[]       @relation("CheckedInBy")
-  collected   CheckinRecord[]       @relation("ReleasedTo")
+  aliases             PersonAlias[]
+  events              CalendarEventPerson[]
+  primaryFor          Household[]           @relation("HouseholdPrimaryContact")
+  gifts               Gift[]
+  followUps           FollowUp[]
+  smsMessages         SmsMessage[]
+  checkins            CheckinRecord[]       @relation("CheckedInChild")
+  broughtIn           CheckinRecord[]       @relation("CheckedInBy")
+  collected           CheckinRecord[]       @relation("ReleasedTo")
+  giftAidDeclarations GiftAidDeclaration[]
 
   deletedAt DateTime?
   createdAt DateTime  @default(now())
@@ -3239,10 +3240,19 @@ model Gift {
   /// Who typed it in, for anything that didn't arrive through the webhook.
   recordedByEmail String?
 
+  /// The claim that included this gift, once one has. Null means not yet
+  /// claimed — and `SetNull` rather than `Cascade`, because deleting a claim
+  /// that was never sent must release its gifts for the next one rather than
+  /// delete the donations.
+  giftAidClaim   GiftAidClaim? @relation(fields: [giftAidClaimId], references: [id], onDelete: SetNull)
+  giftAidClaimId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([givenAt])
+  /// The claim builder's lookup: unclaimed gifts in a span.
+  @@index([giftAidClaimId])
   @@index([fundId, givenAt])
   @@index([householdId, givenAt])
   @@index([giverId, givenAt])
@@ -3610,4 +3620,113 @@ model DataAccessLog {
   @@index([actorEmail, at])
   /// The lookup the coalescing does on every audited read.
   @@index([kind, actorEmail, at])
+}
+
+/// A donor's Gift Aid declaration.
+///
+/// The fund being eligible is necessary and **not sufficient**: a UK church may
+/// only claim where the individual has declared that they pay enough tax and
+/// want the church to claim. `GivingFund.taxDeductible` was never that, and a
+/// statement filtered on it alone overstates what is claimable.
+///
+/// Attached to a `Person`, not a `Household`, because HMRC claims against an
+/// individual. A gift recorded against a household with no named giver cannot
+/// be claimed at all, which is one of the blocked reasons the reconciliation
+/// view reports rather than silently dropping.
+///
+/// The donor's name and address are **copied in rather than read through the
+/// household**, for two reasons that both matter. HMRC wants the address the
+/// declaration was made from, and a family that moves in 2028 must not
+/// retroactively alter a claim submitted in 2026. And `Person` holds one
+/// `displayName` where the claim schedule wants a forename and a surname in
+/// separate columns.
+model GiftAidDeclaration {
+  id String @id @default(cuid())
+
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+  personId String
+
+  /// The day they made it. A calendar day — see lib/dates.ts.
+  madeOn DateTime @db.Date
+
+  /// Whether it covers gifts given before it was made.
+  ///
+  /// HMRC's standard wording lets a declaration reach back four years, and
+  /// most churches use it. An enduring declaration that does *not* reach back
+  /// is a real thing too, so this is a flag rather than an assumption.
+  coversPast Boolean @default(true)
+
+  /// As declared. See the model comment: copied, not derived.
+  title       String?
+  firstName   String
+  lastName    String
+  /// "House name or number" in HMRC's own schedule — their column, their name.
+  houseNumber String
+  postcode    String
+
+  how DeclarationMethod @default(PAPER)
+
+  /// Withdrawn from this day forward.
+  ///
+  /// **Gifts before it stay claimable**, which is the rule this feature is
+  /// most likely to get wrong: a withdrawal is not a statement that the donor
+  /// never paid tax, it is a statement about the future. Treating it as
+  /// retroactive would mean repaying claims that were correct when made.
+  withdrawnOn   DateTime? @db.Date
+  withdrawnNote String?
+
+  recordedByEmail String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([personId, madeOn])
+  @@index([withdrawnOn])
+}
+
+enum DeclarationMethod {
+  /// A signed form in the safe.
+  PAPER
+  /// Ticked on a web form.
+  ONLINE
+  /// Said out loud. HMRC requires written confirmation to the donor, so this
+  /// value exists mostly so a church can find the ones still owed a letter.
+  VERBAL
+}
+
+/// One submission to HMRC.
+///
+/// A row per claim rather than a boolean per gift, because "has this been
+/// claimed" is not the question that gets asked — "which claim included it,
+/// and when did we send it" is. It is also what makes the idempotence real:
+/// gifts are stamped with the claim that took them, so a second claim cannot
+/// take them again.
+model GiftAidClaim {
+  id String @id @default(cuid())
+
+  /// The span the claim covers, for the record. The gifts themselves are the
+  /// authority — these are what the church told HMRC.
+  from DateTime @db.Date
+  to   DateTime @db.Date
+
+  /// Minor units, like every other money column in this app.
+  donationTotal Int
+  claimTotal    Int
+
+  giftCount Int
+
+  /// Filled in when HMRC pays, which is weeks later and is how a treasurer
+  /// reconciles the bank statement against what was asked for.
+  submittedOn DateTime? @db.Date
+  settledOn   DateTime? @db.Date
+  reference   String?
+
+  gifts Gift[]
+
+  createdByEmail String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([from, to])
 }

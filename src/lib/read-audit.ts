@@ -44,6 +44,7 @@ export const AUDITED_READS = {
   safeguarding_register: "the safeguarding register",
   withdrawal_reason: "why a clearance was withdrawn",
   group_roll: "a small group's attendance roll",
+  gift_aid_declarations: "the Gift Aid declarations",
 } as const;
 
 /**

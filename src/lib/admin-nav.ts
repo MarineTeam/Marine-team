@@ -157,6 +157,9 @@ export const ADMIN_GROUPS: AdminGroup[] = [
       { href: "/admin/giving", label: "Gifts", visible: (a) => a.canManageGiving },
       { href: "/admin/giving/funds", label: "Funds", visible: (a) => a.canManageGiving },
       { href: "/admin/giving/statements", label: "Statements", visible: (a) => a.canManageGiving },
+      // Next to the statements rather than under reporting: it is the same
+      // job, done for HMRC instead of for the donor.
+      { href: "/admin/giving/gift-aid", label: "Gift Aid", visible: (a) => a.canManageGiving },
     ],
   },
   {
