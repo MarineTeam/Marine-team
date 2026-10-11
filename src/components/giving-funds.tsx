@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { LoadState, Problem } from "@/components/load-state";
 
 type Fund = { id: string; name: string; description: string | null; active: boolean; taxDeductible: boolean };
 
@@ -38,11 +39,11 @@ export function GivingFunds() {
     }
   }
 
-  if (!funds) return <p className="text-sm text-sec">Loading…</p>;
+  if (!funds) return <LoadState error={error} />;
 
   return (
     <div className="space-y-4">
-      {error && <p className="rounded-md border border-red-300 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {error && <Problem>{error}</Problem>}
       <ul className="space-y-2">
         {funds.map((fund) => (
           <li key={fund.id} className="flex items-center justify-between gap-3 rounded-lg border border-sep px-3 py-2 text-sm">

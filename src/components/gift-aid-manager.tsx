@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { LoadState, Problem } from "@/components/load-state";
 
 type Method = "PAPER" | "ONLINE" | "VERBAL";
 
@@ -117,13 +118,13 @@ export function GiftAidManager() {
     }
   }
 
-  if (!data) return <p className="text-sm text-sec">Loading…</p>;
+  if (!data) return <LoadState error={error} />;
 
   const { view, worth } = data;
 
   return (
     <div className="space-y-6">
-      {error && <p className="rounded-md border border-red-300 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {error && <Problem>{error}</Problem>}
       {note && <p className="rounded-md border border-sep px-3 py-2 text-sm text-ink">{note}</p>}
 
       <section className="grid gap-2 sm:grid-cols-3">

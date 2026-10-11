@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { LoadState, Problem } from "@/components/load-state";
 
 type Member = { id: string; displayName: string; householdRole: "ADULT" | "CHILD"; active: boolean; age?: number };
 type Household = {
@@ -82,11 +83,11 @@ export function HouseholdsManager() {
     }
   }
 
-  if (!data) return <p className="text-sm text-sec">Loading…</p>;
+  if (!data) return <LoadState error={error} />;
 
   return (
     <div className="space-y-6">
-      {error && <p className="rounded-md border border-red-300 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {error && <Problem>{error}</Problem>}
 
       {data.occasions.length > 0 && (
         <section className="rounded-lg border border-sep p-4">

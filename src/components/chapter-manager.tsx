@@ -17,7 +17,8 @@ export function ChapterManager({ videoId }: { videoId: string }) {
 
   async function load() {
     const res = await fetch(`/api/admin/videos/${videoId}/chapters`);
-    if (res.ok) setChapters(await res.json());
+    if (!res.ok) return setError("Couldn't load the chapters.");
+    setChapters(await res.json());
   }
 
   useEffect(() => {

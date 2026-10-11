@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { LoadState, Problem } from "@/components/load-state";
 
 type Resource = { id: string; name: string; kind: "ROOM" | "VEHICLE" | "EQUIPMENT"; capacity: number | null; active: boolean };
 type Booking = {
@@ -55,11 +56,11 @@ export function ResourcesManager() {
     }
   }
 
-  if (!resources) return <p className="text-sm text-sec">Loading…</p>;
+  if (!resources) return <LoadState error={error} />;
 
   return (
     <div className="space-y-6">
-      {error && <p className="rounded-md border border-red-300 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {error && <Problem>{error}</Problem>}
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-ink">Booked</h2>

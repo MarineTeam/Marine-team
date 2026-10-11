@@ -32,7 +32,8 @@ export function ViewerAccessManager({ type, id }: { type: "series" | "video"; id
       setGroupGrants(data.granted);
       setAvailableGroups(data.available);
     }
-    if (viewersRes.ok) setUserGrants(await viewersRes.json());
+    if (!viewersRes.ok) return setError("Couldn't load who has access.");
+    setUserGrants(await viewersRes.json());
     setLoaded(true);
   }
 

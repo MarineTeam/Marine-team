@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { LoadState, Problem } from "@/components/load-state";
 
 type WeekPoint = { week: string; total: number | null; gatherings: number };
 type Average = { mean: number; weeksCounted: number; weeksMissing: number } | null;
@@ -101,13 +102,13 @@ export function AttendanceManager({ canCount }: { canCount: boolean }) {
     }
   }
 
-  if (!view) return <p className="text-sm text-sec">Loading…</p>;
+  if (!view) return <LoadState error={error} />;
 
   const shown = hover === null ? null : view.series[hover];
 
   return (
     <div className="space-y-6">
-      {error && <p className="rounded-md border border-red-300 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {error && <Problem>{error}</Problem>}
       {warning && (
         <p className="rounded-md border border-amber-300 px-3 py-2 text-sm text-amber-700">
           Saved — but {warning.charAt(0).toLowerCase()}

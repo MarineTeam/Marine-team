@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { formatMoney } from "@/lib/giving";
+import { LoadState, Problem } from "@/components/load-state";
 
 type Fund = { id: string; name: string; active: boolean; taxDeductible: boolean };
 type Gift = {
@@ -65,12 +66,12 @@ export function GivingManager() {
     }
   }
 
-  if (!data) return <p className="text-sm text-sec">Loading…</p>;
+  if (!data) return <LoadState error={error} />;
   const currency = data.gifts[0]?.currency ?? "GBP";
 
   return (
     <div className="space-y-6">
-      {error && <p className="rounded-md border border-red-300 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {error && <Problem>{error}</Problem>}
 
       <section className="rounded-lg border border-sep p-4">
         <p className="text-[11px] font-bold tracking-[0.08em] text-ter uppercase">

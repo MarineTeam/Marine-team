@@ -31,7 +31,8 @@ export function CommentSection({
 
   async function load() {
     const res = await fetch(`/api/comments?type=${type}&id=${id}`);
-    if (res.ok) setComments(await res.json());
+    if (!res.ok) return setError("Couldn't load the comments.");
+    setComments(await res.json());
   }
 
   async function post(e: React.FormEvent) {

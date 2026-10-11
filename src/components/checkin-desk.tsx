@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { LoadState, Problem } from "@/components/load-state";
 
 type Member = { id: string; displayName: string; householdRole: "ADULT" | "CHILD"; active: boolean };
 type Family = {
@@ -49,7 +50,8 @@ export function CheckinDesk({ sessionId }: { sessionId: string }) {
 
   const load = useCallback(async () => {
     const response = await fetch(`/api/checkin/${sessionId}`);
-    if (response.ok) setRegister(await response.json());
+    if (!response.ok) return setError("Couldn't load the register.");
+    setRegister(await response.json());
   }, [sessionId]);
 
   useEffect(() => {
@@ -118,12 +120,12 @@ export function CheckinDesk({ sessionId }: { sessionId: string }) {
     await load();
   }
 
-  if (!register) return <p className="text-sm text-sec">Loading…</p>;
+  if (!register) return <LoadState error={error} />;
 
   return (
     <div className="space-y-6">
       {message && <p className="rounded-md border border-sep bg-hover px-3 py-2 text-sm text-ink">{message}</p>}
-      {error && <p className="rounded-md border border-red-300 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {error && <Problem>{error}</Problem>}
 
       {!register.session.closedAt && (
         <section className="space-y-3">

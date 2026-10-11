@@ -6,6 +6,32 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **A failed first load is no longer invisible.** Ten admin screens rendered
+  their error message *after* an early `if (!data) return <Loading />`, and
+  `data` stays null when the load is what failed — so a network blip, a 500, or
+  a capability revoked mid-session all looked exactly like a slow connection,
+  for ever. A shared `LoadState` now makes the order impossible to get wrong.
+  Found within an hour of writing the first component test, by the first test
+  that rendered a screen with a failing `fetch`.
+- **The check-in desk swallowed a failed register load entirely** — no error
+  was recorded at all, so even the fix above had nothing to show. Four
+  components with that shape now report it. Eighteen others still swallow a
+  failed load; they are listed in the commit and are not yet fixed.
+
+### Added
+
+- **Component tests.** 1674 tests to here and not one of them had rendered a
+  component: the suite proved the rules and said nothing about whether a button
+  worked. Vitest now runs two projects — Node for the pure modules, jsdom for
+  `.test.tsx` — so the fifteen hundred pure tests are untouched and no faster or
+  slower. The first two cover the screens where a silent failure costs most: the
+  Gift Aid claim (18 tests, including that the claim sends the span on screen
+  rather than whatever is in the date boxes) and the check-in desk (13,
+  including that the override cannot be fired with nothing written in it and
+  that a refusal reaches the volunteer at the door).
+
 ### Added
 
 - **Gift Aid** at `/admin/giving/gift-aid`, which closes an assumption in the

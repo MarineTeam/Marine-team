@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { LoadState, Problem } from "@/components/load-state";
 
 type Message = { id: string; direction: "INBOUND" | "OUTBOUND"; body: string; createdAt: string; readAt: string | null };
 type Thread = { phone: string; who: string | null; messages: Message[]; unread: number; lastAt: string };
@@ -44,12 +45,12 @@ export function SmsInbox() {
     }
   }
 
-  if (!threads) return <p className="text-sm text-sec">Loading…</p>;
+  if (!threads) return <LoadState error={error} />;
   if (threads.length === 0) return <p className="text-sm text-sec">No replies yet.</p>;
 
   return (
     <div className="space-y-2">
-      {error && <p className="rounded-md border border-red-300 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {error && <Problem>{error}</Problem>}
       {threads.map((thread) => (
         <div key={thread.phone} className="rounded-lg border border-sep">
           <button

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { LoadState, Problem } from "@/components/load-state";
 
 type FollowUp = {
   id: string;
@@ -58,11 +59,11 @@ export function FollowUpsManager({ meId }: { meId: string }) {
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  if (!rows || !counts) return <p className="text-sm text-sec">Loading…</p>;
+  if (!rows || !counts) return <LoadState error={error} />;
 
   return (
     <div className="space-y-4">
-      {error && <p className="rounded-md border border-red-300 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {error && <Problem>{error}</Problem>}
 
       <p className="flex flex-wrap gap-3 text-sm text-sec">
         <span className="text-ink">{counts.open} open</span>
