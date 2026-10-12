@@ -2049,6 +2049,7 @@ model Person {
   broughtIn           CheckinRecord[]       @relation("CheckedInBy")
   collected           CheckinRecord[]       @relation("ReleasedTo")
   giftAidDeclarations GiftAidDeclaration[]
+  pledges             Pledge[]
 
   deletedAt DateTime?
   createdAt DateTime  @default(now())
@@ -2103,6 +2104,7 @@ model Household {
   members   Person[]   @relation("HouseholdMembers")
   gifts     Gift[]
   followUps FollowUp[]
+  pledges   Pledge[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3168,7 +3170,8 @@ model GivingFund {
 
   position Int @default(0)
 
-  gifts Gift[]
+  gifts     Gift[]
+  campaigns GivingCampaign[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3729,4 +3732,121 @@ model GiftAidClaim {
   updatedAt DateTime @updatedAt
 
   @@index([from, to])
+}
+
+/// A fundraising campaign: the roof, the minibus, the building.
+///
+/// Three numbers follow a campaign around and **must never be conflated**: the
+/// target asked for, the amount pledged, and the amount actually received. A
+/// screen that shows one figure for a campaign will be read as money in the
+/// bank, and a church that mistakes £400,000 pledged for £400,000 received
+/// signs a contract it cannot pay for. Everything downstream of this model
+/// carries all three or none.
+model GivingCampaign {
+  id   String @id @default(cuid())
+  name String
+  slug String @unique
+
+  description String?
+
+  /// What is being asked for, in minor units like every other money column
+  /// here. Nullable: a campaign may genuinely have no number on it ("give what
+  /// you can towards the roof"), and a zero would read as a reached target.
+  target Int?
+
+  /// Which fund the money lands in. Gifts to this fund inside the campaign's
+  /// dates are what count as received — see lib/pledges.ts.
+  fund   GivingFund @relation(fields: [fundId], references: [id])
+  fundId String
+
+  /// The span it runs for. `endsOn` is nullable for an open-ended appeal.
+  startsOn DateTime  @db.Date
+  endsOn   DateTime? @db.Date
+
+  /// Whether the totals appear on the public site. The *church* total only —
+  /// an individual pledge is never public, whatever this says.
+  publicTotals Boolean @default(false)
+
+  closed Boolean @default(false)
+
+  pledges Pledge[]
+
+  createdByEmail String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([closed, startsOn])
+}
+
+/// A promise to give.
+///
+/// Attached to a household rather than a person, because that is how a family
+/// decides to give — and because the giving records already attribute to a
+/// household. A pledge from somebody with no household falls back to the
+/// person, which is why both are nullable and at least one is required by the
+/// rules rather than by the column.
+///
+/// **A pledge is not income.** It is a statement of intent that may be kept,
+/// partly kept, or not kept, and the difference is the single most useful thing
+/// this feature reports. Nothing here is ever added to a giving total.
+model Pledge {
+  id String @id @default(cuid())
+
+  campaign   GivingCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String
+
+  household   Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
+  householdId String?
+  person      Person?    @relation(fields: [personId], references: [id], onDelete: SetNull)
+  personId    String?
+
+  /// The whole promise, in minor units — not the instalment. A £50-a-month
+  /// pledge for two years is 120000 here with a MONTHLY schedule, because the
+  /// total is the promise and the instalment is how it arrives.
+  amount Int
+
+  schedule PledgeSchedule @default(ONE_OFF)
+
+  startsOn DateTime  @db.Date
+  /// When the instalments stop. Null for a one-off, or an open promise.
+  endsOn   DateTime? @db.Date
+
+  status PledgeStatus @default(ACTIVE)
+
+  /// Anything the giver said about it, in their words.
+  note String?
+
+  /// Whether the giver is content for their name to appear on an internal
+  /// list. Defaults to false: a promise made in confidence stays in it, and
+  /// the people most likely to pledge largest are the most likely to care.
+  nameMayBeShown Boolean @default(false)
+
+  recordedByEmail String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One live pledge per household per campaign — a second is a change of
+  /// mind, which edits the first rather than adding to it.
+  @@unique([campaignId, householdId])
+  @@index([campaignId, status])
+  @@index([personId])
+}
+
+enum PledgeSchedule {
+  ONE_OFF
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+}
+
+enum PledgeStatus {
+  ACTIVE
+  /// The whole amount has arrived.
+  FULFILLED
+  /// Withdrawn by the giver, or written off. Kept rather than deleted: a
+  /// campaign's history is the pledges it had, not the ones that worked out.
+  CANCELLED
 }

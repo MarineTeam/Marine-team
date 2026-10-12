@@ -27,6 +27,24 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Campaigns and pledges** at `/admin/giving/campaigns`. Giving recorded what
+  arrived and could not say how it stood against what was asked for. Three
+  numbers now follow a campaign and are never added together: target, pledged,
+  received — kept apart in the data, in the API and on the screen, where
+  received is first and largest and promised is labelled "not money". A pledge
+  is never income; what it produces is an *outstanding* figure, floored at zero.
+  Received counts everybody, including the many who give to an appeal without
+  ever filling in a card, with the pledger share reported separately. A second
+  pledge from one household amends the first rather than doubling the promise.
+  Instalments fall due on their date, are capped at the number the pledge
+  contains, and let the last one absorb the rounding. "Behind schedule" is
+  reported and never acted on — nothing changes a pledge's status on arithmetic.
+  Public totals carry what arrived and what was asked for and never the promise,
+  the outstanding figure or a name; a member sees their own pledge and no one
+  else's. Verified against Postgres (35 checks, passing first run) and by
+  mutation testing the rules module (28 mutants, all killed). A component test
+  asserts the screen never prints the sum of received and promised.
+
 - **Component tests.** 1674 tests to here and not one of them had rendered a
   component: the suite proved the rules and said nothing about whether a button
   worked. Vitest now runs two projects — Node for the pure modules, jsdom for

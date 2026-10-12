@@ -2339,6 +2339,48 @@ ones in `vercel.json`.
 
 ## Security
 
+### Campaigns and pledges (`/admin/giving/campaigns`)
+
+Giving records what arrived. It could not answer "we asked for £400,000, where
+are we?", which is the question a building appeal is actually run on.
+
+- **Three numbers, never added together.** The target asked for, the amount
+  pledged, and the amount received are kept apart everywhere — in the data, in
+  the API, and on the screen, where *received* is first and largest and
+  *promised* is labelled "not money". A church that reads £400,000 promised as
+  £400,000 in the bank signs a contract it cannot pay for, and the way that
+  happens is one big number on a dashboard.
+- **A pledge is never income.** Nothing adds one to a giving total. What it adds
+  is *outstanding*: promised minus what pledgers have actually given, floored at
+  zero so a campaign whose pledgers gave extra does not report a negative debt.
+- **Unpledged giving counts.** Most people give to an appeal without filling in
+  a card, so the received total is all the settled money to the campaign's fund
+  within its dates. How much of it came from pledgers is reported separately,
+  because the two answer different questions.
+- **Over-giving is not an error.** Somebody who promised £500 and gave £700 has
+  given £700. The progress bar stops at full; the figure beside it does not.
+- **A second pledge amends the first.** One live pledge per household per
+  campaign, enforced by a unique index — a change of mind that added instead
+  would double what the church believes it has been promised.
+- **"Behind" is arithmetic, not a judgement.** It compares what has arrived with
+  the instalments due by today and reports a figure for somebody to look at.
+  Nothing changes a pledge's status on the strength of it: a person three weeks
+  late may have been in hospital.
+- **An instalment falls due on its date**, so a monthly pledge from 1 January has
+  three due by 15 March. Capped at the number the pledge contains, so a finished
+  promise does not accrue phantom arrears, and the last instalment absorbs the
+  rounding so nobody looks a penny short after two years.
+- **Public totals carry no promise and no name.** A campaign can publish what has
+  arrived and what was asked for; the pledged figure, the outstanding figure and
+  the pledge count never leave. The public object is built field by field rather
+  than by deleting from the treasurer's one, so a figure added later is absent
+  until somebody decides otherwise.
+- **A member sees their own pledge and nobody else's** — returned as a list of at
+  most one rather than a flag, so a page cannot total what it was never handed.
+- A cancelled pledge is kept and flagged, not deleted: a campaign's history is
+  the pledges it had, not only the ones that worked out. Their money still counts
+  toward the appeal.
+
 ### Gift Aid (`/admin/giving/gift-aid`)
 
 A UK church may reclaim the basic-rate tax on an eligible donation, which adds
