@@ -60,6 +60,8 @@ export function VideoFeedsManager() {
       setFeeds(body.feeds);
       setSeries(body.series);
       setCategories(body.categories);
+    } else {
+      setError("Couldn't load the feeds.");
     }
   }, []);
 

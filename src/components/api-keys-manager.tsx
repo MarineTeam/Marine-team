@@ -43,6 +43,8 @@ export function ApiKeysManager() {
       const data = (await response.json()) as { keys: Key[]; scopes: Scope[] };
       setKeys(data.keys);
       setScopes(data.scopes);
+    } else {
+      setError("Couldn't load the API keys.");
     }
     setLoaded(true);
   }
@@ -182,7 +184,11 @@ export function ApiKeysManager() {
           >
             {busy ? "Making…" : "Make a key"}
           </button>
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          {error && (
+            <p className="text-xs text-red-600" role="alert">
+              {error}
+            </p>
+          )}
         </div>
       </form>
 

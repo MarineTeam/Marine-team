@@ -25,6 +25,7 @@ import {
   useBulkSelect,
 } from "@/components/bulk-select";
 import { readerFormat } from "@/lib/reader";
+import { Problem } from "@/components/load-state";
 
 type UploadStatus = "pending" | "uploading" | "done" | "failed";
 
@@ -74,6 +75,7 @@ type FileAsset = {
 export function FileManager({ seriesId, categoryId }: { seriesId?: string; categoryId?: string }) {
   const scoped = Boolean(seriesId || categoryId);
   const [files, setFiles] = useState<FileAsset[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [seriesList, setSeriesList] = useState<SeriesOption[]>([]);
   const [categoryList, setCategoryList] = useState<CategoryOption[]>([]);
   const [pickedTarget, setPickedTarget] = useState("");
@@ -110,6 +112,12 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
     if (filesRes.ok) setFiles(await filesRes.json());
     if (seriesRes.ok) setSeriesList(await seriesRes.json());
     if (categoriesRes.ok) setCategoryList(await categoriesRes.json());
+    // The file list is the point; the other two only fill the move-to pickers,
+    // so the message names what is actually missing rather than crying off.
+    if (!filesRes.ok) setError("Couldn't load the files.");
+    else if (!seriesRes.ok || !categoriesRes.ok) {
+      setError("Loaded the files, but not the list of series and categories to move them to.");
+    }
   }
 
   useEffect(() => {
@@ -336,6 +344,7 @@ export function FileManager({ seriesId, categoryId }: { seriesId?: string; categ
 
   return (
     <div className="space-y-6">
+      {error && <Problem>{error}</Problem>}
       <h2 className="text-lg font-semibold text-ink">
         {seriesId ? "Files" : categoryId ? "Files in category" : "All files"}
       </h2>

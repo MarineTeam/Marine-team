@@ -22,6 +22,7 @@ export function FormsManager() {
   async function load() {
     const response = await fetch("/api/admin/forms");
     if (response.ok) setForms((await response.json()).forms);
+    else setError("Couldn't load the forms.");
     setLoaded(true);
   }
 

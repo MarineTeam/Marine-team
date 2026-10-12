@@ -38,6 +38,7 @@ export function PrayerWall({ signedIn, t }: { signedIn: boolean; t: Messages["pr
   const load = useCallback(async () => {
     const response = await fetch("/api/prayer");
     if (response.ok) setRequests((await response.json()).requests);
+    else setError("Couldn't load the prayer wall.");
     setLoaded(true);
   }, []);
 

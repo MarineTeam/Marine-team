@@ -69,6 +69,7 @@ export function SeriesManager() {
   async function load() {
     const response = await fetch("/api/admin/events/series");
     if (response.ok) setSeries((await response.json()).series);
+    else setError("Couldn't load the series.");
     setLoaded(true);
   }
 

@@ -66,6 +66,9 @@ export function RotaBuilder({ planId }: { planId: string }) {
     ]);
     if (teamsRes.ok) setTeams((await teamsRes.json()).teams);
     if (rotaRes.ok) setAssignments((await rotaRes.json()).assignments);
+    // Either half failing leaves the builder showing a rota it cannot
+    // actually edit, so say so rather than render a confident half-screen.
+    if (!teamsRes.ok || !rotaRes.ok) setError("Couldn't load the rota.");
   }, [planId]);
 
   useEffect(() => {

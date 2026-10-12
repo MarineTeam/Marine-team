@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Problem } from "@/components/load-state";
 
 type Prayer = {
   id: string;
@@ -29,12 +30,14 @@ const STATUS_LABELS: Record<string, string> = {
  */
 export function PrayerModeration() {
   const [requests, setRequests] = useState<Prayer[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
     const response = await fetch("/api/admin/prayer");
     if (response.ok) setRequests((await response.json()).requests);
+    else setError("Couldn't load the prayer requests.");
     setLoaded(true);
   }, []);
 
@@ -63,6 +66,7 @@ export function PrayerModeration() {
 
   return (
     <div className="space-y-6">
+      {error && <Problem>{error}</Problem>}
       <Section title={`Waiting (${waiting.length})`} empty="Nothing waiting.">
         {waiting.map((request) => (
           <Card key={request.id} request={request}>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Problem } from "@/components/load-state";
 
 type Device = {
   id: string;
@@ -18,11 +19,13 @@ type Device = {
  */
 export function TvDevices() {
   const [devices, setDevices] = useState<Device[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
     const response = await fetch("/api/profile/devices");
     if (response.ok) setDevices((await response.json()).devices);
+    else setError("Couldn't load the paired devices.");
     setLoaded(true);
   }, []);
 
@@ -36,6 +39,11 @@ export function TvDevices() {
     const response = await fetch(`/api/profile/devices/${device.id}`, { method: "DELETE" });
     if (response.ok) await load();
   }
+
+  // Before the empty state, not after: a failed load also leaves the list
+  // empty, and "no televisions are signed in" is then a false statement
+  // rather than a missing error — which is worse than a spinner.
+  if (error) return <Problem>{error}</Problem>;
 
   if (loaded && devices.length === 0) {
     return (

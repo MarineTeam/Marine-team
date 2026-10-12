@@ -16,9 +16,14 @@ All notable changes to this project are documented here. Format follows
   Found within an hour of writing the first component test, by the first test
   that rendered a screen with a failing `fetch`.
 - **The check-in desk swallowed a failed register load entirely** — no error
-  was recorded at all, so even the fix above had nothing to show. Four
-  components with that shape now report it. Eighteen others still swallow a
-  failed load; they are listed in the commit and are not yet fixed.
+  was recorded at all, so even the fix above had nothing to show. Every
+  component with that shape now reports it: twenty-two in all, seven of which
+  had no error state to report into and have one now. The television list was
+  the worst of them, answering a failed load with "No televisions are signed
+  in" — a false statement rather than a missing one.
+- A regression test renders six of those screens with every `fetch` failing and
+  asserts each one says so. Adding a component to its list is how the next
+  reader finds out in a second whether a screen joined the club.
 
 ### Added
 

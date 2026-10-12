@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { ShareLinkForm } from "@/components/share-link-form";
 import { ShareLinkList, type ShareLinkRow } from "@/components/share-link-list";
+import { Problem } from "@/components/load-state";
 
 /**
  * The share-a-link control on a series or video page: collapsed to a single
@@ -24,6 +25,7 @@ export function ShareLinkPanel({
 }) {
   const [open, setOpen] = useState(false);
   const [links, setLinks] = useState<ShareLinkRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   const target = seriesId ? { seriesId } : { videoId: videoId! };
@@ -32,6 +34,7 @@ export function ShareLinkPanel({
     const query = new URLSearchParams(seriesId ? { seriesId } : { videoId: videoId! });
     const res = await fetch(`/api/share-links?${query}`);
     if (res.ok) setLinks(await res.json());
+    else setError("Couldn't load the share links.");
     setLoaded(true);
   }, [seriesId, videoId]);
 
@@ -45,6 +48,7 @@ export function ShareLinkPanel({
 
   return (
     <div className="rounded-lg border border-sep">
+      {error && <Problem>{error}</Problem>}
       <button
         onClick={toggle}
         aria-expanded={open}

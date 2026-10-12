@@ -1,18 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { Problem } from "@/components/load-state";
 
 type PlaylistOption = { id: string; title: string; hasVideo: boolean };
 
 export function AddToPlaylistButton({ videoId }: { videoId: string }) {
   const [open, setOpen] = useState(false);
   const [playlists, setPlaylists] = useState<PlaylistOption[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [pending, setPending] = useState(false);
 
   async function load() {
     const res = await fetch(`/api/playlists/for-video?videoId=${videoId}`);
     if (res.ok) setPlaylists(await res.json());
+    else setError("Couldn't load your playlists.");
   }
 
   async function toggleOpen() {
@@ -62,6 +65,7 @@ export function AddToPlaylistButton({ videoId }: { videoId: string }) {
 
   return (
     <div className="relative">
+      {error && <Problem>{error}</Problem>}
       <button
         onClick={toggleOpen}
         className="rounded-md border border-sep px-3 py-1.5 text-sm hover:bg-hover"

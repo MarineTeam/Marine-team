@@ -2,17 +2,20 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Problem } from "@/components/load-state";
 
 type Playlist = { id: string; title: string; items: { id: string }[] };
 
 export function PlaylistsManager() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [loaded, setLoaded] = useState(false);
 
   async function load() {
     const res = await fetch("/api/playlists");
     if (res.ok) setPlaylists(await res.json());
+    else setError("Couldn't load your playlists.");
     setLoaded(true);
   }
 
@@ -45,6 +48,7 @@ export function PlaylistsManager() {
 
   return (
     <div className="space-y-6">
+      {error && <Problem>{error}</Problem>}
       <form onSubmit={create} className="flex gap-2">
         <input
           value={title}

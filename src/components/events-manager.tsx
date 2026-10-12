@@ -28,6 +28,7 @@ export function EventsManager() {
   async function load() {
     const response = await fetch("/api/admin/events");
     if (response.ok) setEvents((await response.json()).events);
+    else setError("Couldn't load the events.");
     setLoaded(true);
   }
 
@@ -87,7 +88,11 @@ export function EventsManager() {
         >
           {busy ? "Adding…" : "Add event"}
         </button>
-        {error && <p className="w-full text-xs text-red-600">{error}</p>}
+        {error && (
+          <p className="w-full text-xs text-red-600" role="alert">
+            {error}
+          </p>
+        )}
       </form>
 
       {loaded && events.length === 0 ? (

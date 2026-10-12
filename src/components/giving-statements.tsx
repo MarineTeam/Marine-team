@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { formatMoney } from "@/lib/giving";
+import { LoadState, Problem } from "@/components/load-state";
 
 type Statement = {
   householdId: string;
@@ -18,11 +19,12 @@ type Statement = {
 /** One statement per household, ready to print. */
 export function GivingStatements() {
   const [year, setYear] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [statements, setStatements] = useState<Statement[] | null>(null);
 
   const load = useCallback(async (taxYear?: number) => {
     const response = await fetch(`/api/admin/giving/statements${taxYear ? `?taxYear=${taxYear}` : ""}`);
-    if (!response.ok) return;
+    if (!response.ok) return setError("Couldn't load the statements.");
     const body = await response.json();
     setYear(body.taxYear);
     setStatements(body.statements);
@@ -33,10 +35,11 @@ export function GivingStatements() {
     void load();
   }, [load]);
 
-  if (!statements || year === null) return <p className="text-sm text-sec">Loading…</p>;
+  if (!statements || year === null) return <LoadState error={error} />;
 
   return (
     <div className="space-y-4">
+      {error && <Problem>{error}</Problem>}
       <div className="flex items-center gap-2 text-sm print:hidden">
         <button onClick={() => load(year - 1)} className="rounded-md border border-sep px-2 py-1">←</button>
         <span className="text-ink">

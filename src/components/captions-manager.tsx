@@ -20,6 +20,7 @@ export function CaptionsManager({ videoId }: { videoId: string }) {
   const load = useCallback(async () => {
     const res = await fetch(`/api/admin/videos/${videoId}/captions`);
     if (res.ok) setCaptions((await res.json()).captions);
+    else setError("Couldn't load the captions.");
   }, [videoId]);
 
   useEffect(() => {

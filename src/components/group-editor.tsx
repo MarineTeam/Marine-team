@@ -36,6 +36,7 @@ export function GroupEditor({ group: initial }: { group: EditableGroup }) {
   const load = useCallback(async () => {
     const response = await fetch(`/api/admin/groups/${initial.id}`);
     if (response.ok) setMembers((await response.json()).members);
+    else setError("Couldn't load this group's members.");
   }, [initial.id]);
 
   useEffect(() => {

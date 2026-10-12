@@ -24,6 +24,7 @@ export function GroupsManager() {
   async function load() {
     const response = await fetch("/api/admin/groups");
     if (response.ok) setGroups((await response.json()).groups);
+    else setError("Couldn't load the groups.");
     setLoaded(true);
   }
 

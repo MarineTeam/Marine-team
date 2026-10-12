@@ -15,6 +15,7 @@ export function GivingFunds() {
   const load = useCallback(async () => {
     const response = await fetch("/api/admin/giving/funds");
     if (response.ok) setFunds((await response.json()).funds);
+    else setError("Couldn't load the funds.");
   }, []);
 
   useEffect(() => {
