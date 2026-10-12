@@ -23,6 +23,13 @@ export default async function AdminGivingFundsPage() {
         </Link>
         <h1 className="mt-1 text-lg font-semibold text-ink">Funds</h1>
         <p className="mt-1 text-sm text-sec">
+          What is in each fund, and what is left once the bills somebody has already agreed to are
+          counted — two figures, never added. Mark a fund <em>restricted</em> when the money was
+          given for a stated purpose: a cost against it is always recorded, but approving one the
+          fund can&apos;t carry is refused, because money given for one thing can&apos;t be spent
+          on another.
+        </p>
+        <p className="mt-1 text-sm text-sec">
           A fund is closed rather than deleted: a statement for a past year has to be able to name
           where the money went. Untick <em>on statements</em> for anything that isn&apos;t
           claimable — a leaving collection — and it is left out of the total and reported

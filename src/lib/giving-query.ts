@@ -3,6 +3,7 @@ import { ApiError } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { hasCapability } from "@/lib/permissions";
+import { checkFund } from "@/lib/funds";
 import { slugify } from "@/lib/slug";
 import {
   byFund,
@@ -34,6 +35,7 @@ const fundSelect = {
   description: true,
   active: true,
   taxDeductible: true,
+  restricted: true,
   position: true,
 } as const;
 
@@ -74,16 +76,25 @@ export async function createFund(input: {
   name: string;
   description?: string | null;
   taxDeductible?: boolean;
+  restricted?: boolean;
 }) {
   const name = input.name.trim();
   const slug = slugify(name);
   if (!slug) throw new ApiError(400, "bad_name", "Give the fund a name.");
+
+  const restricted = input.restricted ?? false;
+  const description = input.description?.trim() || null;
+  // Asked at the point the flag is set, where somebody still knows the answer.
+  const sane = checkFund({ restricted, description });
+  if (!sane.ok) throw new ApiError(400, "needs_purpose", sane.reason);
+
   return prisma.givingFund.create({
     data: {
       name,
       slug,
-      description: input.description?.trim() || null,
+      description,
       taxDeductible: input.taxDeductible ?? true,
+      restricted,
     },
     select: fundSelect,
   });
@@ -91,8 +102,32 @@ export async function createFund(input: {
 
 export async function updateFund(
   id: string,
-  input: { name?: string; description?: string | null; active?: boolean; taxDeductible?: boolean; position?: number },
+  input: {
+    name?: string;
+    description?: string | null;
+    active?: boolean;
+    taxDeductible?: boolean;
+    restricted?: boolean;
+    position?: number;
+  },
 ) {
+  if (input.restricted !== undefined || input.description !== undefined) {
+    const existing = await prisma.givingFund.findUnique({
+      where: { id },
+      select: { restricted: true, description: true },
+    });
+    if (!existing) throw new ApiError(404, "not_found", "Not found");
+    // Checked against the fund as it would be, not as it is: clearing the
+    // description of an already-restricted fund is the same mistake as
+    // restricting one that never had a purpose written down.
+    const sane = checkFund({
+      restricted: input.restricted ?? existing.restricted,
+      description:
+        input.description !== undefined ? input.description?.trim() || null : existing.description,
+    });
+    if (!sane.ok) throw new ApiError(400, "needs_purpose", sane.reason);
+  }
+
   return prisma.givingFund.update({
     where: { id },
     data: {
@@ -100,6 +135,7 @@ export async function updateFund(
       ...(input.description !== undefined ? { description: input.description?.trim() || null } : {}),
       ...(input.active !== undefined ? { active: input.active } : {}),
       ...(input.taxDeductible !== undefined ? { taxDeductible: input.taxDeductible } : {}),
+      ...(input.restricted !== undefined ? { restricted: input.restricted } : {}),
       ...(input.position !== undefined ? { position: input.position } : {}),
     },
     select: fundSelect,

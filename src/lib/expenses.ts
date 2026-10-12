@@ -37,6 +37,9 @@ export type ExpenseRow = {
   claimantId: string | null;
   approvedById: string | null;
   paidOn: IsoDate | null;
+  /// The fund it comes out of, where a church earmarks that way. Null means
+  /// the cost answers to a category budget only.
+  fundId: string | null;
 };
 
 export type CategoryRow = {

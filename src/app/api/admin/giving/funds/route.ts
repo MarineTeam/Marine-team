@@ -3,6 +3,7 @@ import { z } from "zod";
 import { errorResponse } from "@/lib/api-guard";
 import { logAudit } from "@/lib/audit";
 import { isPluginEnabled } from "@/lib/plugins";
+import { allBalances, listTransfers } from "@/lib/funds-query";
 import { createFund, listFunds, requireGivingAccess } from "@/lib/giving-query";
 
 export const dynamic = "force-dynamic";
@@ -11,13 +12,22 @@ const schema = z.object({
   name: z.string().trim().min(1).max(120),
   description: z.string().max(500).nullish(),
   taxDeductible: z.boolean().optional(),
+  restricted: z.boolean().optional(),
 });
 
 export async function GET() {
   try {
     if (!(await isPluginEnabled("giving"))) return NextResponse.json({ error: "Not found" }, { status: 404 });
     await requireGivingAccess();
-    return NextResponse.json({ funds: await listFunds() }, { headers: { "Cache-Control": "private, no-store" } });
+    const [funds, balances, transfers] = await Promise.all([
+      listFunds(),
+      allBalances(),
+      listTransfers(),
+    ]);
+    return NextResponse.json(
+      { funds, balances, transfers },
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
   } catch (error) {
     return errorResponse(error);
   }

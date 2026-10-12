@@ -16,6 +16,8 @@ import {
   spendOf,
   type ExpenseRow,
 } from "@/lib/expenses";
+import { mayApproveAgainst } from "@/lib/funds";
+import { balanceFor, formatFundMoney } from "@/lib/funds-query";
 import { hasCapability } from "@/lib/permissions";
 
 /**
@@ -76,6 +78,7 @@ type RawExpense = {
   claimantId: string | null;
   approvedById: string | null;
   paidOn: Date | null;
+  fundId: string | null;
 };
 
 function asRow(row: RawExpense): ExpenseRow {
@@ -88,6 +91,7 @@ function asRow(row: RawExpense): ExpenseRow {
     claimantId: row.claimantId,
     approvedById: row.approvedById,
     paidOn: row.paidOn ? toIsoDate(row.paidOn) : null,
+    fundId: row.fundId,
   };
 }
 
@@ -95,7 +99,7 @@ function asRow(row: RawExpense): ExpenseRow {
 async function load(id: string): Promise<ExpenseRow> {
   const row = await prisma.expense.findUnique({
     where: { id },
-    select: { id: true, categoryId: true, amount: true, status: true, incurredOn: true, claimantId: true, approvedById: true, paidOn: true },
+    select: { id: true, categoryId: true, amount: true, status: true, incurredOn: true, claimantId: true, approvedById: true, paidOn: true, fundId: true },
   });
   if (!row) throw new ApiError(404, "not_found", "Not found");
   return asRow(row);
@@ -196,6 +200,12 @@ export async function approveExpense(id: string, approver: User) {
   if (!verdict.ok) {
     throw new ApiError(verdict.reason === "Not found" ? 404 : 409, "refused", verdict.reason);
   }
+
+  // A restricted fund in deficit refuses the *approval*, not the record: the
+  // balance is recomputed here rather than anywhere earlier, because a figure
+  // one request old lets the second of two simultaneous approvals through.
+  const fund = mayApproveAgainst(await balanceFor(row.fundId), row.amount, formatFundMoney);
+  if (!fund.ok) throw new ApiError(409, "fund_restricted", fund.reason);
 
   const { count } = await prisma.expense.updateMany({
     where: { id, status: "SUBMITTED" },

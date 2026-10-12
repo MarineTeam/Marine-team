@@ -26,6 +26,8 @@ type Row = {
 
 type Category = { id: string; name: string; slug: string; annualBudget: number | null; active: boolean };
 
+type Fund = { fundId: string; name: string; restricted: boolean; available: number };
+
 type View = {
   from: string;
   to: string;
@@ -67,6 +69,7 @@ const money = (pence: number) =>
 export function ExpensesManager({ meId }: { meId: string }) {
   const [view, setView] = useState<View | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [funds, setFunds] = useState<Fund[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,6 +82,7 @@ export function ExpensesManager({ meId }: { meId: string }) {
     description: "",
     incurredOn: "",
     receiptRef: "",
+    fundId: "",
   });
 
   const load = useCallback(async () => {
@@ -87,6 +91,7 @@ export function ExpensesManager({ meId }: { meId: string }) {
     const body = await response.json();
     setView(body.view);
     setCategories(body.categories);
+    setFunds(body.funds ?? []);
   }, []);
 
   useEffect(() => {
@@ -278,6 +283,7 @@ export function ExpensesManager({ meId }: { meId: string }) {
               description: form.description,
               incurredOn: form.incurredOn,
               receiptRef: form.receiptRef || undefined,
+              fundId: form.fundId || undefined,
             });
             if (ok) setForm({ ...form, amount: "", payee: "", description: "", receiptRef: "" });
           }}
@@ -295,6 +301,21 @@ export function ExpensesManager({ meId }: { meId: string }) {
               {categories.filter((c) => c.active).map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs text-sec">
+            Out of which fund?
+            <select
+              value={form.fundId}
+              onChange={(e) => setForm({ ...form, fundId: e.target.value })}
+              className="mt-1 w-full rounded-md border border-sep px-3 py-1.5 text-sm"
+            >
+              <option value="">No particular fund</option>
+              {funds.map((fund) => (
+                <option key={fund.fundId} value={fund.fundId}>
+                  {fund.name} — {money(fund.available)} left{fund.restricted ? " (restricted)" : ""}
                 </option>
               ))}
             </select>
@@ -350,7 +371,9 @@ export function ExpensesManager({ meId }: { meId: string }) {
         </form>
         <p className="text-xs text-ter">
           Everything lands waiting for approval, including what a treasurer enters — so there is
-          always a name and a date against the decision.
+          always a name and a date against the decision. Naming a restricted fund means the
+          approval is refused if the fund cannot carry it: money given for one purpose can&apos;t
+          be spent on another, and the recording is never what gets refused.
         </p>
       </section>
 

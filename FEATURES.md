@@ -2428,6 +2428,66 @@ A UK church may reclaim the basic-rate tax on an eligible donation, which adds
   confirmation to the donor and a church needs to find the ones still owed a
   letter.
 
+## Restricted funds and what is left in each (`/admin/giving/funds`)
+
+The app recorded income per fund and expenditure per fund and never subtracted
+one from the other. It held every number needed to answer "how much of the
+building fund is left?" and could not answer it — which is the question a church
+asks before it commits to a roofer, and the reason `Expense.fundId` existed as a
+column nothing read.
+
+- **A restricted fund cannot be approved into deficit.** A restricted fund is
+  money given for a stated purpose; in England and Wales that is a trust, and
+  spending it elsewhere is a breach rather than an irregularity. Churches commit
+  one not by dishonesty but by having a single bank account and no per-fund
+  balance anywhere. So approving a cost a restricted fund can't carry is
+  refused, with the shortfall named and both ways out offered: move the cost to
+  another fund, or top this one up and approve it then.
+- **Recording is never refused; the decision is.** The same split as the budget
+  overspend next door and for a sharper reason — refusing to write a cost down
+  does not stop the money leaving, it stops the money being known about, which
+  makes the church's own books the last place the truth appears. Approving, by
+  contrast, is a decision being taken now, and that is where a control belongs.
+  A cost against an empty restricted fund is recorded, shown, and not approvable
+  until somebody acts.
+- **Two figures per fund, never added.** *In the fund* is money that has moved.
+  *Once agreed bills land* also subtracts what has been approved and not yet
+  paid, and it is the one every decision is taken against: a church reading only
+  the first commits the same money twice, quite innocently, three weeks apart.
+  What is awaiting approval is shown and subtracted from neither — nobody has
+  agreed to it, so treating it as spent would hold a fund hostage to a claim
+  that may well be turned down.
+- **An unrestricted fund may go overdrawn, and is told so.** The general fund
+  going negative is bad news, not a rule breach, and a church that cannot record
+  bad news has no way of acting on it. The two cases get different sentences,
+  because they are different problems.
+- **A restricted fund has to say what the money was given for.** A restriction
+  with no stated purpose cannot be enforced by anybody: nothing says which costs
+  are within it, which makes it a label rather than a rule. Asked for at the
+  moment the flag is set, where somebody still knows the answer — including when
+  clearing the purpose of a fund that is already restricted, which is the same
+  mistake from the other end.
+- **Money can be moved between funds, and the reason is required.** Without
+  transfers a church whose trustees have released part of a designated fund has
+  no way to say so, and will mis-file the costs against the general fund
+  instead — a worse record than a transfer with a reason against it. Moving
+  money out of a restricted fund is the entry somebody has to explain years
+  later, so the authority ("Trustees, 4 March") is required rather than
+  optional, exactly as a rejected claim must say why. Taking out more than a
+  restricted fund holds is refused; an unrestricted source may be taken
+  negative, because with one bank account a transfer only reallocates claims on
+  the same pot, and refusing it would stop a church recording a decision its
+  trustees actually took.
+- **A transfer is never edited or deleted.** Correcting one means a transfer the
+  other way, which leaves both entries and the reason for each on the record.
+  Editing would quietly rewrite the explanation of why a restricted fund got
+  smaller, which is the single thing anybody will want to read back.
+- A cost may name no fund at all, and most do: the electricity bill answers to a
+  category budget, not to an appeal. Those are never touched by any of this.
+- The balance is recomputed from the stored rows at the moment of the decision,
+  never cached: a balance one request out of date is a balance that lets the
+  second of two simultaneous approvals through.
+
 ## Money out (`/admin/expenses`)
 
 Giving, Gift Aid and campaigns made the income side of a treasurer's job good.

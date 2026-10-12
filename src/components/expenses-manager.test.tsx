@@ -81,6 +81,11 @@ const view = {
   ],
 };
 
+const funds = [
+  { fundId: "building", name: "Building fund", restricted: true, available: 5_000_00 },
+  { fundId: "general", name: "General fund", restricted: false, available: 500_00 },
+];
+
 const categories = [
   { id: "utilities", name: "Utilities", slug: "utilities", annualBudget: 1_000_00, active: true },
   { id: "closed", name: "Old thing", slug: "old", annualBudget: null, active: false },
@@ -97,7 +102,7 @@ function mockFetch() {
         posted.push(JSON.parse(String(init.body)));
         return { ok: true, json: async () => ({ ok: true }) } as Response;
       }
-      return { ok: true, json: async () => ({ view, categories }) } as Response;
+      return { ok: true, json: async () => ({ view, categories, funds }) } as Response;
     }),
   );
 }
@@ -340,5 +345,56 @@ describe("categories and budgets", () => {
     render(<ExpensesManager meId={ME} />);
     const closed = await categoryRow("Old thing");
     expect(within(closed).getByRole("button", { name: /^reopen$/i })).toBeInTheDocument();
+  });
+});
+
+describe("the fund a cost comes out of", () => {
+  it("shows what is left in each fund while choosing one", async () => {
+    // Seeing it before the choice beats discovering it when the approval is
+    // refused afterwards.
+    render(<ExpensesManager meId={ME} />);
+    const picker = await screen.findByLabelText(/out of which fund/i);
+    const names = Array.from(picker.querySelectorAll("option")).map((option) => option.textContent);
+    expect(names).toContain("Building fund — £5,000 left (restricted)");
+    expect(names).toContain("General fund — £500 left");
+  });
+
+  it("allows a cost that belongs to no fund", async () => {
+    // The electricity bill answers to a category budget, not to an appeal.
+    render(<ExpensesManager meId={ME} />);
+    const picker = await screen.findByLabelText(/out of which fund/i);
+    expect(within(picker).getByRole("option", { name: /no particular fund/i })).toBeInTheDocument();
+  });
+
+  it("sends the chosen fund with the cost", async () => {
+    render(<ExpensesManager meId={ME} />);
+    await userEvent.selectOptions(await screen.findByLabelText(/out of which fund/i), "building");
+    await userEvent.selectOptions(screen.getByLabelText(/^category$/i), "utilities");
+    await userEvent.type(screen.getByPlaceholderText("Amount in pounds"), "40");
+    await userEvent.type(screen.getByPlaceholderText("Who was paid"), "Roofer");
+    await userEvent.type(screen.getByPlaceholderText("What it was for"), "Slates");
+    await userEvent.type(screen.getByLabelText(/when it was incurred/i), "2026-06-01");
+    await userEvent.click(screen.getByRole("button", { name: /record it/i }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toMatchObject({ action: "expense", fundId: "building", amount: 40_00 });
+  });
+
+  it("sends no fund at all when none was chosen", async () => {
+    // An empty string would be a fund id the server cannot find, turning "no
+    // fund" into a 404.
+    render(<ExpensesManager meId={ME} />);
+    await userEvent.selectOptions(await screen.findByLabelText(/^category$/i), "utilities");
+    await userEvent.type(screen.getByPlaceholderText("Amount in pounds"), "40");
+    await userEvent.type(screen.getByPlaceholderText("Who was paid"), "Stationers");
+    await userEvent.type(screen.getByPlaceholderText("What it was for"), "Paper");
+    await userEvent.type(screen.getByLabelText(/when it was incurred/i), "2026-06-01");
+    await userEvent.click(screen.getByRole("button", { name: /record it/i }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).not.toHaveProperty("fundId");
+  });
+
+  it("says plainly that a restricted fund can refuse the approval", async () => {
+    render(<ExpensesManager meId={ME} />);
+    expect(await screen.findByText(/money given for one purpose can't be spent on another/i)).toBeInTheDocument();
   });
 });

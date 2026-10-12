@@ -27,6 +27,26 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Restricted funds, and what is left in each** at `/admin/giving/funds`.
+  Income was recorded per fund and expenditure per fund and never subtracted one
+  from the other, so the app held every number needed to answer "how much of the
+  building fund is left?" and could not answer it — and `Expense.fundId` was a
+  column nothing read. Each fund now shows two figures that are never added:
+  what is in it, and what is left once the bills somebody has already agreed to
+  are counted. A fund marked *restricted* is money given for a stated purpose,
+  which in England and Wales is a trust, and approving a cost it cannot carry is
+  refused with the shortfall named — while the cost itself is always recorded,
+  because refusing to write something down does not stop the money leaving, it
+  only makes the church's own books the last place the truth appears. An
+  unrestricted fund may go overdrawn and is told so in milder words, since that
+  is bad news rather than a breach. Restricting a fund requires saying what the
+  money was given for, because nothing else says which costs are within it.
+  Money can be moved between funds with a required authority — a trustee minute,
+  a donor's agreement — and a transfer is corrected by one the other way rather
+  than edited, so the explanation of why a restricted fund got smaller stays
+  readable. Costs may still name no fund at all, and most do: the electricity
+  bill answers to a category budget, not to an appeal.
+
 - **Money out** at `/admin/expenses`: expenses, reimbursements and budgets, the
   other half of a treasurer's job. Nobody approves their own claim — a refusal
   rather than a warning, checked against the row as stored and the user as

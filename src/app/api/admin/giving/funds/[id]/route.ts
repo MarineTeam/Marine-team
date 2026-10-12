@@ -12,6 +12,7 @@ const schema = z.object({
   description: z.string().max(500).nullish(),
   active: z.boolean().optional(),
   taxDeductible: z.boolean().optional(),
+  restricted: z.boolean().optional(),
   position: z.number().int().min(0).max(999).optional(),
 });
 

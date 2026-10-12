@@ -3170,11 +3170,23 @@ model GivingFund {
   /// quietly includes it is a statement that is wrong.
   taxDeductible Boolean @default(true)
 
+  /// Whether this is money given for a stated purpose and nothing else.
+  ///
+  /// In England and Wales a restricted fund is a trust: spending it on
+  /// something the donor did not give it for is a breach, not an
+  /// irregularity. The usual way a church commits one is not dishonesty but a
+  /// single bank account and no per-fund balance anywhere — which is why the
+  /// balance in lib/funds.ts exists and why approving against a restricted
+  /// fund in deficit is refused rather than reported.
+  restricted Boolean @default(false)
+
   position Int @default(0)
 
-  gifts     Gift[]
-  campaigns GivingCampaign[]
-  expenses  Expense[]
+  gifts        Gift[]
+  campaigns    GivingCampaign[]
+  expenses     Expense[]
+  transfersOut FundTransfer[]   @relation("TransferFrom")
+  transfersIn  FundTransfer[]   @relation("TransferTo")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3960,4 +3972,42 @@ enum ExpenseStatus {
   /// Turned down, with a reason. Kept rather than deleted: "we said no" is a
   /// different fact from "nobody asked", and only one of them is answerable.
   REJECTED
+}
+
+/// Money moved from one fund to another.
+///
+/// The escape hatch the fund balances need, and the one place they can be
+/// wrong on purpose. Without it a church whose trustees have released part of
+/// a designated fund has no way to say so, and will instead mis-file the costs
+/// against the general fund — which is a worse record than a transfer with a
+/// reason against it.
+///
+/// `authority` is required, not optional: moving money out of a restricted
+/// fund is the thing that needs explaining years later, and "the trustees
+/// agreed on 4 March" is the explanation. Same reasoning as a rejected
+/// expense having to say why.
+model FundTransfer {
+  id String @id @default(cuid())
+
+  from       GivingFund @relation("TransferFrom", fields: [fromFundId], references: [id])
+  fromFundId String
+  to         GivingFund @relation("TransferTo", fields: [toFundId], references: [id])
+  toFundId   String
+
+  /// Minor units, like every other money column here.
+  amount Int
+
+  movedOn DateTime @db.Date
+
+  /// What permits it — a trustee minute, a donor's written agreement. Required.
+  authority String
+  note      String?
+
+  recordedByEmail String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fromFundId, movedOn])
+  @@index([toFundId, movedOn])
 }

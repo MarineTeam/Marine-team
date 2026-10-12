@@ -15,6 +15,7 @@ import {
   requireMoney,
   updateCategory,
 } from "@/lib/expenses-query";
+import { allBalances } from "@/lib/funds-query";
 import { isPluginEnabled } from "@/lib/plugins";
 
 /**
@@ -91,6 +92,10 @@ export async function GET(request: NextRequest) {
           to && isIsoDate(to) ? to : today,
         ),
         categories: await listCategories(),
+        // The open funds with what is left in each, so a treasurer choosing
+        // one can see whether it can carry the cost before they choose it
+        // rather than after the approval is refused.
+        funds: await allBalances(false),
       },
       { headers: { "Cache-Control": "private, no-store" } },
     );

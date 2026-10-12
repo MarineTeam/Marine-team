@@ -26,6 +26,7 @@ const expense = (over: Partial<ExpenseRow> = {}): ExpenseRow => ({
   claimantId: null,
   approvedById: null,
   paidOn: null,
+  fundId: null,
   ...over,
 });
 
