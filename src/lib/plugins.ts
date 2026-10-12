@@ -40,6 +40,7 @@ export const PLUGIN_META = [
   { slug: "sms-inbox", name: "Text replies", description: "Takes replies to the texts this app sends and threads them by number, so an answer to a broadcast lands somewhere a person will read it." },
   { slug: "safeguarding", name: "Safeguarding", description: "Records that somebody saw a volunteer's clearance and until when — never the certificate itself — and refuses to put an uncleared person on a team that requires one." },
   { slug: "attendance", name: "Attendance", description: "A headcount per gathering, taken by a steward rather than inferred from sign-ins, and the church-life dashboard built on it — the denominator every other number needs." },
+  { slug: "expenses", name: "Money out", description: "What the church spends, against a budget — with reimbursements nobody can approve for themselves, and approved kept separate from paid." },
 ] as const;
 
 export type PluginSlug = (typeof PLUGIN_META)[number]["slug"];

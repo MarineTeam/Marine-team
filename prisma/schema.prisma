@@ -184,6 +184,8 @@ model User {
   coveredForAssignments ServiceAssignment[]   @relation("AssignmentCoveredFor")
   clearances            VolunteerClearance[]
   clearancesVerified    VolunteerClearance[]  @relation("ClearanceVerifiedBy")
+  expenseClaims         Expense[]             @relation("ExpenseClaimant")
+  expensesApproved      Expense[]             @relation("ExpenseApprover")
   serviceBlockouts      ServiceBlockout[]
   /// The name this account appears under on a rota, when they are the same
   /// person — see Person.
@@ -3172,6 +3174,7 @@ model GivingFund {
 
   gifts     Gift[]
   campaigns GivingCampaign[]
+  expenses  Expense[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3849,4 +3852,112 @@ enum PledgeStatus {
   /// Withdrawn by the giver, or written off. Kept rather than deleted: a
   /// campaign's history is the pledges it had, not the ones that worked out.
   CANCELLED
+}
+
+/// What the church spends money on: utilities, mission giving, the building.
+///
+/// Separate from `GivingFund`, which is what money comes *in* to. A church
+/// collects into a building fund and spends on a roofer; conflating the two
+/// gives a chart of accounts where every row means one of two things depending
+/// on its sign, which is how a treasurer loses an afternoon.
+model ExpenseCategory {
+  id   String @id @default(cuid())
+  name String
+  slug String @unique
+
+  /// What was set aside for a year, in minor units. Nullable: plenty of
+  /// categories have no budget, and a zero would read as "nothing allowed"
+  /// rather than "nobody has decided".
+  annualBudget Int?
+
+  active   Boolean   @default(true)
+  position Int       @default(0)
+  expenses Expense[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, position])
+}
+
+/// Money going out, including a volunteer's reimbursement.
+///
+/// **Approved is not paid.** They are separate dates and separate states,
+/// because a budget answers "what have we committed?" and a bank statement
+/// answers "what has left?", and a church that reports one as the other either
+/// double-spends or thinks it is poorer than it is. Both figures are reported
+/// everywhere, never one.
+///
+/// The load-bearing rule is in lib/expenses.ts and not expressible as a column:
+/// **nobody may approve their own claim.** A volunteer who can wave through
+/// their own reimbursement is a fraud route, and it is the kind that gets found
+/// years later by an auditor rather than next week by a colleague.
+model Expense {
+  id String @id @default(cuid())
+
+  category   ExpenseCategory @relation(fields: [categoryId], references: [id])
+  categoryId String
+
+  /// Minor units, like every other money column here.
+  amount Int
+
+  /// Who was paid — a supplier, a utility, a person. Free text because most of
+  /// them are never in the membership.
+  payee       String
+  description String
+
+  /// The day the cost was incurred, which is not the day it was paid.
+  incurredOn DateTime @db.Date
+
+  status ExpenseStatus @default(SUBMITTED)
+
+  /// Whose claim this is, when it is a reimbursement rather than an invoice.
+  /// Null for an ordinary bill: the gas board is not claiming anything back.
+  claimant   User?   @relation("ExpenseClaimant", fields: [claimantId], references: [id], onDelete: SetNull)
+  claimantId String?
+
+  /// Who approved it, and when. Denormalized email alongside the relation for
+  /// the same reason the audit log does it: removing somebody's account must
+  /// not erase the record of what they approved.
+  approvedBy      User?     @relation("ExpenseApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedById    String?
+  approvedByEmail String?
+  approvedOn      DateTime? @db.Date
+
+  /// When the money actually left, and how.
+  paidOn     DateTime? @db.Date
+  paidMethod String?
+
+  /// Why it was turned down. Required by the rules when rejecting: a claim
+  /// refused with no reason is one the claimant asks about in person.
+  rejectedReason String?
+
+  /// Where the receipt is filed — the church's own reference, never the image.
+  /// Same reasoning as the Gift Aid declarations: this app is not a document
+  /// store, and a receipt carries a card's last four more often than not.
+  receiptRef String?
+
+  /// Which giving fund it comes out of, where a church earmarks that way.
+  fund   GivingFund? @relation(fields: [fundId], references: [id], onDelete: SetNull)
+  fundId String?
+
+  recordedByEmail String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, incurredOn])
+  @@index([categoryId, incurredOn])
+  @@index([claimantId, status])
+}
+
+enum ExpenseStatus {
+  /// Entered, waiting for somebody to approve it.
+  SUBMITTED
+  /// Agreed, and committed against the budget — but the money has not left.
+  APPROVED
+  PAID
+  /// Turned down, with a reason. Kept rather than deleted: "we said no" is a
+  /// different fact from "nobody asked", and only one of them is answerable.
+  REJECTED
 }

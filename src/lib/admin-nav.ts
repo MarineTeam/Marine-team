@@ -161,6 +161,9 @@ export const ADMIN_GROUPS: AdminGroup[] = [
       // job, done for HMRC instead of for the donor.
       { href: "/admin/giving/gift-aid", label: "Gift Aid", visible: (a) => a.canManageGiving },
       { href: "/admin/giving/campaigns", label: "Campaigns", visible: (a) => a.canManageGiving },
+      // The other half of the treasurer's job, behind the same grant: seeing
+      // what came in and not what went out is a worse half-answer than either.
+      { href: "/admin/expenses", label: "Money out", visible: (a) => a.canManageGiving },
     ],
   },
   {

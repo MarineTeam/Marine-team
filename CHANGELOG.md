@@ -27,6 +27,25 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Money out** at `/admin/expenses`: expenses, reimbursements and budgets, the
+  other half of a treasurer's job. Nobody approves their own claim — a refusal
+  rather than a warning, checked against the row as stored and the user as
+  signed in, so an approver id in a request body counts for nothing; the screen
+  says so on your own claim rather than offering a button that fails. Approved
+  and paid are never one figure: paid out, agreed-not-yet-paid, and the position
+  both at the bank and once the commitments land, with their sum never printed
+  as "spent". Going over budget is reported and never refused — a boiler fails
+  in February whatever the budget said, and refusing the entry only stops the
+  money being recorded — so the percentage stays uncapped where a pledge's is
+  capped. Spend counts by the date a cost was incurred, not when it was paid, so
+  December's figures do not move in January. A rejection must say why and can be
+  reopened. The queue is oldest first, not biggest, and anybody signed in can
+  file a claim and see where their £8 got to without a capability. Everything
+  lands awaiting approval, including what a treasurer enters. Categories and
+  budgets are set on the screen rather than in a seed file; a budget left empty
+  means nobody has decided, which is not the zero that would report a category
+  as instantly over.
+
 - **Campaigns and pledges** at `/admin/giving/campaigns`. Giving recorded what
   arrived and could not say how it stood against what was asked for. Three
   numbers now follow a campaign and are never added together: target, pledged,

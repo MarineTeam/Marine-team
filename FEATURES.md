@@ -2337,9 +2337,7 @@ ones in `vercel.json`.
   when the bar itself is — i.e. never for anyone but an enabled-and-`ADMIN`
   viewer — so it costs nothing for ordinary visitors.
 
-## Security
-
-### Campaigns and pledges (`/admin/giving/campaigns`)
+## Campaigns and pledges (`/admin/giving/campaigns`)
 
 Giving records what arrived. It could not answer "we asked for £400,000, where
 are we?", which is the question a building appeal is actually run on.
@@ -2381,7 +2379,7 @@ are we?", which is the question a building appeal is actually run on.
   the pledges it had, not only the ones that worked out. Their money still counts
   toward the appeal.
 
-### Gift Aid (`/admin/giving/gift-aid`)
+## Gift Aid (`/admin/giving/gift-aid`)
 
 A UK church may reclaim the basic-rate tax on an eligible donation, which adds
 25% to it. Recording the gifts was never enough to do that.
@@ -2429,6 +2427,76 @@ A UK church may reclaim the basic-rate tax on an eligible donation, which adds
 - Verbal declarations are listed separately, because HMRC requires written
   confirmation to the donor and a church needs to find the ones still owed a
   letter.
+
+## Money out (`/admin/expenses`)
+
+Giving, Gift Aid and campaigns made the income side of a treasurer's job good.
+None of it said where a penny went, so the church could see what arrived and not
+what it spent — half an answer to the only question the annual meeting actually
+asks. Expenses, reimbursements and budgets are the other half.
+
+- **Nobody approves their own claim.** The load-bearing rule, and the reason
+  there is a rules module rather than a few extra columns. A volunteer who can
+  wave through their own reimbursement is a fraud route of the kind an auditor
+  finds years later rather than a colleague finds next week. It is a refusal,
+  not a warning, and it holds for the treasurer too. The check runs against the
+  row as stored and the user as signed in, so an approver id in a request body
+  is worth nothing. The screen says so in words on the claimant's own claim
+  rather than offering a button that fails — a control somebody only discovers
+  by tripping over it is one they work around.
+- **Approved is not paid, anywhere.** A budget answers "what have we committed
+  to?" and a bank statement answers "what has left?". Reporting either as the
+  other means double-spending or believing the church is poorer than it is, so
+  the two travel together: *paid out* (money that has left), *agreed, not yet
+  paid* (still in the account), and a position given twice — the bank's, and the
+  one once the agreed bills land. Their sum is never printed as a single "spent"
+  figure, which is what a component test asserts.
+- **Over budget is reported, never refused.** A boiler fails in February
+  whatever the budget said, and refusing the entry does not stop the money going
+  out — it stops the money being recorded. So a category goes over, says by how
+  much, and sorts to the top. The percentage is deliberately uncapped: unlike a
+  pledge, where going past the target is generosity, here flattening 140% to
+  100% hides the one thing the report exists to show.
+- **Spend counts by the date the cost was incurred**, not the date it was paid.
+  A December invoice settled in January belongs to December; a church that files
+  it by the payment date finds its December figures change after the year has
+  closed.
+- **A rejection has to say why.** A claim refused with nothing written is one the
+  claimant asks about in the car park, where the person who refused it cannot
+  remember. Rejected claims keep the refusal on record and can be reopened, so a
+  mistake is not final.
+- **The queue is oldest first, not biggest.** A volunteer who is out of pocket is
+  out of pocket whatever the amount, and a queue sorted by size leaves the small
+  claims for ever — which is how people stop claiming and quietly subsidise the
+  church instead. For the same reason, seeing your own claims needs no
+  capability: anybody signed in can file one and watch where their £8 got to.
+- **Everything lands waiting for approval, including what a treasurer enters.**
+  It looks like a formality until the day somebody asks who agreed to a £9,000
+  payment and the answer is a timestamp rather than a shrug.
+- A future-dated cost is refused: next March's spend is a plan, and a budget that
+  counts plans double-counts when the thing is actually bought. Amounts are whole
+  pence, as everywhere else money is handled.
+- The receipt field holds a *reference* — where the paper is filed — and says so
+  in the box. Storing the receipt itself is a document-management problem, and
+  pretending otherwise would have the church believe its receipts were safe here.
+- Approving and paying are both conditional updates, so two people pressing
+  together produce one approval rather than the second overwriting the first's
+  name, and nothing is paid twice.
+- **Categories and budgets are set on the screen, not in a seed file**, because
+  a feature whose first requirement is a database insert is one no church
+  starts using. A budget may be left empty, which means nobody has decided —
+  not that nothing is allowed, which a zero would say, and which would report
+  the category as instantly over. A closed category stays listed, struck
+  through, and can be reopened: deleting it would take its history with it.
+  Setting a budget refuses a typo rather than accepting it, because `NaN`
+  serialises to `null` and the obvious code silently clears the budget instead.
+- **Expense categories are separate from giving funds.** A church collects into
+  a building fund and spends on a roofer; one table for both gives a chart of
+  accounts where every row means one of two things depending on its sign. An
+  expense can still name the fund it comes out of, where a church earmarks that
+  way.
+
+## Security
 
 ### Who looked, not just who changed
 
