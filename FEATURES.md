@@ -2428,6 +2428,78 @@ A UK church may reclaim the basic-rate tax on an eligible donation, which adds
   confirmation to the donor and a church needs to find the ones still owed a
   letter.
 
+## Receipts and payments (`/admin/giving/accounts`)
+
+Every piece of this had existed for a while — gifts by fund, Gift Aid claims
+HMRC had settled, expenses with a paid date, transfers between funds, a
+restricted flag on each fund — and nothing assembled them. A church could see
+what arrived, what it spent and what was left in each fund, and still had
+nothing to hand its annual meeting or an independent examiner. This is the
+statement: opening balance, receipts, payments, closing balance, for one
+financial year, in restricted and unrestricted columns.
+
+Three of its four rules are inversions of rules that hold elsewhere in the app,
+which is the whole difficulty of the thing.
+
+- **Cash, not commitment.** A payment counts on the day the money left, by
+  `paidOn` — the exact opposite of the budget report, which counts by
+  `incurredOn` because a budget answers "what did this year cost?". This
+  answers "what moved through the bank?". An invoice approved in December and
+  paid in January belongs to December's budget and to January's receipts and
+  payments, and getting it backwards produces a statement that cannot be
+  reconciled against a bank statement — the one thing it must do.
+- **Agreed and not yet paid is a liability, never a payment.** It appears under
+  its own heading, outside the columns. A statement that counted it would not
+  add up against the bank; one that left it out would hide what the church
+  owes. It is judged on the dates rather than the row's current status, so a
+  bill approved in December and paid the following February is a liability at
+  31 December — which is what it was, whatever it looks like when the report is
+  run months later.
+- **A transfer between funds is neither a receipt nor a payment.** It moves
+  money between the columns and nets to zero across them. Counting one as
+  income is how a church reports the same £10,000 twice.
+- **Restricted and unrestricted are separate columns, and the restriction
+  follows the money** — including the Gift Aid. A claim is apportioned across
+  funds in proportion to the gifts it was claimed on, because tax recovered on
+  a restricted gift carries the restriction with it. A single "general income"
+  line for Gift Aid would quietly move restricted money into the unrestricted
+  column, which is the breach the restricted-fund rules exist to prevent. The
+  apportionment gives the whole remainder to the largest share, so the parts
+  add back to the penny.
+
+Also:
+
+- **The financial year is not the tax year.** Gift Aid runs on HMRC's, fixed at
+  6 April; the accounts run on whatever year the church adopted, often 1
+  January and often not. Treating them as one is how a statement ends up
+  covering the wrong twelve months. The year start is chosen on the screen, and
+  a year that straddles two is labelled for both — "the 2026 accounts" means
+  different twelve months to two churches a mile apart.
+- **The statement says whether it closes.** The closing balance is worked out
+  twice by different routes — once as opening plus the year's movements, once
+  from the whole history up to the year end — and the screen says loudly when
+  they disagree, rather than printing figures nobody can trust. It catches a
+  date-boundary mistake, which is how this sort of report usually goes wrong: an
+  opening balance taking the first day of the year and the receipts taking it
+  too counts that day twice, and every total still looks plausible. It is not a
+  check for missing data and cannot be, which is written down so nobody reads
+  more into a tick than it means.
+- **Gift Aid counts on the day HMRC settled it**, not when it was claimed. A
+  claim HMRC has not paid is not a receipt, however certain it looks.
+- **A spreadsheet of the same figures** is a download away, because an examiner
+  asks for something they can open and a church that cannot produce one types
+  the figures out again by hand, which is where transcription errors come from.
+  If the statement does not reconcile, the warning is written into the file as
+  well as shown on the screen: the spreadsheet is what gets emailed on, and a
+  figure nobody can trust must not travel alone.
+- **Read-only, and not read-audited.** There is no POST: giving one would
+  invite somebody to adjust a figure rather than correct the entry it came
+  from. And the read log covers screens that identify a person, which this one
+  does not — every figure on it is a total.
+- The year picker offers only the years there is anything to report on. Every
+  year since 1970 in a dropdown is how somebody files the accounts for 1994 by
+  accident.
+
 ## Restricted funds and what is left in each (`/admin/giving/funds`)
 
 The app recorded income per fund and expenditure per fund and never subtracted

@@ -27,6 +27,26 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Receipts and payments** at `/admin/giving/accounts`: the annual statement,
+  which every piece of had existed for a while with nothing assembling them. A
+  financial year's opening balance, receipts, payments and closing balance, in
+  restricted and unrestricted columns. Three of its rules invert rules that
+  hold elsewhere: payments count on the day the money *left*, not the day the
+  cost was incurred as the budget report counts them; agreed-and-not-yet-paid
+  is a liability shown outside the columns rather than a payment, judged on the
+  dates so a bill approved in December and paid in February is a liability at
+  31 December whenever the report is run; and a transfer between funds is
+  neither a receipt nor a payment, moving between columns and netting to zero,
+  because counting one is how a church reports the same £10,000 twice. Gift Aid
+  counts on the day HMRC settled it and is apportioned across funds in
+  proportion to the gifts claimed on, since tax recovered on a restricted gift
+  carries the restriction with it. The financial year is not the tax year, so
+  its start is chosen on the screen and a straddling year is labelled for both.
+  The closing balance is worked out twice by different routes and the screen
+  says loudly when they disagree rather than printing figures nobody can trust.
+  A spreadsheet of the same figures is a download away, and carries the same
+  warning in the file when it does not reconcile.
+
 - **Restricted funds, and what is left in each** at `/admin/giving/funds`.
   Income was recorded per fund and expenditure per fund and never subtracted one
   from the other, so the app held every number needed to answer "how much of the
