@@ -939,12 +939,25 @@ Written for a Postgres free tier, where every query counts:
 
 ## Testing & CI
 
-`npm test` runs the vitest suite in `src/lib/*.test.ts`. It covers the pure
-and query-shaping logic that tends to break silently — `canAccess`,
+`npm test` runs the vitest suite. It has two projects, split by file
+extension: `src/**/*.test.ts` runs in Node and covers the pure and
+query-shaping logic that tends to break silently — `canAccess`,
 `categoryChainIds`, sequential-unlock derivation, `hasCapability` and
-category-scope resolution, plugin override precedence, and `reorderArray`.
-`@/lib/db` is mocked throughout, so the suite needs no database and no
-environment variables.
+category-scope resolution, plugin override precedence, `reorderArray`, and the
+money rules in `giving`, `gift-aid`, `pledges`, `expenses` and `funds`. The
+`src/**/*.test.tsx` project runs in jsdom against React Testing Library and
+covers the handful of guarantees only a rendered screen can show — that a
+failed load says so rather than sitting on "Loading…", that nobody is offered
+a button the server will refuse, and that two figures which must never be
+added are not. `@/lib/db` is mocked throughout and `fetch` is the seam for the
+component tests, so the suite needs no database and no environment variables.
+
+Claude Code on the web clones this repo into a fresh container each session,
+so `.claude/hooks/session-start.sh` installs `node_modules`, starts a local
+Postgres, writes a `.env` pointing at it, applies the migrations and generates
+the client before the session begins. It only runs when `CLAUDE_CODE_REMOTE`
+is set, so it never touches a developer's own database or `.env`, and each
+step is skipped when it has already been done.
 
 `.github/workflows/ci.yml` runs on every pull request and every push to
 `main`: type check (`tsc --noEmit`), lint (`eslint .`), `npm test`, then
