@@ -959,6 +959,16 @@ the client before the session begins. It only runs when `CLAUDE_CODE_REMOTE`
 is set, so it never touches a developer's own database or `.env`, and each
 step is skipped when it has already been done.
 
+It also creates a second, empty database and puts it in `SHADOW_DATABASE_URL`,
+because **`prisma migrate diff --shadow-database-url` resets whatever database
+it is given**. Pointing that flag at the working database drops its
+`_prisma_migrations` table, and every later `migrate deploy` then refuses to
+run with `P3005` ("the database schema is not empty") — a schema that is
+perfectly up to date but has no history to compare against. Pass
+`"$SHADOW_DATABASE_URL"` instead. The hook also repairs that state when it
+finds it: a database with tables but no migration history is recreated from
+the migrations rather than baselined, since this one holds only test rows.
+
 `.github/workflows/ci.yml` runs on every pull request and every push to
 `main`: type check (`tsc --noEmit`), lint (`eslint .`), `npm test`, then
 `prisma validate` and `prisma format --check`. That last check is why an

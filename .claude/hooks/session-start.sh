@@ -32,6 +32,11 @@ fi
 
 DB_NAME="marine"
 DB_URL="postgresql://postgres@127.0.0.1:5432/${DB_NAME}"
+# A database of its own for `prisma migrate diff --shadow-database-url`, which
+# Prisma RESETS: pointing that flag at $DB_NAME drops its migration history and
+# leaves the next `migrate deploy` refusing to run.
+SHADOW_NAME="${DB_NAME}_shadow"
+SHADOW_URL="postgresql://postgres@127.0.0.1:5432/${SHADOW_NAME}"
 PG_BIN="$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -1)"
 PGDATA="/var/lib/postgresql/${DB_NAME}"
 failures=()
@@ -75,9 +80,27 @@ else
   fi
 
   if "$PG_BIN/pg_isready" -h 127.0.0.1 -p 5432 -q; then
-    if ! su postgres -c "$PG_BIN/psql -h 127.0.0.1 -tAc \"select 1 from pg_database where datname='$DB_NAME'\"" 2>/dev/null | grep -q 1; then
-      say "creating the $DB_NAME database"
-      su postgres -c "$PG_BIN/createdb -h 127.0.0.1 '$DB_NAME'" || fail "createdb"
+    for db in "$DB_NAME" "$SHADOW_NAME"; do
+      if ! su postgres -c "$PG_BIN/psql -h 127.0.0.1 -tAc \"select 1 from pg_database where datname='$db'\"" 2>/dev/null | grep -q 1; then
+        say "creating the $db database"
+        su postgres -c "$PG_BIN/createdb -h 127.0.0.1 '$db'" || fail "createdb $db"
+      fi
+    done
+
+    # A schema with tables but no _prisma_migrations is a database of unknown
+    # provenance: `migrate deploy` refuses it (P3005) and the session is left
+    # with no working database at all. It happens — most easily by pointing
+    # `migrate diff --shadow-database-url` at this database, which Prisma
+    # resets as a matter of course. Since this one is created here and holds
+    # nothing but test rows, the repair is to start it again rather than to
+    # baseline 76 migrations against a schema nobody has checked.
+    tables=$(su postgres -c "$PG_BIN/psql -h 127.0.0.1 -d '$DB_NAME' -tAc \"select count(*) from information_schema.tables where table_schema='public'\"" 2>/dev/null | tr -d ' ')
+    history=$(su postgres -c "$PG_BIN/psql -h 127.0.0.1 -d '$DB_NAME' -tAc \"select to_regclass('public._prisma_migrations')\"" 2>/dev/null | tr -d ' ')
+    if [ "${tables:-0}" -gt 0 ] && [ -z "$history" ]; then
+      say "$DB_NAME has tables but no migration history — recreating it"
+      su postgres -c "$PG_BIN/dropdb -h 127.0.0.1 --force '$DB_NAME'" &&
+        su postgres -c "$PG_BIN/createdb -h 127.0.0.1 '$DB_NAME'" ||
+        fail "recreating $DB_NAME"
     fi
   fi
 fi
@@ -96,6 +119,10 @@ if [ ! -f .env ]; then
 # Postgres. Not the deployment's configuration — see .env.example for that.
 DATABASE_URL="${DB_URL}"
 POOLED_DATABASE_URL="${DB_URL}"
+# What to pass to prisma migrate diff as its --shadow-database-url. Never pass
+# the real database there: Prisma resets whatever it is given, which drops the
+# migration history and leaves the next migrate deploy refusing to run.
+SHADOW_DATABASE_URL="${SHADOW_URL}"
 APP_BASE_URL="http://localhost:3000"
 ENV
 fi
@@ -104,11 +131,13 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   {
     echo "export DATABASE_URL=\"${DB_URL}\""
     echo "export POOLED_DATABASE_URL=\"${DB_URL}\""
+    echo "export SHADOW_DATABASE_URL=\"${SHADOW_URL}\""
   } >> "$CLAUDE_ENV_FILE"
 fi
 
 export DATABASE_URL="$DB_URL"
 export POOLED_DATABASE_URL="$DB_URL"
+export SHADOW_DATABASE_URL="$SHADOW_URL"
 
 # 4 and 5. Migrations and the generated client. Both only if there is a
 # database to talk to; `prisma generate` needs none, but a client generated
