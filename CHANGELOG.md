@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-10-13
+
 ### Fixed
 
 - **A failed first load is no longer invisible.** Ten admin screens rendered
@@ -113,8 +115,6 @@ All notable changes to this project are documented here. Format follows
   rather than whatever is in the date boxes) and the check-in desk (13,
   including that the override cannot be fired with nothing written in it and
   that a refusal reaches the volunteer at the door).
-
-### Added
 
 - **Gift Aid** at `/admin/giving/gift-aid`, which closes an assumption in the
   giving feature rather than adding a new one. `GivingFund.taxDeductible` says a
