@@ -138,6 +138,9 @@ export const ADMIN_GROUPS: AdminGroup[] = [
       { href: "/admin/access-attempts", label: "Access attempts", visible: (a) => a.canViewAuditLog },
       // The people behind the accounts — including everyone who has none.
       { href: "/admin/households", label: "Households", visible: (a) => a.canManagePeople },
+      // The roll is the same sort of list as the household records and is kept
+      // by the same person, so it shares their grant.
+      { href: "/admin/membership", label: "Membership roll", visible: (a) => a.canManagePeople },
       { href: "/admin/follow-ups", label: "Follow-ups", visible: (a) => a.canManagePeople },
       // Same gate as the family records: who has been checked is kept by the
       // same person who keeps the household list, and by nobody else. In

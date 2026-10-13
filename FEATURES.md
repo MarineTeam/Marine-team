@@ -1456,6 +1456,63 @@ The numbers about people, rather than the ones about content.
 - It says how many weeks have no count, because every figure that divides by a
   congregation is only as good as those.
 
+## The membership roll (`/admin/membership`)
+
+A church keeps a roll because somebody asks it to: a denominational return, a
+charity annual report, a vote that needs a quorum. What they ask is not "who is
+a member?" but "who was on the roll on 31 December?", and those are different
+questions. A boolean on a person answers only the first, and answers it for
+today — the moment somebody is removed, last year's roll becomes unknowable,
+which is exactly when the auditor asks for it. So the roll is **derived** from
+an append-only log of changes and never stored.
+
+- **Every change carries the date it took effect**, not the date it was typed. A
+  revision held in March records lapses dated to the previous 31 December, and a
+  transfer letter that arrives in June records the date on the letter.
+  Recording-time dates would put people in the wrong year's figures, which is
+  the whole thing this is for.
+- **A person's changes must alternate**: joining, leaving, joining. Two
+  joinings with no leaving between them is the state that makes a roll count
+  somebody twice, and it cannot be prevented by a column because it depends on
+  the dates of every other change that person has. The check runs against the
+  person's record as at the *new entry's own date*, because backfilling is
+  normal — and against the entries that follow it too, since a joining slipped
+  into the middle of an open spell breaks the sequence just as surely as
+  appending one does.
+- **Nothing is ever edited or deleted.** A correction is a further entry. An
+  editable log would not keep last year's roll reproducible, which is the only
+  reason the log exists.
+- **One enum, not a kind and a reason**, because the direction *is* the reason:
+  a baptism is a joining and a death is a leaving. Two columns would invite the
+  pair that cannot happen. The eight routes — baptism, profession of faith,
+  transfer in, restored, death, transfer out, at their own request, lapsed at a
+  revision — are what a return asks to be counted separately.
+- **Being restored is its own route**, not another transfer in, because a
+  return asks about it separately and because "a member since 1998" is wrong
+  for somebody who left in 2003 and came back in 2022. The roll dates each
+  person from the start of their *current* spell.
+- **Why somebody came off the roll is read one person at a time**, never in a
+  listing, and recorded in the read log when it is. A transfer is nothing; a
+  removal is not, and a roll is a thing churches pin to a noticeboard. Same
+  shape as the safeguarding register withholding a withdrawal reason, for the
+  same reason.
+- **A revision gives the four figures a return wants**: so many at the start,
+  so many in by each route, so many out by each, so many at the end — with the
+  counts worked out independently of the movements and a loud warning when they
+  disagree. Routes nobody came or went by are left out, because eight zeroes
+  would bury the two numbers that matter.
+- **The opening roll is the day before the span starts.** A joining on the
+  first day belongs to the span's movements, not to what was already there;
+  counting it twice is the boundary error this sort of report always has, and
+  every total still looks plausible when it happens.
+- Soft-deleted people drop out of the listing and their history still stands: a
+  person removed from the app is not a statement about whether they were a
+  member in 2019, so historic figures stay intact while the name stops
+  appearing.
+- The picker offers people already on the roll as well as those who are not —
+  somebody has to be on it to come off it, and a picker that hid them would
+  make a death impossible to record.
+
 ## Safeguarding
 
 Who has been checked, at `/admin/safeguarding`.

@@ -2052,6 +2052,7 @@ model Person {
   collected           CheckinRecord[]       @relation("ReleasedTo")
   giftAidDeclarations GiftAidDeclaration[]
   pledges             Pledge[]
+  membership          MembershipEvent[]
 
   deletedAt DateTime?
   createdAt DateTime  @default(now())
@@ -4010,4 +4011,71 @@ model FundTransfer {
 
   @@index([fromFundId, movedOn])
   @@index([toFundId, movedOn])
+}
+
+/// How somebody came onto the roll, or went off it.
+///
+/// One enum rather than a kind column and a reason column, because the
+/// direction *is* the reason: a baptism is a joining and a death is a leaving,
+/// and splitting them into two fields invites the pair that cannot happen —
+/// a joining whose reason is death. lib/membership.ts derives the direction,
+/// which keeps it defined in one place.
+enum MembershipChange {
+  /// Joining.
+  BAPTISM
+  /// Confirmation, profession of faith — whatever the tradition calls it.
+  PROFESSION
+  TRANSFER_IN
+  /// Back on the roll after lapsing, which is a different fact from a first
+  /// joining and is asked about separately on most annual returns.
+  RESTORED
+
+  /// Leaving.
+  DEATH
+  TRANSFER_OUT
+  /// They asked to come off.
+  REQUEST
+  /// Removed at a roll revision: not found, not in touch, not transferred.
+  LAPSED
+}
+
+/// One change to the membership roll, kept for ever.
+///
+/// Append-only, and the roll is derived from it rather than stored. A boolean
+/// on Person would answer "are they a member now?" and nothing else, while the
+/// question an annual return and a denominational audit actually ask is "who
+/// was on the roll on 31 December?" — which a flag somebody has since
+/// overwritten cannot answer at all.
+///
+/// The rule that is not a column: a person's events must alternate, joining
+/// then leaving then joining. Two joinings with no leaving between them is the
+/// state that makes a roll count somebody twice, and it lives in
+/// lib/membership.ts because it depends on the dates of every other event.
+model MembershipEvent {
+  id String @id @default(cuid())
+
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+  personId String
+
+  change MembershipChange
+
+  /// The day it took effect, which is not the day somebody typed it in. A roll
+  /// revision in March records lapses dated to the previous 31 December.
+  on DateTime @db.Date
+
+  /// Where they went, or came from — the other church, usually. Free text
+  /// because most of them are not in any list this app holds.
+  congregation String?
+
+  /// Anything else worth saying. Read one person at a time, never in a list:
+  /// why somebody left a church is the most sensitive line in this table.
+  note String?
+
+  recordedByEmail String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([personId, on])
+  @@index([on])
 }

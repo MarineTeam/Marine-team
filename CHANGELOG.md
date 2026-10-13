@@ -6,6 +6,27 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **The membership roll** at `/admin/membership`, kept as an append-only log of
+  joinings and leavings rather than a flag on each person. What a denominational
+  return or an auditor asks is not "who is a member?" but "who was on the roll
+  on 31 December?", and a flag somebody has since overwritten cannot answer
+  that at all — so the roll is derived and any past date can be reproduced.
+  Every entry carries the date it took effect rather than the date it was
+  typed, because a revision held in March records lapses dated to the previous
+  31 December. A person's entries must alternate, joining then leaving, checked
+  against their record as at the new entry's own date (backfilling is normal)
+  and against the entries that follow it. Nothing is edited or deleted: a
+  correction is a further entry, which is the only reason the log exists. One
+  enum rather than a kind and a reason, because the direction is the reason —
+  eight routes, counted separately as a return asks. Being restored is its own
+  route, so somebody who left in 2003 and came back in 2022 is dated from 2022.
+  Why somebody came off the roll is read one person at a time and recorded in
+  the read log, never shown in a listing. A revision gives the four figures a
+  return wants, with the counts worked out independently of the movements and a
+  warning when they disagree.
+
 ## [2.2.0] - 2026-10-13
 
 ### Fixed

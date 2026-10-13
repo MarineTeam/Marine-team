@@ -46,6 +46,7 @@ export const AUDITED_READS = {
   group_roll: "a small group's attendance roll",
   gift_aid_declarations: "the Gift Aid declarations",
   pledges: "a campaign's pledges",
+  membership_note: "why somebody came off the membership roll",
 } as const;
 
 /**
