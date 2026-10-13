@@ -8,6 +8,21 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **Assets and liabilities** on the same page at `/admin/giving/accounts`: the
+  second statement a receipts-and-payments charity files, which an examiner asks
+  for alongside the first. The cash figure is *taken* from the receipts and
+  payments account rather than worked out again, and so is the
+  approved-and-unpaid one, because a discrepancy between two statements about a
+  figure they share is what gets spotted first and cannot be explained. What
+  HMRC owes is derived as well — claims submitted by the year end and not
+  settled by it, judged on the dates so a claim sent in November and paid the
+  following March is a debtor at 31 December. The building, the minibus and the
+  loan are typed in against a year end of their own, one figure per item per
+  year end; when a year has no figure the most recent is carried forward and
+  labelled as such on the line, in a warning above the table and in the
+  spreadsheet, because a valuation that is silently four years old is how a
+  balance sheet goes quietly wrong.
+
 - **The membership roll** at `/admin/membership`, kept as an append-only log of
   joinings and leavings rather than a flag on each person. What a denominational
   return or an auditor asks is not "who is a member?" but "who was on the roll

@@ -3188,6 +3188,7 @@ model GivingFund {
   expenses     Expense[]
   transfersOut FundTransfer[]   @relation("TransferFrom")
   transfersIn  FundTransfer[]   @relation("TransferTo")
+  holdings     Holding[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -4078,4 +4079,54 @@ model MembershipEvent {
 
   @@index([personId, on])
   @@index([on])
+}
+
+enum HoldingKind {
+  ASSET
+  LIABILITY
+}
+
+/// Something the church holds or owes that no other table knows about.
+///
+/// A receipts-and-payments charity files two statements, not one: the receipts
+/// and payments account, and a statement of assets and liabilities. Most of
+/// the second is already here — the cash is the closing balance, what is owed
+/// to suppliers is the approved-and-unpaid expenses, what HMRC owes is the
+/// submitted-and-unsettled Gift Aid claims — but the building, the minibus and
+/// the loan are facts no transaction in this app implies. They are typed in.
+///
+/// Dated `asAt` a year end rather than carrying a single current value,
+/// because a building valued in 2024 is not evidence of its 2026 value. When a
+/// year has no entry for an item the statement uses the most recent one and
+/// **says that it did, and from when**: a figure that is silently years old is
+/// how a balance sheet goes quietly wrong, and one labelled "carried forward
+/// from 2024" is a prompt to go and check.
+model Holding {
+  id String @id @default(cuid())
+
+  name String
+  kind HoldingKind
+
+  /// Minor units, like every other money column here.
+  amount Int
+
+  /// The year end this figure describes.
+  asAt DateTime @db.Date
+
+  /// Which fund it belongs to, where it belongs to one. Null is unrestricted:
+  /// the hall belongs to the church, not to the appeal that built it, unless
+  /// somebody says otherwise.
+  fund   GivingFund? @relation(fields: [fundId], references: [id], onDelete: SetNull)
+  fundId String?
+
+  note String?
+
+  recordedByEmail String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One figure per item per year end: a second would double the building.
+  @@unique([name, asAt])
+  @@index([asAt])
 }

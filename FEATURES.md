@@ -2557,6 +2557,43 @@ Also:
   year since 1970 in a dropdown is how somebody files the accounts for 1994 by
   accident.
 
+### Assets and liabilities, the other half of the filing
+
+A receipts-and-payments charity files **two** statements, and an examiner asks
+for both: the account above, and what the church holds and owes at the year
+end. Shipping the first alone was half a filing.
+
+- **The cash figure is taken, not worked out again.** It is the closing balance
+  from the account above, and the approved-and-unpaid figure is that same
+  account's liability line. A discrepancy between two statements about a figure
+  they share is what an examiner spots first and the church cannot explain, so
+  there is only ever one computation of each.
+- **What HMRC owes is derived too**: Gift Aid claims submitted by the year end
+  and not settled by it, judged on the dates rather than the row's current
+  state, so a claim sent in November and paid the following March is a debtor at
+  31 December. A claim nobody has sent is not a debtor — HMRC owes nothing until
+  it has been asked. Those are deliberately left in the unrestricted column: a
+  claim row does not carry the gifts it was claimed on, and understating
+  restricted funds is the error that cannot cause a breach.
+- **The building, the minibus and the loan are typed in**, because no
+  transaction in this app implies them. They carry a year end of their own, one
+  figure per item per year end, so a correction replaces a figure and a new year
+  is a new row — last year's statement has to keep saying what it said.
+- **A missing year's figure is carried forward and labelled.** The church still
+  owns the hall, so the line still appears, but it says "carried forward from
+  2022-12-31" on the line, in the warning above the table, and in the
+  spreadsheet. A valuation that is silently four years old is how a balance
+  sheet goes quietly wrong; one that says where it came from is a prompt to go
+  and check.
+- A year end for the *current* year is accepted even though it has not arrived:
+  a treasurer looking at 2026 in October has every reason to attach a valuation
+  to 31 December 2026. What is refused is a date more than a year out, which is
+  the typo — 2206 for 2026 — rather than the ordinary case.
+- Holdings can be deleted, unlike a membership entry or a fund transfer, because
+  a valuation is not a record of something that happened: a figure entered
+  against the wrong year is noise, and leaving it would carry it forward into
+  every later statement.
+
 ## Restricted funds and what is left in each (`/admin/giving/funds`)
 
 The app recorded income per fund and expenditure per fund and never subtracted

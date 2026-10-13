@@ -20,6 +20,7 @@ const column = (restricted: number, unrestricted: number) => ({
 
 let payload: Record<string, unknown>;
 let asked: string[] = [];
+let posted: { url: string; body: Record<string, unknown> }[] = [];
 
 const accounts = (over: Record<string, unknown> = {}) => ({
   from: "2026-01-01",
@@ -46,31 +47,69 @@ const accounts = (over: Record<string, unknown> = {}) => ({
 
 function mockFetch() {
   asked = [];
+  posted = [];
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (url: string) => {
+    vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        posted.push({ url, body: JSON.parse(String(init.body)) });
+        return { ok: true, json: async () => ({ ok: true }) } as Response;
+      }
       asked.push(url);
       return { ok: true, json: async () => payload } as Response;
     }),
   );
 }
 
+const held = (over: Record<string, unknown> = {}) => ({
+  asAt: "2026-12-31",
+  label: "2026",
+  assets: [
+    { name: "Cash at bank and in hand", amounts: column(7_000_00, 5_300_00), carriedFrom: null },
+    { name: "The hall", amounts: column(0, 500_000_00), carriedFrom: "2022-12-31" },
+    { name: "Gift Aid claimed and not yet received", amounts: column(0, 250_00), carriedFrom: null },
+  ],
+  liabilities: [
+    { name: "Agreed and not yet paid", amounts: column(400_00, 300_00), carriedFrom: null },
+  ],
+  totalAssets: column(7_000_00, 505_550_00),
+  totalLiabilities: column(400_00, 300_00),
+  netAssets: column(6_600_00, 505_250_00),
+  stale: [{ name: "The hall", amounts: column(0, 500_000_00), carriedFrom: "2022-12-31" }],
+  ...over,
+});
+
 beforeEach(() => {
-  payload = { accounts: accounts(), years: [2026, 2025, 2024], year: 2026 };
+  payload = {
+    accounts: accounts(),
+    held: held(),
+    holdings: [
+      {
+        id: "h1",
+        name: "The hall",
+        kind: "ASSET",
+        amount: 500_000_00,
+        asAt: "2022-12-31",
+        note: null,
+        fundName: null,
+      },
+    ],
+    years: [2026, 2025, 2024],
+    year: 2026,
+  };
   mockFetch();
 });
 
 const line = async (name: string) => (await screen.findByRole("rowheader", { name })).closest("tr")!;
 
 describe("restricted and unrestricted are columns you can see apart", () => {
-  it("gives all three column headings, with the total last", () => {
+  it("gives all three column headings, with the total last", async () => {
     // The total reconciles against a bank statement, so it earns its place —
     // but a single total column is how a roof appeal pays for the heating.
     render(<AnnualAccounts />);
-    return waitFor(() => {
-      const headings = screen.getAllByRole("columnheader").map((cell) => cell.textContent);
-      expect(headings).toEqual(["Line", "Restricted", "Unrestricted", "Total"]);
-    });
+    const table = await screen.findByRole("table", { name: /receipts and payments/i });
+    const headings = within(table).getAllByRole("columnheader").map((cell) => cell.textContent);
+    expect(headings).toEqual(["Line", "Restricted", "Unrestricted", "Total"]);
   });
 
   it("keeps a restricted receipt out of the unrestricted column", async () => {
@@ -134,9 +173,12 @@ describe("the statement closes", () => {
 
 describe("what is owed sits outside the totals", () => {
   it("reports it under its own heading, not as a payment", async () => {
+    // It is a liability on the other statement, where it belongs; what it must
+    // never be is a line among the payments, which count money that moved.
     render(<AnnualAccounts />);
     expect(await screen.findByText(/agreed and not yet paid at the year end/i)).toBeInTheDocument();
-    expect(screen.queryByRole("rowheader", { name: /agreed and not yet paid/i })).toBeNull();
+    const payments = await screen.findByRole("table", { name: /receipts and payments/i });
+    expect(within(payments).queryByRole("rowheader", { name: /agreed and not yet paid/i })).toBeNull();
   });
 
   it("says how much of what is owed is restricted", async () => {
@@ -195,5 +237,138 @@ describe("when the load fails", () => {
     render(<AnnualAccounts />);
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't load the accounts/i);
     expect(screen.queryByText("Loading…")).toBeNull();
+  });
+});
+
+describe("the statement's other half", () => {
+  const assetsTable = async () =>
+    (await screen.findByRole("table", { name: /assets and liabilities at 2026-12-31/i }));
+
+  it("is on the same page, because the two are one filing", async () => {
+    render(<AnnualAccounts />);
+    expect(await assetsTable()).toBeInTheDocument();
+  });
+
+  it("shows the same cash figure as the closing balance above", async () => {
+    // Taken from the receipts and payments account, not worked out again: the
+    // two statements must not disagree about the figure they share.
+    render(<AnnualAccounts />);
+    const row = within(await assetsTable())
+      .getByRole("rowheader", { name: "Cash at bank and in hand" })
+      .closest("tr")!;
+    const closing = within(await screen.findByRole("table", { name: /receipts and payments/i }))
+      .getByRole("rowheader", { name: "Closing balance" })
+      .closest("tr")!;
+    const cells = (tr: HTMLElement) =>
+      within(tr).getAllByRole("cell").map((cell) => cell.textContent);
+    expect(cells(row)).toEqual(cells(closing));
+  });
+
+  it("separates what the church holds from what it owes", async () => {
+    render(<AnnualAccounts />);
+    const table = await assetsTable();
+    expect(within(table).getByRole("rowheader", { name: /what the church holds/i })).toBeInTheDocument();
+    expect(within(table).getByRole("rowheader", { name: /what it owes/i })).toBeInTheDocument();
+  });
+
+  it("gives net assets as its own line", async () => {
+    render(<AnnualAccounts />);
+    const row = within(await assetsTable()).getByRole("rowheader", { name: "Net assets" }).closest("tr")!;
+    expect(within(row).getAllByRole("cell")[2].textContent).toBe("£511,850.00");
+  });
+
+  it("says on the line itself when a figure was carried forward", async () => {
+    // A valuation that is silently years old is how a balance sheet goes
+    // quietly wrong.
+    render(<AnnualAccounts />);
+    expect(
+      within(await assetsTable()).getByRole("rowheader", {
+        name: /the hall \(carried forward from 2022-12-31\)/i,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("warns once, at the top, about everything carried forward", async () => {
+    render(<AnnualAccounts />);
+    const warning = await screen.findByRole("status");
+    expect(warning).toHaveTextContent(/one figure is carried forward/i);
+    expect(warning).toHaveTextContent(/The hall \(2022-12-31\)/);
+  });
+
+  it("warns about nothing when every figure is this year's", async () => {
+    payload = { ...payload, held: held({ stale: [] }) };
+    render(<AnnualAccounts />);
+    await screen.findByRole("table", { name: /assets and liabilities/i });
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("says nothing is owed rather than showing an empty section", async () => {
+    payload = { ...payload, held: held({ liabilities: [], totalLiabilities: column(0, 0) }) };
+    render(<AnnualAccounts />);
+    expect(await screen.findByText(/nothing owed/i)).toBeInTheDocument();
+  });
+
+  it("does not say nothing is owed while listing something owed", async () => {
+    // A statement claiming both £700 agreed and "nothing owed" is one nobody
+    // would trust a single figure on.
+    render(<AnnualAccounts />);
+    await screen.findByRole("table", { name: /assets and liabilities/i });
+    expect(screen.queryByText(/nothing owed/i)).toBeNull();
+  });
+
+  it("offers its own spreadsheet, separate from the other statement's", async () => {
+    render(<AnnualAccounts />);
+    const link = await screen.findByRole("link", { name: /download assets and liabilities/i });
+    expect(link.getAttribute("href")).toContain("of=holdings");
+    expect(link.getAttribute("href")).toContain("format=csv");
+  });
+});
+
+describe("the figures that have to be typed in", () => {
+  it("lists what has been entered, and when it was valued", async () => {
+    render(<AnnualAccounts />);
+    const list = await screen.findByRole("list", { name: "Entered holdings" });
+    const row = within(list).getByText("The hall").closest("li")!;
+    expect(row.textContent).toContain("£500,000");
+    expect(row.textContent).toContain("held at 2022-12-31");
+  });
+
+  it("records a new figure against the year end on screen, not today", async () => {
+    // Entering a 2026 valuation while looking at 2026 should not date it 2027
+    // because that is when somebody got round to it.
+    render(<AnnualAccounts />);
+    await userEvent.type(
+      await screen.findByPlaceholderText(/what it is — the hall/i),
+      "The minibus",
+    );
+    await userEvent.type(screen.getByPlaceholderText(/amount in pounds/i), "12000");
+    await userEvent.click(screen.getByRole("button", { name: /record it at 2026-12-31/i }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0].body).toEqual({
+      action: "holding",
+      name: "The minibus",
+      kind: "ASSET",
+      amount: 12_000_00,
+      asAt: "2026-12-31",
+    });
+  });
+
+  it("can record something the church owes rather than holds", async () => {
+    render(<AnnualAccounts />);
+    await userEvent.type(await screen.findByPlaceholderText(/what it is — the hall/i), "Mortgage");
+    await userEvent.selectOptions(screen.getByLabelText(/held or owed/i), "LIABILITY");
+    await userEvent.type(screen.getByPlaceholderText(/amount in pounds/i), "120000");
+    await userEvent.click(screen.getByRole("button", { name: /record it at/i }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0].body).toMatchObject({ kind: "LIABILITY", amount: 120_000_00 });
+  });
+
+  it("can forget a figure entered against the wrong year", async () => {
+    render(<AnnualAccounts />);
+    const list = await screen.findByRole("list", { name: "Entered holdings" });
+    const row = within(list).getByText("The hall").closest("li")!;
+    await userEvent.click(within(row).getByRole("button", { name: /forget it/i }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0].body).toEqual({ action: "forget", id: "h1" });
   });
 });
