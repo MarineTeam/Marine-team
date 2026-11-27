@@ -6,6 +6,42 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Security
+
+- **Cleared every open Dependabot advisory except one**, which needs a major
+  upgrade and is reported rather than taken (below). `next` 16.3.4 → 16.4.6
+  closes ten of them, three critical: unauthenticated remote code execution in
+  `use cache` functions returning typed arrays, the same in the image
+  optimization API when SVG files are used, and a denial of service in the App
+  Router through Server Actions — plus cache disclosure and poisoning across
+  root params, cross-client response injection when self-hosted, and HttpOnly
+  cookie exposure on Edge runtime routes. `zod` 4.4.3 → 4.6.7 closes a memory
+  exhaustion when validating oversized constrained collections.
+- Worth knowing for anyone reading the advisory list rather than the diff: most
+  of those criticals did not reach this app as configured. The image optimizer
+  is off (`images.unoptimized: true`), there are no `use cache` functions and
+  Cache Components are not enabled, there are no Server Actions, and no route
+  runs on the Edge runtime. The upgrade is still right — the cross-client
+  response injection one does not depend on any of that, and a configuration
+  that happens to miss a vulnerability is not a defence — but it is the
+  difference between a fire and a fire drill.
+- The dev-only cluster is gone too: `vite` pinned past the three launch-editor
+  flaws and the two of its own, `vitest` to 4.1.12 for the `@vitest/mocker`
+  code-injection pair, `minimatch` past the glob-amplification denial of
+  service, and `sharp`, `brace-expansion` and `source-map-js` past theirs.
+  These went in the existing `overrides` block, which is already how this
+  project pins a transitive dependency past an advisory without waiting for
+  whatever pulls it in to catch up.
+- `next` stays *exactly* pinned, and `eslint-config-next` pinned to match it. A
+  caret would let a later install walk to the next minor on its own, which is
+  what the exact pin is there to prevent.
+- **Still open, deliberately: `prisma` 6.19.3 and three of its dependencies**
+  (`@prisma/config`, `deepmerge-ts`, `effect`), four high advisories whose only
+  fix is Prisma 7. That is a major upgrade — driver adapters become mandatory
+  and the client generator changes — against 77 hand-written migrations and
+  every query in the app. It belongs in its own change with its own testing,
+  not bundled into a patch release.
+
 ### Added
 
 - **Assets and liabilities** on the same page at `/admin/giving/accounts`: the
